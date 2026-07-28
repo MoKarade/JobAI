@@ -6,6 +6,27 @@ import { signIn } from "@/auth";
 
 export const metadata = { title: "Connexion — JobAI" };
 
+/**
+ * Les codes d'erreur d'Auth.js, traduits en quelque chose d'actionnable.
+ *
+ * Un « connexion refusée » générique ne dit pas s'il faut changer de compte ou corriger une
+ * variable d'environnement. Ces deux situations n'ont rien à voir, et se distinguer coûte
+ * une ligne. Aucun de ces messages ne révèle l'adresse autorisée : dire « ce n'est pas la
+ * bonne adresse » suffit, la nommer aiderait quelqu'un qui n'a rien à faire ici.
+ */
+const MESSAGES: Record<string, string> = {
+  // Le callback `signIn` a refusé : l'adresse Google ne correspond pas à celle admise.
+  AccessDenied:
+    "Ce compte Google n’est pas celui autorisé pour cette application. Vérifie que tu utilises la bonne adresse — et, côté serveur, que la variable AUTHORIZED_EMAIL est bien définie et correspond exactement.",
+  // Variables manquantes ou mal formées côté serveur.
+  Configuration:
+    "L’authentification est mal configurée côté serveur : il manque GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET ou AUTH_SECRET, ou l’URI de redirection n’est pas déclarée dans la console Google.",
+  OAuthCallback:
+    "Google a refusé l’échange. L’URI de redirection déclarée dans la console Google ne correspond probablement pas exactement à celle utilisée (protocole et domaine compris).",
+  Verification: "Le lien de connexion a expiré. Réessaie.",
+  Default: "La connexion n’a pas abouti. Réessaie ; si ça persiste, vérifie la configuration Google.",
+};
+
 export default async function Connexion({
   searchParams,
 }: {
@@ -24,7 +45,7 @@ export default async function Connexion({
 
         {error ? (
           <p className="hint" role="alert">
-            Connexion refusée. Ce compte n’est pas autorisé à accéder à cette application.
+            {MESSAGES[error] ?? MESSAGES.Default}
           </p>
         ) : null}
 
