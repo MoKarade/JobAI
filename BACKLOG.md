@@ -348,11 +348,20 @@
 - **`app-template` répond 500** quand `HUB_TOKEN` manque, là où BatchChef et DriveAI
   répondent 503. JobAI a tranché pour 503 (ADR-0001) : le template est l'exception, pas
   la règle. À harmoniser dans `app-template`.
-- 🔴 **`[SEC-BATCHCHEF-DRIZZLE]` — BatchChef est exposé à une injection SQL.** Découvert en
-  installant Drizzle ici : `drizzle-orm < 0.45.2` a une **injection SQL par identifiants mal
-  échappés** (GHSA-gpj5-g38j-94v9, sévérité HIGH). `batchchef-/web` déclare `^0.44.0` et son
-  lockfile résout **0.44.7** — donc vulnérable, en production. JobAI est passé à `^0.45.2`.
-  👤 À corriger dans le dépôt BatchChef (`npm install drizzle-orm@^0.45.2`, puis gate).
+- ✅ **`[SEC-BATCHCHEF-DRIZZLE]` — RÉSOLU le 2026-07-28** (PR `MoKarade/batchchef-#22`,
+  mergée par Marc). `drizzle-orm < 0.45.2` portait une **injection SQL par identifiants mal
+  échappés** (GHSA-gpj5-g38j-94v9, HIGH) ; le lockfile de `batchchef-/web` résolvait 0.44.7,
+  **en production, dans un dépôt PUBLIC**. Découvert en installant Drizzle ici.
+  La mesure a sorti deux autres HIGH au passage : `postcss` 8.4.31 — embarquée par Next dans
+  son PROPRE `node_modules`, donc invisible pour qui ne regarde que la racine — et `sharp`
+  0.34.5. Fermées par les mêmes `overrides` que JobAI, pas par un second remède inventé.
+  Résultat mesuré : `npm audit --omit=dev` **4 HIGH + 1 moderate → 0**.
+  Verrou posé là-bas : `web/tests/dependances.test.ts`, qui inspecte TOUTES les copies du
+  lockfile (volume et discrimination prouvés).
+  ⚠️ **Reste ouvert chez BatchChef : il n'a AUCUNE CI.** Aucun workflow GitHub Actions —
+  seule la prévisualisation Vercel s'exécute. C'est en partie pourquoi cette faille a vécu
+  en production sans que rien ne se déclenche. 🧭 Décision de Marc : lui poser le job `gate`
+  de JobAI ?
 - **Next < 15.5.22 cumulait 8 avis HIGH** (DoS Server Actions, SSRF, cache confusion,
   divulgation d'endpoints internes). JobAI est passé à 15.5.22. Les autres dépôts Next de
   l'écosystème (Hubperso, BatchChef, app-template) sont à vérifier.
