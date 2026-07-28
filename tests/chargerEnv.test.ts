@@ -90,6 +90,56 @@ describe("chargement", () => {
     rmSync(d, { recursive: true, force: true });
   });
 
+  it("LIT un fichier écrit par Windows : BOM UTF-8 et fins de ligne CRLF", () => {
+    // ⚠️ LE bug du 2026-07-28, qui a coûté deux allers-retours. `process.loadEnvFile` de
+    // Node ne retire PAS le BOM : la première clé devient « \uFEFFDATABASE_URL » et
+    // `process.env.DATABASE_URL` reste `undefined`. Le fichier est correct, la variable est
+    // introuvable, et RIEN ne l'explique.
+    //
+    // Windows écrit ce BOM par DÉFAUT — `Set-Content -Encoding utf8` sous PowerShell 5.1
+    // comme le Bloc-notes. On ne demande pas à quelqu'un de contourner le comportement par
+    // défaut de son système : on lit le fichier nous-mêmes.
+    memoriser(CLE);
+    delete process.env[CLE];
+
+    const d = dossierAvec({ ".env.local": `\uFEFF${CLE}=valeur-factice\r\n` });
+    chargerEnvLocal(d);
+    expect(process.env[CLE]).toBe("valeur-factice");
+    rmSync(d, { recursive: true, force: true });
+  });
+
+  it("tolère les formes courantes d'un fichier .env", () => {
+    for (const [libelle, contenu] of [
+      ["guillemets doubles", `${CLE}="valeur-factice"\n`],
+      ["guillemets simples", `${CLE}='valeur-factice'\n`],
+      ["préfixe export", `export ${CLE}=valeur-factice\n`],
+      ["espaces autour du =", `${CLE} = valeur-factice\n`],
+      ["commentaire en tête", `# un commentaire\n${CLE}=valeur-factice\n`],
+      ["ligne vide avant", `\n\n${CLE}=valeur-factice\n`],
+    ] as const) {
+      memoriser(CLE);
+      delete process.env[CLE];
+      const d = dossierAvec({ ".env.local": contenu });
+      chargerEnvLocal(d);
+      expect(process.env[CLE], libelle).toBe("valeur-factice");
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it("ne coupe PAS une valeur qui contient des « = »", () => {
+    // Une chaîne Neon finit par `?sslmode=require&channel_binding=require` : découper sur
+    // chaque `=` la tronquerait silencieusement, et la connexion échouerait sans raison
+    // visible. Seul le PREMIER `=` sépare la clé de la valeur.
+    memoriser(CLE);
+    delete process.env[CLE];
+    const d = dossierAvec({
+      ".env.local": `${CLE}=postgresql://u:p@h/db?sslmode=require&channel_binding=require\n`,
+    });
+    chargerEnvLocal(d);
+    expect(process.env[CLE]).toBe("postgresql://u:p@h/db?sslmode=require&channel_binding=require");
+    rmSync(d, { recursive: true, force: true });
+  });
+
   it("PROPAGE une erreur qui n'est pas « fichier absent »", () => {
     // Un `catch` qui avale tout ferait échouer la commande plus loin, avec un message sans
     // rapport — le genre de panne qu'on met une heure à diagnostiquer. Ici : un DOSSIER

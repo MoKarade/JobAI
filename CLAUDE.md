@@ -170,6 +170,13 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   ignorait tout `tests/` pour ne pas se détecter lui-même : la bonne exclusion était LUI,
   pas le dossier. Exclure large est le réflexe facile, et il laisse un angle mort permanent
   que rien ne signale.
+- **Lire un fichier écrit sous Windows = retirer le BOM, tolérer CRLF.** `Set-Content
+  -Encoding utf8` (PowerShell 5.1) et le Bloc-notes écrivent un BOM UTF-8 **par défaut**.
+  `process.loadEnvFile` de Node ne le retire pas : la première clé devient
+  `\uFEFFDATABASE_URL`, donc `process.env.DATABASE_URL` reste `undefined` — le fichier est
+  correct, la variable est introuvable, et rien ne l'explique. On ne demande pas à
+  quelqu'un de contourner le comportement par défaut de son système : on lit le fichier
+  soi-même. Vaut pour tout fichier de config que Marc édite à la main.
 - **Un outil qui échoue en SILENCE est pire qu'un outil qui plante.** `drizzle-kit migrate`
   choisit le pilote `@neondatabase/serverless` dès qu'il est installé ; ce pilote exige un
   websocket qu'il faut configurer soi-même en Node. Sans ça il sort avec le **code 0**, sans

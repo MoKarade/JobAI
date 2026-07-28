@@ -15,29 +15,78 @@
 // jamais écrasée par le fichier. C'est le bon sens — ce qu'on passe explicitement à une
 // commande doit l'emporter sur un fichier qu'on a oublié.
 
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /** Dans l'ordre de lecture. `.env.local` d'abord : c'est le fichier propre à la machine. */
 const FICHIERS = [".env.local", ".env"] as const;
 
 /**
+ * Lit un fichier `.env` et rend ses paires.
+ *
+ * ⚠️ POURQUOI ON N'UTILISE PLUS `process.loadEnvFile` : il ne retire PAS le BOM UTF-8.
+ * Windows en écrit un par défaut — `Set-Content -Encoding utf8` sous PowerShell 5.1 comme
+ * le Bloc-notes. La première clé du fichier devient alors « \uFEFFDATABASE_URL », et
+ * `process.env.DATABASE_URL` reste `undefined` : le fichier est correct, la variable est
+ * introuvable, et rien ne l'explique. Vécu le 2026-07-28, deux fois.
+ *
+ * On ne peut pas demander à quelqu'un de contourner le comportement par défaut de son
+ * système d'exploitation. On lit donc le fichier nous-mêmes.
+ */
+function analyser(contenu: string): [string, string][] {
+  const paires: [string, string][] = [];
+
+  // Le BOM en tête, et les fins de ligne Windows.
+  for (const brute of contenu.replace(/^\uFEFF/, "").split(/\r?\n/)) {
+    const ligne = brute.trim();
+    if (ligne.length === 0 || ligne.startsWith("#")) continue;
+
+    const separateur = ligne.indexOf("=");
+    if (separateur === -1) continue;
+
+    // `export FOO=bar` est une forme courante quand on recopie depuis un script shell.
+    const cle = ligne.slice(0, separateur).trim().replace(/^export\s+/, "");
+    if (cle.length === 0) continue;
+
+    let valeur = ligne.slice(separateur + 1).trim();
+    // Guillemets encadrants : une chaîne Neon collée entre guillemets ne doit pas les garder.
+    const premier = valeur[0];
+    if ((premier === '"' || premier === "'") && valeur.endsWith(premier) && valeur.length > 1) {
+      valeur = valeur.slice(1, -1);
+    }
+
+    paires.push([cle, valeur]);
+  }
+
+  return paires;
+}
+
+/**
  * Charge les fichiers d'environnement présents, et rend la liste de ceux qui l'ont été.
  *
  * Un fichier ABSENT est normal et silencieux — la plupart des environnements n'en ont pas.
- * Toute autre erreur (fichier illisible, syntaxe invalide) est PROPAGÉE : l'avaler ferait
- * échouer la commande plus loin avec un message sans rapport, ce qui est exactement le
- * genre de panne qu'on met une heure à diagnostiquer.
+ * Toute autre erreur (fichier illisible, dossier au lieu d'un fichier) est PROPAGÉE :
+ * l'avaler ferait échouer la commande plus loin avec un message sans rapport.
+ *
+ * Une variable DÉJÀ posée dans l'environnement n'est jamais écrasée : ce qu'on passe
+ * explicitement à une commande l'emporte sur un fichier qu'on a peut-être oublié.
  */
 export function chargerEnvLocal(racine: string = process.cwd()): string[] {
   const charges: string[] = [];
 
   for (const nom of FICHIERS) {
+    let contenu: string;
     try {
-      process.loadEnvFile(resolve(racine, nom));
-      charges.push(nom);
+      contenu = readFileSync(resolve(racine, nom), "utf8");
     } catch (err) {
-      if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") throw err;
+      if ((err as NodeJS.ErrnoException)?.code === "ENOENT") continue;
+      throw err;
     }
+
+    for (const [cle, valeur] of analyser(contenu)) {
+      if (process.env[cle] === undefined) process.env[cle] = valeur;
+    }
+    charges.push(nom);
   }
 
   return charges;
