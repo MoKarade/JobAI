@@ -20,7 +20,7 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { migrate } from "drizzle-orm/neon-http/migrator";
 import { sql } from "drizzle-orm";
-import { AIDE_URL_MANQUANTE, chargerEnvLocal, urlBaseDeDonnees } from "../lib/chargerEnv";
+import { chargerEnvLocal, diagnostiquerUrl, messageComplet } from "../lib/chargerEnv";
 
 /** Les tables que le schéma doit avoir créées. Le script échoue si l'une manque. */
 const TABLES_ATTENDUES = ["offers", "offer_reasons", "villes"] as const;
@@ -28,13 +28,13 @@ const TABLES_ATTENDUES = ["offers", "offer_reasons", "villes"] as const;
 async function main() {
   chargerEnvLocal();
 
-  const url = urlBaseDeDonnees();
-  if (url === null) {
-    console.error(AIDE_URL_MANQUANTE);
+  const etat = diagnostiquerUrl();
+  if (!etat.ok) {
+    console.error(etat.message);
     process.exit(1);
   }
 
-  const db = drizzle(neon(url));
+  const db = drizzle(neon(etat.url));
 
   console.log("Application des migrations depuis ./drizzle …");
   await migrate(db, { migrationsFolder: "./drizzle" });
@@ -64,6 +64,14 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("\nÉCHEC de la migration :", err instanceof Error ? err.message : err);
+  // ⚠️ MASQUER AVANT D'AFFICHER. `neon()` recopie la chaîne de connexion dans son message
+  // d'erreur : sans ce filtre, une simple faute de frappe dans `.env.local` afficherait le
+  // mot de passe de la base en clair — dans le terminal, l'historique du shell, et de là
+  // dans un copier-coller. On ne contrôle pas ce que les bibliothèques mettent dans leurs
+  // erreurs ; on contrôle ce qu'on imprime.
+  // La chaîne COMPLÈTE des causes : `err.message` seul dit « Failed query: CREATE SCHEMA »
+  // et enterre la vraie raison (hôte bloqué, mot de passe refusé, base absente) un ou deux
+  // niveaux plus bas. Identifiants masqués au passage.
+  console.error(`\nÉCHEC de la migration :\n  ${messageComplet(err)}`);
   process.exit(1);
 });

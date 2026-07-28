@@ -17,7 +17,7 @@ import { offerReasons, offers } from "../lib/db/schema";
 import { SEED } from "../lib/seed";
 import { fusionner } from "../lib/suivi";
 import type { Offre } from "../lib/types";
-import { AIDE_URL_MANQUANTE, chargerEnvLocal, urlBaseDeDonnees } from "../lib/chargerEnv";
+import { chargerEnvLocal, diagnostiquerUrl } from "../lib/chargerEnv";
 
 async function main() {
   // `tsx` tourne hors de Next.js : `.env.local` ne se charge pas tout seul. Même correctif
@@ -25,11 +25,12 @@ async function main() {
   // terminal à chaque nouvelle fenêtre.
   chargerEnvLocal();
 
-  const url = urlBaseDeDonnees();
-  if (url === null) {
-    console.error(AIDE_URL_MANQUANTE);
+  const etat = diagnostiquerUrl();
+  if (!etat.ok) {
+    console.error(etat.message);
     process.exit(1);
   }
+  const url = etat.url;
 
   const db = drizzle(neon(url), { schema });
 

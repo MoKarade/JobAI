@@ -12,7 +12,13 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AIDE_URL_MANQUANTE, chargerEnvLocal, urlBaseDeDonnees } from "../lib/chargerEnv";
+import {
+  AIDE_URL_MANQUANTE,
+  chargerEnvLocal,
+  diagnostiquerUrl,
+  masquerIdentifiants,
+  urlBaseDeDonnees,
+} from "../lib/chargerEnv";
 
 const CLE = "JOBAI_SONDE_ENV";
 const CLE_URL = "DATABASE_URL";
@@ -129,8 +135,80 @@ describe("le message d'aide est ACTIONNABLE", () => {
   });
 
   it("ne contient aucune vraie valeur", () => {
-    // Un exemple d'aide ne doit jamais devenir un endroit où colle un secret.
+    // Un exemple d'aide ne doit jamais devenir l'endroit où quelqu'un colle un secret.
     expect(AIDE_URL_MANQUANTE).not.toMatch(/npg_[A-Za-z0-9]/);
-    expect(AIDE_URL_MANQUANTE).not.toMatch(/postgresql:\/\/[^\s…]+:[^\s@…]+@/);
+
+    // Toute paire identifiant:motdepasse du message doit être un GABARIT (`<…>`), jamais
+    // une valeur. Une assertion qui interdirait toute paire refuserait un exemple lisible ;
+    // une qui les autoriserait toutes ne protégerait rien.
+    const paires = AIDE_URL_MANQUANTE.match(/[a-z]+:\/\/[^\s]+:[^\s@]+@/gi) ?? [];
+    for (const paire of paires) {
+      expect(paire, `« ${paire} » n'est pas un gabarit`).toMatch(/<[^>]+>:<[^>]+>@/);
+    }
+  });
+});
+
+describe("espace réservé — une erreur DIFFÉRENTE d'une variable absente", () => {
+  it("détecte une chaîne restée à l'espace réservé et le NOMME", () => {
+    // Vécu le 2026-07-28 : `.env.local` contenait `postgresql://…?sslmode=require`, copié
+    // depuis la documentation. `neon()` répondait « is not a valid URL », ce qui est vrai
+    // mais n'oriente pas — on cherche une faute de syntaxe au lieu d'une valeur à remplacer.
+    memoriser(CLE_URL);
+    process.env[CLE_URL] = "postgresql://…?sslmode=require&channel_binding=require";
+
+    const etat = diagnostiquerUrl();
+    expect(etat.ok).toBe(false);
+    if (!etat.ok) {
+      expect(etat.message).toContain("espace réservé");
+      expect(etat.message).toContain(".env.local");
+    }
+  });
+
+  it("reconnaît les autres espaces réservés de la documentation", () => {
+    memoriser(CLE_URL);
+    for (const faux of [
+      "postgresql://COLLE-ICI-TA-VRAIE-CHAINE-NEON",
+      "postgresql://TON_UTILISATEUR:x@hote/db",
+      "postgresql://user:xxx@hote/db",
+    ]) {
+      process.env[CLE_URL] = faux;
+      expect(diagnostiquerUrl().ok, faux).toBe(false);
+    }
+  });
+
+  it("laisse passer une chaîne d'allure réelle", () => {
+    memoriser(CLE_URL);
+    // Valeur FACTICE, mais de la forme d'une vraie : aucun marqueur d'exemple.
+    process.env[CLE_URL] = "postgresql://proprietaire:MotDePasseFactice@ep-truc.aws.neon.tech/db";
+    const etat = diagnostiquerUrl();
+    expect(etat.ok).toBe(true);
+    expect(urlBaseDeDonnees()).not.toBeNull();
+  });
+});
+
+describe("masquage des identifiants", () => {
+  // ⚠️ `neon()` RECOPIE la chaîne de connexion dans son message d'erreur. Sans masquage,
+  // une faute de frappe dans `.env.local` affiche le mot de passe de la base en clair —
+  // dans le terminal, l'historique du shell, puis dans le copier-coller envoyé pour aide.
+  it("masque le mot de passe dans un message d'erreur réel", () => {
+    const message =
+      "Connection string: postgresql://neondb_owner:MotDePasseFactice123@ep-x.neon.tech/db";
+    const masque = masquerIdentifiants(message);
+    expect(masque).not.toContain("MotDePasseFactice123");
+    expect(masque).toContain("neondb_owner:***@");
+  });
+
+  it("masque ENTIÈREMENT un mot de passe contenant lui-même un « @ »", () => {
+    // Premier jet du masqueur : il s'arrêtait au PREMIER `@` et laissait fuir la fin
+    // (`***@ssw0rd`). Un mot de passe non encodé peut contenir un `@` — et une assertion
+    // qui ne cherche que la chaîne ENTIÈRE ne voit pas le fragment.
+    const masque = masquerIdentifiants("postgres://utilisateur:p@ssw0rd@hote/db");
+    expect(masque).not.toContain("ssw0rd");
+    expect(masque).toBe("postgres://utilisateur:***@hote/db");
+  });
+
+  it("ne touche pas à une chaîne sans identifiants, ni à un texte ordinaire", () => {
+    expect(masquerIdentifiants("postgresql://hote/db")).toBe("postgresql://hote/db");
+    expect(masquerIdentifiants("connexion refusée")).toBe("connexion refusée");
   });
 });
