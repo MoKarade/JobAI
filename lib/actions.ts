@@ -21,6 +21,50 @@ import { MiseAJourOffreSchema } from "./types";
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
 /**
+ * Marque une offre comme périmée, ou la rouvre.
+ *
+ * Une offre périmée sort des compteurs d'offres actives et ne peut plus être « la
+ * meilleure » du widget — mais elle n'est PAS supprimée : le suivi n'efface rien, et
+ * savoir qu'une piste s'est fermée fait partie de l'historique de la recherche.
+ *
+ * L'opération est réversible dans les deux sens : une offre peut être rouverte si elle a
+ * été marquée à tort, ou si l'employeur republie.
+ */
+export async function marquerPerimee(id: string, perimee: boolean): Promise<Resultat> {
+  try {
+    await exigerSession();
+  } catch {
+    return { ok: false, erreur: "Authentification requise." };
+  }
+
+  try {
+    const [avant] = await db
+      .select({ perimeeLe: offers.perimeeLe })
+      .from(offers)
+      .where(eq(offers.id, id))
+      .limit(1);
+
+    if (!avant) return { ok: false, erreur: "Offre introuvable." };
+
+    // Re-marquer une offre déjà périmée ne doit pas réécrire la date : « périmée depuis
+    // quand » est l'information utile, et l'écraser la perdrait.
+    if (perimee && avant.perimeeLe) return { ok: true };
+
+    await db
+      .update(offers)
+      .set({ perimeeLe: perimee ? new Date() : null, majLe: new Date() })
+      .where(eq(offers.id, id));
+
+    revalidatePath("/");
+    revalidatePath(`/offre/${id}`);
+    return { ok: true };
+  } catch (err) {
+    console.error("[actions] marquage périmé impossible", { id, err });
+    return { ok: false, erreur: "Enregistrement impossible. Réessaie." };
+  }
+}
+
+/**
  * Modifie une offre. Seuls les champs de `MiseAJourOffreSchema` peuvent bouger : un
  * appelant qui tenterait de changer un score ou une justification par ce chemin n'a aucun
  * effet, parce que ces clés ne survivent pas au parse.

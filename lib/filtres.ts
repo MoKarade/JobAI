@@ -16,6 +16,14 @@ export interface EtatFiltres {
   proches: boolean;
   /** Afficher UNIQUEMENT l'historique 2025. */
   historique: boolean;
+  /**
+   * Afficher aussi les offres constatées périmées.
+   *
+   * Masquées par DÉFAUT : une offre fermée n'a rien à faire dans une liste qu'on parcourt
+   * pour décider où postuler. Mais elle reste consultable — le suivi n'efface rien, et
+   * savoir qu'une piste s'est fermée fait partie de l'histoire de la recherche.
+   */
+  avecPerimees: boolean;
 }
 
 export const FILTRES_VIDES: EtatFiltres = {
@@ -24,6 +32,7 @@ export const FILTRES_VIDES: EtatFiltres = {
   notees80Plus: false,
   proches: false,
   historique: false,
+  avecPerimees: false,
 };
 
 /** Seuil du filtre « proche ». Distinct du rayon maximal : c'est un confort, pas une limite. */
@@ -39,6 +48,10 @@ export function filtrer(offres: readonly Offre[], f: EtatFiltres): Offre[] {
     } else if (f.activesSeules && o.histo) {
       return false;
     }
+
+    // Les périmées sont masquées par défaut, mais restent visibles dans la vue
+    // historique : celle-ci sert justement à regarder ce qui est derrière soi.
+    if (!f.avecPerimees && !f.historique && o.perimeeLe !== null) return false;
 
     if (f.notees80Plus && (o.score ?? 0) < 80) return false;
     if (f.proches && (o.km === null || o.km > SEUIL_PROCHE_KM)) return false;

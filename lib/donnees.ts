@@ -52,6 +52,9 @@ export async function lireOffres(): Promise<Offre[] | null> {
     notes: l.notes,
     userNote: l.userNote,
     histo: l.histo,
+    // `Date` en base, chaîne ISO côté application : un objet Date ne traverse pas la
+    // frontière serveur/client d'un Server Component sans surprise.
+    perimeeLe: l.perimeeLe ? l.perimeeLe.toISOString() : null,
   }));
 }
 
@@ -93,6 +96,7 @@ export async function lireOffre(id: string): Promise<Offre | null> {
     notes: ligne.notes,
     userNote: ligne.userNote,
     histo: ligne.histo,
+    perimeeLe: ligne.perimeeLe ? ligne.perimeeLe.toISOString() : null,
   };
 }
 

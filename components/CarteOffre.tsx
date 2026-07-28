@@ -34,9 +34,14 @@ function lienSur(brut: string): string | null {
 export function CarteOffre({ offre }: { offre: Offre }) {
   const p = palier(offre.score);
   const href = lienSur(offre.lien);
+  const perimee = offre.perimeeLe !== null;
 
   return (
-    <article className={`carte carte--${p}${offre.histo ? " carte--histo" : ""}`}>
+    <article
+      className={`carte carte--${p}${offre.histo ? " carte--histo" : ""}${
+        perimee ? " carte--perimee" : ""
+      }`}
+    >
       <div className={`note note--${p}`} title="Note de fit sur 100 — voir le barème">
         {offre.score ?? "–"}
         <small>{offre.score === null ? "histo" : "/100"}</small>
@@ -50,6 +55,9 @@ export function CarteOffre({ offre }: { offre: Offre }) {
           {offre.entreprise}
         </Link>
         <span className="carte__poste">{offre.poste}</span>
+        {/* L'état « périmée » se voit AVANT le contenu : sans ça, on lit une offre
+            fermée comme une piste ouverte. */}
+        {perimee ? <span className="badge-perimee">périmée</span> : null}
         {href ? (
           <a href={href} target="_blank" rel="noopener noreferrer">
             offre ↗

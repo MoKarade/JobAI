@@ -19,6 +19,7 @@ const BOUTONS: readonly { cle: keyof Omit<EtatFiltres, "texte">; libelle: string
   { cle: "notees80Plus", libelle: "Note 80+" },
   { cle: "proches", libelle: `≤ ${SEUIL_PROCHE_KM} km` },
   { cle: "historique", libelle: "Historique 2025" },
+  { cle: "avecPerimees", libelle: "Voir les périmées" },
 ];
 
 export function ListeOffres({ offres }: { offres: Offre[] }) {

@@ -82,3 +82,28 @@ describe("filtres", () => {
     expect(SEED.map((o) => o.id)).toEqual(avant);
   });
 });
+
+describe("offres périmées", () => {
+  const perimee = { ...SEED[0]!, id: "perimee", perimeeLe: "2026-07-20T00:00:00.000Z" };
+  const jeu = [...SEED, perimee];
+
+  it("sont masquées par défaut", () => {
+    // Une offre fermée n'a rien à faire dans une liste qu'on parcourt pour décider où
+    // postuler.
+    const r = filtrer(jeu, FILTRES_VIDES);
+    expect(r.some((o) => o.id === "perimee")).toBe(false);
+    expect(r).toHaveLength(SEED.length);
+  });
+
+  it("réapparaissent quand on le demande", () => {
+    const r = filtrer(jeu, { ...FILTRES_VIDES, avecPerimees: true });
+    expect(r.some((o) => o.id === "perimee")).toBe(true);
+  });
+
+  it("restent visibles dans la vue historique", () => {
+    // L'historique sert justement à regarder ce qui est derrière soi.
+    const histoPerimee = { ...SEED[30]!, id: "histo-perimee", perimeeLe: "2026-07-20T00:00:00.000Z" };
+    const r = filtrer([...SEED, histoPerimee], { ...FILTRES_VIDES, historique: true });
+    expect(r.some((o) => o.id === "histo-perimee")).toBe(true);
+  });
+});

@@ -581,3 +581,17 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   .detail__tete { flex-direction: column; gap: 0.5rem; }
   .detail__tete h1 { font-size: 1.15rem; }
 }
+
+/* ── Offres périmées ─────────────────────────────────────────────────────── */
+.carte--perimee { opacity: 0.55; }
+.carte--perimee:hover { opacity: 0.85; }
+.badge-perimee {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.4rem;
+  color: var(--rouge);
+  border: 1px solid currentColor;
+}
+.bouton--reouvrir { border-color: var(--vert); color: var(--vert); }

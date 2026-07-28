@@ -19,7 +19,15 @@
 import type { Offre } from "./types";
 
 /** Raccourci de lecture : toutes les entrées du jeu de départ ont la même provenance. */
-const base = { source: "seed", statut: "Identifiee", dateEnvoi: "", histo: false } as const;
+const base = {
+  source: "seed",
+  statut: "Identifiee",
+  dateEnvoi: "",
+  histo: false,
+  // Réputées ouvertes au moment du relevé. Elles se périmeront — c'est Marc qui le
+  // constate, jamais le jeu de départ qui le présume.
+  perimeeLe: null,
+} as const;
 
 export const SEED: Offre[] = [
   {
@@ -643,5 +651,6 @@ function historique(
     notes,
     userNote: "",
     histo: true,
+    perimeeLe: null,
   }));
 }

@@ -28,6 +28,7 @@ function offre(champs: Partial<Offre> = {}): Offre {
     notes: "",
     userNote: "",
     histo: false,
+    perimeeLe: null,
     ...champs,
   };
 }
@@ -205,5 +206,43 @@ describe("résumé", () => {
       entrevues: 0,
       meilleure: null,
     });
+  });
+});
+
+describe("offres périmées", () => {
+  // Le cas qui compte : une offre fermée ne doit plus être présentée comme une opportunité.
+  // Le widget du hub afficherait sinon « 92 chez IEL » alors que le poste est pourvu.
+  const jeu = [
+    offre({ id: "a", entreprise: "Ouverte", score: 70, perimeeLe: null }),
+    offre({ id: "b", entreprise: "Fermée", score: 95, perimeeLe: "2026-07-20T00:00:00.000Z" }),
+  ];
+
+  it("exclut les périmées du compte d'offres actives", () => {
+    expect(resumer(jeu).actives).toBe(1);
+  });
+
+  it("ne choisit JAMAIS une offre périmée comme meilleure", () => {
+    const r = resumer(jeu);
+    // 95 > 70, mais l'offre à 95 est fermée : la meilleure disponible est celle à 70.
+    expect(r.meilleure?.entreprise).toBe("Ouverte");
+    expect(r.meilleure?.score).toBe(70);
+  });
+
+  it("ne compte pas une périmée dans les offres notées 80+", () => {
+    expect(resumer(jeu).notees80Plus).toBe(0);
+  });
+
+  it("les garde dans le total — le suivi n'efface rien", () => {
+    // Une piste qui s'est fermée fait partie de l'histoire de la recherche.
+    expect(resumer(jeu).total).toBe(2);
+  });
+
+  it("les compteurs de candidature restent des faits accomplis", () => {
+    // Un CV envoyé reste envoyé, même si l'offre a fermé depuis.
+    const envoye = [
+      offre({ id: "c", statut: "CVenvoye", perimeeLe: "2026-07-20T00:00:00.000Z" }),
+    ];
+    expect(resumer(envoye).cvEnvoyes).toBe(1);
+    expect(resumer(envoye).actives).toBe(0);
   });
 });

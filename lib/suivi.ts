@@ -91,12 +91,21 @@ export function marquerEnvoi(offre: Offre, aujourdhui: string): Offre {
  */
 export type OffrePourResume = Pick<
   Offre,
-  "histo" | "score" | "statut" | "entreprise" | "poste"
+  "histo" | "score" | "statut" | "entreprise" | "poste" | "perimeeLe"
 >;
 
-/** Le résumé du suivi. C'est lui qui alimente le widget du hub. */
+/**
+ * Le résumé du suivi. C'est lui qui alimente le widget du hub.
+ *
+ * Une offre PÉRIMÉE ne compte plus parmi les actives, et ne peut plus être « la meilleure ».
+ * C'est le garde-fou « no fake data » appliqué au temps : une offre fermée présentée comme
+ * une opportunité est un chiffre faux, même s'il a été vrai. Le widget dirait « 92 chez IEL »
+ * alors que le poste est pourvu depuis un mois.
+ *
+ * Elles restent dans `total` : elles ont existé, et le suivi n'efface rien.
+ */
 export function resumer(offres: readonly OffrePourResume[]): ResumeSuivi {
-  const actives = offres.filter((o) => !o.histo);
+  const actives = offres.filter((o) => !o.histo && o.perimeeLe === null);
 
   // La meilleure offre se cherche parmi les ACTIVES : une candidature de 2025 n'est pas
   // une cible, et la remonter en tête du widget serait trompeur.

@@ -95,6 +95,14 @@ export const OffreSchema = z.object({
   notes: z.string().max(600),
   userNote: z.string().max(2000),
   histo: z.boolean(),
+  /**
+   * Quand l'offre a été constatée périmée (ISO), ou null si elle est réputée ouverte.
+   *
+   * Une DATE et non un booléen : « périmée depuis quand » est l'information utile, et un
+   * booléen ne se rétro-remplit pas. C'est ce qui permet de dire « constatée périmée il y a
+   * trois semaines » plutôt qu'un simple drapeau sans contexte.
+   */
+  perimeeLe: z.string().datetime().nullable(),
 });
 export type Offre = z.infer<typeof OffreSchema>;
 

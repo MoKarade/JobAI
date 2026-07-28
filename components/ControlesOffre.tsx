@@ -13,7 +13,7 @@
 // c'est enregistré.
 
 import { useState, useTransition } from "react";
-import { modifierOffre } from "@/lib/actions";
+import { marquerPerimee, modifierOffre } from "@/lib/actions";
 import type { Offre, Priorite, Statut } from "@/lib/types";
 
 const STATUTS: readonly { valeur: Statut; libelle: string }[] = [
@@ -32,6 +32,7 @@ export function ControlesOffre({ offre }: { offre: Offre }) {
   const [priorite, setPriorite] = useState<Priorite>(offre.priorite);
   const [note, setNote] = useState(offre.userNote);
   const [noteEnregistree, setNoteEnregistree] = useState(offre.userNote);
+  const [perimee, setPerimee] = useState(offre.perimeeLe !== null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, demarrer] = useTransition();
 
@@ -118,6 +119,29 @@ export function ControlesOffre({ offre }: { offre: Offre }) {
           Enregistrer la note
         </button>
       ) : null}
+
+      {/* Marquer périmée sort l'offre des compteurs et de la liste par défaut, mais ne la
+          supprime pas : le suivi n'efface rien. L'opération est réversible. */}
+      <button
+        type="button"
+        className={`bouton bouton--discret${perimee ? " bouton--reouvrir" : ""}`}
+        disabled={enCours}
+        onClick={() => {
+          const cible = !perimee;
+          const precedent = perimee;
+          setPerimee(cible);
+          setErreur(null);
+          demarrer(async () => {
+            const r = await marquerPerimee(offre.id, cible);
+            if (!r.ok) {
+              setPerimee(precedent);
+              setErreur(r.erreur);
+            }
+          });
+        }}
+      >
+        {perimee ? "Rouvrir cette offre" : "Marquer périmée"}
+      </button>
 
       {erreur ? (
         <p className="controles-offre__erreur" role="alert">

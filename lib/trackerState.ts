@@ -33,6 +33,7 @@ export async function getTrackerState(): Promise<ResumeSuivi | null> {
       statut: offers.statut,
       entreprise: offers.entreprise,
       poste: offers.poste,
+      perimeeLe: offers.perimeeLe,
     })
     .from(offers);
 
@@ -40,5 +41,10 @@ export async function getTrackerState(): Promise<ResumeSuivi | null> {
   // reste la réponse honnête — publier « 0 offre suivie » affirmerait quelque chose de faux.
   if (lignes.length === 0) return null;
 
-  return resumer(lignes);
+  // `Date` en base, chaîne ISO côté application — même conversion que `lireOffres`.
+  // Le résumé ne teste que la nullité, mais laisser deux représentations coexister
+  // finirait par produire une comparaison qui échoue silencieusement.
+  return resumer(
+    lignes.map((l) => ({ ...l, perimeeLe: l.perimeeLe ? l.perimeeLe.toISOString() : null })),
+  );
 }

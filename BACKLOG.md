@@ -93,8 +93,14 @@
 - [x] 🔧 **`[V1-07]`** `why` converti en **format structuré** (`raisons` : un ton, un texte).
       ✅ 2026-07-28 — plus aucun HTML brut, verrouillé par un test qui refuse toute balise
       résiduelle dans le seed.
-- [ ] 🔧 **`[V1-08]`** Marquage **« offre périmée »** : les offres du seed expireront avant la
-      résidence permanente. Ne jamais présenter comme ouverte une offre dont on ne sait rien.
+- [x] 🔧 **`[V1-08]`** Marquage **« offre périmée »**. ✅ 2026-07-28 : colonne `perimeeLe`
+      branchée (elle existait, anticipée par l'ADR-0001 — aucune migration nécessaire),
+      action réversible, badge visible, filtre « Voir les périmées » (masquées par défaut).
+      **Changement de sémantique du résumé** : une offre périmée ne compte plus parmi les
+      actives et ne peut plus être « la meilleure » du widget — le hub afficherait sinon un
+      poste pourvu comme la meilleure opportunité. Elle reste dans le total : le suivi
+      n'efface rien. 8 tests, **prouvés discriminants** (retirer le filtre fait échouer
+      exactement les 4 tests du résumé, et aucun autre).
 - [ ] 🔧 **`[V1-09]`** Export CSV (existe dans l'artifact, à reporter).
 - [ ] 🔧 **`[V1-10]`** Test-garde `pii-guard` (scan des fichiers versionnés, volume prouvé).
 - [ ] 👤 **`[V1-11]`** Provisionner Neon + lier au projet Vercel.
