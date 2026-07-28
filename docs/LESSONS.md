@@ -41,6 +41,23 @@ d'ici », pas un verdict par défaut.
 session : un test de discrimination dont l'échec venait d'un SQL cassé, et ce verdict de
 signature. Dans les deux cas, l'échec ressemblait à une preuve.
 
+**Épilogue, mesuré en fin de session** — le diagnostic était bien inversé :
+- Les commits **SONT signés** : `git cat-file commit HEAD` montre un bloc `gpgsig` SSHSIG
+  ed25519 complet.
+- Le `N` de `git log --format=%G?` vient de
+  `error: gpg.ssh.allowedSignersFile needs to be configured and exist` — git ne peut pas
+  **vérifier** localement, faute de fichier de signataires autorisés. Et la clé publique
+  configurée (`user.signingkey`) fait **0 octet**, donc l'y pointer ne suffirait pas.
+- `ssh-keygen` est absent du conteneur, ce qui rend toute vérification SSH impossible ici.
+- Conséquence pratique : le correctif habituel (`git commit --amend --reset-author`) est
+  **inopérant** — l'adresse de l'auteur est déjà la bonne, et le ré-amendement re-signerait
+  avec la même clé. Un badge « Unverified » côté GitHub voudrait dire que la clé publique
+  n'est pas enregistrée sur le compte : c'est un réglage de compte, pas un défaut du commit.
+
+Généralisation : un signal d'alerte qui se répète sans que rien ne change **n'est pas une
+preuve accumulée** — c'est le même verdict rejoué. Le mesurer une fois, écrire ce qu'on a
+mesuré, et ne plus le re-litiger.
+
 ---
 
 ## 2026-07-28 — En français, un motif générique de nom de personne ne discrimine rien
