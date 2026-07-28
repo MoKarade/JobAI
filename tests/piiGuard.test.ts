@@ -46,7 +46,7 @@ function fichiersVersionnes(): string[] {
  * la doc, elle n'aura pas de marqueur et sera détectée.
  */
 function estExemple(ligne: string): boolean {
-  return /…|\.\.\.|xxx|motdepasse|mot-de-passe|<[a-z-]+>|TON_|VALEURFACTICE|à remplir|exemple/i.test(
+  return /…|\.\.\.|xxx|motdepasse|mot-de-passe|<[a-z-]+>|TON_|COLLE-ICI|VALEURFACTICE|à remplir|exemple/i.test(
     ligne,
   );
 }

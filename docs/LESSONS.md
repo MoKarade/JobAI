@@ -151,3 +151,27 @@ Marc) ou sur un état **hors dépôt** (réglage GitHub, variable Vercel, DNS) �
 fait vérifiable dans un dépôt accessible.
 
 **Verrou** : aucun (règle de méthode, pas de code).
+
+---
+
+## 2026-07-28 — Un `npm run test | grep` rend le code de sortie du GREP, pas des tests
+
+**Contexte** : gate avant commit, enchaîné en une ligne avec `&&` pour aller vite.
+
+**Ce qui s'est passé** : la ligne
+`npm run test 2>&1 | grep -E "^ +Tests" && npm run lint && … && git commit` a affiché
+`1 failed | 151 passed`, puis `gate complet OK`, puis a committé et poussé. Un test rouge
+est parti en ligne.
+
+**Cause réelle** : dans un pipeline shell, `$?` est le code de sortie du **dernier** maillon.
+`grep` a trouvé sa ligne, donc il rend 0 — quel que soit le sort de `npm run test`. Le `&&`
+a enchaîné sur un succès qui n'existait pas.
+
+**Règle durable** : ne JAMAIS juger un gate à travers un pipe. Soit on capture le code
+explicitement (`npm run test; echo $?`), soit on teste la commande seule
+(`npm run test >/dev/null 2>&1; echo "exit=$?"`), soit on utilise `PIPESTATUS`. Le confort
+d'affichage ne doit jamais passer devant la véracité du verdict — c'est la même classe que
+« ne jamais juger un `git push` via `| tail` », déjà documentée pour DriveAI, et elle
+s'applique à TOUT ce qui décide d'un go/no-go.
+
+**Verrou** : aucun (règle de méthode). Détection : un gate qui n'échoue jamais est suspect.
