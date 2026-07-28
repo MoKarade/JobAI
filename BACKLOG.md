@@ -118,6 +118,17 @@
 - **`app-template` répond 500** quand `HUB_TOKEN` manque, là où BatchChef et DriveAI
   répondent 503. JobAI a tranché pour 503 (ADR-0001) : le template est l'exception, pas
   la règle. À harmoniser dans `app-template`.
+- 🔴 **`[SEC-BATCHCHEF-DRIZZLE]` — BatchChef est exposé à une injection SQL.** Découvert en
+  installant Drizzle ici : `drizzle-orm < 0.45.2` a une **injection SQL par identifiants mal
+  échappés** (GHSA-gpj5-g38j-94v9, sévérité HIGH). `batchchef-/web` déclare `^0.44.0` et son
+  lockfile résout **0.44.7** — donc vulnérable, en production. JobAI est passé à `^0.45.2`.
+  👤 À corriger dans le dépôt BatchChef (`npm install drizzle-orm@^0.45.2`, puis gate).
+- **Next < 15.5.22 cumulait 8 avis HIGH** (DoS Server Actions, SSRF, cache confusion,
+  divulgation d'endpoints internes). JobAI est passé à 15.5.22. Les autres dépôts Next de
+  l'écosystème (Hubperso, BatchChef, app-template) sont à vérifier.
+- **`postcss` et `sharp` sont épinglés vulnérables par Next lui-même** → forcés par
+  `overrides` dans `package.json`, avec la note de retrait quand Next les remontera.
+  Résultat mesuré : `npm audit --omit=dev` → **0 vulnérabilité**.
 - **Node 20 est en fin de support** (avril 2026) [Probable] alors que les 4 workflows de
   DriveAI et les 4 de FinanceAI l'épinglent encore. JobAI épingle **22** (`.nvmrc`), la
   version réellement utilisée en développement — épingler 20 aurait créé un écart dev/CI
