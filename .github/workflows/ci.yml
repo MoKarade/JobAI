@@ -1,0 +1,85 @@
+name: CI
+
+# Le développement se fait directement sur `main` (décision Marc, 2026-07-28) : il n'y a
+# donc pas de revue de PR pour rattraper une erreur. La CI est le SEUL filet partagé —
+# elle doit rester rapide et refléter exactement le gate local du CLAUDE.md :
+#   npm run typecheck && npm run test && npm run build && npm run lint
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Une seule exécution utile par référence : un push qui en suit un autre annule le premier.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Gate (typecheck · tests · lint · build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Aligné sur les autres dépôts de l'écosystème (.nvmrc fait foi).
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `npm ci` et non `npm install` : le lockfile est committé et fait autorité.
+      - name: Dépendances
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm run test
+
+      - name: Lint
+        run: npm run lint
+
+      # Le build vient en dernier : c'est l'étape la plus lente, et un échec de typecheck
+      # ou de test la rend inutile.
+      - name: Build
+        run: npm run build
+
+  garde-fous:
+    name: Garde-fous du CLAUDE.md
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Garde-fou n°1 : dépôt privé, aucune donnée personnelle en clair.
+      # Filet grossier en attendant le vrai test-garde `pii-guard` [V1-10] : il attrape
+      # l'erreur la plus probable — une adresse municipale committée en dur.
+      # Il ne prétend PAS couvrir le garde-fou : c'est un rappel, pas une preuve.
+      - name: Aucune adresse municipale en dur
+        run: |
+          set -euo pipefail
+          # Une adresse québécoise en clair : numéro civique suivi d'une voie.
+          MOTIF='[0-9]{3,5},? (av\.|avenue|rue|boul\.|boulevard|ch\.|chemin) '
+          if git grep -InEi "$MOTIF" -- ':!*.lock' ':!package-lock.json' ':!.github/**'; then
+            echo "::error::Adresse municipale en clair détectée. Garde-fou n°1 du CLAUDE.md :" \
+                 "les coordonnées du domicile vivent dans DOMICILE_LAT / DOMICILE_LON."
+            exit 1
+          fi
+          echo "Aucune adresse municipale en clair."
+
+      # Garde-fou n°5 : jamais de secret en dur.
+      - name: Aucun jeton en dur
+        run: |
+          set -euo pipefail
+          # Une affectation de secret à un littéral non vide, hors .env.example et docs.
+          MOTIF='(HUB_TOKEN|AUTH_SECRET|AUTH_GOOGLE_SECRET|DATABASE_URL|ANTHROPIC_API_KEY)[[:space:]]*[=:][[:space:]]*["'"'"'][^"'"'"'[:space:]]'
+          if git grep -InE "$MOTIF" -- ':!.env.example' ':!*.md' ':!.github/**'; then
+            echo "::error::Secret potentiellement en dur. Les secrets vivent dans" \
+                 "l'environnement, jamais dans le code."
+            exit 1
+          fi
+          echo "Aucun secret en dur."

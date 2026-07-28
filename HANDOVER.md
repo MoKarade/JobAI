@@ -13,8 +13,9 @@
 | | |
 |---|---|
 | **Dépôt** | `MoKarade/JobAI`, **privé**, créé par Marc. Forké depuis `app-template` (contenu identique, un commit `Initial commit`). |
-| **Branches** | `main` créée et poussée par Claude. Travail sur `claude/jobai-app-development-eyzeb7`. ⚠️ La branche **par défaut du dépôt est `claude/hopeful-lovelace-4d09zx`**, pas `main` — à changer côté GitHub (voir « Reste à faire côté Marc »). |
-| **Gate** | `typecheck` + `test` verts au moment du commit (`npm ci` effectué, dépendances installées). |
+| **Branches** | **Développement direct sur `main`**, sans branche de travail ni PR (ADR-0002). `main` est la branche par défaut du dépôt (réglé par Marc). ⚠️ La branche `claude/hopeful-lovelace-4d09zx` (ancienne branche par défaut) traîne encore sur le distant, sans usage — `[B-07]`. |
+| **Gate** | `typecheck` + `test` + `lint` + `build` verts. Rejoué par la CI à chaque push. |
+| **CI** | `.github/workflows/ci.yml` : job `gate` (le gate local) + job `garde-fous` (aucune adresse municipale en dur, aucun secret en dur). Node épinglé par `.nvmrc` (**22**, pas 20 comme les autres dépôts : Node 20 est en fin de support et cette session développe en 22). |
 | **Endpoint hub** | `GET /api/hub/summary` personnalisé : `id: "jobai"`, `name: "JobAI"`, `url: https://emploi.hubperso.com`, `color: "#f2a31b"`. Répond `503` si `HUB_TOKEN` absent, `401` si jeton invalide, `building` sinon. |
 | **Base de données** | Aucune. Prévue en `[V1-01]` (Neon + Drizzle). |
 | **Auth utilisateur** | Aucune. Prévue en `[V1-04]` (Auth.js v5 Google mono-adresse). |
@@ -33,6 +34,11 @@
 - `CLAUDE.md` (constitution, 6 garde-fous non négociables), `BACKLOG.md`, `docs/adr/`.
 - Fork personnalisé : identité JobAI, route déplacée sous `/api/`, contrat d'échec 503,
   `.env.example` complété, `package.json` renommé, tests adaptés et étendus.
+- **PR #1 mergée** (en merge commit `53b17ff`, pas en squash) — c'était la première et la
+  dernière : **ADR-0002** acte le développement direct sur `main`, décidé après le
+  va-et-vient de cette PR. Le filet perdu est remplacé par la CI.
+- **CI en place** `[B-05]`, avec ses deux garde-fous **prouvés discriminants** avant commit
+  (propres sur le dépôt réel, détectant bien une adresse et un secret injectés en sonde).
 
 ### Décisions de cette session (détail dans ADR-0001)
 
@@ -74,11 +80,9 @@ DriveAI · dépôt privé.
 
 ### Reste à faire côté Marc (action humaine)
 
-- [ ] **Changer la branche par défaut du dépôt en `main`** (GitHub → Settings → General →
-      Default branch). Sans ça, les PR viseront `claude/hopeful-lovelace-4d09zx`.
-- [ ] Activer **Allow auto-merge** et protéger `main` (check requis).
-      ⚠️ La toute première PR se merge à la main : le workflow d'auto-merge n'agit qu'une
-      fois présent sur la branche par défaut.
+- [x] ~~Changer la branche par défaut en `main`~~ — fait le 2026-07-28.
+      *(L'auto-merge et la protection de branche sont sans objet depuis l'ADR-0002 :
+      décision de Marc, on n'y revient pas sans nouvel ADR.)*
 - [ ] Provisionner **Neon** et le lier au projet Vercel `[V1-11]`.
 - [ ] Créer le **projet Vercel** + DNS Cloudflare `emploi.hubperso.com` `[V1-12]`.
 - [ ] Créer le **client OAuth Google** (le projet Cloud du hub fait l'affaire) `[V1-13]`.
@@ -87,6 +91,8 @@ DriveAI · dépôt privé.
 ### Comment reprendre
 
 1. `git fetch origin && git status` — vérifier l'état réel avant de juger quoi que ce soit.
+   On travaille **directement sur `main`** : un commit poussé est en ligne, il n'y a pas de
+   revue pour rattraper. Le gate avant commit n'est pas une formalité.
 2. Lire `BACKLOG.md`, chantier #00 puis #01.
 3. La prochaine tâche est `[V1-01]` (schéma Drizzle) ou `[B-04]` (flotte d'agents), selon
    qu'on privilégie le produit ou l'outillage.

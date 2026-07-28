@@ -14,4 +14,5 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 
 | ADR | Titre | Statut |
 |---|---|---|
-| [0001](./0001-fondations-jobai.md) | Fondations de JobAI (identité, stack, phases, périmètre) | Accepté |
+| [0001](./0001-fondations-jobai.md) | Fondations de JobAI (identité, stack, phases, périmètre) | Accepté — volet workflow git modifié par ADR-0002 |
+| [0002](./0002-developpement-direct-sur-main.md) | Développement direct sur `main`, sans branche ni PR | Accepté |

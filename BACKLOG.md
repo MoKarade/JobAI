@@ -24,12 +24,16 @@
 - [x] 🔧 **`[B-03]`** Documents vivants et constitution : `CLAUDE.md` (6 garde-fous),
       `HANDOVER.md`, `BACKLOG.md`, `docs/adr/` (ADR-0001), `docs/LESSONS.md`. ✅ 2026-07-28.
 - [ ] 🔧 **`[B-04]`** Flotte de 5 agents (`.claude/agents/`) + hooks de gate.
-- [ ] 🔧 **`[B-05]`** CI GitHub (typecheck, test, build, lint) + auto-merge.
-      ⚠️ La toute première PR se merge à la main : le workflow d'auto-merge n'agit qu'une
-      fois présent sur la branche par défaut.
-- [ ] 👤 **`[B-06]`** Réglages du dépôt : **branche par défaut → `main`** (elle est
-      actuellement `claude/hopeful-lovelace-4d09zx`), `Allow auto-merge`, protection de
-      `main` + check requis.
+- [x] 🔧 **`[B-05]`** CI GitHub : un job `gate` qui rejoue le gate local (typecheck, tests,
+      lint, build) et un job `garde-fous` (aucune adresse municipale en dur, aucun secret en
+      dur), tous deux **prouvés discriminants** avant commit. ✅ 2026-07-28.
+      L'auto-merge devient sans objet — voir ADR-0002 (développement direct sur `main`).
+- [x] 👤 **`[B-06]`** Réglages du dépôt : **branche par défaut → `main`** ✅ 2026-07-28
+      (fait par Marc). L'auto-merge et la protection de branche sont sans objet depuis
+      l'ADR-0002. ⚠️ Reste optionnel : ne laisser que « Allow squash merging » si des PR
+      réapparaissent un jour (le merge de la PR #1 s'est fait en merge commit).
+- [ ] 🔧 **`[B-07]`** Supprimer la branche distante `claude/hopeful-lovelace-4d09zx`
+      (ancienne branche par défaut, sans usage) — 👤 accord de Marc requis avant suppression.
 
 ## Chantier #01 — V1 : port fidèle + hub ⬜
 
@@ -114,3 +118,7 @@
 - **`app-template` répond 500** quand `HUB_TOKEN` manque, là où BatchChef et DriveAI
   répondent 503. JobAI a tranché pour 503 (ADR-0001) : le template est l'exception, pas
   la règle. À harmoniser dans `app-template`.
+- **Node 20 est en fin de support** (avril 2026) [Probable] alors que les 4 workflows de
+  DriveAI et les 4 de FinanceAI l'épinglent encore. JobAI épingle **22** (`.nvmrc`), la
+  version réellement utilisée en développement — épingler 20 aurait créé un écart dev/CI
+  non testé. À réévaluer pour les autres dépôts.

@@ -59,7 +59,9 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
 
 - **Langue** : code, commentaires, commits et docs **en français**. UI en français.
 - **Commits** : préfixés par l'ID de tâche du backlog. Ex. `[V1-03] endpoint hub summary`.
-- **Branches** : `claude/<slug>` pour le travail automatisé. `main` protégée par la CI.
+- **Branches** : développement **directement sur `main`** (décision Marc 2026-07-28,
+  ADR-0002). Pas de branche de travail, pas de PR : projet solo, le va-et-vient de revue
+  coûtait plus qu'il ne protégeait.
 - **TypeScript strict** + `noUncheckedIndexedAccess`. Pas de `any` silencieux.
 - **Fonctions pures testées** : la logique (notation, fusion, agrégation, résumé hub) vit
   hors des I/O et des composants. C'est ce qui rend le reste testable.
@@ -73,9 +75,10 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
 
 - **Gate avant chaque commit** : `npm run typecheck && npm run test && npm run build`,
   plus `npm run lint` (bloquant). Jamais `--no-verify`.
-- **Push & merge** : branche `claude/**`, PR draft, CI verte, auto-merge (squash).
-  Override par le label `do-not-merge`. La toute première PR se merge à la main (le workflow
-  d'auto-merge n'agit qu'une fois présent sur `main`).
+- **Push** : commits directs sur `main`. **Il n'y a donc AUCUNE revue pour rattraper une
+  erreur** — le gate local est obligatoire avant chaque commit, et la CI est le seul filet
+  partagé. Un commit poussé est en ligne : dans le doute, on vérifie avant, pas après.
+  Retour arrière = `git revert`, jamais de réécriture d'historique sur `main`.
 - **Flotte d'agents** (`.claude/agents/`) : panel avant merge via `/review`. Un finding est
   une **hypothèse** : on vérifie le vrai code avant de coder un correctif. Entre deux agents
   qui se contredisent, **celui qui a mesuré l'emporte sur celui qui a déduit**.
