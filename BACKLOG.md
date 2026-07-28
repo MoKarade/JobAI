@@ -291,6 +291,20 @@
       et il n'y a pas d'e2e) : l'appel réel au géocodeur, et le rendu Leaflet. Toute la
       logique est testée avec un `fetch` injecté (18 tests) ; le premier clic sur « Situer
       les villes » en production est le vrai signal. 👤 À exercer une fois.
+- [x] 🔧 **`[UX-06]`** **Logo**. ✅ 2026-07-28 (demandé par Marc en fin de session).
+      Le mot-symbole portait déjà la marque : « JOB **_** AI », un souligné ambre au milieu —
+      c'est le curseur d'une invite de terminal. Plutôt qu'inventer un symbole sans lien
+      (mallette, loupe), on dessine ce qui existe déjà : `>_`.
+      · **Deux formes, pas une de plus.** À 16 px — la taille réelle d'un onglet — une lettre
+        devient une bouillie et un dessin détaillé une tache.
+      · **Fond sombre opaque** dans `app/icon.svg` : un favicon ne connaît pas le thème de qui
+        le regarde, et une icône transparente disparaîtrait sur l'une des deux barres d'onglets.
+      · **Dans l'en-tête, le même motif est DESSINÉ, pas importé** (`components/Cadre.tsx`) :
+        il suit `currentColor`, donc les deux thèmes. Une image figée resterait ambre sur un
+        fond qui change.
+      · L'ambre est `#f2a31b` — la même que l'`app.color` publiée au hub. La changer ici sans
+        la changer là désaccorderait le widget.
+
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
       · **Guichet-Emplois** — flux XML officiel d'EDSC, sur demande. C'est la source

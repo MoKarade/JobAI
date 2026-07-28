@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="JobAI">
+  <title>JobAI</title>
+  <!--
+    L'icône de JobAI : une invite de terminal.
+
+    POURQUOI CE MOTIF. Le mot-symbole de l'app est « JOB_AI » — un souligné ambre au milieu.
+    Ce souligné EST déjà la marque : c'est le curseur d'une invite. Plutôt que d'inventer un
+    symbole sans lien (une mallette, une loupe), on dessine ce qui existe déjà : `>_`.
+
+    POURQUOI CE DESSIN. Deux formes, pas une de plus. À 16 px — la taille réelle d'un onglet
+    de navigateur — une lettre devient une bouillie et un dessin détaillé devient une tache.
+    Un chevron et une barre restent lisibles.
+
+    POURQUOI UN FOND SOMBRE FIXE. Un favicon ne connaît pas le thème de qui le regarde. Un
+    fond opaque garantit le contraste de l'ambre aussi bien sur une barre d'onglets claire
+    que sombre ; une icône transparente disparaîtrait sur l'une des deux.
+
+    L'ambre est #f2a31b : la même que `app.color` publiée au hub, où elle identifie JobAI
+    parmi les autres widgets. La changer ici sans la changer là désaccorderait les deux.
+  -->
+  <rect width="32" height="32" rx="7" fill="#141821"/>
+  <g fill="none" stroke="#f2a31b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 10.5 L14.5 16 L9 21.5"/>
+    <path d="M18.5 22.5 L24 22.5"/>
+  </g>
+</svg>

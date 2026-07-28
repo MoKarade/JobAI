@@ -45,7 +45,30 @@ export function Cadre({
     <div className="page">
       <header className="entete">
         <Link href="/" className="entete__marque">
-          JOB<span className="entete__accent">_</span>AI
+          {/* Le même motif que `app/icon.svg` : l'invite `>_`. Ici il est DESSINÉ plutôt
+              qu'importé, pour suivre la couleur du texte au survol et dans les deux thèmes —
+              une image figée resterait ambre sur un fond qui change.
+              `aria-hidden` : le texte « JOB_AI » juste à côté donne déjà le nom du lien. */}
+          <svg
+            className="entete__mark"
+            viewBox="0 0 32 32"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <g
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M9 10.5 L14.5 16 L9 21.5" />
+              <path d="M18.5 22.5 L24 22.5" />
+            </g>
+          </svg>
+          <span>
+            JOB<span className="entete__accent">_</span>AI
+          </span>
         </Link>
         <p className="entete__sous">Coordination technique et automatisation · rayon 50 km</p>
       </header>
