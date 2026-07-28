@@ -404,6 +404,64 @@ code {
   .controles-offre { grid-column: 1 / -1; }
 }
 
+/* ── « À faire maintenant » ────────────────────────────────────────────────
+   Le premier bloc de la page : ce qui appelle une action aujourd'hui. Le genre
+   d'action est un MOT, pas une icône — lisible par un lecteur d'écran, et la
+   couleur ne porte donc jamais l'information seule (WCAG 1.4.1). */
+.afaire {
+  margin-top: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ambre);
+  padding: 1rem;
+}
+.afaire--vide { border-left-color: var(--border); }
+.afaire__titre {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+  margin-bottom: 0.7rem;
+}
+.afaire__rien { font-size: 0.86rem; color: var(--text-soft); }
+.afaire__liste {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.afaire__item {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.1rem 0.7rem;
+  align-items: baseline;
+}
+.afaire__genre {
+  grid-row: span 2;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  text-align: center;
+  color: var(--text-soft);
+}
+.afaire__item--entrevue .afaire__genre { border-color: var(--violet); color: var(--violet); }
+.afaire__item--relancer .afaire__genre { border-color: var(--ambre); color: var(--ambre); }
+.afaire__item--postuler .afaire__genre { border-color: var(--vert); color: var(--vert); }
+.afaire__item--verifier .afaire__genre { border-color: var(--bleu); color: var(--bleu); }
+.afaire__lien { font-size: 0.92rem; font-weight: 600; }
+.afaire__motif { font-size: 0.78rem; color: var(--text-soft); }
+
+@media (max-width: 30rem) {
+  /* Sous 30 rem, deux colonnes écrasent le titre : l'étiquette repasse au-dessus. */
+  .afaire__item { grid-template-columns: 1fr; }
+  .afaire__genre { grid-row: auto; justify-self: start; }
+}
+
 /* ── Formulaire d'ajout manuel ────────────────────────────────────────────
    Replié par défaut : la liste est consultée à chaque visite, le formulaire
    quelques fois par semaine. Reprend l'apparence des panneaux pour que

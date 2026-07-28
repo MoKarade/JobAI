@@ -9,11 +9,14 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { lireOffres } from "@/lib/donnees";
 import { resumer } from "@/lib/suivi";
+import { prochainesActions } from "@/lib/aFaire";
+import { aujourdhui } from "@/lib/ajout";
 import type { Offre } from "@/lib/types";
 import { TableauBord } from "@/components/TableauBord";
 import { ListeOffres } from "@/components/ListeOffres";
 import { Panneaux } from "@/components/Panneaux";
 import { FormulaireAjout } from "@/components/FormulaireAjout";
+import { AFaire } from "@/components/AFaire";
 
 // Le suivi change à chaque geste de Marc : jamais de page mise en cache.
 export const dynamic = "force-dynamic";
@@ -110,6 +113,9 @@ export default async function Accueil() {
         </>
       ) : (
         <>
+          {/* « Quoi faire » avant « où on en est » : c'est la question qu'on se pose en
+              ouvrant l'app. La date vient du serveur, dans le fuseau de Marc. */}
+          <AFaire actions={prochainesActions(offres, aujourdhui(new Date()))} />
           <TableauBord resume={resumer(offres)} />
           <FormulaireAjout />
           <ListeOffres offres={offres} />

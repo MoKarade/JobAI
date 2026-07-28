@@ -197,9 +197,21 @@
       identité claire et sobre, l'artifact JobAI une identité terminal/ambre. Décider si on
       converge vers le style FinanceAI ou si on garde l'identité JobAI en montant le niveau
       de finition — les deux se défendent, mais mélanger donnerait un résultat bâtard.
-- [ ] 🔧 **`[UX-02]`** Page d'accueil repensée : aujourd'hui la liste commence tout de suite.
-      Prévoir une vraie entrée en matière (ce qui mérite l'attention maintenant, prochaines
-      actions, état de la recherche) plutôt qu'un tableau de compteurs.
+- [x] 🔧 **`[UX-02]`** Page d'accueil : bloc **« À faire maintenant »** en tête.
+      ✅ 2026-07-28 — `lib/aFaire.ts` (pur, 19 tests). Le tableau de bord répondait à « où
+      en est la recherche » ; il manquait « par où je commence aujourd'hui ».
+      Quatre déclencheurs, tous adossés à un FAIT du suivi : entrevue à préparer, relance
+      échue (CV envoyé depuis ≥ 14 j), candidature à envoyer (note ≥ 80 jamais postulée),
+      offre à vérifier (repérée depuis ≥ 30 j et jamais traitée). Une seule action par
+      offre, plafond de 6, ordre **entrevue → relance → postuler → vérifier** (un tri par
+      note mettrait la meilleure offre devant une entrevue qui a lieu demain).
+      · **Aucune suggestion sur une offre périmée ou historique** — suggérer de postuler à
+        un poste pourvu est pire que ne rien suggérer. **Discrimination prouvée** : filtre
+        retiré ⇒ exactement les 3 tests qui le portent tombent, dont celui sur les 38 offres.
+      · Chaque suggestion affiche **le fait qui la déclenche** : une suggestion qu'on ne peut
+        pas contester finit par être ignorée en bloc. Les seuils sont des heuristiques
+        nommées, exportées et citées dans le texte — jamais des vérités déguisées.
+      ⚠️ Reste de `[UX-02]` : rien. La refonte visuelle globale est `[UX-01]`.
 - [x] 🔧 **`[UX-03]`** **Affichage complet d'une offre** : page `/offre/[id]` avec la
       justification séparée en atouts / réserves, les notes de recherche, les faits
       (distance, salaire, dates, **provenance de la note** — vérifiée à la main ou
