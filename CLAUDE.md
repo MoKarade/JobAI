@@ -144,6 +144,10 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   Le gate local a été vert sur quatre commits d'affilée pendant que la CI était ROUGE — et
   personne ne l'a vu, parce qu'il n'y a pas de PR pour afficher un ✗. Sur ce dépôt,
   « poussé » ne veut pas dire « vert ». Le push n'est fini qu'une fois le run consulté.
+  ⚠️ **Et Vercel ne bloque PAS sur la CI** : les quatre commits rouges ont été déployés en
+  production comme les autres. GitHub Actions et Vercel sont deux chaînes indépendantes —
+  « le site marche » ne prouve rien sur l'état de la CI, et réciproquement. Vérifier les
+  deux, séparément.
 - **Une même règle tenue dans deux langages diverge, et le mauvais exemplaire gagne.**
   Le garde-fou n°1 vivait à la fois dans `tests/piiGuard.test.ts` et dans un `git grep` de
   la CI. Le grep, plus grossier, a fini par bloquer sur la chaîne fabriquée qui PROUVE que
