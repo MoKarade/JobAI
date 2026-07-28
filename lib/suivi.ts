@@ -82,14 +82,28 @@ export function marquerEnvoi(offre: Offre, aujourdhui: string): Offre {
   return { ...offre, dateEnvoi: aujourdhui };
 }
 
-/** Le résumé du suivi. C'est lui qui alimentera le widget du hub. */
-export function resumer(offres: readonly Offre[]): ResumeSuivi {
+/**
+ * Ce dont le résumé a RÉELLEMENT besoin.
+ *
+ * Typer l'entrée sur ces cinq champs plutôt que sur `Offre` entière permet de résumer
+ * aussi bien des offres applicatives que des lignes de base, sans conversion artificielle
+ * — et documente au passage que le résumé ne lit ni les justifications ni les notes.
+ */
+export type OffrePourResume = Pick<
+  Offre,
+  "histo" | "score" | "statut" | "entreprise" | "poste"
+>;
+
+/** Le résumé du suivi. C'est lui qui alimente le widget du hub. */
+export function resumer(offres: readonly OffrePourResume[]): ResumeSuivi {
   const actives = offres.filter((o) => !o.histo);
 
   // La meilleure offre se cherche parmi les ACTIVES : une candidature de 2025 n'est pas
   // une cible, et la remonter en tête du widget serait trompeur.
-  const notees = actives.filter((o): o is Offre & { score: number } => o.score !== null);
-  const meilleure = notees.reduce<(Offre & { score: number }) | null>(
+  const notees = actives.filter(
+    (o): o is OffrePourResume & { score: number } => o.score !== null,
+  );
+  const meilleure = notees.reduce<(OffrePourResume & { score: number }) | null>(
     (best, o) => (best === null || o.score > best.score ? o : best),
     null,
   );

@@ -53,8 +53,12 @@
       19 tests, discrimination prouvée en inversant le sens de fusion). Vérifie chaque
       champ de `CHAMPS_UTILISATEUR` un par un — ajouter un champ sans le préserver casse
       le test. Fusion idempotente et sans mutation des entrées.
-- [ ] 🔧 **`[V1-03]`** Endpoint `GET /api/hub/summary` conforme au contrat + **exclusion du
-      middleware d'auth utilisateur** (verrouillée par un test).
+- [x] 🔧 **`[V1-03]`** Endpoint `GET /api/hub/summary` branché sur les vraies données.
+      ✅ 2026-07-28 : `construireSummary` (pure, la date est un paramètre) + point de
+      bascule unique `getTrackerState()` — `null` = pas branché, objet = données réelles,
+      `throw` = panne. Chemin de panne testé et **prouvé discriminant** (masquer la panne
+      en `building` fait tomber le test). ⚠️ L'exclusion du middleware reste à verrouiller
+      quand le middleware existera `[V1-04]`.
 - [ ] 🔧 **`[V1-04]`** Auth.js v5 Google mono-adresse + middleware fail-closed + `/connexion`.
 - [x] 🔧 **`[V1-05]`** Seed des 38 offres. ✅ 2026-07-28 : adresse du domicile hors du code
       (seules les distances subsistent), nom de la personne des RH retiré, adresses
