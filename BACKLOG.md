@@ -142,6 +142,50 @@
 - [ ] 🔧 **`[V4-03]`** Compléter les codes CNP visés.
 - [ ] 🔧 **`[V4-04]`** Déduplication et filtre de rayon appliqués avant notation.
 
+## Chantier #05 — Expérience et présentation ⬜
+
+> Demandé par Marc le 2026-07-28, juste après la mise en ligne : « améliorer affichage,
+> page accueil, meilleur UI un peu comme FinanceAI, une carte avec les offres pour voir la
+> proximité et la distance de la maison, avec l'affichage complet des offres, un onglet qui
+> va prendre les offres de tous les sites d'offres genre LinkedIn et autre que tu peux
+> trouver avec un lien cliquable pour aller sur l'offre directement ».
+
+- [ ] 🔧 **`[UX-01]`** Refonte de l'interface, en s'inspirant de FinanceAI (densité,
+      hiérarchie visuelle, navigation par onglets). ⚠️ Cadrer d'abord : FinanceAI a une
+      identité claire et sobre, l'artifact JobAI une identité terminal/ambre. Décider si on
+      converge vers le style FinanceAI ou si on garde l'identité JobAI en montant le niveau
+      de finition — les deux se défendent, mais mélanger donnerait un résultat bâtard.
+- [ ] 🔧 **`[UX-02]`** Page d'accueil repensée : aujourd'hui la liste commence tout de suite.
+      Prévoir une vraie entrée en matière (ce qui mérite l'attention maintenant, prochaines
+      actions, état de la recherche) plutôt qu'un tableau de compteurs.
+- [ ] 🔧 **`[UX-03]`** **Affichage complet d'une offre** : vue détail avec tout ce que la
+      carte ne montre pas (justification entière, notes, historique des statuts). C'est le
+      plus rapide à livrer et le plus immédiatement utile.
+- [ ] 🔧 **`[UX-04]`** **Carte des offres** (proximité et distance depuis le domicile).
+      Contraintes à régler avant de coder :
+      · il faut des **coordonnées par offre** — aujourd'hui on ne stocke que la distance en
+        km. Géocodage gratuit possible via Nominatim (OpenStreetMap), limité à 1 requête/s
+        et exigeant un en-tête d'identification ; à faire **une fois par offre**, résultat
+        persisté en base (colonnes à ajouter).
+      · carte : **Leaflet + tuiles OpenStreetMap** (gratuit, pas de clé). ⚠️ Les tuiles
+        viennent d'un domaine tiers : si une CSP est ajoutée d'ici là, il faudra l'autoriser.
+      · **le domicile ne doit PAS être affiché ni envoyé au client** (garde-fou n°1) : la
+        carte montre les offres, pas où habite Marc. Centrer sur la région, pas sur le point.
+- [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
+      ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
+      · **Guichet-Emplois** — flux XML officiel d'EDSC, sur demande. C'est la source
+        légale la plus large pour le Québec. Déjà prévu en `[V4-01]`.
+      · **Indeed** — API officielle réservée aux partenaires. ⚠️ Un connecteur Indeed
+        existe dans la session Claude de Marc : utilisable pour **rafraîchir le seed** au fil
+        des sessions, mais il ne tourne PAS dans l'app déployée. Distinction à ne pas perdre.
+      · **LinkedIn** — **pas d'API publique d'offres**, et le scraping est interdit par ses
+        conditions et activement bloqué. À écarter tant qu'aucune voie légale n'existe :
+        un pipeline qui casse en permanence et expose le compte n'est pas une feature.
+      · **Jobillico / Emploi-Québec** — à vérifier (flux RSS ou API éventuels).
+      → Trancher par ADR quelles sources sont retenues, et **dire dans l'interface d'où
+      vient chaque offre** : une liste qui mélange des sources sans le montrer laisse croire
+      à une exhaustivité qu'elle n'a pas.
+
 ---
 
 ## Découvertes et dette (à trier)
