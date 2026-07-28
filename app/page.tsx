@@ -11,6 +11,7 @@ import { lireOffres } from "@/lib/donnees";
 import { resumer } from "@/lib/suivi";
 import { TableauBord } from "@/components/TableauBord";
 import { ListeOffres } from "@/components/ListeOffres";
+import { Panneaux } from "@/components/Panneaux";
 
 // Le suivi change à chaque geste de Marc : jamais de page mise en cache.
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export default async function Accueil() {
         <>
           <TableauBord resume={resumer(offres)} />
           <ListeOffres offres={offres} />
+          <Panneaux />
         </>
       )}
     </main>

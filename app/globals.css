@@ -403,3 +403,96 @@ code {
 @media (max-width: 23.75rem) {
   .controles-offre { grid-column: 1 / -1; }
 }
+
+/* ── Panneaux repliables (barème, entreprises, salaires, position) ───────── */
+.panneaux { margin-top: 2rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.panneau {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.panneau > summary {
+  padding: 0.8rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+  cursor: pointer;
+  list-style: none;
+}
+.panneau > summary::-webkit-details-marker { display: none; }
+.panneau > summary::before { content: "▸ "; color: var(--ambre); }
+.panneau[open] > summary::before { content: "▾ "; }
+.panneau > summary:focus-visible { outline: 2px solid var(--ambre); outline-offset: -2px; }
+.panneau__corps { padding: 0 1rem 1rem; }
+.panneau__intro { font-size: 0.88rem; margin-bottom: 0.8rem; }
+.panneau__note {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  margin-top: 0.8rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+.bareme__ligne { margin-bottom: 0.6rem; }
+.bareme dt { font-weight: 600; font-size: 0.88rem; }
+.bareme__pts {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ambre);
+  font-weight: 400;
+}
+.bareme dd { font-size: 0.85rem; color: var(--text-soft); margin-left: 0; }
+
+.grille-entreprises {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.5rem;
+}
+.fiche { border: 1px solid var(--border); padding: 0.7rem 0.85rem; }
+.fiche h3 { font-size: 0.9rem; font-weight: 600; }
+.fiche__lieu { font-size: 0.78rem; color: var(--text-soft); }
+.fiche__km { font-family: var(--mono); font-size: 0.75rem; color: var(--ambre); margin: 0.25rem 0; }
+.fiche__km--hors { color: var(--rouge); }
+.fiche__lecture { font-size: 0.8rem; color: var(--text-soft); }
+
+/* Un tableau large défile dans SON conteneur : la page, elle, ne défile jamais
+   horizontalement. */
+.table-enveloppe { overflow-x: auto; }
+.table-marche { width: 100%; border-collapse: collapse; min-width: 32rem; }
+.table-marche th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+.table-marche td { padding: 0.5rem 0.6rem; font-size: 0.83rem; border-bottom: 1px solid var(--border); }
+.table-marche tr:last-child td { border-bottom: none; }
+.table-marche__v { font-family: var(--mono); color: var(--ambre); white-space: nowrap; }
+.table-marche__s { color: var(--text-soft); font-size: 0.75rem; }
+
+.grille-swot {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.5rem;
+}
+.quadrant { border: 1px solid var(--border); border-top: 3px solid var(--border); padding: 0.7rem 0.85rem; }
+.quadrant h3 { font-family: var(--mono); font-size: 0.78rem; margin-bottom: 0.5rem; }
+.quadrant ul { padding-left: 1rem; font-size: 0.82rem; color: var(--text-soft); }
+.quadrant li { margin-bottom: 0.25rem; }
+.quadrant--forces { border-top-color: var(--vert); }
+.quadrant--forces h3 { color: var(--vert); }
+.quadrant--faiblesses { border-top-color: var(--rouge); }
+.quadrant--faiblesses h3 { color: var(--rouge); }
+.quadrant--opportunites { border-top-color: var(--ambre); }
+.quadrant--opportunites h3 { color: var(--ambre); }
+.quadrant--menaces { border-top-color: var(--violet); }
+.quadrant--menaces h3 { color: var(--violet); }
+
+@media (max-width: 47.5rem) {
+  .grille-entreprises, .grille-swot { grid-template-columns: 1fr; }
+}

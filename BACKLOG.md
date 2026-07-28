@@ -81,8 +81,15 @@
       `raisons` ou `entreprise` ne survit pas au parse Zod. Écart assumé avec l'artifact :
       liste déroulante au lieu du cycle au clic (le cycle est inutilisable au clavier et
       n'annonce pas ses valeurs).
-- [ ] 🔧 **`[V1-06c]`** Panneaux de contenu : barème, salaires du marché, SWOT, ajout manuel
-      d'une offre. Le contenu vient de l'artifact et n'est pas encore porté.
+- [x] 🔧 **`[V1-06c]`** Panneaux de contenu : barème, entreprises cibles, salaires du
+      marché, position/SWOT. ✅ 2026-07-28 — sections `<details>` natives (repliables sans
+      JavaScript, accessibles au clavier par construction). Les POINTS du barème sont LUS
+      depuis `PONDERATION`, jamais re-écrits : une valeur recopiée dans un texte explicatif
+      dérive dès qu'on ajuste le barème, et l'explication se met à mentir en silence.
+      Le test de cohérence a trouvé une incohérence RÉELLE dès sa première exécution
+      (« Groupe ACE » avait une offre active mais aucune fiche — écart déjà présent dans
+      l'artifact d'origine).
+- [ ] 🔧 **`[V1-06d]`** Ajout manuel d'une offre (formulaire + Server Action).
 - [x] 🔧 **`[V1-07]`** `why` converti en **format structuré** (`raisons` : un ton, un texte).
       ✅ 2026-07-28 — plus aucun HTML brut, verrouillé par un test qui refuse toute balise
       résiduelle dans le seed.
