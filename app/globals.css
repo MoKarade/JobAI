@@ -86,3 +86,27 @@ code {
   padding: 0.1em 0.35em;
   border-radius: 5px;
 }
+
+/* Bouton de connexion. L'accent du template reste indigo ; l'ambre de JobAI (#f2a31b)
+   est réservée au widget du hub, où elle identifie l'app parmi les autres. */
+.bouton {
+  margin-top: 1.25rem;
+  padding: 0.7rem 1.25rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--accent);
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.bouton:hover {
+  filter: brightness(1.08);
+}
+
+/* Le focus doit rester visible au clavier : c'est la seule façon de savoir où l'on est. */
+.bouton:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}

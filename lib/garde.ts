@@ -1,0 +1,64 @@
+// lib/garde.ts — la décision du middleware, en fonctions PURES.
+//
+// Le middleware lui-même ne fait qu'appliquer ce que ces fonctions décident. C'est ce qui
+// rend la garde testable exhaustivement : un middleware Next ne se teste pas facilement,
+// une fonction pure oui — et c'est précisément la pièce qu'il ne faut pas se tromper.
+
+export type Decision =
+  | { type: "laisser-passer" }
+  | { type: "non-authentifie" } // 401 JSON, pour les appelants qui ne sont pas un navigateur
+  | { type: "rediriger"; vers: string };
+
+/**
+ * Chemins accessibles sans session.
+ *
+ * ⚠️ N'AJOUTER ICI AUCUNE ROUTE QUI AFFICHE DES DONNÉES. La liste doit rester composée de :
+ * la page de connexion, les routes d'Auth.js, les assets, et l'endpoint du hub — ce dernier
+ * n'étant pas « ouvert » mais gardé AUTREMENT, par le jeton `x-hub-token` vérifié dans la
+ * route elle-même.
+ *
+ * L'endpoint du hub DOIT être ici : sans ça, le hub recevrait une redirection HTML vers la
+ * page de connexion au lieu du JSON attendu, et son widget afficherait « injoignable » en
+ * permanence, sans que rien ne paraisse cassé côté app.
+ */
+export function estCheminPublic(chemin: string): boolean {
+  if (chemin === "/connexion" || chemin.startsWith("/connexion/")) return true;
+  if (chemin.startsWith("/api/auth/")) return true;
+  if (chemin === "/api/hub/summary") return true;
+
+  if (
+    chemin.startsWith("/_next/static/") ||
+    chemin.startsWith("/_next/image") ||
+    chemin === "/favicon.ico" ||
+    chemin === "/icon.svg" ||
+    chemin === "/manifest.webmanifest"
+  ) {
+    return true;
+  }
+
+  // Fichiers statiques servis depuis /public : ils portent une extension.
+  const dernierSegment = chemin.split("/").pop() ?? "";
+  return dernierSegment.includes(".");
+}
+
+/**
+ * Que faire d'une requête ?
+ *
+ * Distinction essentielle : une route `/api/*` non authentifiée reçoit un **401**, jamais
+ * une redirection. Un appelant machine ne suit pas une redirection vers un écran de
+ * connexion — il reçoit du HTML là où il attend du JSON, et interprète ça comme une panne.
+ */
+export function deciderGarde(params: {
+  authentifie: boolean;
+  chemin: string;
+  recherche?: string;
+}): Decision {
+  const { authentifie, chemin, recherche = "" } = params;
+
+  if (estCheminPublic(chemin) || authentifie) return { type: "laisser-passer" };
+  if (chemin.startsWith("/api/")) return { type: "non-authentifie" };
+
+  // On mémorise la page demandée pour y revenir après la connexion.
+  const retour = encodeURIComponent(chemin + recherche);
+  return { type: "rediriger", vers: `/connexion?retour=${retour}` };
+}

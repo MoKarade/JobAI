@@ -59,7 +59,14 @@
       `throw` = panne. Chemin de panne testé et **prouvé discriminant** (masquer la panne
       en `building` fait tomber le test). ⚠️ L'exclusion du middleware reste à verrouiller
       quand le middleware existera `[V1-04]`.
-- [ ] 🔧 **`[V1-04]`** Auth.js v5 Google mono-adresse + middleware fail-closed + `/connexion`.
+- [x] 🔧 **`[V1-04]`** Auth.js v5 Google mono-adresse + middleware fail-closed + `/connexion`.
+      ✅ 2026-07-28 : décision de garde en **fonctions pures testées** (`lib/garde.ts`,
+      `lib/autorisation.ts`) — le middleware ne fait que l'appliquer. **L'exclusion de
+      `/api/hub/summary` est enfin verrouillée par un test**, y compris contre les variantes
+      de contournement (`/api/hub/summaryX`, `/api/hub/summary/secret`). Une route `/api/*`
+      non authentifiée reçoit **401**, jamais une redirection HTML.
+      ⚠️ Aucun scope Gmail ni Drive : ce sont des scopes restreints, ils feront l'objet
+      d'un ADR au chantier V2.
 - [x] 🔧 **`[V1-05]`** Seed des 38 offres. ✅ 2026-07-28 : adresse du domicile hors du code
       (seules les distances subsistent), nom de la personne des RH retiré, adresses
       municipales des entreprises réduites à la ville (elles auraient fait échouer le
