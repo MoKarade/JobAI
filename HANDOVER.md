@@ -106,10 +106,20 @@ au hub : tout est en place et vérifié par les journaux. La procédure reste da
 - [x] ~~Changer la branche par défaut en `main`~~ — fait le 2026-07-28.
       *(L'auto-merge et la protection de branche sont sans objet depuis l'ADR-0002 :
       décision de Marc, on n'y revient pas sans nouvel ADR.)*
-- [ ] Provisionner **Neon** et le lier au projet Vercel `[V1-11]`.
-- [ ] Créer le **projet Vercel** + DNS Cloudflare `emploi.hubperso.com` `[V1-12]`.
-- [ ] Créer le **client OAuth Google** (le projet Cloud du hub fait l'affaire) `[V1-13]`.
-- [ ] Poser `HUB_TOKEN` (JobAI) et `HUB_TOKEN_JOBAI` (hub) — **même valeur** `[V1-15]`.
+- [x] ~~Neon, projet Vercel + DNS, client OAuth Google, les deux `HUB_TOKEN`~~ —
+      **tout fait le 2026-07-28** `[V1-11]` `[V1-12]` `[V1-13]` `[V1-15]`. Cette liste est
+      restée cochée « à faire » pendant que l'app était en ligne : le genre de dérive qui
+      fait recommencer une étape déjà faite à la session suivante.
+
+**Ce qui reste réellement côté Marc — deux points, aucun lié à la V1 :**
+
+- [ ] ⚠️ **Confirmer que le mot de passe Neon a été régénéré.** Il a été exposé en
+      conversation le 2026-07-28. Tant que ce n'est pas confirmé, considérer qu'il ne l'est pas.
+- [ ] ⚠️ **BatchChef reste vulnérable en production** — `drizzle-orm` 0.44.7, injection SQL
+      GHSA-gpj5-g38j-94v9 (HIGH). Voir `[SEC-BATCHCHEF-DRIZZLE]` dans `BACKLOG.md`. C'est un
+      autre dépôt : il faut le dire, pas l'oublier ici.
+- [ ] Accorder (ou refuser) la suppression de la branche distante
+      `claude/hopeful-lovelace-4d09zx` `[B-07]`.
 
 ### Comment reprendre
 

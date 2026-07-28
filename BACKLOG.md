@@ -43,7 +43,7 @@
 - [ ] 🔧 **`[B-07]`** Supprimer la branche distante `claude/hopeful-lovelace-4d09zx`
       (ancienne branche par défaut, sans usage) — 👤 accord de Marc requis avant suppression.
 
-## Chantier #01 — V1 : port fidèle + hub ⬜
+## Chantier #01 — V1 : port fidèle + hub ✅
 
 **Critère de fin** : Marc utilise JobAI depuis son téléphone, et le widget s'affiche sur
 `hubperso.com` avec des données réelles.
@@ -139,16 +139,21 @@
       motif (contenu fabriqué détecté / formulation légitime ignorée). Sa **portée est écrite
       dans le test** : il détecte des FORMES, pas des noms isolés. Un garde qui promet plus
       qu'il ne fait est pire qu'un garde absent : on cesse de relire.
-- [ ] 👤 **`[V1-11]`** Provisionner Neon + lier au projet Vercel.
-- [ ] 👤 **`[V1-12]`** Créer le projet Vercel + DNS Cloudflare `emploi.hubperso.com`.
-- [ ] 👤 **`[V1-13]`** Client OAuth Google (le projet Cloud du hub fait l'affaire) +
-      redirect URIs local et production.
+- [x] 👤 **`[V1-11]`** Provisionner Neon + lier au projet Vercel. ✅ 2026-07-28 (Marc) —
+      base `us-east-2`, migration appliquée, jeu de départ chargé.
+- [x] 👤 **`[V1-12]`** Projet Vercel + DNS Cloudflare `emploi.hubperso.com`. ✅ 2026-07-28
+      (Marc) — projet `job-ai`, DNS en « DNS only ». Vérifié : déploiement production
+      `READY` sur le SHA de `main`, zéro erreur runtime.
+- [x] 👤 **`[V1-13]`** Client OAuth Google. ✅ 2026-07-28 (Marc) — auth fonctionnelle en
+      production, une seule adresse admise.
 - [x] 🔧 **`[V1-14]`** Déclarer JobAI dans le hub. ✅ 2026-07-28 — **PR #12 du dépôt
       Hubperso** : entrée `jobai` dans `lib/sources.ts`, les 3 assertions de
       `tests/sources.test.ts` (exhaustif) et `.env.example`. Gate vert côté hub (63 tests),
       déploiement de prévisualisation Vercel *Ready*. 👤 Reste à Marc : merger la PR, poser
       `HUB_TOKEN_JOBAI` dans les variables Vercel du hub, redéployer.
-- [ ] 👤 **`[V1-15]`** Poser `HUB_TOKEN` (JobAI) et `HUB_TOKEN_JOBAI` (hub) — même valeur.
+- [x] 👤 **`[V1-15]`** `HUB_TOKEN` (JobAI) et `HUB_TOKEN_JOBAI` (hub). ✅ 2026-07-28
+      (Marc) — widget actif sur `hubperso.com`. Un `.trim()` asymétrique entre les deux
+      côtés avait donné un 401 permanent : corrigé et verrouillé par tests des deux côtés.
 
 ## Chantier #02 — V2 : scan Gmail ⬜
 
