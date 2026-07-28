@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import type { Offre } from "@/lib/types";
 import { FILTRES_VIDES, SEUIL_PROCHE_KM, filtrer, type EtatFiltres } from "@/lib/filtres";
 import { CarteOffre } from "./CarteOffre";
+import { BoutonExport } from "./BoutonExport";
 
 const BOUTONS: readonly { cle: keyof Omit<EtatFiltres, "texte">; libelle: string }[] = [
   { cle: "activesSeules", libelle: "Actives" },
@@ -52,6 +53,8 @@ export function ListeOffres({ offres }: { offres: Offre[] }) {
             {libelle}
           </button>
         ))}
+        {/* L'export suit les filtres : ce qu'on télécharge est ce qu'on voit. */}
+        <BoutonExport offres={visibles} />
       </div>
 
       {/* Le compte est annoncé aux lecteurs d'écran : sans lui, un filtre qui vide la liste

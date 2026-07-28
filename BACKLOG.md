@@ -101,8 +101,22 @@
       poste pourvu comme la meilleure opportunité. Elle reste dans le total : le suivi
       n'efface rien. 8 tests, **prouvés discriminants** (retirer le filtre fait échouer
       exactement les 4 tests du résumé, et aucun autre).
-- [ ] 🔧 **`[V1-09]`** Export CSV (existe dans l'artifact, à reporter).
-- [ ] 🔧 **`[V1-10]`** Test-garde `pii-guard` (scan des fichiers versionnés, volume prouvé).
+- [x] 🔧 **`[V1-09]`** Export CSV. ✅ 2026-07-28 : mise en forme **pure et testée**
+      (`lib/export.ts`, 17 tests), téléchargement côté navigateur sans route à protéger.
+      L'export suit les **filtres affichés** — un fichier qui ne correspond pas à l'écran est
+      une source de confusion garantie. Deux pièges traités : BOM UTF-8 (sans lui Excel rend
+      « Chargé » en « ChargÃ© ») et surtout l'**injection de formule** — une cellule
+      commençant par `=`, `+`, `-` ou `@` est ÉVALUÉE par Excel, LibreOffice et Sheets ;
+      elle est neutralisée par apostrophe. Le contenu vient de Marc aujourd'hui, il viendra
+      d'un LLM en V3 : on ferme avant que ce soit un problème. **Discrimination prouvée**
+      (neutralisation retirée ⇒ exactement les 2 tests d'injection tombent).
+- [x] 🔧 **`[V1-10]`** Test-garde PII. ✅ 2026-07-28 — `tests/piiGuard.test.ts` : scan des
+      fichiers **réellement versionnés** (`git ls-files`, la seule définition qui compte :
+      ce qui part en ligne), **volume prouvé** (un scan qui ne lit rien passerait tous les
+      tests en silence — premier piège d'un test-garde), et discrimination prouvée motif par
+      motif (contenu fabriqué détecté / formulation légitime ignorée). Sa **portée est écrite
+      dans le test** : il détecte des FORMES, pas des noms isolés. Un garde qui promet plus
+      qu'il ne fait est pire qu'un garde absent : on cesse de relire.
 - [ ] 👤 **`[V1-11]`** Provisionner Neon + lier au projet Vercel.
 - [ ] 👤 **`[V1-12]`** Créer le projet Vercel + DNS Cloudflare `emploi.hubperso.com`.
 - [ ] 👤 **`[V1-13]`** Client OAuth Google (le projet Cloud du hub fait l'affaire) +

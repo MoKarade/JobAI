@@ -20,12 +20,12 @@
 | **Base de données** | Neon (`us-east-2`), migration **appliquée** et jeu de départ **chargé**. Connexion paresseuse : le module s'importe au build sans `DATABASE_URL`, l'erreur ne part qu'à la première requête réelle. ⚠️ Le mot de passe initial a été exposé en conversation le 2026-07-28 et **doit avoir été régénéré** — à confirmer. |
 | **Sécurité des dépendances** | `npm audit --omit=dev` → **0 vulnérabilité**. drizzle-orm monté en 0.45.2 (injection SQL), Next en 15.5.22 (8 avis HIGH), `postcss`/`sharp` forcés par `overrides`. ⚠️ **BatchChef reste exposé** à la même injection SQL (drizzle 0.44.7) — voir `[SEC-BATCHCHEF-DRIZZLE]`. |
 | **Auth utilisateur** | ✅ **Fonctionnelle en production.** Auth.js v5 + Google, une seule adresse (`AUTHORIZED_EMAIL`), middleware **fail-closed** (503 si `AUTH_SECRET`/`AUTHORIZED_EMAIL` manquent). Décision de garde en fonctions pures testées. La page `/connexion` traduit les codes d'erreur d'Auth.js en cause actionnable. |
-| **Logique métier** | Complète, testée et branchée : `lib/types.ts` (schémas Zod), `lib/scoring.ts` (barème), `lib/seed.ts` (38 offres), `lib/suivi.ts` (fusion, modification, résumé), `lib/filtres.ts`, `lib/hubSummary.ts`, `lib/actions.ts`. **161 tests**, dont 13 d'intégration sur PGlite. |
-| **UI** | Tracker utilisable : tableau de bord, liste, recherche et 4 filtres, **et écriture** (statut, priorité, note personnelle). Styles bi-thème reprenant l'identité de l'artifact. Restent les panneaux barème/salaires/SWOT et l'ajout manuel `[V1-06c]`. |
+| **Logique métier** | Complète, testée et branchée : `lib/types.ts` (schémas Zod), `lib/scoring.ts` (barème), `lib/seed.ts` (38 offres), `lib/suivi.ts` (fusion, modification, résumé), `lib/filtres.ts`, `lib/hubSummary.ts`, `lib/actions.ts`, `lib/export.ts`. **186 tests**, dont 13 d'intégration sur PGlite. |
+| **UI** | Tracker utilisable : tableau de bord, liste, recherche et 5 filtres, **écriture** (statut, priorité, note personnelle), panneaux barème/salaires/SWOT, **vue détaillée** `/offre/[id]`, marquage **périmée** et **export CSV** (qui suit les filtres affichés). Styles bi-thème reprenant l'identité de l'artifact. Reste l'ajout manuel `[V1-06d]`. |
 | **Chargement du suivi** | `npm run db:seed` charge les 38 offres. **Idempotent et non destructif** : relançable après une mise à jour du jeu de départ, le suivi de Marc est préservé. |
 | **Déploiement** | ✅ **EN LIGNE** sur `https://emploi.hubperso.com` (projet Vercel `job-ai`, DNS Cloudflare en DNS only). Vérifié par les journaux Vercel le 2026-07-28 : `/` en 200 (session active), `/api/hub/summary` en 200 (le hub lit le summary), **zéro erreur runtime**. |
 | **Widget hub** | ✅ **ACTIF**. PR #12 de Hubperso mergée (entrée `jobai`), `HUB_TOKEN_JOBAI` posé, hub redéployé. |
-| **Chantier courant** | V1 livrée et en ligne. Reste `[V1-06c]`, `[V1-08]`, `[V1-09]`, `[V1-10]` — voir `BACKLOG.md`. |
+| **Chantier courant** | V1 livrée et en ligne. Il ne reste que `[V1-06d]` (ajout manuel d'une offre) au chantier #01 ; la suite est le chantier #05 (expérience et présentation), qui attend une décision de style `[UX-01]`. Voir `BACKLOG.md`. |
 
 ### Ce qui a été fait
 
@@ -78,10 +78,12 @@ DriveAI · dépôt privé.
 3. **Ajouter JobAI au hub exige un redéploiement du hub** : `SOURCE_DEFS` est du code
    (`Hubperso/lib/sources.ts`), pas de la configuration, et `tests/sources.test.ts` est
    exhaustif — il cassera tant que les trois endroits ne sont pas mis à jour.
-4. **Le garde-fou n°1 (données personnelles) n'a pas encore de vrai test-garde** `[V1-10]` :
-   il repose sur le job `garde-fous` de la CI (filet grossier, assumé comme tel) et sur la
-   section « données personnelles » de `tests/seed.test.ts`, dont la portée est **partielle
-   et écrite dans le test**. Le garde-fou n°2, lui, est verrouillé depuis le 2026-07-28.
+4. ~~**Le garde-fou n°1 n'a pas encore de vrai test-garde**~~ — **résolu** le 2026-07-28
+   (`tests/piiGuard.test.ts`, `[V1-10]`). Ce qui reste ouvert est sa **portée assumée** :
+   il détecte des FORMES (adresse, coordonnées, civilité, secret affecté), pas un nom de
+   personne isolé — un motif générique de patronyme est inutilisable en français. Les six
+   garde-fous ont désormais un verrou codé, sauf le n°4 (aucun scraping), qui reste tenu par
+   l'ADR et la revue.
 
 ### Mise en ligne — FAITE le 2026-07-28
 
@@ -113,9 +115,12 @@ au hub : tout est en place et vérifié par les journaux. La procédure reste da
 1. `git fetch origin && git status` — vérifier l'état réel avant de juger quoi que ce soit.
    On travaille **directement sur `main`** : un commit poussé est en ligne, il n'y a pas de
    revue pour rattraper. Le gate avant commit n'est pas une formalité.
-2. Lire `BACKLOG.md`, chantier #00 puis #01.
-3. La prochaine tâche est `[V1-01]` (schéma Drizzle) ou `[B-04]` (flotte d'agents), selon
-   qu'on privilégie le produit ou l'outillage.
+2. Lire `BACKLOG.md`. Le chantier #01 (V1) est livré à une tâche près ; l'essentiel du
+   travail restant est au chantier #05.
+3. La prochaine tâche est `[V1-06d]` (ajout manuel d'une offre — la dernière de la V1),
+   `[B-04]` (flotte d'agents) ou `[UX-02]` (page d'accueil). ⚠️ `[UX-01]` (refonte
+   visuelle) et `[UX-05]` (agrégateur multi-sources) attendent une **décision de Marc**,
+   pas du code : ne pas les démarrer sans elle.
 4. Les trois pièces de référence de Marc (artifact HTML, squelette `jobtracker`, handover du
    27/07) ne sont **pas** dans le dépôt : elles ont été fournies en pièces jointes de session.
    L'artifact reste la référence pour le portage de l'UI `[V1-06]`.

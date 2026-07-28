@@ -24,8 +24,11 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
    commit portant l'un de ces éléments. *Exception* : aucune. L'adresse de référence pour le
    calcul de distance vit dans `DOMICILE_LAT` / `DOMICILE_LON` (variables d'environnement) ;
    les noms de tiers ne sont jamais persistés dans un fichier versionné.
-   *Verrou* : ⚠️ **pas encore codé** — `tests/pii-guard.test.ts`, tâche `[V1-10]`. Tant qu'il
-   n'existe pas, ce garde-fou repose sur la vigilance, pas sur un test : ne pas l'oublier.
+   *Verrou* : `tests/piiGuard.test.ts` — scan des fichiers **réellement versionnés**
+   (`git ls-files`), volume prouvé, discrimination prouvée motif par motif. Sa **portée est
+   écrite dans le test** : il détecte des FORMES (adresse municipale, coordonnées, civilité,
+   secret affecté), pas des noms isolés — un motif générique de patronyme est inutilisable en
+   français (mesuré : il attrapait « Machines-Outils », « Saint-Damien », « garde-fou »).
 
 2. **Le suivi appartient à Marc.** `statut`, `prio`, `dateEnvoi`, `userNote`
    (`USER_OWNED_FIELDS`) ne sont **jamais** écrasés par un rafraîchissement de seed, une
@@ -122,7 +125,23 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
 
 ## 7. Leçons apprises (règles durables)
 
-> Vide au démarrage. N'ajouter ici que ce qui change la façon de coder.
+> N'ajouter ici que ce qui change la façon de coder.
+
+- **Avant d'écrire un fichier ou d'annoncer une tâche, vérifier qu'elle n'est pas DÉJÀ
+  faite.** Vécu 2× en une session : `components/Panneaux.tsx` puis `tests/piiGuard.test.ts`
+  ont été ré-écrits de zéro alors qu'ils existaient et étaient committés — seul le refus
+  d'écrasement de l'outil l'a évité. Réflexe : `git log --oneline -- <fichier>` et
+  `grep <ID-de-tâche>` dans les commits **avant** de coder, pas après.
+- **Un document vivant qui décrit un verrou doit nommer le fichier EXACT, et se met à jour
+  dans le commit qui livre le verrou.** `CLAUDE.md` a déclaré le garde-fou n°1 « pas encore
+  codé » alors que son test était en ligne depuis deux commits, et le nommait
+  `tests/pii-guard.test.ts` au lieu de `tests/piiGuard.test.ts`. Une constitution qui
+  renvoie à un fichier inexistant n'est pas juste périmée : elle est invérifiable — on ne
+  peut pas distinguer « le verrou manque » de « le nom est faux ».
+- **Un export de données est une surface d'exécution, pas un dump.** Une cellule CSV qui
+  commence par `=`, `+`, `-` ou `@` est évaluée à l'ouverture par Excel, LibreOffice et
+  Google Sheets. Tout champ de texte libre qui sort de l'app vers un tableur se neutralise
+  au point de FORMATAGE (`lib/export.ts`), jamais dans le composant qui télécharge.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 
