@@ -20,7 +20,7 @@
 | **Base de données** | Schéma Drizzle en place (`offers`, `offer_reasons`), migration `drizzle/0000_*.sql` **générée et committée mais JAMAIS APPLIQUÉE** — aucune instance Neon n'existe encore `[V1-11]`. Connexion paresseuse : le module s'importe au build sans `DATABASE_URL`, l'erreur ne part qu'à la première requête réelle. |
 | **Sécurité des dépendances** | `npm audit --omit=dev` → **0 vulnérabilité**. drizzle-orm monté en 0.45.2 (injection SQL), Next en 15.5.22 (8 avis HIGH), `postcss`/`sharp` forcés par `overrides`. ⚠️ **BatchChef reste exposé** à la même injection SQL (drizzle 0.44.7) — voir `[SEC-BATCHCHEF-DRIZZLE]`. |
 | **Auth utilisateur** | Aucune. Prévue en `[V1-04]` (Auth.js v5 Google mono-adresse). |
-| **Logique métier** | Portée et testée : `lib/types.ts` (schémas Zod), `lib/scoring.ts` (barème sur 100, 27 tests), `lib/seed.ts` (38 offres, 18 tests d'intégrité). **60 tests au total.** Restent la fusion du suivi et le résumé `[V1-02]`. |
+| **Logique métier** | Complète et testée : `lib/types.ts` (schémas Zod), `lib/scoring.ts` (barème, 27 tests), `lib/seed.ts` (38 offres, 18 tests), `lib/suivi.ts` (fusion, modification, résumé — 19 tests). **79 tests au total.** Toute la logique pure de la V1 est là ; il reste à la brancher (`[V1-03]` summary, `[V1-04]` auth, `[V1-06]` interface). |
 | **UI** | Celle d'`app-template` (page d'accueil du squelette). Le portage du tracker est `[V1-06]`. |
 | **Déploiement** | Rien de déployé. Aucun projet Vercel, aucun DNS. |
 | **Chantier courant** | #00 Bootstrap — voir `BACKLOG.md`. |
@@ -76,9 +76,10 @@ DriveAI · dépôt privé.
 3. **Ajouter JobAI au hub exige un redéploiement du hub** : `SOURCE_DEFS` est du code
    (`Hubperso/lib/sources.ts`), pas de la configuration, et `tests/sources.test.ts` est
    exhaustif — il cassera tant que les trois endroits ne sont pas mis à jour.
-4. **Deux garde-fous du `CLAUDE.md` ne sont pas encore verrouillés par un test**
-   (`pii-guard`, `merge`) : ils sont marqués comme tels dans le fichier. Tant qu'ils ne le
-   sont pas, ils reposent sur la vigilance.
+4. **Le garde-fou n°1 (données personnelles) n'a pas encore de vrai test-garde** `[V1-10]` :
+   il repose sur le job `garde-fous` de la CI (filet grossier, assumé comme tel) et sur la
+   section « données personnelles » de `tests/seed.test.ts`, dont la portée est **partielle
+   et écrite dans le test**. Le garde-fou n°2, lui, est verrouillé depuis le 2026-07-28.
 
 ### Reste à faire côté Marc (action humaine)
 

@@ -48,8 +48,11 @@
       Choix assumé : on anticipe la **forme** (`scoreSource`, `perimeeLe`, justification
       structurée) mais on ne crée **pas** les tables de la V3 — un `CREATE TABLE` est
       additif et indolore, une table vide « au cas où » est de la spéculation.
-- [ ] 🔧 **`[V1-02]`** Fusion du suivi (`CHAMPS_UTILISATEUR` préservés) + résumé.
-      Le barème est fait (`lib/scoring.ts`, 27 tests) ; il reste la fusion et `ResumeSuivi`.
+- [x] 🔧 **`[V1-02]`** Fusion du suivi + modification + résumé (`lib/suivi.ts`).
+      ✅ 2026-07-28 : **le verrou du garde-fou n°2 existe enfin** (`tests/suivi.test.ts`,
+      19 tests, discrimination prouvée en inversant le sens de fusion). Vérifie chaque
+      champ de `CHAMPS_UTILISATEUR` un par un — ajouter un champ sans le préserver casse
+      le test. Fusion idempotente et sans mutation des entrées.
 - [ ] 🔧 **`[V1-03]`** Endpoint `GET /api/hub/summary` conforme au contrat + **exclusion du
       middleware d'auth utilisateur** (verrouillée par un test).
 - [ ] 🔧 **`[V1-04]`** Auth.js v5 Google mono-adresse + middleware fail-closed + `/connexion`.

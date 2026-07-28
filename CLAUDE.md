@@ -30,8 +30,10 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
 2. **Le suivi appartient à Marc.** `statut`, `prio`, `dateEnvoi`, `userNote`
    (`USER_OWNED_FIELDS`) ne sont **jamais** écrasés par un rafraîchissement de seed, une
    ingestion ni un scan Gmail. *Exception* : aucune — le scan **propose**, Marc valide.
-   *Seul fichier autorisé à les écrire* : `lib/actions.ts` (Server Action déclenchée par un
-   geste de Marc). *Verrou* : ⚠️ **pas encore codé** — `tests/merge.test.ts`, tâche `[V1-02]`.
+   *Seul module autorisé à les écrire* : `lib/suivi.ts` (`appliquerModification`, appelée
+   depuis une Server Action déclenchée par un geste de Marc). *Verrou* :
+   `tests/suivi.test.ts` — vérifie CHAQUE champ de `CHAMPS_UTILISATEUR` un par un, et sa
+   discrimination est prouvée (fusion inversée ⇒ le test tombe).
 
 3. **No fake data.** Une métrique non mesurée ne s'affiche pas : `status:"building"` tant que
    le moteur ne produit rien de réel, `—` plutôt qu'un 0 plausible, et une offre dont on ne
