@@ -170,6 +170,14 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   ignorait tout `tests/` pour ne pas se détecter lui-même : la bonne exclusion était LUI,
   pas le dossier. Exclure large est le réflexe facile, et il laisse un angle mort permanent
   que rien ne signale.
+- **Ce que Next.js fait pour toi, les outils en ligne de commande ne le font pas.** Next
+  charge `.env.local` ; `drizzle-kit` et les scripts `tsx` tournent HORS de Next et ne le
+  chargent pas. `npm run db:migrate` échouait donc sur `url: ''` avec la chaîne dans le
+  fichier juste à côté, et l'unique contournement — poser la variable dans le terminal —
+  meurt avec la fenêtre et oblige à recoller un SECRET à la main chaque fois. Tout script
+  hors Next qui lit une variable d'environnement appelle `chargerEnvLocal()` en première
+  ligne. Et un message « valeur manquante » doit dire OÙ la poser, pas seulement qu'elle
+  manque.
 - **Un message d'erreur FAUX coûte plus cher qu'un message générique.** La page Carte a
   annoncé « la base n'a pas répondu » alors que la base répondait très bien — pour dire que
   la table n'existait pas. Marc est parti vérifier une connexion là où il manquait une

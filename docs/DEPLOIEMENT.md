@@ -197,9 +197,16 @@ npm run db:migrate
 npm run db:seed
 ```
 
-Si l'une des deux se plaint que `DATABASE_URL` est absent, c'est que le fichier `.env.local`
-n'est pas lu. Passe alors la variable pour la session en cours — **avec des guillemets
-SIMPLES**, sans quoi PowerShell interprète le `&` et le `$` :
+> Depuis le 2026-07-28, ces deux commandes **lisent `.env.local` toutes seules**. Ce
+> n'était pas le cas avant : `drizzle-kit` et `tsx` tournent hors de Next.js, qui est le
+> seul à charger ce fichier automatiquement. `npm run db:migrate` échouait donc sur
+> `[x] url: ''` alors que la chaîne était dans le fichier juste à côté.
+
+Si `DATABASE_URL` est signalée absente, le message affiché dit maintenant où la poser. Le
+plus probable est que `.env.local` n'existe pas encore, ou que la ligne y est vide.
+
+En dernier recours seulement, tu peux passer la variable pour la session en cours — **avec
+des guillemets SIMPLES**, sans quoi PowerShell interprète le `&` et le `$` :
 
 ```powershell
 $env:DATABASE_URL='COLLE-ICI-TA-VRAIE-CHAINE-NEON'

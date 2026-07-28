@@ -1,6 +1,6 @@
 // scripts/charger-seed.ts — charge le jeu de départ dans la base.
 //
-//   DATABASE_URL='postgres://…' npx tsx scripts/charger-seed.ts
+//   npm run db:seed   (la chaîne de connexion est lue depuis `.env.local`)
 //
 // IDEMPOTENT et NON DESTRUCTIF : il applique exactement la règle du garde-fou n°2. Les
 // champs qui appartiennent à Marc (statut, priorité, date d'envoi, note personnelle) sont
@@ -17,12 +17,17 @@ import { offerReasons, offers } from "../lib/db/schema";
 import { SEED } from "../lib/seed";
 import { fusionner } from "../lib/suivi";
 import type { Offre } from "../lib/types";
+import { AIDE_URL_MANQUANTE, chargerEnvLocal, urlBaseDeDonnees } from "../lib/chargerEnv";
 
 async function main() {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    console.error("DATABASE_URL manquant. Exemple :");
-    console.error("  DATABASE_URL='postgres://…' npx tsx scripts/charger-seed.ts");
+  // `tsx` tourne hors de Next.js : `.env.local` ne se charge pas tout seul. Même correctif
+  // que `drizzle.config.ts` — sans lui, il faut recoller la chaîne de connexion dans le
+  // terminal à chaque nouvelle fenêtre.
+  chargerEnvLocal();
+
+  const url = urlBaseDeDonnees();
+  if (url === null) {
+    console.error(AIDE_URL_MANQUANTE);
     process.exit(1);
   }
 
