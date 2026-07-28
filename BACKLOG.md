@@ -101,9 +101,11 @@
 - [ ] 👤 **`[V1-12]`** Créer le projet Vercel + DNS Cloudflare `emploi.hubperso.com`.
 - [ ] 👤 **`[V1-13]`** Client OAuth Google (le projet Cloud du hub fait l'affaire) +
       redirect URIs local et production.
-- [ ] 🔧 **`[V1-14]`** Déclarer JobAI dans `Hubperso/lib/sources.ts` + `tests/sources.test.ts`
-      (3 endroits) + `.env.example`. ⚠️ Exige un **redéploiement du hub** : `SOURCE_DEFS` est
-      du code, pas de la configuration.
+- [x] 🔧 **`[V1-14]`** Déclarer JobAI dans le hub. ✅ 2026-07-28 — **PR #12 du dépôt
+      Hubperso** : entrée `jobai` dans `lib/sources.ts`, les 3 assertions de
+      `tests/sources.test.ts` (exhaustif) et `.env.example`. Gate vert côté hub (63 tests),
+      déploiement de prévisualisation Vercel *Ready*. 👤 Reste à Marc : merger la PR, poser
+      `HUB_TOKEN_JOBAI` dans les variables Vercel du hub, redéployer.
 - [ ] 👤 **`[V1-15]`** Poser `HUB_TOKEN` (JobAI) et `HUB_TOKEN_JOBAI` (hub) — même valeur.
 
 ## Chantier #02 — V2 : scan Gmail ⬜
