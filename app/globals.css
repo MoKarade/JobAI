@@ -404,6 +404,54 @@ code {
   .controles-offre { grid-column: 1 / -1; }
 }
 
+/* ── Formulaire d'ajout manuel ────────────────────────────────────────────
+   Replié par défaut : la liste est consultée à chaque visite, le formulaire
+   quelques fois par semaine. Reprend l'apparence des panneaux pour que
+   l'interface n'ait pas deux vocabulaires visuels pour un même geste (ouvrir). */
+.ajout {
+  margin-top: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.ajout__titre {
+  padding: 0.8rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+  cursor: pointer;
+  list-style: none;
+}
+.ajout__titre::-webkit-details-marker { display: none; }
+.ajout__titre::before { content: "+ "; color: var(--ambre); }
+.ajout[open] .ajout__titre::before { content: "− "; }
+.ajout__titre:focus-visible { outline: 2px solid var(--ambre); outline-offset: -2px; }
+
+.ajout__grille {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  padding: 0 1rem 1rem;
+}
+/* `input` partage la classe `.select` : mêmes bordure, focus et état désactivé.
+   Sans cette ligne, un input hérite de la largeur du contenu et la grille saute. */
+.ajout__grille input.select { min-width: 0; }
+.ajout__erreur-champ {
+  font-size: 0.75rem;
+  color: var(--rouge);
+}
+.ajout__aide {
+  flex: 1 0 100%;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+.ajout__actions { flex: 1 0 100%; }
+.ajout__message { flex: 1 0 100%; font-size: 0.82rem; }
+.ajout__message--erreur { color: var(--rouge); }
+.ajout__message--succes { color: var(--vert); }
+
 /* ── Panneaux repliables (barème, entreprises, salaires, position) ───────── */
 .panneaux { margin-top: 2rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .panneau {

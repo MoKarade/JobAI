@@ -17,8 +17,89 @@ import { db } from "./db";
 import { offers } from "./db/schema";
 import { exigerSession } from "./session";
 import { MiseAJourOffreSchema } from "./types";
+import { NouvelleOffreSchema, aujourdhui, construireOffre, identifiantPour } from "./ajout";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
+
+/**
+ * Comme `Resultat`, mais l'échec peut désigner LE champ fautif.
+ *
+ * Un formulaire qui répond « saisie invalide » sans dire lequel des huit champs est en cause
+ * oblige à deviner. Les messages viennent des schémas Zod, pas d'une seconde liste tenue à
+ * la main qui dériverait.
+ */
+export type ResultatAjout =
+  | { ok: true; id: string }
+  | { ok: false; erreur: string; champs?: Record<string, string> };
+
+/**
+ * Ajoute une offre saisie à la main.
+ *
+ * Tout ce qui décide (identifiant, note, statut initial) vit dans `lib/ajout.ts`, pur et
+ * testé ; ici il ne reste que la session, les deux valeurs que seul le serveur connaît
+ * — l'heure et les identifiants déjà pris — et l'écriture.
+ */
+export async function ajouterOffre(saisie: unknown): Promise<ResultatAjout> {
+  try {
+    await exigerSession();
+  } catch {
+    return { ok: false, erreur: "Authentification requise." };
+  }
+
+  const parse = NouvelleOffreSchema.safeParse(saisie);
+  if (!parse.success) {
+    const champs: Record<string, string> = {};
+    for (const issue of parse.error.issues) {
+      const cle = issue.path[0];
+      // Premier message par champ : au-delà, on empile des reformulations du même problème.
+      if (typeof cle === "string" && !(cle in champs)) champs[cle] = issue.message;
+    }
+    return { ok: false, erreur: "Vérifie les champs signalés.", champs };
+  }
+
+  try {
+    // Tous les identifiants, pas seulement ceux qui ressemblent : le suivi fait quelques
+    // dizaines de lignes, et un filtre par préfixe raterait une collision après troncature.
+    const pris = await db.select({ id: offers.id }).from(offers);
+    const offre = construireOffre(parse.data, {
+      id: identifiantPour(parse.data.entreprise, parse.data.poste, new Set(pris.map((l) => l.id))),
+      aujourdhui: aujourdhui(new Date()),
+    });
+
+    await db.insert(offers).values({
+      id: offre.id,
+      source: offre.source,
+      dateReperage: offre.dateReperage,
+      entreprise: offre.entreprise,
+      poste: offre.poste,
+      lien: offre.lien,
+      km: offre.km,
+      salaireAffiche: offre.salaireAffiche,
+      priorite: offre.priorite,
+      statut: offre.statut,
+      dateEnvoi: offre.dateEnvoi,
+      score: offre.score,
+      scoreSource: offre.scoreSource,
+      notes: offre.notes,
+      userNote: offre.userNote,
+      histo: offre.histo,
+      perimeeLe: null,
+    });
+
+    revalidatePath("/");
+    return { ok: true, id: offre.id };
+  } catch (err) {
+    console.error("[actions] ajout impossible", err);
+    // 23505 = violation d'unicité. Le seul cas réaliste est une double soumission : le
+    // dire permet à Marc de vérifier au lieu de re-saisir une offre déjà enregistrée.
+    const code = (err as { cause?: { code?: string }; code?: string })?.cause?.code
+      ?? (err as { code?: string })?.code;
+    if (code === "23505") {
+      return { ok: false, erreur: "Cette offre semble déjà enregistrée. Vérifie la liste." };
+    }
+    return { ok: false, erreur: "Enregistrement impossible. Réessaie." };
+  }
+}
 
 /**
  * Marque une offre comme périmée, ou la rouvre.

@@ -89,7 +89,21 @@
       Le test de cohérence a trouvé une incohérence RÉELLE dès sa première exécution
       (« Groupe ACE » avait une offre active mais aucune fiche — écart déjà présent dans
       l'artifact d'origine).
-- [ ] 🔧 **`[V1-06d]`** Ajout manuel d'une offre (formulaire + Server Action).
+- [x] 🔧 **`[V1-06d]`** Ajout manuel d'une offre. ✅ 2026-07-28 : formulaire replié
+      (`<details>` natif), Server Action `ajouterOffre`, toute la décision en fonctions
+      pures testées (`lib/ajout.ts`, 29 tests). Trois points qui valaient d'être verrouillés :
+      · **l'identifiant** — dérivé de l'entreprise et du poste (lisible, diffable, comme le
+        jeu de départ), suffixé en cas de collision, tronqué sans tiret orphelin, avec repli
+        quand le slug est vide (titre non latin). Une collision non gérée écraserait une
+        offre existante.
+      · **la provenance de la note** — premier consommateur réel de `scoreSource` : note
+        saisie ⇒ `manuel` (peut valoir 100) ; champ laissé vide ⇒ `calcule` via `computeScore`,
+        plafonné à 85. Aucune justification n'est fabriquée : elle décrirait une lecture de
+        l'annonce que personne n'a faite.
+      · **la date de repérage** — ⚠️ vrai bug évité : `toISOString().slice(0,10)` est de
+        l'UTC. Vercel tourne en UTC, Marc est à UTC−4 ⇒ toute offre ajoutée après 20 h
+        locale aurait porté la date du LENDEMAIN. **Discrimination prouvée** (retour à
+        l'UTC ⇒ exactement les 2 tests de fuseau tombent, aucun autre).
 - [x] 🔧 **`[V1-07]`** `why` converti en **format structuré** (`raisons` : un ton, un texte).
       ✅ 2026-07-28 — plus aucun HTML brut, verrouillé par un test qui refuse toute balise
       résiduelle dans le seed.
@@ -214,6 +228,17 @@
 ---
 
 ## Découvertes et dette (à trier)
+
+- 🧭 **`[NOTE-SALAIRE]` — le salaire affiché n'entre pas dans la note calculée.**
+  `scoreSalaire` attend un annuel ; `salaireAffiche` est du texte libre, et les six formes
+  réellement présentes dans le seed le montrent : `40 $/h+ (~83 k$)`, `52 260 – 120 727 $`,
+  `marché 51-74 k$`, `marché ~89 k$`, `à partir de 65 000 $`, `à partir de 70 000 $`.
+  Un parseur devrait trancher : quelle extrémité d'une fourchette ? quel facteur pour
+  annualiser un taux horaire ? un « marché ~89 k$ » est-il une donnée de l'offre ou une
+  estimation de la recherche ? **Chaque réponse change la note d'une offre** — c'est donc
+  une modification de la logique de notation, soumise au protocole `CLAUDE.md` §8 (ADR +
+  tableau avant/après sur les 38 offres). En attendant, `scoreSalaire(null)` rend sa valeur
+  **neutre** (9/15), jamais zéro : une offre saisie à la main n'est ni avantagée ni pénalisée.
 
 - **`hub-contract`** : le tag `v1.1.0` n'existe pas côté distant alors que `package.json`
   l'annonce, et `package-lock.json` est resté en `1.0.0`. JobAI pinne le SHA en attendant.

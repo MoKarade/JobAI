@@ -13,6 +13,7 @@ import type { Offre } from "@/lib/types";
 import { TableauBord } from "@/components/TableauBord";
 import { ListeOffres } from "@/components/ListeOffres";
 import { Panneaux } from "@/components/Panneaux";
+import { FormulaireAjout } from "@/components/FormulaireAjout";
 
 // Le suivi change à chaque geste de Marc : jamais de page mise en cache.
 export const dynamic = "force-dynamic";
@@ -93,16 +94,24 @@ export default async function Accueil() {
           </p>
         </div>
       ) : offres.length === 0 ? (
-        <div className="etat">
-          <h2>Aucune offre enregistrée</h2>
-          <p>
-            La base répond, mais elle est vide. Charger le jeu de départ avec{" "}
-            <code>npx tsx scripts/charger-seed.ts</code>.
-          </p>
-        </div>
+        // La base répond : le formulaire d'ajout a donc sa place ici aussi. C'est même le
+        // moment où il sert le plus — sans lui, un suivi vide n'offrirait aucune issue
+        // depuis l'interface.
+        <>
+          <div className="etat">
+            <h2>Aucune offre enregistrée</h2>
+            <p>
+              La base répond, mais elle est vide. Charger le jeu de départ avec{" "}
+              <code>npx tsx scripts/charger-seed.ts</code> — ou ajouter une première offre
+              à la main ci-dessous.
+            </p>
+          </div>
+          <FormulaireAjout />
+        </>
       ) : (
         <>
           <TableauBord resume={resumer(offres)} />
+          <FormulaireAjout />
           <ListeOffres offres={offres} />
           <Panneaux />
         </>

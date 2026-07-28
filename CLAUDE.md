@@ -138,6 +138,13 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   `tests/pii-guard.test.ts` au lieu de `tests/piiGuard.test.ts`. Une constitution qui
   renvoie à un fichier inexistant n'est pas juste périmée : elle est invérifiable — on ne
   peut pas distinguer « le verrou manque » de « le nom est faux ».
+- **Toute date que l'app ÉCRIT se calcule dans le fuseau de Marc, jamais en UTC.**
+  Vercel tourne en UTC, Marc vit à UTC−4 : `new Date().toISOString().slice(0, 10)` date du
+  LENDEMAIN toute offre ajoutée après 20 h locale. Le format voulu (`AAAA-MM-JJ`) s'obtient
+  par `Intl.DateTimeFormat("en-CA", { timeZone: FUSEAU })` — pas en recomposant les
+  composants à la main. Et l'instant reste un **paramètre** de la fonction : c'est la seule
+  façon de tester le passage de minuit. Vaut pour `dateReperage`, `dateEnvoi`, et toute
+  date future que l'app posera elle-même.
 - **Un export de données est une surface d'exécution, pas un dump.** Une cellule CSV qui
   commence par `=`, `+`, `-` ou `@` est évaluée à l'ouverture par Excel, LibreOffice et
   Google Sheets. Tout champ de texte libre qui sort de l'app vers un tableur se neutralise
