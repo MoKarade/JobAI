@@ -17,10 +17,10 @@
 - [x] 🔧 **`[B-02a]`** Personnaliser le fork : identité JobAI publiée au hub
       (`id: jobai`, `#f2a31b`), route déplacée sous `/api/hub/summary`, contrat d'échec 503,
       `.env.example`, `package.json`, `layout`/`page`. ✅ 2026-07-28 — gate vert, 5 tests.
-- [ ] 🔧 **`[B-02b]`** Porter la logique du squelette `jobtracker` (types, `scoring.ts`,
-      fusion du suivi, seed) — **pas** son stockage Redis ni ses routes API.
-      ⚠️ Corriger au passage : `SEED` ne compile pas en l'état (`source` a un `.default()`,
-      donc requis en sortie de `z.infer`, et aucune des 38 entrées ne le fournit).
+- [x] 🔧 **`[B-02b]`** Porter la logique du squelette `jobtracker` : `lib/types.ts`,
+      `lib/scoring.ts`, `lib/seed.ts`. ✅ 2026-07-28 — **pas** son stockage Redis ni ses
+      routes API. Le bug `SEED` (`source` requis en sortie de `z.infer` et absent des 38
+      entrées) est corrigé par construction. La fusion du suivi reste à écrire `[V1-02]`.
 - [x] 🔧 **`[B-03]`** Documents vivants et constitution : `CLAUDE.md` (6 garde-fous),
       `HANDOVER.md`, `BACKLOG.md`, `docs/adr/` (ADR-0001), `docs/LESSONS.md`. ✅ 2026-07-28.
 - [ ] 🔧 **`[B-04]`** Flotte de 5 agents (`.claude/agents/`) + hooks de gate.
@@ -48,18 +48,21 @@
       Choix assumé : on anticipe la **forme** (`scoreSource`, `perimeeLe`, justification
       structurée) mais on ne crée **pas** les tables de la V3 — un `CREATE TABLE` est
       additif et indolore, une table vide « au cas où » est de la spéculation.
-- [ ] 🔧 **`[V1-02]`** Portage de la logique pure : `scoring.ts`, fusion du suivi
-      (`USER_OWNED_FIELDS`), résumé. Tests unitaires en premier.
+- [ ] 🔧 **`[V1-02]`** Fusion du suivi (`CHAMPS_UTILISATEUR` préservés) + résumé.
+      Le barème est fait (`lib/scoring.ts`, 27 tests) ; il reste la fusion et `ResumeSuivi`.
 - [ ] 🔧 **`[V1-03]`** Endpoint `GET /api/hub/summary` conforme au contrat + **exclusion du
       middleware d'auth utilisateur** (verrouillée par un test).
 - [ ] 🔧 **`[V1-04]`** Auth.js v5 Google mono-adresse + middleware fail-closed + `/connexion`.
-- [ ] 🔧 **`[V1-05]`** Seed des 38 offres, **adresse du domicile sortie du code** (variables
-      d'env) et nom de la conseillère RH retiré.
+- [x] 🔧 **`[V1-05]`** Seed des 38 offres. ✅ 2026-07-28 : adresse du domicile hors du code
+      (seules les distances subsistent), nom de la personne des RH retiré, adresses
+      municipales des entreprises réduites à la ville (elles auraient fait échouer le
+      garde-fou de la CI pour rien). 18 tests d'intégrité, garde PII prouvé discriminant.
 - [ ] 🔧 **`[V1-06]`** Portage de l'UI depuis `tracker-emploi-v4.html` : `Dashboard`,
       `Filters`, `OfferCard`, `AddOfferDialog`, `MarketTable`, `SwotPanel`, `ScoringPanel`.
       Le CSS et le responsive (breakpoints 760/380 px) sont réutilisables quasi tels quels.
-- [ ] 🔧 **`[V1-07]`** `why` converti en **format structuré** (atouts / réserves typés) —
-      plus jamais de HTML brut : c'est une XSS stockée dès que la V3 le fera générer.
+- [x] 🔧 **`[V1-07]`** `why` converti en **format structuré** (`raisons` : un ton, un texte).
+      ✅ 2026-07-28 — plus aucun HTML brut, verrouillé par un test qui refuse toute balise
+      résiduelle dans le seed.
 - [ ] 🔧 **`[V1-08]`** Marquage **« offre périmée »** : les offres du seed expireront avant la
       résidence permanente. Ne jamais présenter comme ouverte une offre dont on ne sait rien.
 - [ ] 🔧 **`[V1-09]`** Export CSV (existe dans l'artifact, à reporter).

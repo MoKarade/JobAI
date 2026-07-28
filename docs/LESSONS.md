@@ -18,6 +18,55 @@
 
 ---
 
+## 2026-07-28 — Avant d'interpréter le verdict d'un outil de vérification, prouver que l'outil peut vérifier
+
+**Contexte** : un hook signalait les commits comme non signés. J'ai voulu trancher par la
+mesure plutôt que par le raisonnement.
+
+**Ce qui s'est passé** : j'ai extrait la clé publique embarquée dans la signature du commit,
+monté un fichier de signataires autorisés, et lancé la vérification. Verdict : `B`, mauvaise
+signature. J'ai failli l'annoncer comme un fait.
+
+**Cause réelle** : `ssh-keygen` n'existe pas dans le conteneur, et git ne peut pas vérifier
+une signature SSH sans lui. Le `B` mesurait l'absence de l'outil, pas la qualité de la
+signature. Le verdict avait toutes les apparences d'une mesure et n'en était pas une.
+
+**Règle durable** : un outil de vérification qui rend un verdict négatif doit d'abord être
+prouvé CAPABLE de rendre un verdict positif. Sinon « échec de vérification » et
+« impossibilité de vérifier » se confondent — et la seconde se lit comme la première.
+Corollaire : quand l'instrument manque, la réponse honnête est « je ne peux pas savoir
+d'ici », pas un verdict par défaut.
+
+**Verrou** : aucun (règle de méthode). Le même piège a frappé deux fois dans la même
+session : un test de discrimination dont l'échec venait d'un SQL cassé, et ce verdict de
+signature. Dans les deux cas, l'échec ressemblait à une preuve.
+
+---
+
+## 2026-07-28 — En français, un motif générique de nom de personne ne discrimine rien
+
+**Contexte** : garde-fou n°1 — vérifier qu'aucun nom de personne de recrutement n'est
+committé dans le jeu de départ. J'avais écrit un motif « prénom + nom composé à trait
+d'union », la forme d'un patronyme québécois.
+
+**Ce qui s'est passé** : le test a échoué au premier lancement, sur un seed pourtant
+expurgé. Les correspondances mesurées : « Machines-Outils », « servo-contrôle »,
+« Saint-Damien », « garde-fou », « là-bas », « un cran au-dessus ».
+
+**Cause réelle** : en français, les mots composés à trait d'union sont partout — toponymes
+(Saint-X-de-Y), termes techniques, adverbes. Le motif n'avait aucun pouvoir discriminant.
+
+**Règle durable** : on ne détecte pas « un nom de personne » par sa forme. On détecte les
+FORMES DE PRÉSENTATION d'une personne : une civilité, un nom après « avec », un nom entre
+parenthèses après une mention de contact. Et on écrit dans le test que sa portée est
+partielle — un garde qui promet plus qu'il ne fait est pire qu'un garde absent, parce qu'on
+cesse de relire.
+
+**Verrou** : `tests/seed.test.ts`, section « données personnelles ». Discrimination prouvée :
+3 formes réelles détectées, 0 faux positif sur 3 formulations effectivement utilisées.
+
+---
+
 ## 2026-07-28 — Un endpoint destiné à une machine ne doit jamais passer par un middleware qui redirige
 
 **Contexte** : audit du squelette `jobtracker` produit le 27/07, avant de le porter.
