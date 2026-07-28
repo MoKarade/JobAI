@@ -94,9 +94,13 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
   Retour arrière = `git revert`, jamais de réécriture d'historique sur `main`.
   ⚠️ **Le push n'est pas fini tant que le run de CI n'a pas été CONSULTÉ.** Sans PR, rien
   n'affiche un ✗ : une CI rouge peut passer inaperçue sur plusieurs commits (vécu, ×4).
-- **Flotte d'agents** (`.claude/agents/`) : panel avant merge via `/review`. Un finding est
-  une **hypothèse** : on vérifie le vrai code avant de coder un correctif. Entre deux agents
-  qui se contredisent, **celui qui a mesuré l'emporte sur celui qui a déduit**.
+- **Flotte d'agents** (`.claude/agents/`, **5**) : `gardien-des-garde-fous`,
+  `code-reviewer`, `chasseur-de-pannes-muettes`, `auditeur-accessibilite`,
+  `gardien-des-documents`. Panel avant commit via `/review`, qui route selon les fichiers
+  touchés. Leurs périmètres ne se recouvrent pas — chacun dit ce qu'il ne traite pas.
+  Un finding est une **hypothèse** : on vérifie le vrai code avant de coder un correctif.
+  Entre deux agents qui se contredisent, **celui qui a mesuré l'emporte sur celui qui a
+  déduit**. La flotte ne remplace pas le gate déterministe.
 - **Documents vivants**, tenus à jour dans la **même PR** que le code : `HANDOVER.md` (état
   courant, lu en premier), `BACKLOG.md` (coché au merge), `docs/LESSONS.md`, `docs/adr/`.
   Doc périmée = pire que pas de doc.

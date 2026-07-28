@@ -132,7 +132,7 @@ au hub : tout est en place et vérifié par les journaux. La procédure reste da
    revue pour rattraper. Le gate avant commit n'est pas une formalité.
 2. Lire `BACKLOG.md`. Le chantier #01 (V1) est livré à une tâche près ; l'essentiel du
    travail restant est au chantier #05.
-3. La prochaine tâche est `[B-04]` (flotte d'agents). ⚠️ `[UX-05]` (agrégateur
+3. Le chantier #05 est livré sauf `[UX-05]`. ⚠️ `[UX-05]` (agrégateur
    multi-sources) attendent une **décision de Marc**, pas du code : ne pas les démarrer
    sans elle. `[NOTE-SALAIRE]` exige un ADR avant la moindre ligne (protocole §8).
 4. Les trois pièces de référence de Marc (artifact HTML, squelette `jobtracker`, handover du

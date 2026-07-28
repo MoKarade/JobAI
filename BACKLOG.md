@@ -23,7 +23,26 @@
       entrées) est corrigé par construction. La fusion du suivi reste à écrire `[V1-02]`.
 - [x] 🔧 **`[B-03]`** Documents vivants et constitution : `CLAUDE.md` (6 garde-fous),
       `HANDOVER.md`, `BACKLOG.md`, `docs/adr/` (ADR-0001), `docs/LESSONS.md`. ✅ 2026-07-28.
-- [ ] 🔧 **`[B-04]`** Flotte de 5 agents (`.claude/agents/`) + hooks de gate.
+- [x] 🔧 **`[B-04]`** Flotte d'agents + commande `/review`. ✅ 2026-07-28 — **5 agents**
+      (`.claude/agents/`), avec des périmètres qui NE SE RECOUVRENT PAS : chacun dit
+      explicitement ce qu'il ne traite pas, sinon trois agents remontent le même point et
+      la synthèse devient du bruit.
+      · `gardien-des-garde-fous` — les six règles de `CLAUDE.md` §2, rien d'autre. Une
+        violation est bloquante et ne se nuance pas.
+      · `code-reviewer` — correction, cas limites, **discrimination des tests**, duplication
+        d'une règle. Ne traite ni garde-fous, ni pannes muettes, ni accessibilité.
+      · `chasseur-de-pannes-muettes` — ce qui échoue sans le dire : `catch` qui avale,
+        `catch` trop large, panne de plateforme confondue avec un fait métier, repli qui
+        fabrique une donnée.
+      · `auditeur-accessibilite` — WCAG AA, dans les DEUX thèmes.
+      · `gardien-des-documents` — seul autorisé à éditer la doc, jamais le code. Sur ce dépôt
+        sans PR ni revue humaine, un handover qui ment fait refaire du travail déjà fait.
+      La commande `/review` route selon les fichiers touchés et rappelle les trois règles de
+      lecture : un garde-fou ne se nuance pas · un finding est une hypothèse · entre deux
+      agents qui se contredisent, **celui qui a mesuré l'emporte**.
+      ⚠️ Écart assumé avec le libellé d'origine : **pas de hooks de gate**. Le gate est déjà
+      obligatoire et documenté ; un hook qui le rejoue ajouterait un point de panne (et un
+      hook `Stop` auto-relanceur est explicitement déconseillé dans l'écosystème).
 - [x] 🔧 **`[B-05]`** CI GitHub : un job `gate` qui rejoue le gate local (typecheck, tests,
       lint, build). ✅ 2026-07-28. L'auto-merge est sans objet — voir ADR-0002
       (développement direct sur `main`).
