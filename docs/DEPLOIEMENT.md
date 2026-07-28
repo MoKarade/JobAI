@@ -22,6 +22,11 @@ déroutantes :
 | 📄 **CONTENU DE FICHIER** | Du texte à enregistrer | On l'écrit **dans un fichier**, jamais dans PowerShell |
 | 💾 **CODE** | Du TypeScript | Ça va dans un fichier source — c'est mon travail, pas le tien |
 
+Et une convention pour les valeurs : **`…`, `xxx`, `TON_…` et `COLLE-ICI-…` sont des espaces
+réservés**. Ils signalent du texte à remplacer par ta vraie valeur, jamais à taper tel quel.
+Une chaîne de connexion Neon fait plus de cent caractères — si ce que tu colles en fait
+trois, c'est l'espace réservé.
+
 Coller `DATABASE_URL=postgresql://…` dans PowerShell donne
 `Le caractère perluète (&) n'est pas autorisé` ou `n'est pas reconnu comme nom d'applet de
 commande` : c'est normal, ce n'est **pas une commande**, c'est une ligne de fichier.
@@ -170,7 +175,20 @@ HUB_TOKEN=...
 > `.env.local` est ignoré par git (vérifié dans `.gitignore`) : il ne partira jamais sur
 > GitHub.
 
-**2. Créer les tables et charger les offres.**
+**2. Installer les dépendances** — à faire UNE FOIS, avant toute autre commande.
+
+🖥️ **COMMANDE** :
+
+```powershell
+npm install
+```
+
+> Sans cette étape, `npm run db:migrate` répond `'drizzle-kit' n'est pas reconnu` et
+> `npm run db:seed` répond `'tsx' n'est pas reconnu` : ces outils sont des dépendances du
+> projet, ils n'existent pas tant qu'elles ne sont pas installées. Ça prend une à deux
+> minutes et ça ne se refait qu'après un changement de dépendances.
+
+**3. Créer les tables et charger les offres.**
 
 🖥️ **COMMANDES** — une par une :
 
@@ -179,18 +197,32 @@ npm run db:migrate
 npm run db:seed
 ```
 
-Si l'une des deux se plaint que `DATABASE_URL` est absent, c'est que le fichier n'est pas lu.
-Passe alors la variable pour la session en cours — **avec des guillemets SIMPLES**, sans quoi
-PowerShell interprète le `&` et le `$` :
+Si l'une des deux se plaint que `DATABASE_URL` est absent, c'est que le fichier `.env.local`
+n'est pas lu. Passe alors la variable pour la session en cours — **avec des guillemets
+SIMPLES**, sans quoi PowerShell interprète le `&` et le `$` :
 
 ```powershell
-$env:DATABASE_URL='postgresql://user:motdepasse@ep-xxx-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+$env:DATABASE_URL='COLLE-ICI-TA-VRAIE-CHAINE-NEON'
 npm run db:migrate
 npm run db:seed
 ```
 
+> ⚠️ **`COLLE-ICI-TA-VRAIE-CHAINE-NEON` est un espace réservé**, à remplacer intégralement
+> par la chaîne copiée depuis neon.tech. Elle commence par `postgresql://` et fait plusieurs
+> dizaines de caractères. Partout dans ce document, `…`, `xxx` et `TON_…` signalent la même
+> chose : **du texte à remplacer**, jamais à taper tel quel.
+
 La variable ainsi posée ne vaut que pour cette fenêtre PowerShell — c'est voulu : elle ne
 traîne pas sur ta machine.
+
+🖥️ **VÉRIFIER** que la chaîne est bien celle de Neon avant de lancer quoi que ce soit :
+
+```powershell
+$env:DATABASE_URL.Length
+```
+
+Doit afficher un nombre autour de 130. Si tu vois `0`, la variable est vide ; si tu vois
+moins de 50, c'est l'espace réservé qui a été collé au lieu de la vraie valeur.
 
 `db:seed` est **relançable sans risque** : ton suivi (statut, priorité, date d'envoi, note
 personnelle) est préservé, seuls les champs de recherche sont rafraîchis.
