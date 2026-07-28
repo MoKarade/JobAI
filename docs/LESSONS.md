@@ -60,6 +60,30 @@ mesuré, et ne plus le re-litiger.
 
 ---
 
+## 2026-07-28 — Une procédure destinée à un humain doit MARQUER ce qui s'exécute et ce qui s'enregistre
+
+**Contexte** : `docs/DEPLOIEMENT.md`, la marche à suivre pour mettre JobAI en ligne.
+
+**Ce qui s'est passé** : Marc a collé dans PowerShell deux blocs qui n'étaient pas des
+commandes — une ligne de fichier `.env.local` (`DATABASE_URL=postgresql://…`) et un bloc
+TypeScript destiné à `lib/sources.ts`. Erreurs obtenues : `Le caractère perluète (&) n'est
+pas autorisé`, puis `Expression manquante après « , »`. Deux échecs, zéro progression.
+
+**Cause réelle** : la doc mélangeait trois natures de contenu dans des blocs visuellement
+identiques — commandes à exécuter, contenu de fichier à enregistrer, code source à modifier.
+Rien ne les distinguait. Le lecteur ne peut pas deviner l'intention de l'auteur.
+
+**Règle durable** : dans toute procédure destinée à un humain, MARQUER chaque bloc par sa
+nature (🖥️ commande · 📄 contenu de fichier · 💾 code) et le dire en tête du document.
+Corollaire pour PowerShell : une valeur contenant `&` ou `$` se met entre guillemets
+**simples** (`$env:X='…'`) — les guillemets doubles laissent l'interpréteur agir. Et une
+chaîne de connexion ne se « tape » jamais : elle s'écrit dans un fichier.
+
+**Verrou** : aucun (règle de rédaction). Mais l'indicateur est simple : si l'utilisateur
+échoue à l'étape N, la doc est en cause avant lui.
+
+---
+
 ## 2026-07-28 — En français, un motif générique de nom de personne ne discrimine rien
 
 **Contexte** : garde-fou n°1 — vérifier qu'aucun nom de personne de recrutement n'est

@@ -11,6 +11,21 @@
 > **Toutes les commandes sont données pour PowerShell** (ton poste) — `openssl` n'y existe
 > pas, donc rien n'en dépend ici.
 
+## ⚠️ Avant tout : deux natures de blocs, à ne pas confondre
+
+Ce document contient deux choses très différentes, et les confondre produit des erreurs
+déroutantes :
+
+| Marqueur | Ce que c'est | Ce qu'on en fait |
+|---|---|---|
+| 🖥️ **COMMANDE** | À exécuter | On la tape (ou colle) dans PowerShell |
+| 📄 **CONTENU DE FICHIER** | Du texte à enregistrer | On l'écrit **dans un fichier**, jamais dans PowerShell |
+| 💾 **CODE** | Du TypeScript | Ça va dans un fichier source — c'est mon travail, pas le tien |
+
+Coller `DATABASE_URL=postgresql://…` dans PowerShell donne
+`Le caractère perluète (&) n'est pas autorisé` ou `n'est pas reconnu comme nom d'applet de
+commande` : c'est normal, ce n'est **pas une commande**, c'est une ligne de fichier.
+
 ---
 
 ## Vue d'ensemble
@@ -75,24 +90,24 @@ C'est ce qui permet la connexion. **Le même projet Google Cloud que le hub fait
 
 Ouvre PowerShell dans le dossier du dépôt.
 
-**Le secret de session** (signe les cookies de connexion) :
-
-```powershell
-npx auth secret
-```
-
-Cette commande écrit directement `AUTH_SECRET` dans ton `.env.local`. Si tu préfères la
-valeur à la main :
+🖥️ **COMMANDE** — le secret de session (signe les cookies de connexion) :
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-**Le jeton du hub** (celui que le hub enverra pour lire ton widget) :
+🖥️ **COMMANDE** — le jeton du hub (celui que le hub enverra pour lire ton widget) :
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
 ```
+
+Copie les deux valeurs affichées : elles iront dans le fichier `.env.local` à l'étape
+suivante, et dans les variables Vercel.
+
+> `npx auth secret` fait la même chose pour `AUTH_SECRET` et l'écrit directement dans
+> `.env.local`. Les commandes ci-dessus se contentent d'**afficher** la valeur, ce qui te
+> laisse la coller où tu veux — c'est plus prévisible quand on configure deux endroits.
 
 Garde cette seconde valeur : elle servira **deux fois**, à l'identique — côté JobAI
 (`HUB_TOKEN`) et côté hub (`HUB_TOKEN_JOBAI`). Si les deux diffèrent, le widget affichera
@@ -126,25 +141,56 @@ Garde cette seconde valeur : elle servira **deux fois**, à l'identique — côt
 
 ### Appliquer le schéma et charger tes offres
 
-Toujours dans PowerShell, à la racine du dépôt :
+**1. Créer le fichier `.env.local`** à la racine du dépôt.
+
+🖥️ **COMMANDE** — ouvre le Bloc-notes sur un fichier neuf :
 
 ```powershell
-# 1. Mets la connection string dans ton .env.local (une fois)
-#    DATABASE_URL=postgresql://...
+notepad .env.local
+```
 
-# 2. Crée les tables
+Windows demande de confirmer la création : accepte.
+
+📄 **CONTENU DE FICHIER** — colle ceci dans le Bloc-notes, remplace par tes vraies valeurs,
+puis enregistre (Ctrl+S) et ferme :
+
+```
+DATABASE_URL=postgresql://user:motdepasse@ep-xxx-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+AUTH_SECRET=...
+AUTHORIZED_EMAIL=marc.richard4@gmail.com
+HUB_TOKEN=...
+```
+
+> ⚠️ Ces lignes **ne se tapent pas dans PowerShell**. Le `&` de la chaîne Neon y est un
+> opérateur réservé, d'où l'erreur `Le caractère perluète (&) n'est pas autorisé`. Dans un
+> fichier, il n'a aucune signification particulière : il est pris tel quel.
+>
+> `.env.local` est ignoré par git (vérifié dans `.gitignore`) : il ne partira jamais sur
+> GitHub.
+
+**2. Créer les tables et charger les offres.**
+
+🖥️ **COMMANDES** — une par une :
+
+```powershell
 npm run db:migrate
-
-# 3. Charge tes 38 offres
 npm run db:seed
 ```
 
-Si `npm run db:migrate` ne lit pas ton `.env.local`, passe la variable directement :
+Si l'une des deux se plaint que `DATABASE_URL` est absent, c'est que le fichier n'est pas lu.
+Passe alors la variable pour la session en cours — **avec des guillemets SIMPLES**, sans quoi
+PowerShell interprète le `&` et le `$` :
 
 ```powershell
-$env:DATABASE_URL="postgresql://..."; npm run db:migrate
-$env:DATABASE_URL="postgresql://..."; npm run db:seed
+$env:DATABASE_URL='postgresql://user:motdepasse@ep-xxx-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+npm run db:migrate
+npm run db:seed
 ```
+
+La variable ainsi posée ne vaut que pour cette fenêtre PowerShell — c'est voulu : elle ne
+traîne pas sur ta machine.
 
 `db:seed` est **relançable sans risque** : ton suivi (statut, priorité, date d'envoi, note
 personnelle) est préservé, seuls les champs de recherche sont rafraîchis.
@@ -180,29 +226,15 @@ Le domaine `hubperso.com` est chez **Cloudflare Registrar** (nameservers
 
 ## Étape 6 — Déclarer JobAI dans le hub
 
-Deux choses, et la première est du **code** : poser la variable ne suffit pas, il faut
-committer et redéployer le hub.
+**a. Le code : ✅ déjà fait.** L'entrée `jobai` est ajoutée à `lib/sources.ts` du dépôt
+`Hubperso`, avec la mise à jour de `tests/sources.test.ts` (exhaustif, trois assertions) et
+de son `.env.example` — voir la **PR #12** du dépôt Hubperso. Il te reste à la merger.
 
-**a. Dans le dépôt `Hubperso`**, ajouter une entrée à `lib/sources.ts` :
+**b. La variable :** dans les variables Vercel du projet **hubperso**, ajouter
+`HUB_TOKEN_JOBAI` avec **exactement la même valeur** que le `HUB_TOKEN` de JobAI (étape 3).
 
-```ts
-  {
-    id: "jobai",
-    name: "JobAI",
-    defaultUrl: "https://emploi.hubperso.com/api/hub/summary",
-    urlEnv: "JOBAI_SUMMARY_URL",
-    tokenEnv: "HUB_TOKEN_JOBAI",
-  },
-```
-
-⚠️ Le fichier `tests/sources.test.ts` est **exhaustif** : il liste les apps attendues et
-leurs URLs. Il faut le mettre à jour aux **trois** endroits concernés, sinon la suite de
-tests casse. Dis-le-moi et je fais cette modification — c'est du code, c'est mon travail.
-
-**b. Dans les variables Vercel du projet du hub** : ajouter `HUB_TOKEN_JOBAI`, avec
-**exactement la même valeur** que le `HUB_TOKEN` de JobAI (étape 3).
-
-**c. Redéployer le hub** pour que l'entrée prenne effet.
+**c. Redéployer le hub** pour que l'entrée prenne effet — `SOURCE_DEFS` est du code, poser
+la variable seule ne suffit pas.
 
 > Tant que le jeton n'est pas posé, le widget affiche « non configurée » — et les autres
 > apps continuent de s'afficher normalement. Rien ne casse.
