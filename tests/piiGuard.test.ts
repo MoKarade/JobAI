@@ -9,8 +9,14 @@
 //   - il détecte des FORMES (adresse municipale, secret assigné, coordonnées, civilité) ;
 //   - il ne « comprend » rien : un nom de personne isolé lui échappe, et c'est assumé —
 //     un motif générique de patronyme est inutilisable en français (mesuré : il attrapait
-//     « Machines-Outils », « Saint-Damien », « garde-fou »).
+//     « Machines-Outils », « Saint-Damien », « garde-fou ») ;
+//   - il couvre TOUS les fichiers versionnés sauf lui-même, fixtures de test comprises.
 // Un garde qui promet plus qu'il ne fait est pire qu'un garde absent : on cesse de relire.
+//
+// C'est le SEUL garde de ce type du dépôt. La CI portait au départ deux `git grep`
+// équivalents en bash ; ils ont été retirés une fois ce test écrit, parce que maintenir la
+// même règle dans deux langages la fait diverger — et elle avait déjà divergé : le bash
+// n'avait aucune notion d'« exemple documenté » et échouait sur la doc de `charger-seed.ts`.
 
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
@@ -31,7 +37,11 @@ function fichiersVersionnes(): string[] {
     .filter((f) => /\.(ts|tsx|js|mjs|json|md|css|yml|yaml|sql|example)$/.test(f))
     // Le lockfile est du bruit machine. Les fichiers de test, eux, contiennent PAR NATURE
     // les motifs qu'ils vérifient — les scanner reviendrait à détecter le détecteur.
-    .filter((f) => f !== "package-lock.json" && !f.startsWith("tests/"));
+    // Le lockfile est du bruit machine. `piiGuard` s'exclut LUI-MÊME parce qu'il contient
+    // par construction les motifs qu'il cherche — le scanner reviendrait à détecter le
+    // détecteur. Les AUTRES fichiers de test, eux, sont scannés : ils sont versionnés comme
+    // le reste, et rien ne garantit qu'une vraie valeur ne s'y glisse pas un jour.
+    .filter((f) => f !== "package-lock.json" && f !== "tests/piiGuard.test.ts");
 }
 
 /**
@@ -46,7 +56,7 @@ function fichiersVersionnes(): string[] {
  * la doc, elle n'aura pas de marqueur et sera détectée.
  */
 function estExemple(ligne: string): boolean {
-  return /…|\.\.\.|xxx|motdepasse|mot-de-passe|<[a-z-]+>|TON_|COLLE-ICI|VALEURFACTICE|à remplir|exemple/i.test(
+  return /…|\.\.\.|xxx|motdepasse|mot-de-passe|<[a-z-]+>|TON_|COLLE-ICI|factice|à remplir|exemple/i.test(
     ligne,
   );
 }
@@ -85,6 +95,15 @@ describe("volume du scan", () => {
     expect(FICHIERS).toContain("lib/seed.ts");
     expect(FICHIERS).toContain("lib/reference.ts");
     expect(FICHIERS).toContain(".env.example");
+  });
+
+  it("scanne AUSSI les autres fichiers de test, et pas seulement lui-même", () => {
+    // Les fixtures de test sont versionnées comme le reste. Les exclure en bloc — ce que
+    // faisait la première version — laissait un angle mort entier.
+    expect(FICHIERS).toContain("tests/diagnostic.test.ts");
+    expect(FICHIERS).toContain("tests/seed.test.ts");
+    // Le détecteur, lui, reste hors du scan : il contient par construction ce qu'il cherche.
+    expect(FICHIERS).not.toContain("tests/piiGuard.test.ts");
   });
 });
 

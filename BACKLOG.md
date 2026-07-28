@@ -25,9 +25,17 @@
       `HANDOVER.md`, `BACKLOG.md`, `docs/adr/` (ADR-0001), `docs/LESSONS.md`. ✅ 2026-07-28.
 - [ ] 🔧 **`[B-04]`** Flotte de 5 agents (`.claude/agents/`) + hooks de gate.
 - [x] 🔧 **`[B-05]`** CI GitHub : un job `gate` qui rejoue le gate local (typecheck, tests,
-      lint, build) et un job `garde-fous` (aucune adresse municipale en dur, aucun secret en
-      dur), tous deux **prouvés discriminants** avant commit. ✅ 2026-07-28.
-      L'auto-merge devient sans objet — voir ADR-0002 (développement direct sur `main`).
+      lint, build). ✅ 2026-07-28. L'auto-merge est sans objet — voir ADR-0002
+      (développement direct sur `main`).
+      ⚠️ **Le job `garde-fous` a été RETIRÉ le 2026-07-28**, après avoir mis la CI au rouge
+      sur **quatre commits d'affilée** sans que personne le voie (sans PR, rien n'affiche
+      un ✗). Cause : son `git grep` d'adresse attrapait la chaîne fabriquée qui PROUVE que
+      `tests/piiGuard.test.ts` détecte quelque chose — il détectait le détecteur. Et il
+      masquait un second échec latent, son grep de secrets n'ayant aucune notion d'exemple
+      documenté (il aurait bloqué sur `DATABASE_URL='postgres://…'` de `charger-seed.ts`).
+      La même règle tenue en bash ET en TypeScript avait divergé. Une seule survit : le
+      test, plus précis et prouvé. En échange, sa couverture a été **étendue aux fixtures
+      de test** (il ne s'exclut plus que lui-même), preuve faite par sonde.
 - [x] 👤 **`[B-06]`** Réglages du dépôt : **branche par défaut → `main`** ✅ 2026-07-28
       (fait par Marc). L'auto-merge et la protection de branche sont sans objet depuis
       l'ADR-0002. ⚠️ Reste optionnel : ne laisser que « Allow squash merging » si des PR

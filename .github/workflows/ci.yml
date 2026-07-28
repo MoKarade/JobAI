@@ -49,37 +49,19 @@ jobs:
       - name: Build
         run: npm run build
 
-  garde-fous:
-    name: Garde-fous du CLAUDE.md
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      # Garde-fou n°1 : dépôt privé, aucune donnée personnelle en clair.
-      # Filet grossier en attendant le vrai test-garde `pii-guard` [V1-10] : il attrape
-      # l'erreur la plus probable — une adresse municipale committée en dur.
-      # Il ne prétend PAS couvrir le garde-fou : c'est un rappel, pas une preuve.
-      - name: Aucune adresse municipale en dur
-        run: |
-          set -euo pipefail
-          # Une adresse québécoise en clair : numéro civique suivi d'une voie.
-          MOTIF='[0-9]{3,5},? (av\.|avenue|rue|boul\.|boulevard|ch\.|chemin) '
-          if git grep -InEi "$MOTIF" -- ':!*.lock' ':!package-lock.json' ':!.github/**'; then
-            echo "::error::Adresse municipale en clair détectée. Garde-fou n°1 du CLAUDE.md :" \
-                 "les coordonnées du domicile vivent dans DOMICILE_LAT / DOMICILE_LON."
-            exit 1
-          fi
-          echo "Aucune adresse municipale en clair."
-
-      # Garde-fou n°5 : jamais de secret en dur.
-      - name: Aucun jeton en dur
-        run: |
-          set -euo pipefail
-          # Une affectation de secret à un littéral non vide, hors .env.example et docs.
-          MOTIF='(HUB_TOKEN|AUTH_SECRET|AUTH_GOOGLE_SECRET|DATABASE_URL|ANTHROPIC_API_KEY)[[:space:]]*[=:][[:space:]]*["'"'"'][^"'"'"'[:space:]]'
-          if git grep -InE "$MOTIF" -- ':!.env.example' ':!*.md' ':!.github/**'; then
-            echo "::error::Secret potentiellement en dur. Les secrets vivent dans" \
-                 "l'environnement, jamais dans le code."
-            exit 1
-          fi
-          echo "Aucun secret en dur."
+# ── Où sont passés les garde-fous n°1 et n°5 ? ────────────────────────────────
+# Ce fichier portait deux `git grep` en bash — un filet grossier annoncé comme provisoire,
+# « en attendant le vrai test-garde `pii-guard` [V1-10] ». Ce test existe désormais
+# (`tests/piiGuard.test.ts`) : il tourne dans le job `gate` ci-dessus, avec la même autorité
+# de blocage, mais il est PRÉCIS (motifs de forme), son VOLUME est prouvé, sa DISCRIMINATION
+# est prouvée motif par motif, et il connaît la convention « un exemple porte un marqueur ».
+#
+# Les deux versions ont été retirées plutôt que corrigées, parce que maintenir la même règle
+# dans deux langages la fait diverger — et elle AVAIT divergé, en silence :
+#   · le grep d'adresse attrapait la chaîne fabriquée qui prouve que le test détecte
+#     quelque chose (« détecter le détecteur ») ⇒ CI rouge sur quatre commits d'affilée ;
+#   · le grep de secrets, masqué derrière le premier, aurait échoué sur la ligne de
+#     documentation `DATABASE_URL='postgres://…'` de `scripts/charger-seed.ts` — il n'avait
+#     aucune notion d'exemple documenté.
+# Une règle, un endroit. Toute évolution du garde-fou n°1 ou n°5 passe par ce test.

@@ -107,7 +107,7 @@ describe("données personnelles (garde-fou n°1)", () => {
       (o) => `${o.notes} ${o.raisons.map((r) => r.texte).join(" ")}`,
     ).join(" ");
 
-    // Civilité suivie d'un mot capitalisé : « M. Tremblay », « Mme Gagnon ».
+    // Civilité suivie d'un mot capitalisé — exemples factices : « M. Untel », « Mme Unetelle ».
     expect(texte, "civilité suivie d'un nom").not.toMatch(
       /\b(M\.|Mme|Monsieur|Madame)\s+[A-ZÉÈÀ]/,
     );

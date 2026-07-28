@@ -84,6 +84,8 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
   erreur** — le gate local est obligatoire avant chaque commit, et la CI est le seul filet
   partagé. Un commit poussé est en ligne : dans le doute, on vérifie avant, pas après.
   Retour arrière = `git revert`, jamais de réécriture d'historique sur `main`.
+  ⚠️ **Le push n'est pas fini tant que le run de CI n'a pas été CONSULTÉ.** Sans PR, rien
+  n'affiche un ✗ : une CI rouge peut passer inaperçue sur plusieurs commits (vécu, ×4).
 - **Flotte d'agents** (`.claude/agents/`) : panel avant merge via `/review`. Un finding est
   une **hypothèse** : on vérifie le vrai code avant de coder un correctif. Entre deux agents
   qui se contredisent, **celui qui a mesuré l'emporte sur celui qui a déduit**.
@@ -138,6 +140,20 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   `tests/pii-guard.test.ts` au lieu de `tests/piiGuard.test.ts`. Une constitution qui
   renvoie à un fichier inexistant n'est pas juste périmée : elle est invérifiable — on ne
   peut pas distinguer « le verrou manque » de « le nom est faux ».
+- **Sans PR, la CI ne se regarde pas toute seule : la vérifier fait partie du push.**
+  Le gate local a été vert sur quatre commits d'affilée pendant que la CI était ROUGE — et
+  personne ne l'a vu, parce qu'il n'y a pas de PR pour afficher un ✗. Sur ce dépôt,
+  « poussé » ne veut pas dire « vert ». Le push n'est fini qu'une fois le run consulté.
+- **Une même règle tenue dans deux langages diverge, et le mauvais exemplaire gagne.**
+  Le garde-fou n°1 vivait à la fois dans `tests/piiGuard.test.ts` et dans un `git grep` de
+  la CI. Le grep, plus grossier, a fini par bloquer sur la chaîne fabriquée qui PROUVE que
+  le test détecte quelque chose — il détectait le détecteur. Et il cachait un second échec
+  latent, faute de connaître la convention « un exemple porte un marqueur ». Deux
+  implémentations d'une règle, c'est une règle et demie : garder la précise, retirer l'autre.
+- **Un garde qui s'exclut d'un dossier entier s'en exclut pour toujours.** `piiGuard`
+  ignorait tout `tests/` pour ne pas se détecter lui-même : la bonne exclusion était LUI,
+  pas le dossier. Exclure large est le réflexe facile, et il laisse un angle mort permanent
+  que rien ne signale.
 - **Toute date que l'app ÉCRIT se calcule dans le fuseau de Marc, jamais en UTC.**
   Vercel tourne en UTC, Marc vit à UTC−4 : `new Date().toISOString().slice(0, 10)` date du
   LENDEMAIN toute offre ajoutée après 20 h locale. Le format voulu (`AAAA-MM-JJ`) s'obtient

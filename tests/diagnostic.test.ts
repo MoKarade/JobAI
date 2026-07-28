@@ -6,8 +6,11 @@
 import { describe, it, expect } from "vitest";
 import { diagnostiquerConfiguration } from "../lib/diagnostic";
 
+// Toutes ces valeurs sont FACTICES. Le marqueur n'est pas décoratif : `tests/piiGuard.test.ts`
+// scanne aussi ce fichier, et sa règle est qu'un exemple porte un marqueur reconnaissable.
+// Une vraie valeur collée ici n'en aurait pas — et serait donc détectée.
 const ENV_COMPLET = {
-  AUTH_SECRET: "un-secret-de-signature-tres-long",
+  AUTH_SECRET: "signature-factice-assez-longue",
   AUTHORIZED_EMAIL: "quelquun@exemple.test",
   GOOGLE_CLIENT_ID: "123456789-abcdef.apps.googleusercontent.com",
   GOOGLE_CLIENT_SECRET: "GOCSPX-valeurfactice",
