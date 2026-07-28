@@ -75,8 +75,12 @@
       (recherche + 4 filtres), page d'accueil, styles bi-thème. ✅ 2026-07-28.
       Logique de filtrage en fonction pure testée (`lib/filtres.ts`, 11 tests).
       États honnêtes distincts : « base non configurée » ≠ « aucune offre ».
-- [ ] 🔧 **`[V1-06b]`** Interactivité d'écriture : changer un statut, une priorité, une note
-      personnelle (Server Actions + revalidation). C'est ce qui rend le tracker *utilisable*.
+- [x] 🔧 **`[V1-06b]`** Écriture : statut, priorité et note personnelle modifiables
+      (Server Action + revalidation, affichage optimiste avec retour arrière signalé).
+      ✅ 2026-07-28. Le verrou du garde-fou n°2 est testé : un patch contenant `score`,
+      `raisons` ou `entreprise` ne survit pas au parse Zod. Écart assumé avec l'artifact :
+      liste déroulante au lieu du cycle au clic (le cycle est inutilisable au clavier et
+      n'annonce pas ses valeurs).
 - [ ] 🔧 **`[V1-06c]`** Panneaux de contenu : barème, salaires du marché, SWOT, ajout manuel
       d'une offre. Le contenu vient de l'artifact et n'est pas encore porté.
 - [x] 🔧 **`[V1-07]`** `why` converti en **format structuré** (`raisons` : un ton, un texte).

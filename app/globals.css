@@ -340,3 +340,66 @@ code {
   .carte__raisons, .carte__meta, .carte__notes,
   .carte__note-perso, .carte .pastille { grid-column: 1 / -1; }
 }
+
+/* ── Contrôles d'une offre (statut, priorité, note) ──────────────────────── */
+.controles-offre {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: flex-end;
+  margin-top: 0.35rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.controle { display: flex; flex-direction: column; gap: 0.2rem; }
+.controle--large { flex: 1 1 14rem; }
+.controle__l {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+.select,
+.zone-note {
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  padding: 0.35rem 0.5rem;
+  min-height: 2.25rem;
+}
+.zone-note { width: 100%; resize: vertical; font-size: 0.85rem; }
+.select:focus-visible,
+.zone-note:focus-visible { outline: 2px solid var(--ambre); outline-offset: 1px; }
+.select:disabled,
+.zone-note:disabled { opacity: 0.6; }
+
+/* Le statut garde sa couleur, comme la pastille de l'artifact. */
+.select--Identifiee { border-left: 3px solid var(--bleu); }
+.select--CVenvoye { border-left: 3px solid var(--vert); }
+.select--Relance { border-left: 3px solid var(--ambre); }
+.select--Entrevue { border-left: 3px solid var(--violet); }
+.select--Refusee { border-left: 3px solid var(--rouge); }
+.select--Offre { border-left: 3px solid var(--vert); }
+
+.bouton--discret {
+  margin-top: 0;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: transparent;
+  border-color: var(--ambre);
+}
+.controles-offre__erreur {
+  flex: 1 0 100%;
+  font-size: 0.8rem;
+  color: var(--rouge);
+}
+
+@media (max-width: 23.75rem) {
+  .controles-offre { grid-column: 1 / -1; }
+}

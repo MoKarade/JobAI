@@ -9,15 +9,7 @@
 
 import type { Offre } from "@/lib/types";
 import { palier } from "@/lib/scoring";
-
-const LIBELLE_STATUT: Record<Offre["statut"], string> = {
-  Identifiee: "IDENTIFIÉE",
-  CVenvoye: "CV ENVOYÉ",
-  Relance: "RELANCE FAITE",
-  Entrevue: "ENTREVUE",
-  Refusee: "REFUSÉE",
-  Offre: "OFFRE REÇUE",
-};
+import { ControlesOffre } from "./ControlesOffre";
 
 /** Les distances s'écrivent à la française : 3,5 km. */
 function formaterKm(km: number): string {
@@ -59,10 +51,6 @@ export function CarteOffre({ offre }: { offre: Offre }) {
         ) : null}
       </div>
 
-      <span className={`pastille pastille--${offre.statut}`}>
-        {LIBELLE_STATUT[offre.statut]}
-      </span>
-
       {offre.raisons.length > 0 ? (
         <ul className="carte__raisons">
           {offre.raisons.map((r, i) => (
@@ -74,7 +62,6 @@ export function CarteOffre({ offre }: { offre: Offre }) {
       ) : null}
 
       <div className="carte__meta">
-        <span className={`priorite priorite--${offre.priorite}`}>{offre.priorite}</span>
         {offre.km !== null ? (
           <span className="etiquette etiquette--km">{formaterKm(offre.km)}</span>
         ) : null}
@@ -87,7 +74,8 @@ export function CarteOffre({ offre }: { offre: Offre }) {
       </div>
 
       {offre.notes ? <p className="carte__notes">{offre.notes}</p> : null}
-      {offre.userNote ? <p className="carte__note-perso">{offre.userNote}</p> : null}
+
+      <ControlesOffre offre={offre} />
     </article>
   );
 }
