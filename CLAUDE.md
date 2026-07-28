@@ -50,6 +50,10 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
    Guichet-Emplois, données ouvertes EDSC) et les API officielles. *Seul fichier autorisé à
    faire un `fetch` sortant vers une source d'offres* : `lib/ingest/`. *Verrou* : ADR-0002
    avant toute nouvelle source.
+   *Autre frontière réseau, distincte* : `lib/geocodage.ts` est le seul fichier autorisé à
+   appeler Nominatim (OpenStreetMap), et il ne géocode que des **municipalités** — jamais
+   une adresse, jamais un employeur, jamais le domicile. Service bénévole : une requête par
+   seconde, déclenchée par un geste de Marc, jamais au chargement d'une page.
 
 5. **Échec fermé, server-side only.** Jetons et appels LLM restent côté serveur. Chaque
    Server Action revérifie la session (`requireSession`). `HUB_TOKEN` absent → 503 ;

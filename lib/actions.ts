@@ -14,10 +14,13 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { offers } from "./db/schema";
+import { offers, villes } from "./db/schema";
 import { exigerSession } from "./session";
-import { MiseAJourOffreSchema } from "./types";
+import { MiseAJourOffreSchema, type Offre } from "./types";
 import { NouvelleOffreSchema, aujourdhui, construireOffre, identifiantPour } from "./ajout";
+import { villesNecessaires } from "./carte";
+import { geocoderPlusieurs } from "./geocodage";
+import { ENTREPRISES_CIBLES } from "./reference";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -31,6 +34,69 @@ export type Resultat = { ok: true } | { ok: false; erreur: string };
 export type ResultatAjout =
   | { ok: true; id: string }
   | { ok: false; erreur: string; champs?: Record<string, string> };
+
+/**
+ * Géocode les villes des offres qui n'en ont pas encore, une passe à la fois.
+ *
+ * Déclenchée par un GESTE de Marc, jamais automatiquement : Nominatim est un service
+ * bénévole qui demande un usage parcimonieux, et une app qui le sollicite à chaque
+ * chargement de page se fait bannir — ce qui casserait la carte pour de bon.
+ *
+ * Le résultat DIT ce qui s'est passé, y compris quand rien n'a été trouvé. Un bouton qui
+ * ne répond rien laisse croire qu'il n'a pas fonctionné.
+ */
+export async function geocoderVillesManquantes(): Promise<
+  | { ok: true; ajoutees: number; introuvables: string[]; restantes: number; panne: string | null }
+  | { ok: false; erreur: string }
+> {
+  try {
+    await exigerSession();
+  } catch {
+    return { ok: false, erreur: "Authentification requise." };
+  }
+
+  try {
+    const [lignes, connues] = await Promise.all([
+      db.select().from(offers),
+      db.select({ nom: villes.nom }).from(villes),
+    ]);
+
+    const dejaConnues = new Set(connues.map((v) => v.nom));
+    const aFaire = villesNecessaires(lignes as unknown as Offre[], ENTREPRISES_CIBLES).filter(
+      (v) => !dejaConnues.has(v),
+    );
+
+    if (aFaire.length === 0) {
+      return { ok: true, ajoutees: 0, introuvables: [], restantes: 0, panne: null };
+    }
+
+    const r = await geocoderPlusieurs(aFaire, {
+      recuperer: fetch,
+      courrielContact: process.env.AUTHORIZED_EMAIL,
+    });
+
+    // On enregistre ce qui a été trouvé MÊME en cas de panne en cours de passe : jeter le
+    // travail déjà fait garantirait de rebuter sur le même obstacle à chaque tentative.
+    if (r.trouvees.length > 0) {
+      await db
+        .insert(villes)
+        .values(r.trouvees.map((v) => ({ nom: v.nom, lat: v.lat, lon: v.lon })))
+        .onConflictDoNothing();
+    }
+
+    revalidatePath("/carte");
+    return {
+      ok: true,
+      ajoutees: r.trouvees.length,
+      introuvables: r.introuvables,
+      restantes: Math.max(0, aFaire.length - r.trouvees.length - r.introuvables.length),
+      panne: r.panne,
+    };
+  } catch (err) {
+    console.error("[actions] géocodage impossible", err);
+    return { ok: false, erreur: "Géocodage impossible. Réessaie plus tard." };
+  }
+}
 
 /**
  * Ajoute une offre saisie à la main.

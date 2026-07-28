@@ -5,6 +5,7 @@
 
 import { describe, it, expect } from "vitest";
 import { ENTREPRISES_CIBLES, SALAIRES_MARCHE, SWOT } from "../lib/reference";
+import { apparier } from "../lib/carte";
 import { RAYON_MAX_KM } from "../lib/scoring";
 import { SEED } from "../lib/seed";
 
@@ -64,13 +65,11 @@ describe("entreprises cibles", () => {
   it("couvrent les employeurs des offres actives", () => {
     // Si une offre cite un employeur absent de cette liste, l'une des deux sources est
     // en retard sur l'autre — et c'est le genre d'écart qu'on ne voit jamais à l'œil.
-    const connues = new Set(ENTREPRISES_CIBLES.map((e) => e.nom.toLowerCase()));
+    // Appariement via `lib/carte.ts` : la carte s'en sert pour situer chaque offre. Deux
+    // règles écrites séparément divergeraient, et l'une des deux se mettrait à mentir.
     const manquantes = SEED.filter((o) => !o.histo)
       .map((o) => o.entreprise)
-      .filter((nom) => {
-        const n = nom.toLowerCase();
-        return ![...connues].some((c) => n.includes(c) || c.includes(n));
-      });
+      .filter((nom) => !ENTREPRISES_CIBLES.some((c) => apparier(nom, c.nom)));
     expect(manquantes).toEqual([]);
   });
 });

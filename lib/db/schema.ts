@@ -164,7 +164,48 @@ export const offerReasons = pgTable(
   ],
 );
 
+/**
+ * Coordonnées des municipalités, géocodées une fois puis conservées.
+ *
+ * POURQUOI UNE TABLE, ET PAS DES COLONNES SUR `offers` : les villes se répètent (une
+ * douzaine de municipalités pour des dizaines d'offres). Géocoder par offre ferait dix
+ * fois le même appel pour « Québec », alors que Nominatim demande une requête par seconde
+ * au maximum et un usage parcimonieux.
+ *
+ * POURQUOI EN BASE, ET PAS EN DUR DANS LE CODE : le garde-fou n°1 interdit tout couple de
+ * coordonnées dans un fichier versionné, et `tests/piiGuard.test.ts` le fait respecter. Ces
+ * coordonnées-ci sont publiques et inoffensives, mais un garde qui distingue « les bonnes »
+ * des « mauvaises » coordonnées par la forme n'existe pas — l'assouplir pour laisser passer
+ * des centres-villes ouvrirait la porte à celles qu'il protège. La donnée va donc en base.
+ */
+export const villes = pgTable(
+  "villes",
+  {
+    /** Nom géocodable, normalisé (« Beauport », pas « Québec (Beauport) »). */
+    nom: text("nom").primaryKey(),
+
+    /**
+     * Position du CENTRE de la municipalité — jamais celle d'un employeur, encore moins
+     * celle du domicile. C'est une approximation assumée, et l'interface le dit : la
+     * distance exacte de chaque offre vit dans `offers.km`, mesurée, elle.
+     */
+    lat: real("lat").notNull(),
+    lon: real("lon").notNull(),
+
+    /** Quand le géocodage a eu lieu. Permet de re-sonder une entrée douteuse sans tout refaire. */
+    geocodeLe: timestamp("geocode_le", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Bornes de la grande région de Québec, larges. Un géocodeur qui rend « Québec,
+    // Colombie-Britannique » ou une erreur de signe placerait une épingle à des milliers
+    // de kilomètres, et la carte aurait l'air cassée sans qu'on sache pourquoi.
+    check("villes_lat_ck", sql`${table.lat} >= 45 AND ${table.lat} <= 49`),
+    check("villes_lon_ck", sql`${table.lon} >= -75 AND ${table.lon} <= -68`),
+  ],
+);
+
 export type OfferRow = typeof offers.$inferSelect;
 export type NewOfferRow = typeof offers.$inferInsert;
 export type OfferReasonRow = typeof offerReasons.$inferSelect;
+export type VilleRow = typeof villes.$inferSelect;
 export type NewOfferReasonRow = typeof offerReasons.$inferInsert;

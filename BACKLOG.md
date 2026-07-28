@@ -243,16 +243,35 @@
       Une panne de base y donne un message honnête plutôt qu'un 404 trompeur.
       ⚠️ Reste à faire : l'historique des changements de statut (rien ne l'enregistre
       aujourd'hui — il faudrait une table dédiée).
-- [ ] 🔧 **`[UX-04]`** **Carte des offres** (proximité et distance depuis le domicile).
-      Contraintes à régler avant de coder :
-      · il faut des **coordonnées par offre** — aujourd'hui on ne stocke que la distance en
-        km. Géocodage gratuit possible via Nominatim (OpenStreetMap), limité à 1 requête/s
-        et exigeant un en-tête d'identification ; à faire **une fois par offre**, résultat
-        persisté en base (colonnes à ajouter).
-      · carte : **Leaflet + tuiles OpenStreetMap** (gratuit, pas de clé). ⚠️ Les tuiles
-        viennent d'un domaine tiers : si une CSP est ajoutée d'ici là, il faudra l'autoriser.
-      · **le domicile ne doit PAS être affiché ni envoyé au client** (garde-fou n°1) : la
-        carte montre les offres, pas où habite Marc. Centrer sur la région, pas sur le point.
+- [x] 🔧 **`[UX-04]`** **Carte des offres**. ✅ 2026-07-28 — 3ᵉ onglet `/carte`.
+      · **On géocode des VILLES, pas des offres** : une douzaine de municipalités pour des
+        dizaines d'offres. Géocoder par offre ferait dix fois la même requête pour
+        « Québec », alors que Nominatim demande une requête/seconde et un usage parcimonieux.
+        La ville vient de `ENTREPRISES_CIBLES`, déjà structurée — aucun parsing des `notes`,
+        qui aurait produit des épingles fausses là où la ville n'est pas écrite.
+      · **Les coordonnées vont en BASE, jamais dans le code.** Le garde PII interdit tout
+        couple `4x.xxxx, -7x.xxxx` dans un fichier versionné. Ces coordonnées-ci sont
+        publiques, mais aucun garde ne distingue « les bonnes » des « mauvaises » par la
+        forme : l'assouplir pour laisser passer des centres-villes ouvrirait la porte à
+        celles qu'il protège. Nouvelle table `villes` + migration `0001`.
+      · **Garde-fou n°1 tenu** : le domicile n'est ni affiché, ni envoyé au client, ni
+        déductible — le cadrage se calcule à partir des seules épingles. Verrouillé par test.
+      · **Ce qui manque est COMPTÉ** : « 4 offres situées sur 23 », employeurs sans ville
+        nommés, villes en attente de géocodage. Une carte qui montre 12 épingles pour
+        23 offres sans le dire laisse croire à une couverture qu'elle n'a pas.
+      · **Parité clavier/lecteur d'écran** : la carte est `aria-hidden` (une carte de tuiles
+        ne s'explore pas au lecteur d'écran) et la liste sous elle porte la MÊME information.
+      · `circleMarker` plutôt que les marqueurs par défaut : ceux-ci référencent des PNG par
+        URL relative et disparaissent dès qu'un bundler renomme les fichiers — panne visible
+        en production seulement. Leaflet est chargé dynamiquement (**mesuré** : absent des
+        chunks de démarrage).
+      · La règle d'appariement offre↔entreprise vivait **dans un test** ; extraite dans
+        `lib/carte.ts`, consommée par la carte ET par le test de référence. Une règle, un
+        endroit — plancher de longueur ajouté contre le piège du matching par sous-chaîne.
+      ⚠️ **Deux parties NON vérifiées depuis la session** (le proxy réseau refuse Nominatim
+      et il n'y a pas d'e2e) : l'appel réel au géocodeur, et le rendu Leaflet. Toute la
+      logique est testée avec un `fetch` injecté (18 tests) ; le premier clic sur « Situer
+      les villes » en production est le vrai signal. 👤 À exercer une fois.
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
       · **Guichet-Emplois** — flux XML officiel d'EDSC, sur demande. C'est la source

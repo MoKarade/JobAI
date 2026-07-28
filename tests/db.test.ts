@@ -67,20 +67,20 @@ function hash(s: string): number {
 }
 
 describe("migration", () => {
-  it("crée les deux tables attendues", async () => {
+  it("crée les trois tables attendues", async () => {
     const r = await pg.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' ORDER BY table_name`,
     );
-    expect(r.rows.map((x) => x.table_name)).toEqual(["offer_reasons", "offers"]);
+    expect(r.rows.map((x) => x.table_name)).toEqual(["offer_reasons", "offers", "villes"]);
   });
 
-  it("pose bien les 7 contraintes CHECK du schéma", async () => {
+  it("pose bien les 9 contraintes CHECK du schéma", async () => {
     const r = await pg.query<{ constraint_name: string }>(
       `SELECT con.conname AS constraint_name
        FROM pg_constraint con
        JOIN pg_class rel ON rel.oid = con.conrelid
-       WHERE con.contype = 'c' AND rel.relname IN ('offers', 'offer_reasons')
+       WHERE con.contype = 'c' AND rel.relname IN ('offers', 'offer_reasons', 'villes')
        ORDER BY con.conname`,
     );
     expect(r.rows.map((x) => x.constraint_name)).toEqual([
@@ -91,7 +91,40 @@ describe("migration", () => {
       "offers_score_source_ck",
       "offers_source_ck",
       "offers_statut_ck",
+      "villes_lat_ck",
+      "villes_lon_ck",
     ]);
+  });
+});
+
+describe("table villes — les bornes géographiques", () => {
+  // Ces CHECK ne sont pas décoratifs : un géocodeur qui rend « Québec,
+  // Colombie-Britannique », ou une inversion de signe, poserait une épingle à des milliers
+  // de kilomètres. La carte aurait l'air cassée sans qu'on sache pourquoi. La base refuse.
+  it("accepte une position de la région", async () => {
+    await expect(
+      pg.query("INSERT INTO villes (nom, lat, lon) VALUES ('Ville-Test', 46.8, -71.2)"),
+    ).resolves.toBeDefined();
+  });
+
+  it("refuse une latitude hors région", async () => {
+    await expect(
+      pg.query("INSERT INTO villes (nom, lat, lon) VALUES ('Trop-Au-Sud', 40.7, -71.2)"),
+    ).rejects.toThrow(/villes_lat_ck/);
+  });
+
+  it("refuse une longitude de signe inversé", async () => {
+    // Le cas réel : `Number('-71.2')` mal lu, ou un géocodeur qui rend l'hémisphère est.
+    await expect(
+      pg.query("INSERT INTO villes (nom, lat, lon) VALUES ('Signe-Inverse', 46.8, 71.2)"),
+    ).rejects.toThrow(/villes_lon_ck/);
+  });
+
+  it("refuse deux fois la même ville", async () => {
+    await pg.query("INSERT INTO villes (nom, lat, lon) VALUES ('Unique', 46.8, -71.2)");
+    await expect(
+      pg.query("INSERT INTO villes (nom, lat, lon) VALUES ('Unique', 46.9, -71.3)"),
+    ).rejects.toThrow();
   });
 });
 

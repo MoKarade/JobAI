@@ -527,6 +527,67 @@ code {
   .afaire__genre { grid-row: auto; justify-self: start; }
 }
 
+/* ── Carte des offres ─────────────────────────────────────────────────────
+   La carte est `aria-hidden` : une carte de tuiles ne s'explore pas au lecteur
+   d'écran. La liste sous elle porte exactement la même information — c'est
+   elle, l'accès réel, pas un pis-aller. */
+.carte-offres {
+  height: 26rem;
+  margin: var(--pas-2) 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.carte__compte {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  margin-bottom: var(--pas);
+}
+.carte__echec { font-size: 0.82rem; color: var(--rouge); margin-top: var(--pas); }
+.carte__manquants {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  margin-top: var(--pas-2);
+  padding-top: var(--pas);
+  border-top: 1px solid var(--border);
+}
+.geocodage { margin-bottom: var(--pas-2); }
+.geocodage__message { font-size: 0.82rem; margin-top: 0.4rem; }
+.geocodage__note { font-size: 0.75rem; color: var(--text-soft); margin-top: 0.35rem; max-width: 62ch; }
+
+.carte-liste { list-style: none; display: flex; flex-direction: column; gap: var(--pas); }
+.carte-liste__ville {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 0.7rem 0.9rem;
+}
+.carte-liste__titre {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.4rem;
+}
+.carte-liste__n { color: var(--text-soft); font-weight: 400; }
+.carte-liste__ville ul { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.carte-liste__offre {
+  font-size: 0.86rem;
+  padding-left: 0.6rem;
+  border-left: 3px solid var(--border);
+}
+.carte-liste__offre--A { border-left-color: var(--violet); }
+.carte-liste__offre--B { border-left-color: var(--vert); }
+.carte-liste__offre--C { border-left-color: var(--ambre); }
+.carte-liste__faits {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+/* Les fenêtres de Leaflet sont injectées hors de React : on les habille ici. */
+.popup-offres { list-style: none; margin: 0.3rem 0 0; padding: 0; font-size: 0.82rem; }
+.popup-offres li { margin-bottom: 0.35rem; }
+
 /* ── Formulaire d'ajout manuel ────────────────────────────────────────────
    Replié par défaut : la liste est consultée à chaque visite, le formulaire
    quelques fois par semaine. Reprend l'apparence des panneaux pour que
