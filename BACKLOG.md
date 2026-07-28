@@ -158,9 +158,14 @@
 - [ ] 🔧 **`[UX-02]`** Page d'accueil repensée : aujourd'hui la liste commence tout de suite.
       Prévoir une vraie entrée en matière (ce qui mérite l'attention maintenant, prochaines
       actions, état de la recherche) plutôt qu'un tableau de compteurs.
-- [ ] 🔧 **`[UX-03]`** **Affichage complet d'une offre** : vue détail avec tout ce que la
-      carte ne montre pas (justification entière, notes, historique des statuts). C'est le
-      plus rapide à livrer et le plus immédiatement utile.
+- [x] 🔧 **`[UX-03]`** **Affichage complet d'une offre** : page `/offre/[id]` avec la
+      justification séparée en atouts / réserves, les notes de recherche, les faits
+      (distance, salaire, dates, **provenance de la note** — vérifiée à la main ou
+      calculée), et les contrôles de suivi. ✅ 2026-07-28. L'entreprise devient un lien
+      depuis la liste ; « offre ↗ » reste le lien externe — deux destinations, deux liens.
+      Une panne de base y donne un message honnête plutôt qu'un 404 trompeur.
+      ⚠️ Reste à faire : l'historique des changements de statut (rien ne l'enregistre
+      aujourd'hui — il faudrait une table dédiée).
 - [ ] 🔧 **`[UX-04]`** **Carte des offres** (proximité et distance depuis le domicile).
       Contraintes à régler avant de coder :
       · il faut des **coordonnées par offre** — aujourd'hui on ne stocke que la distance en

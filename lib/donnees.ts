@@ -55,6 +55,47 @@ export async function lireOffres(): Promise<Offre[] | null> {
   }));
 }
 
+/**
+ * Une offre par son identifiant, ou `null` si elle n'existe pas — ou si la base n'est pas
+ * configurée. Les deux cas donnent le même écran (« introuvable ») et c'est volontaire :
+ * un visiteur n'a pas à distinguer une offre absente d'une base éteinte.
+ *
+ * Une requête ciblée plutôt qu'un filtre sur `lireOffres()` : la page de détail ne doit pas
+ * dépendre du chargement de tout le suivi.
+ */
+export async function lireOffre(id: string): Promise<Offre | null> {
+  if (!process.env.DATABASE_URL) return null;
+
+  const [ligne] = await db.select().from(offers).where(eq(offers.id, id)).limit(1);
+  if (!ligne) return null;
+
+  const raisons = await db
+    .select()
+    .from(offerReasons)
+    .where(eq(offerReasons.offerId, id))
+    .orderBy(asc(offerReasons.ordre));
+
+  return {
+    id: ligne.id,
+    source: ligne.source,
+    dateReperage: ligne.dateReperage,
+    entreprise: ligne.entreprise,
+    poste: ligne.poste,
+    lien: ligne.lien,
+    km: ligne.km,
+    salaireAffiche: ligne.salaireAffiche,
+    priorite: ligne.priorite,
+    statut: ligne.statut,
+    dateEnvoi: ligne.dateEnvoi,
+    score: ligne.score,
+    scoreSource: ligne.scoreSource,
+    raisons: raisons.map((r) => ({ ton: r.ton, texte: r.texte })),
+    notes: ligne.notes,
+    userNote: ligne.userNote,
+    histo: ligne.histo,
+  };
+}
+
 /** Remplace la justification d'une offre. Utilisé par le chargement du jeu de départ. */
 export async function remplacerRaisons(offreId: string, raisons: readonly Raison[]) {
   await db.delete(offerReasons).where(eq(offerReasons.offerId, offreId));

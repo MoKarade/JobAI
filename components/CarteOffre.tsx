@@ -7,6 +7,7 @@
 // stockait du HTML et l'injectait tel quel ; React échappe tout par défaut, donc même si
 // un texte contenait des chevrons, ils s'afficheraient au lieu d'être interprétés.
 
+import Link from "next/link";
 import type { Offre } from "@/lib/types";
 import { palier } from "@/lib/scoring";
 import { ControlesOffre } from "./ControlesOffre";
@@ -42,7 +43,12 @@ export function CarteOffre({ offre }: { offre: Offre }) {
       </div>
 
       <div className="carte__tete">
-        <span className="carte__entreprise">{offre.entreprise}</span>
+        {/* L'entreprise mène au détail interne ; « offre ↗ » mène à l'annonce externe.
+            Deux destinations différentes, donc deux liens distincts — un seul lien qui
+            fait les deux selon le contexte serait un piège. */}
+        <Link href={`/offre/${offre.id}`} className="carte__entreprise">
+          {offre.entreprise}
+        </Link>
         <span className="carte__poste">{offre.poste}</span>
         {href ? (
           <a href={href} target="_blank" rel="noopener noreferrer">
