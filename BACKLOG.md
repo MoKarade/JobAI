@@ -40,8 +40,14 @@
 **Critère de fin** : Marc utilise JobAI depuis son téléphone, et le widget s'affiche sur
 `hubperso.com` avec des données réelles.
 
-- [ ] 🔧 **`[V1-01]`** Schéma Drizzle + migration initiale. Modélise dès maintenant ce que la
-      V3 produira (documents générés par offre), pour ne pas migrer deux fois.
+- [x] 🔧 **`[V1-01]`** Schéma Drizzle + migration initiale + connexion paresseuse.
+      ✅ 2026-07-28 : tables `offers` et `offer_reasons`, **7 contraintes CHECK réelles**
+      (les `enum` de Drizzle ne sont que du typage TypeScript — sans CHECK, la base
+      accepterait n'importe quelle chaîne), 13 tests d'intégration sur PGlite, **prouvés
+      discriminants** (contrainte neutralisée → exactement le bon test échoue).
+      Choix assumé : on anticipe la **forme** (`scoreSource`, `perimeeLe`, justification
+      structurée) mais on ne crée **pas** les tables de la V3 — un `CREATE TABLE` est
+      additif et indolore, une table vide « au cas où » est de la spéculation.
 - [ ] 🔧 **`[V1-02]`** Portage de la logique pure : `scoring.ts`, fusion du suivi
       (`USER_OWNED_FIELDS`), résumé. Tests unitaires en premier.
 - [ ] 🔧 **`[V1-03]`** Endpoint `GET /api/hub/summary` conforme au contrat + **exclusion du

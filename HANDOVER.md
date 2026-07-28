@@ -17,7 +17,8 @@
 | **Gate** | `typecheck` + `test` + `lint` + `build` verts. Rejoué par la CI à chaque push. |
 | **CI** | `.github/workflows/ci.yml` : job `gate` (le gate local) + job `garde-fous` (aucune adresse municipale en dur, aucun secret en dur). Node épinglé par `.nvmrc` (**22**, pas 20 comme les autres dépôts : Node 20 est en fin de support et cette session développe en 22). |
 | **Endpoint hub** | `GET /api/hub/summary` personnalisé : `id: "jobai"`, `name: "JobAI"`, `url: https://emploi.hubperso.com`, `color: "#f2a31b"`. Répond `503` si `HUB_TOKEN` absent, `401` si jeton invalide, `building` sinon. |
-| **Base de données** | Aucune. Prévue en `[V1-01]` (Neon + Drizzle). |
+| **Base de données** | Schéma Drizzle en place (`offers`, `offer_reasons`), migration `drizzle/0000_*.sql` **générée et committée mais JAMAIS APPLIQUÉE** — aucune instance Neon n'existe encore `[V1-11]`. Connexion paresseuse : le module s'importe au build sans `DATABASE_URL`, l'erreur ne part qu'à la première requête réelle. |
+| **Sécurité des dépendances** | `npm audit --omit=dev` → **0 vulnérabilité**. drizzle-orm monté en 0.45.2 (injection SQL), Next en 15.5.22 (8 avis HIGH), `postcss`/`sharp` forcés par `overrides`. ⚠️ **BatchChef reste exposé** à la même injection SQL (drizzle 0.44.7) — voir `[SEC-BATCHCHEF-DRIZZLE]`. |
 | **Auth utilisateur** | Aucune. Prévue en `[V1-04]` (Auth.js v5 Google mono-adresse). |
 | **UI** | Celle d'`app-template` (page d'accueil du squelette). Le portage du tracker est `[V1-06]`. |
 | **Déploiement** | Rien de déployé. Aucun projet Vercel, aucun DNS. |
