@@ -71,9 +71,14 @@
       (seules les distances subsistent), nom de la personne des RH retiré, adresses
       municipales des entreprises réduites à la ville (elles auraient fait échouer le
       garde-fou de la CI pour rien). 18 tests d'intégrité, garde PII prouvé discriminant.
-- [ ] 🔧 **`[V1-06]`** Portage de l'UI depuis `tracker-emploi-v4.html` : `Dashboard`,
-      `Filters`, `OfferCard`, `AddOfferDialog`, `MarketTable`, `SwotPanel`, `ScoringPanel`.
-      Le CSS et le responsive (breakpoints 760/380 px) sont réutilisables quasi tels quels.
+- [x] 🔧 **`[V1-06a]`** Cœur de l'interface : `TableauBord`, `CarteOffre`, `ListeOffres`
+      (recherche + 4 filtres), page d'accueil, styles bi-thème. ✅ 2026-07-28.
+      Logique de filtrage en fonction pure testée (`lib/filtres.ts`, 11 tests).
+      États honnêtes distincts : « base non configurée » ≠ « aucune offre ».
+- [ ] 🔧 **`[V1-06b]`** Interactivité d'écriture : changer un statut, une priorité, une note
+      personnelle (Server Actions + revalidation). C'est ce qui rend le tracker *utilisable*.
+- [ ] 🔧 **`[V1-06c]`** Panneaux de contenu : barème, salaires du marché, SWOT, ajout manuel
+      d'une offre. Le contenu vient de l'artifact et n'est pas encore porté.
 - [x] 🔧 **`[V1-07]`** `why` converti en **format structuré** (`raisons` : un ton, un texte).
       ✅ 2026-07-28 — plus aucun HTML brut, verrouillé par un test qui refuse toute balise
       résiduelle dans le seed.

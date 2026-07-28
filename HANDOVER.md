@@ -21,7 +21,8 @@
 | **Sécurité des dépendances** | `npm audit --omit=dev` → **0 vulnérabilité**. drizzle-orm monté en 0.45.2 (injection SQL), Next en 15.5.22 (8 avis HIGH), `postcss`/`sharp` forcés par `overrides`. ⚠️ **BatchChef reste exposé** à la même injection SQL (drizzle 0.44.7) — voir `[SEC-BATCHCHEF-DRIZZLE]`. |
 | **Auth utilisateur** | Auth.js v5 + Google, une seule adresse (`AUTHORIZED_EMAIL`), middleware **fail-closed** (503 si `AUTH_SECRET`/`AUTHORIZED_EMAIL` manquent). Décision de garde en fonctions pures testées. Page `/connexion`. **Pas encore utilisable** : le client OAuth Google n'existe pas `[V1-13]`. |
 | **Logique métier** | Complète et testée : `lib/types.ts` (schémas Zod), `lib/scoring.ts` (barème, 27 tests), `lib/seed.ts` (38 offres, 18 tests), `lib/suivi.ts` (fusion, modification, résumé — 19 tests). **79 tests au total.** Toute la logique pure de la V1 est là ; il reste à la brancher (`[V1-03]` summary, `[V1-04]` auth, `[V1-06]` interface). |
-| **UI** | Celle d'`app-template` (page d'accueil du squelette). Le portage du tracker est `[V1-06]`. |
+| **UI** | Tracker en lecture : tableau de bord, liste, recherche et 4 filtres, styles bi-thème reprenant l'identité de l'artifact. **Pas encore d'écriture** (changer un statut) `[V1-06b]`, ni les panneaux barème/salaires/SWOT `[V1-06c]`. |
+| **Chargement du suivi** | `npm run db:seed` charge les 38 offres. **Idempotent et non destructif** : relançable après une mise à jour du jeu de départ, le suivi de Marc est préservé. |
 | **Déploiement** | Rien de déployé. Aucun projet Vercel, aucun DNS. |
 | **Chantier courant** | #00 Bootstrap — voir `BACKLOG.md`. |
 

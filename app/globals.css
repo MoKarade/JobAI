@@ -110,3 +110,233 @@ code {
   outline: 2px solid var(--text);
   outline-offset: 2px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Le tracker.
+
+   Reprend l'identité de l'artifact d'origine — accent ambre, chiffres en
+   monospace, bordure gauche colorée par palier — mais déclinée dans les DEUX
+   thèmes : le sombre n'est pas imposé, `prefers-color-scheme` décide.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ambre: oklch(62% 0.15 75);
+  --vert: oklch(58% 0.13 155);
+  --bleu: oklch(58% 0.14 250);
+  --rouge: oklch(56% 0.19 25);
+  --violet: oklch(56% 0.16 300);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ambre: oklch(78% 0.14 75);
+    --vert: oklch(72% 0.13 155);
+    --bleu: oklch(72% 0.12 250);
+    --rouge: oklch(68% 0.16 25);
+    --violet: oklch(74% 0.13 300);
+  }
+}
+
+.page {
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.entete h1 {
+  font-family: var(--mono);
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+}
+.entete__accent { color: var(--ambre); }
+.entete__sous {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  margin-top: 0.25rem;
+}
+
+/* ── Tableau de bord ─────────────────────────────────────────────────────── */
+.bord {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.6rem;
+  margin: 1.25rem 0 1.4rem;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ambre);
+  padding: 0.75rem 0.9rem;
+}
+.stat--envoi { border-left-color: var(--vert); }
+.stat--reponse { border-left-color: var(--bleu); }
+.stat--haut { border-left-color: var(--violet); }
+.stat--neutre { border-left-color: var(--border); }
+.stat__n { font-family: var(--mono); font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+.stat__l {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+  margin-top: 0.15rem;
+}
+
+/* ── Contrôles ───────────────────────────────────────────────────────────── */
+.controles { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.controles__recherche {
+  flex: 1 1 12rem;
+  max-width: 20rem;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+}
+.filtre {
+  padding: 0.45rem 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  cursor: pointer;
+  /* Cible tactile confortable : au moins 40 px de haut sur mobile. */
+  min-height: 2.5rem;
+}
+.filtre--actif { color: var(--ambre); border-color: var(--ambre); }
+.controles__recherche:focus-visible,
+.filtre:focus-visible { outline: 2px solid var(--ambre); outline-offset: 1px; }
+.controles__compte {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  margin: 0.7rem 0 0.5rem;
+}
+
+/* ── Cartes d'offre ──────────────────────────────────────────────────────── */
+.liste { display: flex; flex-direction: column; gap: 0.5rem; }
+.carte {
+  display: grid;
+  grid-template-columns: 3.25rem 1fr;
+  gap: 0.4rem 0.9rem;
+  align-items: start;
+  padding: 0.8rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+}
+.carte--A { border-left-color: var(--vert); }
+.carte--B { border-left-color: var(--ambre); }
+.carte--C { border-left-color: var(--text-soft); }
+.carte--histo { opacity: 0.62; }
+.carte--histo:hover { opacity: 0.9; }
+
+.note {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+.note small { display: block; font-size: 0.55rem; font-weight: 400; color: var(--text-soft); }
+.note--A { color: var(--vert); }
+.note--B { color: var(--ambre); }
+.note--C { color: var(--text-soft); }
+
+.carte__tete { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
+.carte__entreprise { font-weight: 600; }
+.carte__poste { color: var(--text-soft); font-size: 0.88rem; }
+.carte__tete a { color: var(--bleu); font-size: 0.78rem; }
+
+.carte__raisons,
+.carte__meta,
+.carte__notes,
+.carte__note-perso,
+.carte .pastille { grid-column: 2 / -1; }
+
+.carte__raisons { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; }
+.raison { font-size: 0.82rem; padding-left: 0.85rem; position: relative; }
+.raison::before { position: absolute; left: 0; font-weight: 700; }
+.raison--atout { color: var(--text); }
+.raison--atout::before { content: "+"; color: var(--vert); }
+.raison--reserve { color: var(--text-soft); }
+.raison--reserve::before { content: "−"; color: var(--ambre); }
+
+.carte__meta { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.75rem; }
+.etiquette {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+.etiquette--km { color: var(--ambre); }
+.etiquette--salaire { color: var(--vert); }
+.carte__date { font-family: var(--mono); font-size: 0.7rem; color: var(--text-soft); }
+.carte__notes { font-size: 0.8rem; color: var(--text-soft); }
+.carte__note-perso {
+  font-size: 0.82rem;
+  border-left: 2px solid var(--ambre);
+  padding-left: 0.6rem;
+}
+
+.pastille {
+  justify-self: start;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid currentColor;
+}
+.pastille--Identifiee { color: var(--bleu); }
+.pastille--CVenvoye { color: var(--vert); }
+.pastille--Relance { color: var(--ambre); }
+.pastille--Entrevue { color: var(--violet); }
+.pastille--Refusee { color: var(--rouge); }
+.pastille--Offre { color: var(--vert); font-weight: 700; }
+
+.priorite { font-family: var(--mono); font-size: 0.7rem; }
+.priorite--Haute { color: var(--ambre); }
+.priorite--Haute::before { content: "▲ "; }
+.priorite--Moyenne { color: var(--text-soft); }
+.priorite--Moyenne::before { content: "■ "; }
+.priorite--Basse { color: var(--text-soft); opacity: 0.75; }
+.priorite--Basse::before { content: "▽ "; }
+
+.vide { color: var(--text-soft); padding: 1.25rem 0; }
+
+/* ── États honnêtes ──────────────────────────────────────────────────────── */
+.etat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ambre);
+  padding: 1.1rem 1.25rem;
+  margin-top: 1.5rem;
+}
+.etat h2 { font-family: var(--mono); font-size: 0.95rem; margin-bottom: 0.5rem; }
+.etat p { color: var(--text-soft); font-size: 0.88rem; margin-bottom: 0.4rem; }
+.etat code { font-family: var(--mono); font-size: 0.82rem; color: var(--text); }
+.etat__aide { font-size: 0.82rem; }
+
+/* ── Mobile ──────────────────────────────────────────────────────────────── */
+@media (max-width: 47.5rem) {
+  .page { padding: 0.75rem 0.75rem 2.5rem; }
+  .bord { grid-template-columns: repeat(2, 1fr); }
+  .bord .stat:first-child { grid-column: 1 / -1; }
+  .controles__recherche { max-width: none; flex: 1 0 100%; font-size: 1rem; }
+  .filtre { flex: 1; text-align: center; }
+  .carte { grid-template-columns: 2.75rem 1fr; }
+}
+
+@media (max-width: 23.75rem) {
+  .bord { grid-template-columns: 1fr; }
+  .carte { grid-template-columns: 1fr; }
+  .note { text-align: left; }
+  .note small { display: inline; margin-left: 0.3rem; }
+  .carte__raisons, .carte__meta, .carte__notes,
+  .carte__note-perso, .carte .pastille { grid-column: 1 / -1; }
+}
