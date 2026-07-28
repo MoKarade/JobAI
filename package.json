@@ -1,14 +1,14 @@
 {
-  "name": "app-template",
+  "name": "jobai",
   "version": "0.1.0",
   "private": true,
-  "description": "Squelette d'app hub perso : expose GET /hub/summary conforme au contrat, prêt à forker.",
+  "description": "Suivi et analyse de recherche d'emploi (région de Québec) — app du hub perso.",
   "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

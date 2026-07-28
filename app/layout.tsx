@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "App Template",
-  description: "Squelette d'app hub perso.",
+  title: "JobAI",
+  description: "Suivi et analyse de recherche d'emploi — région de Québec.",
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

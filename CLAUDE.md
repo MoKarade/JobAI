@@ -1,35 +1,135 @@
-# CLAUDE.md — app-template
+# CLAUDE.md — JobAI
 
-Squelette d'app hub perso. Sa seule responsabilité générique : exposer
-`GET /hub/summary` conforme à [`@mokarade/hub-contract`](https://github.com/MoKarade/hub-contract).
-Tout le reste (l'interface, le moteur métier) se construit après le fork.
+> Mémoire de projet, chargée à chaque session. **Garde ce fichier court et à jour** (plafond
+> assumé : 150 lignes). Le détail vit dans `docs/`, `BACKLOG.md` et `HANDOVER.md`.
 
-## Principes non négociables
+## 1. Le projet en une phrase
 
-- **Contrat d'abord.** Le endpoint `/hub/summary` respecte le contrat ; toute réponse
-  passe par le schéma du contrat (ici `buildingSummary` le garantit ; au fork,
-  `HubSummarySchema.parse(...)` sur un vrai summary).
-- **No fake data.** Par défaut `status: "building"`, aucune métrique inventée. On ne
-  publie de vrais chiffres que quand le moteur les produit réellement.
-- **Auth échec fermé.** `x-hub-token` obligatoire (401 sinon), `HUB_TOKEN` obligatoire
-  côté serveur (500 sinon). Comparaison en temps constant. Jamais de secret en dur.
-- **no-store systématique** sur les réponses du endpoint (un summary est un instantané).
+**JobAI** suit la recherche d'emploi de Marc dans la région de Québec : offres notées selon
+son profil, statuts de candidature, détection des réponses de recruteurs, et assistance IA
+pour l'analyse d'offres et la rédaction de CV/lettres ciblés.
 
-## Au fork — checklist
+Stack : **Next.js 15** (App Router, Server Components + Server Actions) · **Neon** (Postgres
+serverless) + **Drizzle** · **Auth.js v5** (Google, mono-adresse) · **Anthropic SDK** ·
+**Zod** · **vitest**. Déploiement **Vercel** sur `emploi.hubperso.com`.
+Widget publié au hub perso via `GET /api/hub/summary` (contrat `@mokarade/hub-contract`).
 
-1. Personnaliser `APP` (id/name/url/color) dans `app/hub/summary/route.ts`.
-2. Remplacer `buildingSummary(...)` par un vrai summary quand le moteur est prêt.
-3. Générer + configurer `HUB_TOKEN`.
-4. Déclarer l'app dans `lib/sources.ts` du hub + `HUB_TOKEN_<ID>`.
+## 2. Garde-fous NON NÉGOCIABLES
 
-## Vérifications avant commit
+Format : {l'interdit · l'exception nommée et bornée · le seul fichier autorisé · le verrou}.
 
-```bash
-npm run typecheck && npm run test && npm run build
-```
+1. **Dépôt PRIVÉ, et aucune donnée personnelle en clair dans le code.**
+   Le suivi de recherche d'emploi contient l'adresse du domicile, le statut migratoire,
+   l'historique de refus et des noms de personnes tierces (conseillers RH). *Interdit* : tout
+   commit portant l'un de ces éléments. *Exception* : aucune. L'adresse de référence pour le
+   calcul de distance vit dans `DOMICILE_LAT` / `DOMICILE_LON` (variables d'environnement) ;
+   les noms de tiers ne sont jamais persistés dans un fichier versionné.
+   *Verrou* : ⚠️ **pas encore codé** — `tests/pii-guard.test.ts`, tâche `[V1-10]`. Tant qu'il
+   n'existe pas, ce garde-fou repose sur la vigilance, pas sur un test : ne pas l'oublier.
 
-## Style (hérité du CLAUDE.md global de Marc)
+2. **Le suivi appartient à Marc.** `statut`, `prio`, `dateEnvoi`, `userNote`
+   (`USER_OWNED_FIELDS`) ne sont **jamais** écrasés par un rafraîchissement de seed, une
+   ingestion ni un scan Gmail. *Exception* : aucune — le scan **propose**, Marc valide.
+   *Seul fichier autorisé à les écrire* : `lib/actions.ts` (Server Action déclenchée par un
+   geste de Marc). *Verrou* : ⚠️ **pas encore codé** — `tests/merge.test.ts`, tâche `[V1-02]`.
 
-- Réponses, commits et docs **en français** (`feat:`, `fix:`, `docs:`, …).
-- TypeScript strict, pas de `any` silencieux. Erreurs honnêtes, jamais avalées.
-- Ne pas imposer le dark mode : `prefers-color-scheme` décide.
+3. **No fake data.** Une métrique non mesurée ne s'affiche pas : `status:"building"` tant que
+   le moteur ne produit rien de réel, `—` plutôt qu'un 0 plausible, et une offre dont on ne
+   sait plus si elle est active est marquée **périmée**, jamais présentée comme ouverte.
+   Une note calculée par `scoring.ts` est plafonnée à 85 pour ne jamais dépasser une note
+   vérifiée à la main. *Verrou* : `tests/hubSummary.test.ts` couvre aujourd'hui le volet hub
+   (statut `building`, identité publiée) ; le plafond de notation reste à verrouiller `[V1-02]`.
+
+4. **Aucun scraping.** Indeed et Jobillico l'interdisent par leurs conditions et le bloquent
+   activement. *Exception nommée* : les sources publiques officielles (flux XML du
+   Guichet-Emplois, données ouvertes EDSC) et les API officielles. *Seul fichier autorisé à
+   faire un `fetch` sortant vers une source d'offres* : `lib/ingest/`. *Verrou* : ADR-0002
+   avant toute nouvelle source.
+
+5. **Échec fermé, server-side only.** Jetons et appels LLM restent côté serveur. Chaque
+   Server Action revérifie la session (`requireSession`). `HUB_TOKEN` absent → 503 ;
+   `x-hub-token` faux → 401 ; comparaison en temps constant. Jamais de secret en dur.
+
+6. **Le texte non maîtrisé n'entre pas nu dans un prompt.** Une description d'offre ou un
+   courriel de recruteur est une surface d'injection : tout passe par `sanitizePromptText`
+   + balisage de données (patron `promptSafety` de FinanceAI). Le LLM ne décide jamais seul
+   d'une écriture : il propose, le code valide contre un schéma Zod, Marc confirme.
+
+## 3. Conventions de code
+
+- **Langue** : code, commentaires, commits et docs **en français**. UI en français.
+- **Commits** : préfixés par l'ID de tâche du backlog. Ex. `[V1-03] endpoint hub summary`.
+- **Branches** : `claude/<slug>` pour le travail automatisé. `main` protégée par la CI.
+- **TypeScript strict** + `noUncheckedIndexedAccess`. Pas de `any` silencieux.
+- **Fonctions pures testées** : la logique (notation, fusion, agrégation, résumé hub) vit
+  hors des I/O et des composants. C'est ce qui rend le reste testable.
+- **Erreurs honnêtes** : jamais de `catch` qui avale. Un échec de plateforme (429, crédit
+  épuisé, quota Gmail) se distingue d'un échec métier et ne s'impute jamais à l'item.
+- **Pas d'emoji** dans l'UI produit ni dans les commits. Tolérés comme marqueurs de statut
+  dans `BACKLOG.md` et `HANDOVER.md` uniquement.
+- **Discipline de scope** : on livre par phases (voir `BACKLOG.md`). Ne pas anticiper.
+
+## 4. Workflow
+
+- **Gate avant chaque commit** : `npm run typecheck && npm run test && npm run build`,
+  plus `npm run lint` (bloquant). Jamais `--no-verify`.
+- **Push & merge** : branche `claude/**`, PR draft, CI verte, auto-merge (squash).
+  Override par le label `do-not-merge`. La toute première PR se merge à la main (le workflow
+  d'auto-merge n'agit qu'une fois présent sur `main`).
+- **Flotte d'agents** (`.claude/agents/`) : panel avant merge via `/review`. Un finding est
+  une **hypothèse** : on vérifie le vrai code avant de coder un correctif. Entre deux agents
+  qui se contredisent, **celui qui a mesuré l'emporte sur celui qui a déduit**.
+- **Documents vivants**, tenus à jour dans la **même PR** que le code : `HANDOVER.md` (état
+  courant, lu en premier), `BACKLOG.md` (coché au merge), `docs/LESSONS.md`, `docs/adr/`.
+  Doc périmée = pire que pas de doc.
+- **Boucle de leçons** : à chaque push, se demander « qu'ai-je appris ? ». Une leçon durable
+  remonte en §7 ci-dessous, dans le même commit. Rien appris → le dire, jamais sauter en silence.
+
+## 5. Commandes utiles
+
+- `npm run dev` · `npm run typecheck` · `npm run test` · `npm run build` · `npm run lint`
+- `npm run db:generate` / `db:migrate` — migrations Drizzle (appliquées à la main, hors build)
+- `/review` — panel d'agents sur le diff courant · `/lesson "…"` — consigne une leçon
+- `/handover` — régénère `HANDOVER.md` à partir de l'état réel
+
+## 6. État du projet
+
+Voir **`HANDOVER.md`** — ne pas dupliquer ici un état qui se périme.
+
+## 6 bis. Intégration Hub
+
+JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
+`@mokarade/hub-contract` (pinné par SHA, voir ADR-0001).
+
+- **Identité publiée** : `id: "jobai"`, `name: "JobAI"`, `url: "https://emploi.hubperso.com"`,
+  `color: "#f2a31b"`. L'`id` doit rester identique à l'entrée de `Hubperso/lib/sources.ts`.
+- **Auth** : header `x-hub-token`, comparaison en temps constant (SHA-256 + `timingSafeEqual`).
+  `HUB_TOKEN` absent → **503** ; jeton absent/faux → **401** ; méthode ≠ GET → **405**.
+  Réponse toujours `Cache-Control: no-store`.
+- **La route hub est hors du middleware d'auth utilisateur** : elle porte sa propre
+  authentification. L'ajouter au matcher renverrait une redirection HTML au hub, qui
+  afficherait « injoignable » en permanence.
+- **Honnêteté** : `status:"building"` tant qu'aucune donnée réelle n'est en base. Le point de
+  bascule unique est `getTrackerState()` — `null` = pas encore branché, `throw` = panne.
+  **Règle de maintenance** : chaque phase qui rend une métrique réellement disponible la
+  branche ici et fait passer le statut à `ok`. Jamais de chiffre fabriqué.
+- Le bloc `usage` (coût LLM) n'est publié que **mesuré**, jamais estimé.
+
+## 7. Leçons apprises (règles durables)
+
+> Vide au démarrage. N'ajouter ici que ce qui change la façon de coder.
+
+## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
+
+La note de fit est le cœur du produit : elle décide ce que Marc regarde en premier.
+Toute modification de `lib/scoring.ts` ou de la logique de matching offre↔profil exige :
+
+1. **ADR d'abord** — problème, impact coût LLM estimé, risques, méthode de test. Aucune
+   ligne de code avant l'ADR.
+2. **Audit sur du réel** — exécuter la nouvelle logique sur les **38 offres du seed**
+   (23 actives + 15 historiques, notées à la main) et rendre le tableau
+   [entreprise | poste | note avant | note après | écart] **avant** de modifier le pipeline.
+   Prouver sur du réel, jamais sur 2-3 cas choisis.
+3. **Non-régression** — les offres à note manuelle font foi : une note calculée qui dépasse
+   une note vérifiée à la main est un bug (plafond 85).
+4. **Fonctions pures + revue flotte** — logique isolée des I/O, testable, revue avant merge.

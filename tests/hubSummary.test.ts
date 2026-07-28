@@ -1,5 +1,5 @@
-// tests/hubSummary.test.ts — le Route Handler /hub/summary : auth (échec fermé) et
-// payload validé par le VRAI schéma du contrat.
+// tests/hubSummary.test.ts — le Route Handler /api/hub/summary : auth (échec fermé) et
+// payload validé par le VRAI schéma du contrat (jamais par une copie locale).
 
 import { describe, it, expect } from "vitest";
 import {
@@ -8,12 +8,12 @@ import {
   validateSummary,
 } from "@mokarade/hub-contract";
 import { hubTokenValid } from "../lib/hubToken";
-import { GET } from "../app/hub/summary/route";
+import { GET } from "../app/api/hub/summary/route";
 
-const JETON = "jeton-de-test-app-template-0123456789";
+const JETON = "jeton-de-test-jobai-0123456789abcdef";
 
 function req(headers: Record<string, string> = {}): Request {
-  return new Request("https://app-template.hubperso.com/hub/summary", { headers });
+  return new Request("https://emploi.hubperso.com/api/hub/summary", { headers });
 }
 
 function withHubToken(value: string | undefined, fn: () => void | Promise<void>) {
@@ -37,11 +37,12 @@ describe("hubTokenValid", () => {
   });
 });
 
-describe("GET /hub/summary", () => {
-  it("500 si HUB_TOKEN non configuré, sans summary", async () => {
+describe("GET /api/hub/summary", () => {
+  // ADR-0001 : 503 et non 500 — l'app fonctionne, c'est l'intégration qui n'est pas branchée.
+  it("503 si HUB_TOKEN non configuré, sans fuite de summary", async () => {
     await withHubToken(undefined, async () => {
       const res = GET(req({ [HUB_TOKEN_HEADER]: JETON }));
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(503);
       expect(await res.text()).not.toContain("contractVersion");
     });
   });
@@ -65,7 +66,20 @@ describe("GET /hub/summary", () => {
       expect(summary.metrics).toEqual([]);
       expect(summary.actions).toEqual([]);
       expect(summary.alerts).toHaveLength(1);
-      expect(summary.app.id).toBe("app-template");
+    });
+  });
+
+  // L'`id` publié est la clé de rapprochement avec `Hubperso/lib/sources.ts`.
+  // Le changer sans changer l'entrée du hub casse le widget en silence.
+  it("publie l'identité JobAI attendue par le hub", async () => {
+    await withHubToken(JETON, async () => {
+      const summary = validateSummary(
+        await GET(req({ [HUB_TOKEN_HEADER]: JETON })).json(),
+      );
+      expect(summary.app.id).toBe("jobai");
+      expect(summary.app.name).toBe("JobAI");
+      expect(summary.app.url).toBe("https://emploi.hubperso.com");
+      expect(summary.app.color).toBe("#f2a31b");
     });
   });
 });
