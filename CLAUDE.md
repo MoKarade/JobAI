@@ -170,6 +170,15 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   ignorait tout `tests/` pour ne pas se détecter lui-même : la bonne exclusion était LUI,
   pas le dossier. Exclure large est le réflexe facile, et il laisse un angle mort permanent
   que rien ne signale.
+- **Un message d'erreur FAUX coûte plus cher qu'un message générique.** La page Carte a
+  annoncé « la base n'a pas répondu » alors que la base répondait très bien — pour dire que
+  la table n'existait pas. Marc est parti vérifier une connexion là où il manquait une
+  commande. La cause n'était pas la logique mais sa DUPLICATION : l'accueil classait
+  correctement (`42P01` = table absente ≠ panne), la nouvelle page avait été écrite sans
+  reprendre cette classification. **Quand tu écris une page qui ressemble à une page
+  existante, va CHERCHER ses gardes au lieu de les réécrire** — et si elles sont inline,
+  extrais-les d'abord (`lib/panne.ts`). Verrouillé par un test qui interdit à toute page de
+  re-comparer le code Postgres dans son coin.
 - **Toute date que l'app ÉCRIT se calcule dans le fuseau de Marc, jamais en UTC.**
   Vercel tourne en UTC, Marc vit à UTC−4 : `new Date().toISOString().slice(0, 10)` date du
   LENDEMAIN toute offre ajoutée après 20 h locale. Le format voulu (`AAAA-MM-JJ`) s'obtient

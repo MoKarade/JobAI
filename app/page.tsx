@@ -11,6 +11,7 @@ import { lireOffres } from "@/lib/donnees";
 import { resumer } from "@/lib/suivi";
 import { prochainesActions } from "@/lib/aFaire";
 import { aujourdhui } from "@/lib/ajout";
+import { classerPanne, type Panne } from "@/lib/panne";
 import type { Offre } from "@/lib/types";
 import { TableauBord } from "@/components/TableauBord";
 import { ListeOffres } from "@/components/ListeOffres";
@@ -30,17 +31,15 @@ export default async function Accueil() {
   // simple digest : l'app a l'air cassée alors qu'il manque une commande à lancer.
   // Même patron que la route du hub — l'erreur est journalisée ET expliquée à l'écran.
   let offres: Offre[] | null = null;
-  let panne: "schema-absent" | "base-injoignable" | null = null;
+  let panne: Panne | null = null;
 
   try {
     offres = await lireOffres();
   } catch (err) {
     console.error("[page] lecture des offres impossible", err);
-    // Postgres 42P01 = « undefined_table ». C'est le cas le plus probable au premier
-    // déploiement : la base répond, mais `npm run db:migrate` n'a pas encore tourné.
-    const code = (err as { cause?: { code?: string }; code?: string })?.cause?.code
-      ?? (err as { code?: string })?.code;
-    panne = code === "42P01" ? "schema-absent" : "base-injoignable";
+    // La classification vit dans `lib/panne.ts`, partagée avec la page Carte : écrite deux
+    // fois à la main, elle a déjà divergé une fois — et l'écran s'est mis à mentir.
+    panne = classerPanne(err);
   }
 
   return (

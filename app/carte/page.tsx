@@ -21,6 +21,7 @@ import { lireOffres } from "@/lib/donnees";
 import { cadrage, construireVue, villesNecessaires } from "@/lib/carte";
 import { ENTREPRISES_CIBLES } from "@/lib/reference";
 import { palier } from "@/lib/scoring";
+import { classerPanne, type Panne } from "@/lib/panne";
 import { Cadre } from "@/components/Cadre";
 import { CarteOffres } from "@/components/CarteOffres";
 import { BoutonGeocoder } from "@/components/BoutonGeocoder";
@@ -34,7 +35,7 @@ export default async function PageCarte() {
 
   let offres = null;
   let coordonnees = new Map<string, { lat: number; lon: number }>();
-  let panne = false;
+  let panne: Panne | null = null;
 
   try {
     offres = await lireOffres();
@@ -43,20 +44,40 @@ export default async function PageCarte() {
       coordonnees = new Map(lignes.map((v) => [v.nom, { lat: v.lat, lon: v.lon }]));
     }
   } catch (err) {
-    // Même principe que partout ailleurs : une panne se DIT. Une carte vide sans
-    // explication envoie chercher un problème de données là où la base ne répond pas.
     console.error("[carte] lecture impossible", err);
-    panne = true;
+    // La MÊME classification que l'accueil (`lib/panne.ts`). Écrite à part, elle a divergé
+    // dès la première version de cette page : l'écran annonçait « la base n'a pas répondu »
+    // alors que la base répondait très bien — pour dire que la table `villes` n'existait
+    // pas. Un message d'erreur faux coûte plus cher qu'un message générique.
+    panne = classerPanne(err);
   }
 
-  if (panne || offres === null) {
+  if (panne === "schema-absent") {
     return (
       <Cadre actif="/carte" titre="Carte des offres">
         <div className="etat">
-          <h2>{panne ? "Données illisibles" : "Base de données non configurée"}</h2>
+          <h2>Table de la carte absente</h2>
+          <p>
+            La base répond, mais la table <code>villes</code> n’existe pas : la migration
+            qui l’ajoute n’a pas encore été appliquée. Ce n’est pas une panne.
+          </p>
+          <p className="etat__aide">
+            Depuis le dépôt, sur ton poste : <code>npm run db:migrate</code>. Puis reviens
+            ici et lance une passe de localisation.
+          </p>
+        </div>
+      </Cadre>
+    );
+  }
+
+  if (panne !== null || offres === null) {
+    return (
+      <Cadre actif="/carte" titre="Carte des offres">
+        <div className="etat">
+          <h2>{panne ? "Base de données injoignable" : "Base de données non configurée"}</h2>
           <p>
             {panne
-              ? "La base n’a pas répondu. Le détail est dans les journaux du serveur."
+              ? "La connexion a échoué. Le détail est dans les journaux du serveur — il n’est pas affiché ici, un message d’erreur de base pouvant contenir des identifiants."
               : "La variable DATABASE_URL n’est pas définie : aucune offre ne peut être lue."}
           </p>
         </div>
