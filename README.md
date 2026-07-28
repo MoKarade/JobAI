@@ -1,71 +1,77 @@
-# app-template
+# JobAI
 
-Squelette d'app pour l'écosystème hub perso. Toute nouvelle app `<nom>.hubperso.com`
-part d'ici : elle expose déjà `GET /hub/summary` conforme au contrat
-[`@mokarade/hub-contract`](https://github.com/MoKarade/hub-contract), avec l'auth
-`x-hub-token`, et démarre honnêtement « en construction » (`buildingSummary`) tant que
-son moteur n'est pas actif.
+Suivi et analyse de recherche d'emploi dans la région de Québec : offres notées selon un
+barème pondéré par le profil, statuts de candidature, détection des réponses de recruteurs,
+et assistance IA pour l'analyse d'offres et la rédaction de CV et lettres ciblés.
 
-## Ce qui est déjà branché
+App de l'écosystème hub perso, aux côtés de FinanceAI, DriveAI et BatchChef.
+Destination : **`emploi.hubperso.com`**. Widget publié au hub via
+[`@mokarade/hub-contract`](https://github.com/MoKarade/hub-contract).
 
-- **`app/hub/summary/route.ts`** — Route Handler Next.js : vérifie le header
-  `x-hub-token` (temps constant, 401 sinon), répond toujours en `Cache-Control: no-store`,
-  et renvoie un `buildingSummary` conforme au contrat. Le hub peut donc afficher un widget
-  « en construction » dès le premier déploiement.
-- **`lib/hubToken.ts`** — comparaison de jeton en temps constant.
-- Pin `@mokarade/hub-contract#v1.0.0`, TypeScript strict, tests Vitest.
+> **Dépôt privé, et ce n'est pas négociable** : les données de suivi contiennent l'adresse du
+> domicile, le statut migratoire, l'historique de candidatures et des noms de personnes
+> tierces. Voir le garde-fou n°1 du [`CLAUDE.md`](./CLAUDE.md).
 
-## Forker une nouvelle app
+## État
 
-1. **Cloner ce template** sous un nouveau repo `<nom>` (ou « Use this template » sur GitHub).
-2. **Personnaliser l'identité** dans `app/hub/summary/route.ts` (bloc `APP`) :
-   ```ts
-   const APP = {
-     id: "mon-app",              // kebab-case, stable
-     name: "Mon App",            // 1 à 30 caractères
-     url: "https://mon-app.hubperso.com",
-     color: "#e11d48",           // hex 6 digits
-   };
-   ```
-   et le `<title>` dans `app/layout.tsx`, le contenu de `app/page.tsx`.
-3. **Générer un jeton** et le configurer (voir ci-dessous).
-4. **Construire l'app.** Quand ton moteur produit de vraies données, remplace dans
-   `route.ts` le `buildingSummary(APP, …)` par un vrai `HubSummary` (metrics/alerts/actions),
-   validé par `HubSummarySchema.parse(...)` avant d'être renvoyé.
-5. **Déclarer l'app au hub** : ajouter une entrée dans `lib/sources.ts` du repo Hubperso
-   + la variable de jeton `HUB_TOKEN_<ID>`.
+**Chantier #00 — bootstrap.** Le fork est personnalisé et l'endpoint hub répond, mais rien
+n'est déployé : ni base de données, ni auth utilisateur, ni interface. Le suivi vit encore
+dans un artifact HTML autonome, hors du dépôt.
 
-## Auth
+L'état courant fait foi dans **[`HANDOVER.md`](./HANDOVER.md)** — à lire en premier.
+Les tâches sont dans [`BACKLOG.md`](./BACKLOG.md), les décisions dans [`docs/adr/`](./docs/adr/).
 
-- Le hub envoie le header **`x-hub-token`**. Sans jeton valide → **401** (échec fermé).
-- Sans `HUB_TOKEN` côté serveur → **500** (jamais de summary sans auth configurée).
-- Le jeton vit dans une variable d'environnement (`.env.local` en dev, variables de l'hôte
-  en prod), jamais dans le code.
+## Ce qui est branché aujourd'hui
 
-```bash
-# générer un jeton
-node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
-```
+- **`app/api/hub/summary/route.ts`** — endpoint consommé par le hub. Vérifie `x-hub-token` en
+  temps constant, répond en `Cache-Control: no-store`, et renvoie un summary honnêtement
+  `building` tant qu'aucune donnée réelle n'existe.
+- **`lib/hubToken.ts`** — comparaison de jeton en temps constant (SHA-256 + `timingSafeEqual`).
+- TypeScript strict, tests Vitest validés contre le **vrai** schéma du contrat.
 
-## CORS : rien à faire
+## Contrat d'échec du endpoint
 
-Le hub fetch `/hub/summary` **server-side via son proxy** — aucun header CORS à configurer.
+| Situation | Réponse |
+|---|---|
+| `HUB_TOKEN` absent côté serveur | **503** — l'app marche, l'intégration n'est pas branchée |
+| `x-hub-token` absent ou invalide | **401** — échec fermé |
+| Méthode ≠ GET | **405** |
+| Nominal | **200**, summary conforme au contrat, `no-store` |
+
+⚠️ Cette route reste **hors du middleware d'authentification utilisateur** : elle porte sa
+propre auth. L'y inclure renverrait au hub une redirection HTML au lieu du JSON, et le widget
+afficherait « injoignable » en permanence.
 
 ## Développement
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000  (endpoint : /hub/summary)
-npm run test       # vitest (auth + contrat)
+npm run dev        # http://localhost:3000
+npm run test       # vitest
 npm run typecheck  # tsc --noEmit
 npm run build
+npm run lint
 
-# tester le endpoint en local
+# tester le endpoint hub en local
 HUB_TOKEN=dev npm run dev
-curl -s -H "x-hub-token: dev" http://localhost:3000/hub/summary
+curl -s -H "x-hub-token: dev" http://localhost:3000/api/hub/summary
 ```
 
-## Déploiement
+Avant chaque commit : `npm run typecheck && npm run test && npm run build && npm run lint`.
 
-Sur Vercel (ou tout hôte Next.js). Définir la variable `HUB_TOKEN` (le même jeton que le
-hub enverra). Le domaine cible est `<nom>.hubperso.com`.
+## Configuration
+
+Voir [`.env.example`](./.env.example). Le jeton hub se génère avec :
+
+```bash
+node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
+```
+
+La **même** valeur doit être posée dans `HUB_TOKEN` (côté JobAI) et `HUB_TOKEN_JOBAI`
+(côté hub). Déclarer aussi l'app dans `lib/sources.ts` du dépôt Hubperso — c'est du **code**,
+donc ça exige un redéploiement du hub, pas seulement une variable d'environnement.
+
+## CORS : rien à faire
+
+Le hub interroge l'endpoint **côté serveur**. Aucun header CORS à configurer — si le besoin
+apparaît, c'est le signe que le fetch est parti côté client.
