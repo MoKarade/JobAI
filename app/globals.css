@@ -496,3 +496,15 @@ code {
 @media (max-width: 47.5rem) {
   .grille-entreprises, .grille-swot { grid-template-columns: 1fr; }
 }
+
+/* ── Diagnostic de configuration (page de connexion, après un échec) ─────── */
+.diagnostic { margin-top: 1rem; font-size: 0.82rem; }
+.diagnostic > summary { cursor: pointer; color: var(--text-soft); }
+.diagnostic > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.diagnostic ul { list-style: none; margin-top: 0.6rem; }
+.diagnostic li { padding: 0.2rem 0; font-family: var(--mono); font-size: 0.76rem; }
+.diagnostic li.ok::before { content: "✓ "; color: var(--vert); }
+.diagnostic li.absente::before { content: "✕ "; color: var(--rouge); }
+.diagnostic li.absente { color: var(--rouge); }
+.diagnostic__role { font-family: var(--font); color: var(--text-soft); }
+.diagnostic__note { margin-top: 0.6rem; color: var(--text-soft); font-size: 0.78rem; }

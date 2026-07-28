@@ -3,6 +3,7 @@
 // Un écran de connexion qui laisse fuir un chiffre annule l'intérêt de la porte.
 
 import { signIn } from "@/auth";
+import { diagnostiquerConfiguration } from "@/lib/diagnostic";
 
 export const metadata = { title: "Connexion — JobAI" };
 
@@ -44,9 +45,28 @@ export default async function Connexion({
         </p>
 
         {error ? (
-          <p className="hint" role="alert">
-            {MESSAGES[error] ?? MESSAGES.Default}
-          </p>
+          <>
+            <p className="hint" role="alert">
+              {MESSAGES[error] ?? MESSAGES.Default}
+            </p>
+            {/* Affiché UNIQUEMENT après un échec : ce sont des booléens, jamais des
+                valeurs. Voir lib/diagnostic.ts pour pourquoi c'est sans risque. */}
+            <details className="diagnostic">
+              <summary>Variables configurées côté serveur</summary>
+              <ul>
+                {diagnostiquerConfiguration().map((v) => (
+                  <li key={v.nom} className={v.presente ? "ok" : "absente"}>
+                    <code>{v.nom}</code> {v.presente ? "présente" : "ABSENTE"}
+                    <span className="diagnostic__role"> — {v.role}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="diagnostic__note">
+                Aucune valeur n’est affichée, seulement leur présence. Une variable ajoutée
+                dans Vercel n’est prise en compte qu’au redéploiement suivant.
+              </p>
+            </details>
+          </>
         ) : null}
 
         <form
