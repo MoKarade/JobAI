@@ -197,11 +197,29 @@
 > va prendre les offres de tous les sites d'offres genre LinkedIn et autre que tu peux
 > trouver avec un lien cliquable pour aller sur l'offre directement ».
 
-- [ ] 🔧 **`[UX-01]`** Refonte de l'interface, en s'inspirant de FinanceAI (densité,
-      hiérarchie visuelle, navigation par onglets). ⚠️ Cadrer d'abord : FinanceAI a une
-      identité claire et sobre, l'artifact JobAI une identité terminal/ambre. Décider si on
-      converge vers le style FinanceAI ou si on garde l'identité JobAI en montant le niveau
-      de finition — les deux se défendent, mais mélanger donnerait un résultat bâtard.
+- [x] 🔧 **`[UX-01]`** Refonte de l'interface. ✅ 2026-07-28 — **décision de Marc** :
+      densité et grammaire de FinanceAI, **accent ambre conservé** (voir
+      [ADR-0003](./docs/adr/0003-direction-visuelle.md)). Ce n'est pas un mélange
+      d'identités : une langue de mise en page et une couleur de marque sont séparables, et
+      l'ambre n'est pas décorative — c'est l'`app.color` publiée au hub, elle identifie
+      JobAI parmi les widgets.
+      · **Navigation par onglets, en vraies ROUTES** (`/`, `/references`) plutôt qu'un état
+        client : chaque onglet a une URL, se met en signet, le bouton Retour marche, et une
+        page ne charge que ce qu'elle affiche. Onglet courant signalé par `aria-current` ET
+        par un trait — la couleur ne porte jamais l'information seule.
+      · **L'accueil cesse d'être un mur** : barème, entreprises, salaires et SWOT partent
+        sous `/references`. Ce sont des documents qu'on consulte, pas des choses qu'on fait.
+      · Cadre partagé (`components/Cadre.tsx`), échelle d'espacement unique, tuiles de
+        compteurs plus compactes. La page de connexion ne prend PAS le cadre : hors session,
+        afficher des onglets donnerait l'illusion d'un accès.
+      · ⚠️ **Régression d'accessibilité rattrapée en cours de route** : en devenant un lien,
+        la marque a cessé d'être un `<h1>` — `/` et `/references` se sont retrouvées sans
+        titre de niveau 1. Corrigé par un `<h1>` hors écran nommant l'onglet (`.hors-ecran`,
+        jamais `display:none` qui le retirerait aussi des lecteurs d'écran).
+      · **Verrou posé** : `tests/routesGardees.test.ts` DÉCOUVRE les routes depuis `app/` et
+        exige que chacune soit gardée, sauf exemption motivée. Le danger n'était pas
+        `/references`, vérifiée en l'écrivant — c'est la sixième route, dans six semaines.
+        Discrimination prouvée (ouvrir `/references` indûment fait tomber exactement ce test).
 - [x] 🔧 **`[UX-02]`** Page d'accueil : bloc **« À faire maintenant »** en tête.
       ✅ 2026-07-28 — `lib/aFaire.ts` (pur, 19 tests). Le tableau de bord répondait à « où
       en est la recherche » ; il manquait « par où je commence aujourd'hui ».

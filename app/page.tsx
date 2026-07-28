@@ -14,9 +14,9 @@ import { aujourdhui } from "@/lib/ajout";
 import type { Offre } from "@/lib/types";
 import { TableauBord } from "@/components/TableauBord";
 import { ListeOffres } from "@/components/ListeOffres";
-import { Panneaux } from "@/components/Panneaux";
 import { FormulaireAjout } from "@/components/FormulaireAjout";
 import { AFaire } from "@/components/AFaire";
+import { Cadre } from "@/components/Cadre";
 
 // Le suivi change à chaque geste de Marc : jamais de page mise en cache.
 export const dynamic = "force-dynamic";
@@ -44,16 +44,7 @@ export default async function Accueil() {
   }
 
   return (
-    <main className="page">
-      <header className="entete">
-        <h1>
-          JOB<span className="entete__accent">_</span>AI
-        </h1>
-        <p className="entete__sous">
-          Coordination technique et automatisation · rayon 50 km
-        </p>
-      </header>
-
+    <Cadre actif="/" titre="Suivi des offres">
       {panne === "schema-absent" ? (
         <div className="etat">
           <h2>Tables absentes de la base</h2>
@@ -119,9 +110,8 @@ export default async function Accueil() {
           <TableauBord resume={resumer(offres)} />
           <FormulaireAjout />
           <ListeOffres offres={offres} />
-          <Panneaux />
         </>
       )}
-    </main>
+    </Cadre>
   );
 }

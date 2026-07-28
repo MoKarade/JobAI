@@ -13,6 +13,7 @@ import { auth } from "@/auth";
 import { lireOffre } from "@/lib/donnees";
 import { palier } from "@/lib/scoring";
 import { ControlesOffre } from "@/components/ControlesOffre";
+import { Cadre } from "@/components/Cadre";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
     // qui enverrait chercher une offre supprimée alors que la base ne répond pas.
     console.error("[offre] lecture impossible", { id, err });
     return (
-      <main className="page">
+      <Cadre actif={null}>
         <Link href="/" className="retour">
           ← Toutes les offres
         </Link>
@@ -59,7 +60,7 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
             pas affiché ici, un message d’erreur de base pouvant contenir des identifiants.
           </p>
         </div>
-      </main>
+      </Cadre>
     );
   }
 
@@ -71,7 +72,7 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
   const reserves = offre.raisons.filter((r) => r.ton === "reserve");
 
   return (
-    <main className="page">
+    <Cadre actif={null}>
       <Link href="/" className="retour">
         ← Toutes les offres
       </Link>
@@ -176,6 +177,6 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
           <ControlesOffre offre={offre} />
         </section>
       </article>
-    </main>
+    </Cadre>
   );
 }

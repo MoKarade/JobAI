@@ -138,37 +138,102 @@ code {
   }
 }
 
+/* Échelle d'espacement UNIQUE (ADR-0003). Avant, chaque bloc choisissait sa marge dans son
+   coin — d'où l'impression de mur : rien ne se répondait verticalement. */
+:root {
+  --pas: 0.5rem;
+  --pas-2: 1rem;
+  --pas-3: 1.5rem;
+  --pas-4: 2.25rem;
+}
+
 .page {
   max-width: 78rem;
   margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
+  padding: var(--pas-3) var(--pas-2) var(--pas-4);
 }
 
-.entete h1 {
+.entete { display: flex; flex-direction: column; gap: 0.15rem; }
+.entete__marque {
   font-family: var(--mono);
   font-size: 1.15rem;
+  font-weight: 700;
   letter-spacing: 0.04em;
+  color: var(--text);
+  text-decoration: none;
+  align-self: flex-start;
 }
+.entete__marque:focus-visible { outline: 2px solid var(--ambre); outline-offset: 3px; }
 .entete__accent { color: var(--ambre); }
 .entete__sous {
   font-family: var(--mono);
   font-size: 0.78rem;
   color: var(--text-soft);
-  margin-top: 0.25rem;
+}
+
+/* ── Onglets ──────────────────────────────────────────────────────────────
+   De vraies routes, pas un état client : chaque onglet a une URL. L'onglet
+   courant se signale par `aria-current="page"` ET par un trait — la couleur
+   seule ne porte jamais l'information (WCAG 1.4.1). */
+.onglets {
+  display: flex;
+  gap: var(--pas);
+  margin: var(--pas-3) 0 var(--pas-2);
+  border-bottom: 1px solid var(--border);
+}
+.onglet {
+  padding: 0.45rem 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.onglet:hover { color: var(--text); }
+.onglet--actif {
+  color: var(--text);
+  border-bottom-color: var(--ambre);
+  font-weight: 600;
+}
+.onglet:focus-visible { outline: 2px solid var(--ambre); outline-offset: -2px; }
+
+/* Retire du rendu VISUEL sans retirer du DOM ni de l'arbre d'accessibilité.
+   Surtout pas `display: none` ni `visibility: hidden` : les deux retirent l'élément des
+   lecteurs d'écran aussi, ce qui viderait le titre de son intérêt. */
+.hors-ecran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.intro-section {
+  font-size: 0.88rem;
+  color: var(--text-soft);
+  max-width: 62ch;
+  margin-bottom: var(--pas-2);
 }
 
 /* ── Tableau de bord ─────────────────────────────────────────────────────── */
 .bord {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-  gap: 0.6rem;
-  margin: 1.25rem 0 1.4rem;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: var(--pas);
+  margin: var(--pas-2) 0;
 }
 .stat {
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 3px solid var(--ambre);
-  padding: 0.75rem 0.9rem;
+  padding: 0.6rem 0.75rem;
 }
 .stat--envoi { border-left-color: var(--vert); }
 .stat--reponse { border-left-color: var(--bleu); }
@@ -409,7 +474,7 @@ code {
    d'action est un MOT, pas une icône — lisible par un lecteur d'écran, et la
    couleur ne porte donc jamais l'information seule (WCAG 1.4.1). */
 .afaire {
-  margin-top: 1.5rem;
+  margin-top: var(--pas-2);
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 3px solid var(--ambre);
@@ -467,7 +532,7 @@ code {
    quelques fois par semaine. Reprend l'apparence des panneaux pour que
    l'interface n'ait pas deux vocabulaires visuels pour un même geste (ouvrir). */
 .ajout {
-  margin-top: 1.5rem;
+  margin-top: var(--pas-2);
   background: var(--surface);
   border: 1px solid var(--border);
 }
@@ -511,7 +576,7 @@ code {
 .ajout__message--succes { color: var(--vert); }
 
 /* ── Panneaux repliables (barème, entreprises, salaires, position) ───────── */
-.panneaux { margin-top: 2rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.panneaux { display: flex; flex-direction: column; gap: var(--pas); }
 .panneau {
   background: var(--surface);
   border: 1px solid var(--border);

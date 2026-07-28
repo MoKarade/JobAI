@@ -54,6 +54,10 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
 5. **Échec fermé, server-side only.** Jetons et appels LLM restent côté serveur. Chaque
    Server Action revérifie la session (`requireSession`). `HUB_TOKEN` absent → 503 ;
    `x-hub-token` faux → 401 ; comparaison en temps constant. Jamais de secret en dur.
+   *Verrou* : `tests/routesGardees.test.ts` — il DÉCOUVRE les routes depuis `app/` et exige
+   que chacune soit gardée, sauf exemption **motivée dans le test**. Une nouvelle page non
+   exemptée le fait échouer tant qu'on n'a pas tranché son cas : le risque n'est jamais la
+   route qu'on écrit aujourd'hui, c'est la sixième.
 
 6. **Le texte non maîtrisé n'entre pas nu dans un prompt.** Une description d'offre ou un
    courriel de recruteur est une surface d'injection : tout passe par `sanitizePromptText`
