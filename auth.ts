@@ -15,8 +15,10 @@ import { estEmailAutorise } from "@/lib/autorisation";
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Google({
-      clientId: process.env.AUTH_GOOGLE_ID,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET,
+      // Mêmes noms de variables que le hub et BatchChef : trois conventions différentes
+      // pour la même chose finiraient par coûter une soirée de débogage.
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     }),
   ],
   session: { strategy: "jwt" },

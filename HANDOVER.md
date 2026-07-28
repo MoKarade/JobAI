@@ -84,6 +84,9 @@ DriveAI · dépôt privé.
 
 ### Reste à faire côté Marc (action humaine)
 
+> **Procédure détaillée pas à pas : [`docs/DEPLOIEMENT.md`](./docs/DEPLOIEMENT.md).**
+> Les commandes y sont données pour PowerShell (poste de Marc, `openssl` absent).
+
 - [x] ~~Changer la branche par défaut en `main`~~ — fait le 2026-07-28.
       *(L'auto-merge et la protection de branche sont sans objet depuis l'ADR-0002 :
       décision de Marc, on n'y revient pas sans nouvel ADR.)*
