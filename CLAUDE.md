@@ -170,6 +170,15 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   ignorait tout `tests/` pour ne pas se détecter lui-même : la bonne exclusion était LUI,
   pas le dossier. Exclure large est le réflexe facile, et il laisse un angle mort permanent
   que rien ne signale.
+- **Un outil qui échoue en SILENCE est pire qu'un outil qui plante.** `drizzle-kit migrate`
+  choisit le pilote `@neondatabase/serverless` dès qu'il est installé ; ce pilote exige un
+  websocket qu'il faut configurer soi-même en Node. Sans ça il sort avec le **code 0**, sans
+  erreur, **sans avoir créé une seule table** — et on continue en croyant la base à jour.
+  Deux règles qui en découlent : (a) un script qui MODIFIE quelque chose doit VÉRIFIER le
+  résultat auprès de la source, pas se fier à l'absence d'exception ; (b) « la commande n'a
+  rien dit » ne vaut jamais « la commande a réussi ». `npm run db:migrate` passe désormais
+  par `scripts/migrer.ts` (pilote HTTP, celui de l'app), qui relit `information_schema` et
+  sort en échec si une table manque. Verrouillé par `tests/outillage.test.ts`.
 - **Ce que Next.js fait pour toi, les outils en ligne de commande ne le font pas.** Next
   charge `.env.local` ; `drizzle-kit` et les scripts `tsx` tournent HORS de Next et ne le
   chargent pas. `npm run db:migrate` échouait donc sur `url: ''` avec la chaîne dans le

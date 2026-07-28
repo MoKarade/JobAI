@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx scripts/migrer.ts",
     "db:seed": "tsx scripts/charger-seed.ts"
   },
   "dependencies": {

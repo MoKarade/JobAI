@@ -197,6 +197,12 @@ npm run db:migrate
 npm run db:seed
 ```
 
+> ⚠️ **`npm run db:migrate` ne passe plus par `drizzle-kit`** (depuis le 2026-07-28).
+> `drizzle-kit migrate` utilisait le pilote websocket de Neon, qui échouait à se connecter
+> et sortait **avec le code 0, sans erreur et sans créer de table**. La commande passe
+> maintenant par `scripts/migrer.ts` : même pilote HTTP que l'app, et il RELIT la base pour
+> confirmer que les tables existent — il échoue bruyamment sinon.
+>
 > Depuis le 2026-07-28, ces deux commandes **lisent `.env.local` toutes seules**. Ce
 > n'était pas le cas avant : `drizzle-kit` et `tsx` tournent hors de Next.js, qui est le
 > seul à charger ce fichier automatiquement. `npm run db:migrate` échouait donc sur
