@@ -23,8 +23,9 @@
 | **Logique métier** | Complète et testée : `lib/types.ts` (schémas Zod), `lib/scoring.ts` (barème, 27 tests), `lib/seed.ts` (38 offres, 18 tests), `lib/suivi.ts` (fusion, modification, résumé — 19 tests). **79 tests au total.** Toute la logique pure de la V1 est là ; il reste à la brancher (`[V1-03]` summary, `[V1-04]` auth, `[V1-06]` interface). |
 | **UI** | Tracker utilisable : tableau de bord, liste, recherche et 4 filtres, **et écriture** (statut, priorité, note personnelle). Styles bi-thème reprenant l'identité de l'artifact. Restent les panneaux barème/salaires/SWOT et l'ajout manuel `[V1-06c]`. |
 | **Chargement du suivi** | `npm run db:seed` charge les 38 offres. **Idempotent et non destructif** : relançable après une mise à jour du jeu de départ, le suivi de Marc est préservé. |
-| **Déploiement** | Rien de déployé. Aucun projet Vercel, aucun DNS. |
-| **Chantier courant** | #00 Bootstrap — voir `BACKLOG.md`. |
+| **Déploiement** | ✅ **EN LIGNE** sur `https://emploi.hubperso.com` (projet Vercel `job-ai`, DNS Cloudflare en DNS only). Vérifié par les journaux Vercel le 2026-07-28 : `/` en 200 (session active), `/api/hub/summary` en 200 (le hub lit le summary), **zéro erreur runtime**. |
+| **Widget hub** | ✅ **ACTIF**. PR #12 de Hubperso mergée (entrée `jobai`), `HUB_TOKEN_JOBAI` posé, hub redéployé. |
+| **Chantier courant** | V1 livrée et en ligne. Reste `[V1-06c]`, `[V1-08]`, `[V1-09]`, `[V1-10]` — voir `BACKLOG.md`. |
 
 ### Ce qui a été fait
 
@@ -82,10 +83,22 @@ DriveAI · dépôt privé.
    section « données personnelles » de `tests/seed.test.ts`, dont la portée est **partielle
    et écrite dans le test**. Le garde-fou n°2, lui, est verrouillé depuis le 2026-07-28.
 
-### Reste à faire côté Marc (action humaine)
+### Mise en ligne — FAITE le 2026-07-28
 
-> **Procédure détaillée pas à pas : [`docs/DEPLOIEMENT.md`](./docs/DEPLOIEMENT.md).**
-> Les commandes y sont données pour PowerShell (poste de Marc, `openssl` absent).
+Neon, client OAuth Google, secrets, projet Vercel, DNS `emploi.hubperso.com`, déclaration
+au hub : tout est en place et vérifié par les journaux. La procédure reste dans
+[`docs/DEPLOIEMENT.md`](./docs/DEPLOIEMENT.md) pour la prochaine app.
+
+**Trois pièges rencontrés à la mise en ligne, tous corrigés dans le code** :
+1. La page rendait l'écran d'erreur générique de Next quand le schéma n'était pas appliqué.
+   Elle explique désormais la panne et donne la commande à lancer.
+2. La page de connexion disait « connexion refusée » sans distinguer un mauvais compte
+   d'une variable manquante. Les codes d'Auth.js sont maintenant traduits.
+3. Le hub applique `.trim()` à son jeton, JobAI ne le faisait pas : un espace invisible
+   dans une variable Vercel donnait un 401 permanent entre deux valeurs d'apparence
+   identique. Corrigé des deux côtés, verrouillé par tests.
+
+### Reste à faire côté Marc (action humaine)
 
 - [x] ~~Changer la branche par défaut en `main`~~ — fait le 2026-07-28.
       *(L'auto-merge et la protection de branche sont sans objet depuis l'ADR-0002 :
