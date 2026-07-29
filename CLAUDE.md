@@ -21,9 +21,13 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
 1. **Dépôt PRIVÉ, et aucune donnée personnelle en clair dans le code.**
    Le suivi de recherche d'emploi contient l'adresse du domicile, le statut migratoire,
    l'historique de refus et des noms de personnes tierces (conseillers RH). *Interdit* : tout
-   commit portant l'un de ces éléments. *Exception* : aucune. L'adresse de référence pour le
-   calcul de distance vit dans `DOMICILE_LAT` / `DOMICILE_LON` (variables d'environnement) ;
-   les noms de tiers ne sont jamais persistés dans un fichier versionné.
+   commit portant l'un de ces éléments. *Exception* : aucune. Les coordonnées du domicile
+   vivent dans `DOMICILE_LAT` / `DOMICILE_LON` (variables d'environnement) et les lieux
+   personnels en BASE — jamais dans un fichier versionné ; les noms de tiers ne sont jamais
+   persistés dans un fichier versionné. *Révision ADR-0004 (décision Marc 2026-07-29)* :
+   ces données PEUVENT s'afficher sur une page servie à la **session authentifiée**
+   (login mono-adresse) — l'interdit porte sur le dépôt et sur toute requête non
+   authentifiée, pas sur ce que Marc voit de sa propre carte.
    *Verrou* : `tests/piiGuard.test.ts` — scan des fichiers **réellement versionnés**
    (`git ls-files`), volume prouvé, discrimination prouvée motif par motif. Sa **portée est
    écrite dans le test** : il détecte des FORMES (adresse municipale, coordonnées, civilité,
