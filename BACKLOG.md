@@ -418,11 +418,29 @@
   en production sans que rien ne se déclenche. 🧭 Décision de Marc : lui poser le job `gate`
   de JobAI ?
   ⚠️ **Élargi le 2026-07-29, en vérifiant les CI des PR du lot dette : Hubperso,
-  hub-contract et app-template n'ont AUCUNE CI non plus** — JobAI est le seul dépôt de
-  l'écosystème avec un workflow. Les PR `Hubperso#13`, `hub-contract#2` et
-  `app-template#1` n'ont donc que le gate local (exécuté et consigné dans chaque PR) et la
-  preview Vercel (Hubperso seulement). 🧭 La même décision vaut pour les quatre : poser le
-  job `gate` partout ?
+  hub-contract et app-template n'avaient AUCUNE CI non plus** — JobAI était le seul dépôt
+  de l'écosystème avec un workflow.
+  ✅ **TRAITÉ le 2026-07-29 — une CI par dépôt, quatre PR draft**, chacune avec son gate
+  prouvé localement AVANT livraison (une CI rouge au premier run est pire que pas de CI) :
+  `Hubperso#14`, `hub-contract#3`, `app-template#2`, `batchchef-#23`. 🧭 Reste à Marc de
+  les merger. Les décisions de conception, communes aux quatre :
+  · **Le gate rejoue EXACTEMENT le gate local du CLAUDE.md de chaque dépôt** — une CI qui
+    vérifie autre chose diverge, et c'est le mauvais exemplaire qu'on finit par croire.
+  · **L'audit (`npm audit --omit=dev`) est un job SÉPARÉ**, aussi en hebdomadaire. Un avis
+    de sécurité paraît sans qu'une ligne n'ait changé : mêlé au gate, il peindrait un dépôt
+    sain en rouge du jour au lendemain et on prendrait l'habitude du rouge — exactement
+    comment cette CI-ci a été ignorée sur quatre commits. Séparés, « gate vert / audit
+    rouge » se lit d'un coup d'œil.
+  · **Vérifié partout : aucun build ne demande de variable d'environnement** (aucun clone
+    n'a de `.env.local`) — donc aucune CI ne réclame de secret ni ne rougit au premier run.
+  · Spécificités : `working-directory: web` + `cache-dependency-path` chez BatchChef
+    (`.nvmrc` reste à la RACINE, `setup-node` le résout depuis le workspace) ; chez
+    hub-contract, deux gardes **prouvés discriminants** (aucune dépendance runtime hors
+    `zod` ; version du package == tag poussé) plus un **avertissement** quand le tag de la
+    version courante manque — le garde attrape un tag qui DIVERGE, jamais un tag ABSENT,
+    qui ne déclenche aucun run et fut pourtant l'incident réel.
+  · Au passage, `next lint` (déprécié, retiré dans Next 16) migré vers l'ESLint CLI chez
+    Hubperso : inscrire dans une CI une commande condamnée, c'est programmer sa panne.
 - ✅ **Next < 15.5.21 cumulait 8 avis HIGH — VÉRIFIÉ PARTOUT le 2026-07-29** (l'audit
   qu'annonçait cette entrée) :
   · **Hubperso** était PIRE que prévu : 5 vulnérabilités en production dont **2 CRITICAL

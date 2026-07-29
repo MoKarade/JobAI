@@ -226,6 +226,26 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   de géocodeur DANS les bornes régionales n'est pas encore la bonne — la valider par la
   CLASSE du lieu et la DISTANCE au référent attendu, sinon un homonyme d'ailleurs s'inscrit
   « exact » à vie.
+- **Une sonde qui tourne dans un état local différent du distant ne prouve rien.**
+  L'avertissement « le tag de la version courante existe-t-il ? » a répondu « tag v1.1.0
+  présent » — parce que mon clone portait le tag créé lors d'un `git push` REFUSÉ (403).
+  Invisible du distant, donc inexistant pour le clone frais d'une CI : la sonde validait
+  un garde qui, en vrai, se serait déclenché. Toute vérification d'un mécanisme qui
+  tournera ailleurs (CI, autre poste, production) se fait dans SES conditions —
+  ici `git ls-remote`, pas `git rev-parse`. Vaut aussi pour l'inverse : un `.env.local`
+  présent en local ferait croire qu'un build « ne demande aucun secret ».
+- **Un message de commit ne passe jamais par une chaîne interpolée par le shell.**
+  Deux mots entre backticks dans un `git commit -m "…"` ont été exécutés comme des
+  commandes : le message poussé disait « le gate accepte ␣ comme ␣ ». Bash ne prévient
+  pas, et le message est déjà en ligne quand on le relit. Passer par
+  `git commit -F - <<'MSG'` (heredoc entre quotes : aucune interpolation) dès qu'un
+  message contient des backticks, `$`, ou des guillemets.
+- **Ce qui doit bloquer vit dans le gate ; ce qui change sans le code vit à côté.**
+  `npm audit` en CI est utile mais devient rouge alors qu'aucune ligne n'a bougé — dans
+  le gate, il peint un dépôt sain en rouge et on prend l'habitude du rouge, ce qui est
+  exactement comment la CI de ce dépôt a été ignorée quatre commits d'affilée. En job
+  séparé (plus un passage hebdomadaire), « gate vert / audit rouge » se lit d'un coup
+  d'œil et désigne la vraie cause.
 - **Un export de données est une surface d'exécution, pas un dump.** Une cellule CSV qui
   commence par `=`, `+`, `-` ou `@` est évaluée à l'ouverture par Excel, LibreOffice et
   Google Sheets. Tout champ de texte libre qui sort de l'app vers un tableur se neutralise
