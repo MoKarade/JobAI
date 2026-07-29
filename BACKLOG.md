@@ -394,19 +394,15 @@
   tableau avant/après sur les 38 offres). En attendant, `scoreSalaire(null)` rend sa valeur
   **neutre** (9/15), jamais zéro : une offre saisie à la main n'est ni avantagée ni pénalisée.
 
-- **`hub-contract`** : le tag `v1.1.0` n'existe pas côté distant alors que `package.json`
-  l'annonce, et `package-lock.json` est resté en `1.0.0`. JobAI pinne le SHA en attendant.
-  À corriger dans le dépôt `hub-contract`, avec sa table de consommateurs qui oublie déjà
-  BatchChef (JobAI en sera le 6ᵉ).
-- **`app-template`** pinne `#v1.0.0` : un fork brut n'a donc **pas** le bloc `usage`, et un
-  champ inconnu est stripé **silencieusement** par Zod.
-- **`next lint` est déprécié** (retiré dans Next 16) — migré vers l'ESLint CLI (`eslint .`)
-  dès le bootstrap. ⚠️ Piège : `next lint` ignorait `node_modules` et `.next`
-  implicitement, l'ESLint CLI **non** — sans bloc `ignores` explicite, `eslint .` rend
-  4122 problèmes de faux positifs. À remonter dans `app-template` pour les prochains forks.
-- **`app-template` répond 500** quand `HUB_TOKEN` manque, là où BatchChef et DriveAI
-  répondent 503. JobAI a tranché pour 503 (ADR-0001) : le template est l'exception, pas
-  la règle. À harmoniser dans `app-template`.
+- ✅ **`hub-contract` — TRAITÉ le 2026-07-29** (PR `hub-contract#2`, draft) : lockfile
+  resynchronisé, table des consommateurs complétée (BatchChef et JobAI manquaient — dans
+  `HANDOVER.md` ET `CLAUDE.md` §3). ⚠️ Le **tag `v1.1.0` reste à pousser par Marc** (la
+  session ne peut pas pousser de tag — proxy git restreint à sa branche) : la commande
+  d'une ligne est dans le HANDOVER de hub-contract. JobAI re-pinnera `#v1.1.0` ensuite.
+- ✅ **`app-template` — TRAITÉ le 2026-07-29** (PR `app-template#1`, draft) : re-pinné sur
+  le SHA du contrat v1.1.0 (le bloc `usage` arrive aux forks), **503** au lieu de 500,
+  migration ESLint CLI avec le bloc `ignores`, next `^15.5.22` + overrides. Gate vert,
+  `npm audit --omit=dev` → 0.
 - ✅ **`[SEC-BATCHCHEF-DRIZZLE]` — RÉSOLU le 2026-07-28** (PR `MoKarade/batchchef-#22`,
   mergée par Marc). `drizzle-orm < 0.45.2` portait une **injection SQL par identifiants mal
   échappés** (GHSA-gpj5-g38j-94v9, HIGH) ; le lockfile de `batchchef-/web` résolvait 0.44.7,
@@ -421,9 +417,16 @@
   seule la prévisualisation Vercel s'exécute. C'est en partie pourquoi cette faille a vécu
   en production sans que rien ne se déclenche. 🧭 Décision de Marc : lui poser le job `gate`
   de JobAI ?
-- **Next < 15.5.22 cumulait 8 avis HIGH** (DoS Server Actions, SSRF, cache confusion,
-  divulgation d'endpoints internes). JobAI est passé à 15.5.22. Les autres dépôts Next de
-  l'écosystème (Hubperso, BatchChef, app-template) sont à vérifier.
+- ✅ **Next < 15.5.21 cumulait 8 avis HIGH — VÉRIFIÉ PARTOUT le 2026-07-29** (l'audit
+  qu'annonçait cette entrée) :
+  · **Hubperso** était PIRE que prévu : 5 vulnérabilités en production dont **2 CRITICAL
+    sur `@auth/core`** — l'une est un contournement d'adresse par homoglyphes, le vecteur
+    exact contre un hub à adresse unique (`AUTHORIZED_EMAIL`). Fermées (next 15.5.22,
+    next-auth beta.32, overrides postcss/sharp) — **PR `Hubperso#13`** (draft), audit
+    mesuré à 0, gate vert (63 tests).
+  · **BatchChef** : déjà propre — 15.5.21 (la version corrigée des 8 avis) + overrides
+    posés par la PR #22, `npm audit --omit=dev` mesuré à 0. Item périmé, rien à faire.
+  · **app-template** : corrigé dans la PR `app-template#1` (voir ci-dessus).
 - **`postcss` et `sharp` sont épinglés vulnérables par Next lui-même** → forcés par
   `overrides` dans `package.json`, avec la note de retrait quand Next les remontera.
   Résultat mesuré : `npm audit --omit=dev` → **0 vulnérabilité**.
