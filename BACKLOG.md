@@ -417,6 +417,12 @@
   seule la prévisualisation Vercel s'exécute. C'est en partie pourquoi cette faille a vécu
   en production sans que rien ne se déclenche. 🧭 Décision de Marc : lui poser le job `gate`
   de JobAI ?
+  ⚠️ **Élargi le 2026-07-29, en vérifiant les CI des PR du lot dette : Hubperso,
+  hub-contract et app-template n'ont AUCUNE CI non plus** — JobAI est le seul dépôt de
+  l'écosystème avec un workflow. Les PR `Hubperso#13`, `hub-contract#2` et
+  `app-template#1` n'ont donc que le gate local (exécuté et consigné dans chaque PR) et la
+  preview Vercel (Hubperso seulement). 🧭 La même décision vaut pour les quatre : poser le
+  job `gate` partout ?
 - ✅ **Next < 15.5.21 cumulait 8 avis HIGH — VÉRIFIÉ PARTOUT le 2026-07-29** (l'audit
   qu'annonçait cette entrée) :
   · **Hubperso** était PIRE que prévu : 5 vulnérabilités en production dont **2 CRITICAL
