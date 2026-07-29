@@ -126,6 +126,12 @@ code {
   --bleu: oklch(58% 0.14 250);
   --rouge: oklch(56% 0.19 25);
   --violet: oklch(56% 0.16 300);
+  /* Variantes pour du TEXTE sur fond de surface. Les teintes d'accent ci-dessus servent
+     des bordures et des pastilles (3:1 suffit) ; en TEXTE sur fond clair, l'ambre 62 %
+     donne 3,67:1 et le bleu 58 % donne 4,22:1 — MESURÉ, sous le AA de 4,5:1. Ces deux-ci
+     sont foncées jusqu'à passer : ambre 50 % = 6,0:1, bleu 48 % = 6,0:1 sur les deux fonds. */
+  --ambre-texte: oklch(50% 0.13 75);
+  --bleu-texte: oklch(48% 0.14 250);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -135,6 +141,9 @@ code {
     --bleu: oklch(72% 0.12 250);
     --rouge: oklch(68% 0.16 25);
     --violet: oklch(74% 0.13 300);
+    /* Sur fond sombre, les teintes claires passent largement (ambre 8,7:1, bleu 7,2:1). */
+    --ambre-texte: oklch(78% 0.14 75);
+    --bleu-texte: oklch(72% 0.12 250);
   }
 }
 
@@ -560,6 +569,24 @@ code {
 .geocodage__message { font-size: 0.82rem; margin-top: 0.4rem; }
 .geocodage__note { font-size: 0.75rem; color: var(--text-soft); margin-top: 0.35rem; max-width: 62ch; }
 
+.carte-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  margin-bottom: var(--pas);
+}
+.carte-legende__pastille {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 50%;
+  margin-right: 0.3em;
+  vertical-align: baseline;
+}
+.carte-liste__lecture { font-size: 0.82rem; margin: 0.2rem 0 0.4rem; max-width: 70ch; }
 .carte-liste { list-style: none; display: flex; flex-direction: column; gap: var(--pas); }
 .carte-liste__ville {
   background: var(--surface);
@@ -592,6 +619,18 @@ code {
 /* Les fenêtres de Leaflet sont injectées hors de React : on les habille ici. */
 .popup-offres { list-style: none; margin: 0.3rem 0 0; padding: 0; font-size: 0.82rem; }
 .popup-offres li { margin-bottom: 0.35rem; }
+.popup-approx {
+  display: block;
+  font-size: 0.72rem;
+  font-style: italic;
+  color: #a2540a;
+  margin: 0.1rem 0;
+}
+.popup-faits { display: block; font-size: 0.75rem; opacity: 0.75; margin: 0.15rem 0; }
+.popup-lecture { display: block; font-size: 0.78rem; margin: 0.25rem 0; }
+.popup-trajet { display: inline-block; font-size: 0.78rem; margin-top: 0.3rem; }
+.popup-groupe { border-top: 1px solid #ccc3; padding-top: 0.4rem; margin-top: 0.4rem; }
+.carte-liste__trajet { display: inline-block; font-size: 0.78rem; margin-top: 0.35rem; color: var(--ambre-texte); }
 
 /* ── Formulaire d'ajout manuel ────────────────────────────────────────────
    Replié par défaut : la liste est consultée à chaque visite, le formulaire
@@ -776,10 +815,10 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .detail__tete { display: flex; gap: 1rem; align-items: flex-start; }
 .detail__tete h1 { font-size: 1.3rem; line-height: 1.2; }
 .detail__poste { color: var(--text-soft); margin-top: 0.15rem; }
-.detail__lien { display: inline-block; margin-top: 0.5rem; color: var(--bleu); font-size: 0.85rem; }
+.detail__lien { display: inline-block; margin-top: 0.5rem; color: var(--bleu-texte); font-size: 0.85rem; }
 /* Deux liens côte à côte : l'annonce et le trajet. L'espacement les distingue, la couleur
    ambre marque le trajet — accompagnée du libellé, jamais seule (WCAG 1.4.1). */
-.detail__lien--trajet { margin-left: 1rem; color: var(--ambre); }
+.detail__lien--trajet { margin-left: 1rem; color: var(--ambre-texte); }
 .detail__sans-lien {
   margin-top: 0.5rem;
   font-size: 0.8rem;

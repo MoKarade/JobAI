@@ -320,6 +320,50 @@
       (l'ajouter « pour aider » enverrait le domicile dans l'historique de navigation), et
       chaque offre active du seed produit un lien avec sa ville.
 
+- [x] 🔧 **`[UX-09]`** **Carte par ENTREPRISES** (demande Marc 2026-07-29 : « je veux la
+      vue d'ensemble, mais je veux voir sur la carte les entreprises et leurs endroits et
+      les offres associées »). ✅ 2026-07-29 — remplace les épingles de municipalités.
+      · **Chaque entreprise cible à son emplacement** (Nominatim, requête « nom, ville,
+        Québec, Canada »), avec fiche au clic : lecture des Références, km mesuré, ses
+        offres actives (liens vers le détail), lien « Trajet dans Google Maps ».
+      · **Repli honnête** : une entreprise absente d'OpenStreetMap est posée au CENTRE de
+        sa ville — cercle en POINTILLÉ, « position approximative » dans la fiche ET la
+        liste. Présenter un centre-ville comme l'adresse d'un employeur serait du fake data.
+        Les replis d'une même ville sont REGROUPÉS sur une épingle (des cercles empilés se
+        masqueraient). Re-tenter une approximative = retirer sa ligne `entreprises_lieux`
+        (👤 en base pour l'instant ; correction manuelle dans l'app = `[UX-10]` si besoin).
+      · **Une cible SANS offre active reste affichée** (teinte neutre) : c'est la liste de
+        chasse (« candidature spontanée possible »), pas un vide à masquer.
+      · **Zoom molette activé au premier clic** sur la carte (avant, faire défiler la page
+        zoomait la carte au survol — le piège classique).
+      · Table `entreprises_lieux` (migration `0002`) : precision `exacte`/`ville` en CHECK,
+        bornes régionales en CHECK (un homonyme de Vancouver est refusé par la base).
+      · La mécanique Nominatim est UNE seule série générique (`geocoderSerie`) pour villes
+        et entreprises — deux copies de la boucle auraient divergé.
+      · Frontière `lib/geocodage.ts` élargie aux entreprises cibles dans `CLAUDE.md` §2.4 ;
+        toujours JAMAIS le domicile ni un lieu personnel.
+      · **Revue adversariale : 14 findings confirmés, 0 réfuté — tous corrigés.** Les
+        structurants : une résolution Nominatim DANS les bornes régionales n'est pas encore
+        la bonne — validée par la CLASSE du lieu (`place`/`boundary`/`highway` rejetées :
+        « Labatt, Québec » résolvait une RUE ou la municipalité, inscrite « exacte » à VIE)
+        ET par la DISTANCE au centre-ville attendu (≤ 30 km — la brasserie Labatt de
+        Montréal est dans les bornes) · délai de 4 s PAR requête (sans lui, une requête qui
+        pend meurt au mur des 30 s de la Server Action, APRÈS le travail, AVANT
+        l'enregistrement) · villes d'abord PUIS entreprises dans la même passe (une
+        entreprise dont la ville n'était pas géocodée restait coincée à vie) · villes
+        insituables NOMMÉES dans le compte-rendu · dénominateur d'offres rétabli (« X sur
+        Y ») · légende des couleurs, seuils LUS du barème (`SEUIL_PALIER_A/B`) · contraste
+        des liens MESURÉ (sonde oklch→sRGB : ambre 3,7:1 → variantes texte 6,0:1, deux
+        thèmes) · `role=status` permanent pendant la passe · focusables de Leaflet retirés
+        du parcours clavier (conteneur `aria-hidden`) · invariant de comptage du test
+        corrigé (il additionnait des OFFRES à des NOMS dédupliqués — vacant). Chaque
+        correctif discriminant est prouvé par sonde (validation par distance et invariant
+        compris : neutralisés ⇒ exactement le bon test tombe).
+      👤 Reste à Marc : `npm run db:migrate` (migration 0002), puis « Situer N entreprises »
+      sur l'onglet Carte — plusieurs passes (~6 entreprises/passe, cadence Nominatim).
+      ⚠️ L'appel réel Nominatim n'est toujours pas exerçable depuis la session : logique
+      testée par injection, le premier clic réel fait foi.
+
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
       · **Guichet-Emplois** — flux XML officiel d'EDSC, sur demande. C'est la source

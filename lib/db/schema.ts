@@ -204,8 +204,41 @@ export const villes = pgTable(
   ],
 );
 
+/**
+ * Position de chaque ENTREPRISE CIBLE, géocodée une fois puis conservée.
+ *
+ * `precision` dit la vérité sur ce que la position EST :
+ *   - `exacte` : Nominatim a trouvé l'entreprise elle-même (elle existe dans OpenStreetMap).
+ *   - `ville`  : introuvable — la position est le CENTRE DE SA MUNICIPALITÉ, et l'interface
+ *     le dit. Présenter un centre-ville comme l'adresse d'un employeur serait du fake data.
+ * Re-tenter une entreprise en `ville` = retirer sa ligne (la passe la reprendra) ; sans ça,
+ * la passe converge et ne re-paie jamais une recherche déjà tranchée.
+ */
+export const entreprisesLieux = pgTable(
+  "entreprises_lieux",
+  {
+    /** Nom EXACT de l'entreprise cible (`lib/reference.ts`) — la clé de rapprochement. */
+    nom: text("nom").primaryKey(),
+    lat: real("lat").notNull(),
+    lon: real("lon").notNull(),
+    precision: text("precision", { enum: ["exacte", "ville"] }).notNull(),
+    geocodeLe: timestamp("geocode_le", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Mêmes bornes régionales que `villes` : une résolution aberrante (homonyme d'un autre
+    // continent, signe inversé) est refusée par la base, pas affichée comme une épingle.
+    check("entreprises_lieux_lat_ck", sql`${table.lat} >= 45 AND ${table.lat} <= 49`),
+    check("entreprises_lieux_lon_ck", sql`${table.lon} >= -75 AND ${table.lon} <= -68`),
+    check(
+      "entreprises_lieux_precision_ck",
+      sql`${table.precision} IN ('exacte', 'ville')`,
+    ),
+  ],
+);
+
 export type OfferRow = typeof offers.$inferSelect;
 export type NewOfferRow = typeof offers.$inferInsert;
 export type OfferReasonRow = typeof offerReasons.$inferSelect;
 export type VilleRow = typeof villes.$inferSelect;
+export type EntrepriseLieuRow = typeof entreprisesLieux.$inferSelect;
 export type NewOfferReasonRow = typeof offerReasons.$inferInsert;

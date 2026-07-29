@@ -1,22 +1,21 @@
 // lib/carte.ts — situer les offres sur une carte, honnêtement.
 //
-// PURE : elle reçoit des offres, la liste des entreprises cibles et les coordonnées déjà
-// géocodées, et rend des épingles. Aucun accès réseau, aucun accès base.
+// PURE : elle reçoit les offres, les entreprises cibles et les positions déjà géocodées,
+// et rend des épingles. Aucun accès réseau, aucun accès base.
 //
-// CE QUE LA CARTE MONTRE, ET CE QU'ELLE NE MONTRE PAS
-// Elle montre des MUNICIPALITÉS où se trouvent des offres. Elle ne montre PAS le domicile
-// de Marc (garde-fou n°1 : il ne sort pas des variables d'environnement, et n'est jamais
-// envoyé au navigateur), et elle ne prétend pas situer un employeur à sa porte — une
-// épingle est un centre de municipalité.
+// DEPUIS [UX-09], LA CARTE MONTRE DES ENTREPRISES, PAS DES MUNICIPALITÉS — c'était la
+// demande : voir chaque employeur à son emplacement, avec ses offres. Mais OpenStreetMap ne
+// connaît pas toutes les PME : une entreprise introuvable est posée au CENTRE DE SA VILLE,
+// avec `precision: "ville"` AFFICHÉE. Présenter un centre-ville comme l'adresse d'un
+// employeur serait du fake data — le dire est la condition pour l'afficher.
 //
-// La distance, elle, est EXACTE : elle vient de `offers.km`, mesurée, pas déduite de la
-// position de l'épingle. C'est ce qui permet d'assumer l'approximation géographique sans
-// mentir sur le chiffre qui compte.
+// CE QUE LA CARTE NE MONTRE PAS : le domicile de Marc (garde-fou n°1 — le trajet passe par
+// un lien Google Maps qui ne porte que la destination, `lib/lienTrajet.ts`), et le contenu
+// personnel des offres (`notes`, `userNote`) qui ne sert pas à la carte.
 //
-// CE QUI MANQUE EST COMPTÉ, JAMAIS MASQUÉ
-// Une offre dont on ne connaît pas la ville, ou dont la ville n'est pas encore géocodée,
-// n'apparaît pas — et l'interface DIT combien. Une carte qui affiche 12 épingles pour
-// 23 offres sans le signaler laisse croire à une couverture qu'elle n'a pas.
+// CE QUI MANQUE EST COMPTÉ, JAMAIS MASQUÉ : entreprises restant à situer, employeurs hors
+// des cibles. Une carte qui affiche 12 épingles pour 20 entreprises sans le signaler laisse
+// croire à une couverture qu'elle n'a pas.
 
 import type { EntrepriseCible } from "./reference";
 import type { Offre } from "./types";
@@ -58,20 +57,41 @@ export interface OffreSurCarte {
   statut: Offre["statut"];
 }
 
-export interface Epingle {
-  /** Nom géocodable — celui de la table `villes`. */
+/** Une entreprise cible telle que la carte la présente : ses faits, et ses offres vivantes. */
+export interface EntrepriseSurCarte {
+  nom: string;
   ville: string;
+  /** Distance mesurée de la référence — jamais recalculée depuis l'épingle. */
+  km: number;
+  lecture: string;
+  offres: OffreSurCarte[];
+}
+
+/** Ce que la position EST : l'entreprise elle-même, ou le centre de sa ville (repli dit). */
+export type PrecisionEpingle = "exacte" | "ville";
+
+export interface Epingle {
   lat: number;
   lon: number;
-  offres: OffreSurCarte[];
+  precision: PrecisionEpingle;
+  /** Ville de rattachement — le libellé de l'épingle approximative, l'info de contexte sinon. */
+  ville: string;
+  /** Une seule entreprise sur une épingle exacte ; toutes celles de la ville sur un repli. */
+  entreprises: EntrepriseSurCarte[];
 }
 
 export interface VueCarte {
   epingles: Epingle[];
-  /** Offres dont l'employeur n'est dans aucune entreprise cible : ville inconnue. */
-  sansVille: string[];
-  /** Villes connues mais pas encore géocodées — un géocodage les fera apparaître. */
-  villesAGeocoder: string[];
+  /** Entreprises cibles SANS position en base : une passe de géocodage les fera apparaître. */
+  aSituer: string[];
+  /** Employeurs d'offres vivantes absents des entreprises cibles : insituables. */
+  horsCibles: string[];
+}
+
+export interface PositionEntreprise {
+  lat: number;
+  lon: number;
+  precision: PrecisionEpingle;
 }
 
 /** Les offres qu'une carte de recherche d'emploi doit montrer : celles qui sont vivantes. */
@@ -80,35 +100,32 @@ function estVivante(o: Offre): boolean {
 }
 
 /**
- * Assemble la vue.
+ * Assemble la vue, en partant des ENTREPRISES CIBLES — pas des offres.
  *
- * Les offres sont regroupées PAR VILLE : « Québec » porte une dizaine d'offres, et dix
- * épingles au même point seraient illisibles et se masqueraient l'une l'autre.
+ * Une cible sans offre active reste sur la carte : c'est la liste de chasse de Marc
+ * (« Poly-Robotics — candidature spontanée possible » est une information de carte, pas un
+ * vide à masquer). Les offres s'y rattachent ; celles dont l'employeur n'apparie aucune
+ * cible sont COMPTÉES dans `horsCibles`, jamais perdues en silence.
  */
 export function construireVue(
   offres: readonly Offre[],
   cibles: readonly EntrepriseCible[],
-  coordonnees: ReadonlyMap<string, { lat: number; lon: number }>,
+  positions: ReadonlyMap<string, PositionEntreprise>,
 ): VueCarte {
-  const parVille = new Map<string, OffreSurCarte[]>();
-  const sansVille: string[] = [];
-  const villesAGeocoder = new Set<string>();
+  const vivantes = offres.filter(estVivante);
 
-  for (const o of offres.filter(estVivante)) {
-    const libelle = villeDeLEntreprise(o.entreprise, cibles);
-    const ville = libelle === null ? null : villeGeocodable(libelle);
+  // Rattachement offre → cible. Une offre ne se rattache qu'à UNE entreprise : la première
+  // qui apparie (l'appariement est déjà borné par le plancher de longueur).
+  const offresParCible = new Map<string, OffreSurCarte[]>();
+  const horsCibles = new Set<string>();
 
-    if (ville === null) {
-      sansVille.push(o.entreprise);
+  for (const o of vivantes) {
+    const cible = cibles.find((c) => apparier(o.entreprise, c.nom));
+    if (!cible) {
+      horsCibles.add(o.entreprise);
       continue;
     }
-
-    if (!coordonnees.has(ville)) {
-      villesAGeocoder.add(ville);
-      continue;
-    }
-
-    const liste = parVille.get(ville) ?? [];
+    const liste = offresParCible.get(cible.nom) ?? [];
     liste.push({
       id: o.id,
       entreprise: o.entreprise,
@@ -117,48 +134,72 @@ export function construireVue(
       km: o.km,
       statut: o.statut,
     });
-    parVille.set(ville, liste);
+    offresParCible.set(cible.nom, liste);
   }
 
   const epingles: Epingle[] = [];
-  for (const [ville, liste] of parVille) {
-    const c = coordonnees.get(ville);
-    if (!c) continue; // impossible ici, mais `get` rend `T | undefined` et on ne force rien
-    // La meilleure note en tête : c'est elle qui décide de la couleur de l'épingle.
-    liste.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
-    epingles.push({ ville, lat: c.lat, lon: c.lon, offres: liste });
+  const aSituer: string[] = [];
+  // Les replis d'une même ville partagent la même position : une épingle par ville, qui
+  // liste ses entreprises — dix cercles empilés au centre-ville se masqueraient l'un l'autre.
+  const groupesVille = new Map<string, Epingle>();
+
+  for (const c of cibles) {
+    const position = positions.get(c.nom);
+    if (!position) {
+      aSituer.push(c.nom);
+      continue;
+    }
+
+    const offresDeLaCible = offresParCible.get(c.nom) ?? [];
+    // La meilleure note en tête : c'est elle qui teinte l'épingle.
+    offresDeLaCible.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+
+    const ville = villeGeocodable(c.ville) ?? c.ville;
+    const entreprise: EntrepriseSurCarte = {
+      nom: c.nom,
+      ville,
+      km: c.km,
+      lecture: c.lecture,
+      offres: offresDeLaCible,
+    };
+
+    if (position.precision === "exacte") {
+      epingles.push({ ...position, ville, entreprises: [entreprise] });
+      continue;
+    }
+
+    const groupe = groupesVille.get(ville);
+    if (groupe) groupe.entreprises.push(entreprise);
+    else {
+      const nouveau: Epingle = { ...position, ville, entreprises: [entreprise] };
+      groupesVille.set(ville, nouveau);
+      epingles.push(nouveau);
+    }
   }
 
-  // Ordre stable : sans lui, deux rendus successifs réordonnent les épingles sans raison.
-  epingles.sort((a, b) => a.ville.localeCompare(b.ville, "fr-CA"));
+  // Ordre STABLE : sans lui, deux rendus successifs réordonnent les épingles sans raison.
+  for (const e of epingles) {
+    e.entreprises.sort((a, b) => a.nom.localeCompare(b.nom, "fr-CA"));
+  }
+  epingles.sort(
+    (a, b) =>
+      a.ville.localeCompare(b.ville, "fr-CA") ||
+      (a.entreprises[0]?.nom ?? "").localeCompare(b.entreprises[0]?.nom ?? "", "fr-CA"),
+  );
 
   return {
     epingles,
-    sansVille: [...new Set(sansVille)].sort((a, b) => a.localeCompare(b, "fr-CA")),
-    villesAGeocoder: [...villesAGeocoder].sort((a, b) => a.localeCompare(b, "fr-CA")),
+    aSituer: aSituer.sort((a, b) => a.localeCompare(b, "fr-CA")),
+    horsCibles: [...horsCibles].sort((a, b) => a.localeCompare(b, "fr-CA")),
   };
-}
-
-/** Toutes les villes qu'il faudrait connaître pour situer toutes les offres vivantes. */
-export function villesNecessaires(
-  offres: readonly Offre[],
-  cibles: readonly EntrepriseCible[],
-): string[] {
-  const villes = new Set<string>();
-  for (const o of offres.filter(estVivante)) {
-    const libelle = villeDeLEntreprise(o.entreprise, cibles);
-    const v = libelle === null ? null : villeGeocodable(libelle);
-    if (v !== null) villes.add(v);
-  }
-  return [...villes].sort((a, b) => a.localeCompare(b, "fr-CA"));
 }
 
 /**
  * Cadrage de la carte : le rectangle qui contient toutes les épingles.
  *
  * Rend `null` sans épingle — l'appelant affiche alors un état honnête, plutôt qu'une carte
- * centrée sur un point arbitraire. Et surtout : le cadrage se déduit des OFFRES, jamais du
- * domicile. Centrer sur le domicile le révélerait à qui regarde la carte.
+ * centrée sur un point arbitraire. Et surtout : le cadrage se déduit des ENTREPRISES,
+ * jamais du domicile. Centrer sur le domicile le révélerait à qui regarde la carte.
  */
 export function cadrage(
   epingles: readonly Epingle[],

@@ -1,32 +1,37 @@
-// app/carte/page.tsx — où sont les offres.
+// app/carte/page.tsx — où sont les entreprises, et leurs offres.
 //
 // Server Component : il lit la base, assemble la vue avec `construireVue` (pure et testée)
-// et n'envoie au navigateur que des épingles de municipalités.
+// et n'envoie au navigateur que des entreprises et leurs offres.
 //
 // GARDE-FOU N°1 : le domicile de Marc n'entre JAMAIS dans cette page. Ni en props, ni dans
-// le cadrage — qui se déduit des seules offres. `DOMICILE_LAT` / `DOMICILE_LON` restent des
-// variables serveur au service du calcul de distance, et rien d'autre. La carte montre où
-// sont les offres, pas où habite quelqu'un.
+// le cadrage — qui se déduit des seules entreprises. Le TRAJET passe par un lien Google
+// Maps qui ne porte que la destination (`lib/lienTrajet.ts`) : l'origine est proposée par
+// Google, côté compte de Marc, jamais par l'app.
 //
-// La distance affichée est celle de `offers.km`, MESURÉE. Elle n'est pas recalculée depuis
-// la position de l'épingle, qui n'est qu'un centre de municipalité : deux nombres pour la
-// même grandeur finiraient par diverger, et c'est l'affichage qu'on accuserait.
+// HONNÊTETÉ DES POSITIONS : une épingle pleine est l'entreprise elle-même (trouvée dans
+// OpenStreetMap) ; une épingle en pointillé est un REPLI au centre de sa ville, et la page
+// le dit — en légende, dans la fenêtre, et dans la liste. La distance affichée reste celle
+// du suivi, MESURÉE, jamais recalculée depuis l'épingle.
 
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { villes as tableVilles } from "@/lib/db/schema";
+import { entreprisesLieux } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
-import { cadrage, construireVue, villesNecessaires } from "@/lib/carte";
+import { cadrage, construireVue, type PositionEntreprise } from "@/lib/carte";
 import { ENTREPRISES_CIBLES } from "@/lib/reference";
-import { palier } from "@/lib/scoring";
+import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
+import { SEUIL_PALIER_A, SEUIL_PALIER_B, palier } from "@/lib/scoring";
 import { classerPanne, type Panne } from "@/lib/panne";
 import { Cadre } from "@/components/Cadre";
 import { CarteOffres } from "@/components/CarteOffres";
-import { BoutonGeocoder } from "@/components/BoutonGeocoder";
+import { BoutonSituer } from "@/components/BoutonSituer";
 
 export const dynamic = "force-dynamic";
+// La passe de localisation enchaîne des requêtes Nominatim à ~1,1 s d'intervalle : la
+// Server Action a besoin de plus que la durée par défaut.
+export const maxDuration = 30;
 export const metadata = { title: "Carte — JobAI" };
 
 export default async function PageCarte() {
@@ -34,21 +39,21 @@ export default async function PageCarte() {
   if (!session) redirect("/connexion");
 
   let offres = null;
-  let coordonnees = new Map<string, { lat: number; lon: number }>();
+  let positions = new Map<string, PositionEntreprise>();
   let panne: Panne | null = null;
 
   try {
     offres = await lireOffres();
     if (offres !== null) {
-      const lignes = await db.select().from(tableVilles);
-      coordonnees = new Map(lignes.map((v) => [v.nom, { lat: v.lat, lon: v.lon }]));
+      const lignes = await db.select().from(entreprisesLieux);
+      positions = new Map(
+        lignes.map((l) => [l.nom, { lat: l.lat, lon: l.lon, precision: l.precision }]),
+      );
     }
   } catch (err) {
     console.error("[carte] lecture impossible", err);
-    // La MÊME classification que l'accueil (`lib/panne.ts`). Écrite à part, elle a divergé
-    // dès la première version de cette page : l'écran annonçait « la base n'a pas répondu »
-    // alors que la base répondait très bien — pour dire que la table `villes` n'existait
-    // pas. Un message d'erreur faux coûte plus cher qu'un message générique.
+    // La MÊME classification que l'accueil (`lib/panne.ts`) : écrite à part, elle a déjà
+    // divergé une fois, et l'écran s'est mis à mentir.
     panne = classerPanne(err);
   }
 
@@ -56,14 +61,15 @@ export default async function PageCarte() {
     return (
       <Cadre actif="/carte" titre="Carte des offres">
         <div className="etat">
-          <h2>Table de la carte absente</h2>
+          <h2>Tables de la carte absentes</h2>
           <p>
-            La base répond, mais la table <code>villes</code> n’existe pas : la migration
-            qui l’ajoute n’a pas encore été appliquée. Ce n’est pas une panne.
+            La base répond, mais le schéma de la carte (table{" "}
+            <code>entreprises_lieux</code>) n’est pas encore appliqué. Ce n’est pas une panne.
           </p>
           <p className="etat__aide">
-            Depuis le dépôt, sur ton poste : <code>npm run db:migrate</code>. Puis reviens
-            ici et lance une passe de localisation.
+            Depuis le dépôt, sur ton poste : <code>npm run db:migrate</code> — le script
+            vérifie lui-même que les tables existent après coup. Puis reviens ici et lance
+            la localisation.
           </p>
         </div>
       </Cadre>
@@ -85,73 +91,139 @@ export default async function PageCarte() {
     );
   }
 
-  const vue = construireVue(offres, ENTREPRISES_CIBLES, coordonnees);
+  const vue = construireVue(offres, ENTREPRISES_CIBLES, positions);
   const cadre = cadrage(vue.epingles);
-  const situees = vue.epingles.reduce((n, e) => n + e.offres.length, 0);
-  const vivantes = offres.filter((o) => !o.histo && o.perimeeLe === null).length;
-  const restantes = villesNecessaires(offres, ENTREPRISES_CIBLES).filter(
-    (v) => !coordonnees.has(v),
-  ).length;
+  const situees = vue.epingles.reduce((n, e) => n + e.entreprises.length, 0);
+  const exactes = vue.epingles
+    .filter((e) => e.precision === "exacte")
+    .reduce((n, e) => n + e.entreprises.length, 0);
+  const offresAffichees = vue.epingles.reduce(
+    (n, e) => n + e.entreprises.reduce((m, x) => m + x.offres.length, 0),
+    0,
+  );
+  // Le DÉNOMINATEUR : les offres vivantes que la carte ne montre pas encore (cibles à
+  // situer, employeurs hors cibles) doivent se compter — la revue a montré que le compte
+  // sans dénominateur masquait jusqu'à 5 offres actives sans aucun signal.
+  const offresVivantes = offres.filter((o) => !o.histo && o.perimeeLe === null).length;
 
   return (
     <Cadre actif="/carte" titre="Carte des offres">
       <p className="intro-section">
-        Chaque épingle est une <strong>municipalité</strong>, pas un employeur : la position
-        est le centre de la ville. La distance affichée, elle, est celle du suivi — mesurée,
-        jamais déduite de l’épingle.
+        Chaque cercle plein est une <strong>entreprise</strong> à son emplacement ; un cercle
+        en <strong>pointillé</strong> regroupe celles qu’OpenStreetMap ne connaît pas, posées
+        au centre de leur ville — la position est alors approximative, et la fiche le dit.
+        Clique une épingle pour l’entreprise, ses offres et le trajet.
       </p>
 
-      {/* Le compte AVANT la carte : savoir que 4 offres sur 23 sont situées change
-          complètement la lecture de ce qu'on regarde. */}
+      {/* Le compte AVANT la carte : savoir ce qui est précis, approximatif et manquant
+          change la lecture de ce qu'on regarde. */}
       <p className="carte__compte">
-        {situees} offre{situees > 1 ? "s" : ""} située{situees > 1 ? "s" : ""} sur {vivantes}{" "}
-        active{vivantes > 1 ? "s" : ""}.
+        {situees} entreprise{situees > 1 ? "s" : ""} sur la carte ({exactes} précise
+        {exactes > 1 ? "s" : ""}, {situees - exactes} au centre-ville) ·{" "}
+        {offresAffichees} offre{offresAffichees > 1 ? "s" : ""} active
+        {offresAffichees > 1 ? "s" : ""} rattachée{offresAffichees > 1 ? "s" : ""} sur{" "}
+        {offresVivantes}.
       </p>
 
-      <BoutonGeocoder restantes={restantes} />
+      {/* Les couleurs des cercles portent le palier : la légende le DIT, avec les seuils
+          LUS depuis le barème — recopiés, ils mentiraient au premier ajustement. */}
+      <p className="carte-legende">
+        <span>
+          <span className="carte-legende__pastille" style={{ background: "#7c5cff" }} />
+          {SEUIL_PALIER_A}+ (fonce)
+        </span>
+        <span>
+          <span className="carte-legende__pastille" style={{ background: "#2f9e6d" }} />
+          {SEUIL_PALIER_B}–{SEUIL_PALIER_A - 1} (solide)
+        </span>
+        <span>
+          <span className="carte-legende__pastille" style={{ background: "#c98a1b" }} />
+          sous {SEUIL_PALIER_B}
+        </span>
+        <span>
+          <span className="carte-legende__pastille" style={{ background: "#7a8194" }} />
+          sans offre active
+        </span>
+        <span>pointillé = position approximative</span>
+      </p>
+
+      <BoutonSituer restantes={vue.aSituer.length} />
 
       <CarteOffres epingles={vue.epingles} cadre={cadre} />
 
       {vue.epingles.length === 0 ? (
         <div className="etat">
-          <h2>Aucune offre située pour l’instant</h2>
+          <h2>Aucune entreprise située pour l’instant</h2>
           <p>
-            {restantes > 0
-              ? "Les villes des offres ne sont pas encore localisées. Le bouton ci-dessus lance une passe."
-              : "Aucune offre active ne correspond à une entreprise dont la ville est connue."}
+            {vue.aSituer.length > 0
+              ? "Les entreprises n’ont pas encore été localisées. Le bouton ci-dessus lance une passe."
+              : "Aucune entreprise cible n’est définie dans les Références."}
           </p>
         </div>
       ) : (
-        // La même information que la carte, mais LISIBLE AU CLAVIER ET AU LECTEUR D'ÉCRAN.
-        // Une carte de tuiles n'est pas explorable autrement ; sans cette liste, la page
-        // serait inutilisable pour qui n'utilise pas la souris.
+        // La même information que la carte, LISIBLE AU CLAVIER ET AU LECTEUR D'ÉCRAN. Une
+        // carte de tuiles n'est pas explorable autrement ; sans cette liste, la page serait
+        // inutilisable pour qui n'utilise pas la souris.
         <ul className="carte-liste">
-          {vue.epingles.map((e) => (
-            <li key={e.ville} className="carte-liste__ville">
-              <h2 className="carte-liste__titre">
-                {e.ville} <span className="carte-liste__n">{e.offres.length}</span>
-              </h2>
-              <ul>
-                {e.offres.map((o) => (
-                  <li key={o.id} className={`carte-liste__offre carte-liste__offre--${palier(o.score)}`}>
-                    <Link href={`/offre/${o.id}`}>{o.entreprise}</Link> — {o.poste}
-                    <span className="carte-liste__faits">
-                      {o.score === null ? "note –" : `${o.score}/100`}
-                      {o.km === null ? "" : ` · ${String(o.km).replace(".", ",")} km`}
+          {vue.epingles.flatMap((e) =>
+            e.entreprises.map((x) => {
+              const trajet = lienTrajetGoogleMaps(x.nom);
+              return (
+                <li key={x.nom} className="carte-liste__ville">
+                  <h2 className="carte-liste__titre">
+                    {x.nom}{" "}
+                    <span className="carte-liste__n">
+                      {x.ville}
+                      {e.precision === "ville" ? " · position approximative" : ""}
                     </span>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
+                  </h2>
+                  {/* La liste porte TOUT ce que la fenêtre de la carte porte — distance
+                      de référence et lecture comprises : c'est elle, l'accès clavier et
+                      lecteur d'écran, pas un résumé appauvri. */}
+                  <p className="carte-liste__faits">
+                    {String(x.km).replace(".", ",")} km du domicile (mesuré)
+                  </p>
+                  {x.lecture ? <p className="carte-liste__lecture">{x.lecture}</p> : null}
+                  {x.offres.length > 0 ? (
+                    <ul>
+                      {x.offres.map((o) => (
+                        <li
+                          key={o.id}
+                          className={`carte-liste__offre carte-liste__offre--${palier(o.score)}`}
+                        >
+                          <Link href={`/offre/${o.id}`}>{o.poste}</Link>
+                          <span className="carte-liste__faits">
+                            {o.score === null ? "note –" : `${o.score}/100`}
+                            {o.km === null ? "" : ` · ${String(o.km).replace(".", ",")} km`}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="carte-liste__faits">Aucune offre active repérée.</p>
+                  )}
+                  {trajet ? (
+                    <a
+                      href={trajet}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="carte-liste__trajet"
+                      aria-label={`Trajet vers ${x.nom} dans Google Maps`}
+                    >
+                      Trajet dans Google Maps ↗
+                    </a>
+                  ) : null}
+                </li>
+              );
+            }),
+          )}
         </ul>
       )}
 
-      {vue.sansVille.length > 0 ? (
+      {vue.horsCibles.length > 0 ? (
         <p className="carte__manquants">
-          Sans ville connue, donc absent{vue.sansVille.length > 1 ? "es" : "e"} de la carte :{" "}
-          {vue.sansVille.join(", ")}. Ces employeurs ne figurent pas dans les entreprises
-          cibles de l’onglet Références.
+          Hors de la carte, faute d’entreprise cible correspondante :{" "}
+          {vue.horsCibles.join(", ")}. Les ajouter aux Références les fera apparaître.
         </p>
       ) : null}
     </Cadre>

@@ -67,23 +67,31 @@ function hash(s: string): number {
 }
 
 describe("migration", () => {
-  it("crée les trois tables attendues", async () => {
+  it("crée les quatre tables attendues", async () => {
     const r = await pg.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' ORDER BY table_name`,
     );
-    expect(r.rows.map((x) => x.table_name)).toEqual(["offer_reasons", "offers", "villes"]);
+    expect(r.rows.map((x) => x.table_name)).toEqual([
+      "entreprises_lieux",
+      "offer_reasons",
+      "offers",
+      "villes",
+    ]);
   });
 
-  it("pose bien les 9 contraintes CHECK du schéma", async () => {
+  it("pose bien les 12 contraintes CHECK du schéma", async () => {
     const r = await pg.query<{ constraint_name: string }>(
       `SELECT con.conname AS constraint_name
        FROM pg_constraint con
        JOIN pg_class rel ON rel.oid = con.conrelid
-       WHERE con.contype = 'c' AND rel.relname IN ('offers', 'offer_reasons', 'villes')
+       WHERE con.contype = 'c' AND rel.relname IN ('offers', 'offer_reasons', 'villes', 'entreprises_lieux')
        ORDER BY con.conname`,
     );
     expect(r.rows.map((x) => x.constraint_name)).toEqual([
+      "entreprises_lieux_lat_ck",
+      "entreprises_lieux_lon_ck",
+      "entreprises_lieux_precision_ck",
       "offer_reasons_ton_ck",
       "offers_km_ck",
       "offers_priorite_ck",
@@ -94,6 +102,36 @@ describe("migration", () => {
       "villes_lat_ck",
       "villes_lon_ck",
     ]);
+  });
+});
+
+describe("table entreprises_lieux — précision et bornes", () => {
+  it("accepte les deux précisions honnêtes, refuse le reste", async () => {
+    await expect(
+      pg.query(
+        "INSERT INTO entreprises_lieux (nom, lat, lon, precision) VALUES ('E-Exacte', 46.8, -71.2, 'exacte')",
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      pg.query(
+        "INSERT INTO entreprises_lieux (nom, lat, lon, precision) VALUES ('E-Ville', 46.8, -71.2, 'ville')",
+      ),
+    ).resolves.toBeDefined();
+    // « approximative », « gps », une faute de frappe : la base refuse, le typage ne
+    // survivrait pas à une écriture faite hors de l'app.
+    await expect(
+      pg.query(
+        "INSERT INTO entreprises_lieux (nom, lat, lon, precision) VALUES ('E-Autre', 46.8, -71.2, 'gps')",
+      ),
+    ).rejects.toThrow(/entreprises_lieux_precision_ck/);
+  });
+
+  it("refuse une position hors de la région, comme pour les villes", async () => {
+    await expect(
+      pg.query(
+        "INSERT INTO entreprises_lieux (nom, lat, lon, precision) VALUES ('E-Vancouver', 46.8, -123.11, 'exacte')",
+      ),
+    ).rejects.toThrow(/entreprises_lieux_lon_ck/);
   });
 });
 

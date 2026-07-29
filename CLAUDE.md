@@ -56,9 +56,12 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
    faire un `fetch` sortant vers une source d'offres* : `lib/ingest/`. *Verrou* : ADR-0002
    avant toute nouvelle source.
    *Autre frontière réseau, distincte* : `lib/geocodage.ts` est le seul fichier autorisé à
-   appeler Nominatim (OpenStreetMap), et il ne géocode que des **municipalités** — jamais
-   une adresse, jamais un employeur, jamais le domicile. Service bénévole : une requête par
-   seconde, déclenchée par un geste de Marc, jamais au chargement d'une page.
+   appeler Nominatim (OpenStreetMap). Il géocode des **municipalités** et des **entreprises
+   cibles** (données publiques — frontière élargie le 2026-07-29, demande de Marc `[UX-09]`) ;
+   **jamais le domicile, jamais un lieu personnel**. Service bénévole : une requête par
+   seconde, déclenchée par un geste de Marc, jamais au chargement d'une page. Une entreprise
+   introuvable est posée au centre de sa ville avec `precision: "ville"` DITE à l'écran —
+   jamais présentée comme son adresse (garde-fou n°3).
 
 5. **Échec fermé, server-side only.** Jetons et appels LLM restent côté serveur. Chaque
    Server Action revérifie la session (`requireSession`). `HUB_TOKEN` absent → 503 ;
@@ -215,6 +218,14 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   composants à la main. Et l'instant reste un **paramètre** de la fonction : c'est la seule
   façon de tester le passage de minuit. Vaut pour `dateReperage`, `dateEnvoi`, et toute
   date future que l'app posera elle-même.
+- **Un invariant de COMPTAGE additionne des grandeurs de MÊME unité.** Le test « aucune
+  offre ne disparaît » additionnait un compte d'OFFRES épinglées à `horsCibles` — un compte
+  de NOMS dédupliqués : vacant dès qu'un employeur hors cibles porte deux offres (trouvé par
+  la revue, sonde à l'appui). Compter des deux côtés dans la même unité, et préférer
+  l'égalité EXACTE au `>=` quand la partition est totale. Sœur, même revue : une résolution
+  de géocodeur DANS les bornes régionales n'est pas encore la bonne — la valider par la
+  CLASSE du lieu et la DISTANCE au référent attendu, sinon un homonyme d'ailleurs s'inscrit
+  « exact » à vie.
 - **Un export de données est une surface d'exécution, pas un dump.** Une cellule CSV qui
   commence par `=`, `+`, `-` ou `@` est évaluée à l'ouverture par Excel, LibreOffice et
   Google Sheets. Tout champ de texte libre qui sort de l'app vers un tableur se neutralise

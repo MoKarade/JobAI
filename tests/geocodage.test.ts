@@ -10,11 +10,17 @@ import {
   BORNES,
   DELAI_ENTRE_REQUETES_MS,
   MAX_VILLES_PAR_PASSE,
+  RAYON_VALIDATION_KM,
+  deciderPrecision,
+  distanceKm,
   entete,
   geocoderPlusieurs,
   geocoderVille,
   lireReponse,
+  lireReponseEntreprise,
   urlRecherche,
+  urlRechercheEntreprise,
+  geocoderEntreprises,
   villeGeocodable,
 } from "../lib/geocodage";
 
@@ -106,6 +112,115 @@ describe("lecture de la réponse", () => {
   });
 });
 
+describe("recherche d'entreprise", () => {
+  it("cadre la requête par la ville et la province", () => {
+    const url = urlRechercheEntreprise("Laserax", "Québec");
+    const q = new URL(url).searchParams.get("q");
+    expect(q).toBe("Laserax, Québec, Québec, Canada");
+    expect(url).toContain("countrycodes=ca");
+  });
+
+  it("trie trouvées et INTROUVABLES — une PME absente d'OpenStreetMap n'est pas une panne", () => {
+    const { recuperer } = faussetFetch([ok(46.75, -71.29), []]);
+    return geocoderEntreprises(
+      [
+        { nom: "Laserax", ville: "Québec" },
+        { nom: "PME Inconnue", ville: "Lévis" },
+      ],
+      { recuperer, attendre: async () => {} },
+    ).then((r) => {
+      expect(r.trouvees.map((t) => t.nom)).toEqual(["Laserax"]);
+      expect(r.introuvables).toEqual(["PME Inconnue"]);
+      expect(r.panne).toBeNull();
+    });
+  });
+
+  it("partage la MÊME mécanique que les villes : cadence, bornes, panne conservée", async () => {
+    // Une entreprise résolue hors de la région (homonyme d'ailleurs) est REFUSÉE comme
+    // pour une ville — même lecteur de réponse, mêmes bornes.
+    const { recuperer } = faussetFetch([ok(49.26, -123.11)]); // Vancouver
+    const r = await geocoderEntreprises([{ nom: "Labatt", ville: "Québec" }], {
+      recuperer,
+      attendre: async () => {},
+    });
+    expect(r.trouvees).toEqual([]);
+    expect(r.introuvables).toEqual(["Labatt"]);
+
+    const casse = faussetFetch([ok(46.75, -71.29), "HTTP_500"]);
+    const r2 = await geocoderEntreprises(
+      [
+        { nom: "A-Entreprise", ville: "Québec" },
+        { nom: "B-Entreprise", ville: "Lévis" },
+      ],
+      { recuperer: casse.recuperer, attendre: async () => {} },
+    );
+    expect(r2.trouvees.map((t) => t.nom)).toEqual(["A-Entreprise"]);
+    expect(r2.panne).toMatch(/500/);
+  });
+});
+
+describe("lecture d'une réponse d'ENTREPRISE", () => {
+  const avecClasse = (classe: string) => [{ lat: "46.75", lon: "-71.29", class: classe }];
+
+  it("accepte un lieu ponctuel plausible, classe connue ou absente", () => {
+    expect(lireReponseEntreprise(avecClasse("building"))).toEqual({ lat: 46.75, lon: -71.29 });
+    expect(lireReponseEntreprise(avecClasse("amenity"))).not.toBeNull();
+    // Nominatim rend toujours une classe ; son absence ne doit pas rejeter à tort.
+    expect(lireReponseEntreprise(ok(46.75, -71.29))).not.toBeNull();
+  });
+
+  it("REFUSE une municipalité, une frontière administrative ou une rue", () => {
+    // La sonde de la revue : « Labatt, Québec » peut résoudre une RUE Labatt ou la ville
+    // elle-même — DANS les bornes régionales, donc inscrite « exacte » à vie sans ce rejet.
+    // Une ville se résout légitimement en `place`/`boundary` ; une entreprise, jamais.
+    for (const classe of ["place", "boundary", "highway"]) {
+      expect(lireReponseEntreprise(avecClasse(classe)), classe).toBeNull();
+    }
+  });
+
+  it("garde les bornes régionales du lecteur de base", () => {
+    expect(
+      lireReponseEntreprise([{ lat: "49.26", lon: "-123.11", class: "office" }]),
+    ).toBeNull();
+  });
+});
+
+describe("validation d'une résolution par la DISTANCE au centre-ville", () => {
+  // Le centre de la ville de Québec, tel que `situerEntreprises` le fournit en référent.
+  const quebec = { lat: 46.813, lon: -71.208 };
+  // ~1° de latitude = 111,2 km : les décalages sont DÉRIVÉS du rayon, jamais codés en dur.
+  const decalageLat = (km: number) => ({ lat: quebec.lat + km / 111.2, lon: quebec.lon });
+
+  it("mesure une distance connue, symétriquement, zéro sur soi-même", () => {
+    const montreal = { lat: 45.502, lon: -73.567 };
+    const d = distanceKm(quebec, montreal);
+    expect(d).toBeGreaterThan(200);
+    expect(d).toBeLessThan(260);
+    expect(distanceKm(montreal, quebec)).toBeCloseTo(d, 6);
+    expect(distanceKm(quebec, quebec)).toBe(0);
+  });
+
+  it("une résolution PROCHE de sa ville est exacte, aux coordonnées résolues", () => {
+    const proche = decalageLat(RAYON_VALIDATION_KM - 5);
+    expect(deciderPrecision(proche, quebec)).toEqual({ ...proche, precision: "exacte" });
+  });
+
+  it("REJETTE un homonyme d'ailleurs : repli au centre-ville, et le DIT", () => {
+    // Le cas de la revue : la brasserie Labatt de MONTRÉAL est dans les bornes régionales
+    // mais à ~230 km du centre de Québec — un homonyme, pas l'entreprise cherchée.
+    const labattMontreal = { lat: 45.502, lon: -73.567 };
+    expect(deciderPrecision(labattMontreal, quebec)).toEqual({ ...quebec, precision: "ville" });
+    expect(deciderPrecision(decalageLat(RAYON_VALIDATION_KM + 5), quebec)).toEqual({
+      ...quebec,
+      precision: "ville",
+    });
+  });
+
+  it("sans résolution : repli au centre-ville", () => {
+    expect(deciderPrecision(null, quebec)).toEqual({ ...quebec, precision: "ville" });
+  });
+});
+
 describe("une ville", () => {
   it("rend les coordonnées trouvées", async () => {
     const { recuperer, appels } = faussetFetch([ok(46.81, -71.21)]);
@@ -170,6 +285,33 @@ describe("une passe complète", () => {
     });
     expect(r.trouvees.map((v) => v.nom)).toEqual(["Québec"]);
     expect(r.panne).toMatch(/500/);
+  });
+
+  it("borne CHAQUE requête par un signal d'abandon", async () => {
+    // Sans lui, une requête qui pend suspend la passe jusqu'au mur de la Server Action
+    // (30 s), qui tue le processus AVANT l'enregistrement de l'acquis — perte silencieuse.
+    const inits: (RequestInit | undefined)[] = [];
+    const recuperer = (async (_url: string | URL, init?: RequestInit) => {
+      inits.push(init);
+      return { ok: true, status: 200, json: async () => ok(46.81, -71.21) };
+    }) as unknown as typeof fetch;
+    await geocoderPlusieurs(["Québec", "Lévis"], { recuperer, ...sansAttente });
+    expect(inits).toHaveLength(2);
+    for (const init of inits) expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("traite un abandon par délai comme une PANNE : l'acquis est gardé", async () => {
+    // C'est le rejet du fetch (TimeoutError) qui matérialise le délai : même chemin que
+    // toute panne — la passe s'interrompt, ce qui est trouvé est rendu, rien n'est inscrit
+    // pour la requête interrompue.
+    const { recuperer } = faussetFetch([ok(46.81, -71.21), new Error("Requête interrompue")]);
+    const r = await geocoderPlusieurs(["Québec", "Lévis", "Saint-Nicolas"], {
+      recuperer,
+      ...sansAttente,
+    });
+    expect(r.trouvees.map((v) => v.nom)).toEqual(["Québec"]);
+    expect(r.introuvables).toEqual([]);
+    expect(r.panne).toMatch(/interrompue/);
   });
 
   it("ne fait aucune requête sans ville à traiter", async () => {

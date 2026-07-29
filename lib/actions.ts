@@ -14,12 +14,16 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { offers, villes } from "./db/schema";
+import { entreprisesLieux, offers, villes } from "./db/schema";
 import { exigerSession } from "./session";
-import { MiseAJourOffreSchema, type Offre } from "./types";
+import { MiseAJourOffreSchema } from "./types";
 import { NouvelleOffreSchema, aujourdhui, construireOffre, identifiantPour } from "./ajout";
-import { villesNecessaires } from "./carte";
-import { geocoderPlusieurs } from "./geocodage";
+import {
+  deciderPrecision,
+  geocoderEntreprises,
+  geocoderPlusieurs,
+  villeGeocodable,
+} from "./geocodage";
 import { ENTREPRISES_CIBLES } from "./reference";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
@@ -36,17 +40,34 @@ export type ResultatAjout =
   | { ok: false; erreur: string; champs?: Record<string, string> };
 
 /**
- * Géocode les villes des offres qui n'en ont pas encore, une passe à la fois.
+ * Situe les entreprises cibles qui n'ont pas encore de position, une passe à la fois.
  *
  * Déclenchée par un GESTE de Marc, jamais automatiquement : Nominatim est un service
- * bénévole qui demande un usage parcimonieux, et une app qui le sollicite à chaque
- * chargement de page se fait bannir — ce qui casserait la carte pour de bon.
+ * bénévole (une requête par seconde, usage parcimonieux).
  *
- * Le résultat DIT ce qui s'est passé, y compris quand rien n'a été trouvé. Un bouton qui
- * ne répond rien laisse croire qu'il n'a pas fonctionné.
+ * ORDRE DE LA PASSE — les VILLES d'abord, puis les entreprises. La revue adversariale a
+ * montré que l'ordre inverse coinçait : une entreprise introuvable dont la ville n'était
+ * pas encore géocodée ne recevait AUCUNE position, restait « à situer » à vie, et
+ * re-payait sa recherche à chaque passe en affamant les suivantes. Ici, une entreprise
+ * n'est tentée que si le centre de sa ville est connu : quoi qu'il arrive, elle reçoit une
+ * position — la sienne si Nominatim la connaît ET la place à distance plausible de sa
+ * ville (`deciderPrecision`), le centre-ville DIT sinon.
+ *
+ * BUDGET DE LA PASSE — 4 requêtes réseau au total, chacune bornée à 4 s. Le pire cas
+ * (~4 × 5,1 s + cadence + base) tient sous le mur des 30 s de la Server Action : un mur
+ * atteint tuerait le processus AVANT l'enregistrement de l'acquis, ce qui est pire qu'une
+ * passe courte.
  */
-export async function geocoderVillesManquantes(): Promise<
-  | { ok: true; ajoutees: number; introuvables: string[]; restantes: number; panne: string | null }
+export async function situerEntreprises(): Promise<
+  | {
+      ok: true;
+      exactes: number;
+      approximatives: number;
+      restantes: number;
+      /** Villes que Nominatim ne connaît pas : leurs entreprises resteront à situer. */
+      insituables: string[];
+      panne: string | null;
+    }
   | { ok: false; erreur: string }
 > {
   try {
@@ -56,46 +77,99 @@ export async function geocoderVillesManquantes(): Promise<
   }
 
   try {
-    const [lignes, connues] = await Promise.all([
-      db.select().from(offers),
-      db.select({ nom: villes.nom }).from(villes),
+    const [dejaSituees, villesConnues] = await Promise.all([
+      db.select({ nom: entreprisesLieux.nom }).from(entreprisesLieux),
+      db.select().from(villes),
     ]);
+    const deja = new Set(dejaSituees.map((l) => l.nom));
+    const coordVilles = new Map(villesConnues.map((v) => [v.nom, { lat: v.lat, lon: v.lon }]));
 
-    const dejaConnues = new Set(connues.map((v) => v.nom));
-    const aFaire = villesNecessaires(lignes as unknown as Offre[], ENTREPRISES_CIBLES).filter(
-      (v) => !dejaConnues.has(v),
-    );
-
-    if (aFaire.length === 0) {
-      return { ok: true, ajoutees: 0, introuvables: [], restantes: 0, panne: null };
+    const aSituer = ENTREPRISES_CIBLES.filter((c) => !deja.has(c.nom)).map((c) => ({
+      nom: c.nom,
+      ville: villeGeocodable(c.ville) ?? c.ville,
+    }));
+    if (aSituer.length === 0) {
+      return { ok: true, exactes: 0, approximatives: 0, restantes: 0, insituables: [], panne: null };
     }
 
-    const r = await geocoderPlusieurs(aFaire, {
-      recuperer: fetch,
-      courrielContact: process.env.AUTHORIZED_EMAIL,
-    });
+    let budget = 4;
+    const pannes: string[] = [];
+    const insituables: string[] = [];
 
-    // On enregistre ce qui a été trouvé MÊME en cas de panne en cours de passe : jeter le
-    // travail déjà fait garantirait de rebuter sur le même obstacle à chaque tentative.
-    if (r.trouvees.length > 0) {
-      await db
-        .insert(villes)
-        .values(r.trouvees.map((v) => ({ nom: v.nom, lat: v.lat, lon: v.lon })))
-        .onConflictDoNothing();
+    // 1. Les villes inconnues des entreprises en attente, dans la limite du budget.
+    const villesRequises = [...new Set(aSituer.map((e) => e.ville))].filter(
+      (v) => !coordVilles.has(v),
+    );
+    if (villesRequises.length > 0) {
+      const passeVilles = villesRequises.slice(0, budget);
+      const rv = await geocoderPlusieurs(passeVilles, outilsNominatim());
+      budget -= rv.trouvees.length + rv.introuvables.length + (rv.panne ? 1 : 0);
+
+      if (rv.trouvees.length > 0) {
+        await db
+          .insert(villes)
+          .values(rv.trouvees.map((v) => ({ nom: v.nom, lat: v.lat, lon: v.lon })))
+          .onConflictDoNothing();
+        for (const v of rv.trouvees) coordVilles.set(v.nom, { lat: v.lat, lon: v.lon });
+      }
+      // Une ville que Nominatim ne connaît pas est NOMMÉE dans le compte-rendu : ses
+      // entreprises resteront « à situer », et un état qui ne peut pas converger doit se
+      // voir, pas se déduire. (Panne ≠ introuvable : une panne n'inscrit rien.)
+      insituables.push(...rv.introuvables);
+      if (rv.panne) pannes.push(rv.panne);
+    }
+
+    // 2. Les entreprises dont le centre-ville est connu, dans le budget restant.
+    const lignes: { nom: string; lat: number; lon: number; precision: "exacte" | "ville" }[] = [];
+    let exactes = 0;
+
+    const tentables = aSituer.filter((e) => coordVilles.has(e.ville));
+    if (budget > 0 && tentables.length > 0 && pannes.length === 0) {
+      const passe = tentables.slice(0, budget);
+      const r = await geocoderEntreprises(passe, outilsNominatim());
+      if (r.panne) pannes.push(r.panne);
+
+      // TOUT résultat passe par `deciderPrecision` (pure, testée) : « exacte » seulement
+      // si Nominatim a rendu un lieu ponctuel À DISTANCE PLAUSIBLE du centre de sa ville.
+      // La revue a prouvé qu'un homonyme DANS les bornes régionales (la brasserie Labatt
+      // de Montréal, à ~247 km) serait sinon inscrit exact à vie.
+      const resolues = new Map(r.trouvees.map((t) => [t.nom, { lat: t.lat, lon: t.lon }]));
+      for (const e of passe) {
+        // Une entreprise que la panne a empêché d'interroger n'est PAS un « introuvable » :
+        // elle n'apparaît ni dans trouvees ni dans introuvables, et ne s'inscrit pas.
+        if (!resolues.has(e.nom) && !r.introuvables.includes(e.nom)) continue;
+        const centre = coordVilles.get(e.ville);
+        if (!centre) continue;
+        const d = deciderPrecision(resolues.get(e.nom) ?? null, centre);
+        lignes.push({ nom: e.nom, ...d });
+        if (d.precision === "exacte") exactes += 1;
+      }
+    }
+
+    // L'acquis s'enregistre MÊME en cas de panne en cours de passe : jeter le travail
+    // déjà fait garantirait de rebuter sur le même obstacle à chaque tentative.
+    if (lignes.length > 0) {
+      await db.insert(entreprisesLieux).values(lignes).onConflictDoNothing();
     }
 
     revalidatePath("/carte");
     return {
       ok: true,
-      ajoutees: r.trouvees.length,
-      introuvables: r.introuvables,
-      restantes: Math.max(0, aFaire.length - r.trouvees.length - r.introuvables.length),
-      panne: r.panne,
+      exactes,
+      approximatives: lignes.length - exactes,
+      restantes: Math.max(0, aSituer.length - lignes.length),
+      insituables,
+      panne: pannes.length > 0 ? pannes.join(" · ") : null,
     };
   } catch (err) {
-    console.error("[actions] géocodage impossible", err);
-    return { ok: false, erreur: "Géocodage impossible. Réessaie plus tard." };
+    console.error("[actions] localisation des entreprises impossible", err);
+    return { ok: false, erreur: "Localisation impossible. Réessaie plus tard." };
   }
+}
+
+/** Les outils réseau de Nominatim — un seul endroit, pour que rien ne diverge. */
+function outilsNominatim() {
+  return { recuperer: fetch, courrielContact: process.env.AUTHORIZED_EMAIL };
 }
 
 /**

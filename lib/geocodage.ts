@@ -5,10 +5,11 @@
 // `villes`, jamais le réseau.
 //
 // CE QU'ON GÉOCODE, ET CE QU'ON NE GÉOCODE PAS
-// On géocode des VILLES — « Lévis », « Saint-Nicolas ». Jamais une adresse, jamais un
-// employeur nommé, et évidemment jamais le domicile de Marc : il ne sort pas des variables
-// `DOMICILE_LAT` / `DOMICILE_LON`, qui restent côté serveur et ne servent qu'au calcul de
-// distance. Une épingle sur la carte situe une municipalité, pas une personne.
+// On géocode des VILLES (« Lévis ») et des ENTREPRISES CIBLES (« Laserax, Québec ») — des
+// données PUBLIQUES. Jamais le domicile de Marc ni un lieu personnel : ils ne sortent pas
+// des variables `DOMICILE_LAT` / `DOMICILE_LON` et ne partent vers aucun service tiers.
+// *(Frontière élargie aux entreprises le 2026-07-29, [UX-09] : les épingles par ville
+// étaient jugées inutilisables — voir CLAUDE.md §2.4.)*
 //
 // PRÉCISION ASSUMÉE
 // Le point rendu est le centre de la municipalité. Ce n'est PAS la position de l'employeur,
@@ -72,6 +73,21 @@ export function urlRecherche(ville: string): string {
   return `https://nominatim.openstreetmap.org/search?${p.toString()}`;
 }
 
+/**
+ * L'URL pour chercher une ENTREPRISE. Le nom seul serait ambigu (« Labatt » existe
+ * partout) : la ville et la province cadrent la recherche, les mêmes bornes régionales
+ * rejettent le reste.
+ */
+export function urlRechercheEntreprise(nom: string, ville: string): string {
+  const p = new URLSearchParams({
+    q: `${nom}, ${ville}, Québec, Canada`,
+    format: "json",
+    limit: "1",
+    countrycodes: "ca",
+  });
+  return `https://nominatim.openstreetmap.org/search?${p.toString()}`;
+}
+
 export interface Coordonnees {
   lat: number;
   lon: number;
@@ -101,6 +117,14 @@ export function lireReponse(charge: unknown): Coordonnees | null {
 
   return { lat, lon };
 }
+
+/**
+ * Délai maximal d'UNE requête Nominatim. Sans lui, une requête qui pend suspend toute la
+ * passe jusqu'au mur de la Server Action (30 s) — qui tue le processus AVANT
+ * l'enregistrement de l'acquis. Un échec à 4 s est une panne propre ; un mur à 30 s est
+ * une perte silencieuse.
+ */
+export const DELAI_MAX_REQUETE_MS = 4_000;
 
 /** Ce que l'appelant doit fournir : de quoi appeler le réseau, et de quoi attendre. */
 export interface OutilsGeocodage {
@@ -135,35 +159,48 @@ export async function geocoderVille(
   return lireReponse(await reponse.json());
 }
 
-/**
- * Géocode une série de villes en respectant la cadence, et rend ce qui a été trouvé.
- *
- * Une panne interrompt la passe et remonte : les villes déjà obtenues sont rendues quand
- * même, pour que l'appelant puisse les enregistrer plutôt que de tout perdre. Un traitement
- * de fond qui jette son travail à la première erreur ne finit jamais.
- */
-export async function geocoderPlusieurs(
-  villes: readonly string[],
-  outils: OutilsGeocodage,
-): Promise<{
+export interface ResultatPasse {
   trouvees: { nom: string; lat: number; lon: number }[];
   introuvables: string[];
   panne: string | null;
-}> {
+}
+
+/**
+ * Géocode une série de requêtes en respectant la cadence, et rend ce qui a été trouvé.
+ *
+ * UNE seule mécanique pour les villes et les entreprises : cadence, plafond par passe,
+ * distinction introuvable/panne. Deux copies de cette boucle divergeraient — c'est la
+ * classe de bug qui a déjà coûté deux incidents à ce projet.
+ *
+ * Une panne interrompt la passe et remonte : ce qui est déjà obtenu est rendu quand même,
+ * pour que l'appelant l'enregistre plutôt que de tout perdre. Un traitement de fond qui
+ * jette son travail à la première erreur ne finit jamais.
+ */
+async function geocoderSerie(
+  requetes: readonly { nom: string; url: string; lire?: (charge: unknown) => Coordonnees | null }[],
+  outils: OutilsGeocodage,
+): Promise<ResultatPasse> {
   const attendre = outils.attendre ?? dormir;
   const trouvees: { nom: string; lat: number; lon: number }[] = [];
   const introuvables: string[] = [];
 
-  const aTraiter = villes.slice(0, MAX_VILLES_PAR_PASSE);
+  const aTraiter = requetes.slice(0, MAX_VILLES_PAR_PASSE);
 
-  for (const [i, nom] of aTraiter.entries()) {
+  for (const [i, r] of aTraiter.entries()) {
     // Cadence AVANT la requête, sauf pour la première : ne jamais attendre pour rien.
     if (i > 0) await attendre(DELAI_ENTRE_REQUETES_MS);
 
     try {
-      const c = await geocoderVille(nom, outils);
-      if (c) trouvees.push({ nom, ...c });
-      else introuvables.push(nom);
+      const reponse = await outils.recuperer(r.url, {
+        headers: entete(outils.courrielContact),
+        signal: AbortSignal.timeout(DELAI_MAX_REQUETE_MS),
+      });
+      if (!reponse.ok) {
+        throw new Error(`Nominatim a répondu ${reponse.status} pour « ${r.nom} »`);
+      }
+      const c = (r.lire ?? lireReponse)(await reponse.json());
+      if (c) trouvees.push({ nom: r.nom, ...c });
+      else introuvables.push(r.nom);
     } catch (err) {
       return {
         trouvees,
@@ -174,4 +211,105 @@ export async function geocoderPlusieurs(
   }
 
   return { trouvees, introuvables, panne: null };
+}
+
+/**
+ * Classes Nominatim qui ne peuvent PAS être une entreprise.
+ *
+ * ⚠️ Trouvé par la revue adversariale (2026-07-29, sonde exécutée) : « Labatt, Québec » peut
+ * résoudre une RUE Labatt ou la MUNICIPALITÉ elle-même — dans les bornes régionales, donc
+ * accepté, inscrit « precision: exacte » À VIE et affiché comme l'adresse de l'entreprise.
+ * Une ville se résout légitimement en `place`/`boundary` ; une entreprise, jamais.
+ */
+const CLASSES_NON_ENTREPRISE = new Set(["place", "boundary", "highway"]);
+
+/**
+ * Lit une réponse Nominatim pour une ENTREPRISE : mêmes bornes que `lireReponse`, plus le
+ * rejet des classes non ponctuelles. Un rejet rend `null` (introuvable → repli ville DIT),
+ * jamais une fausse position étiquetée exacte.
+ */
+export function lireReponseEntreprise(charge: unknown): Coordonnees | null {
+  const c = lireReponse(charge);
+  if (c === null) return null;
+
+  const premier = (charge as unknown[])[0] as { class?: unknown };
+  if (typeof premier?.class === "string" && CLASSES_NON_ENTREPRISE.has(premier.class)) {
+    return null;
+  }
+  return c;
+}
+
+/**
+ * Distance à vol d'oiseau entre deux points, en km (haversine).
+ * Sert à VALIDER une résolution d'entreprise contre le centre de sa ville attendue.
+ */
+export function distanceKm(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number },
+): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const R = 6_371;
+  const dLat = rad(b.lat - a.lat);
+  const dLon = rad(b.lon - a.lon);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * Rayon de VALIDATION d'une résolution d'entreprise : au-delà de cette distance du centre
+ * de sa ville attendue, le résultat est un HOMONYME d'ailleurs (la brasserie Labatt de
+ * Montréal est à ~247 km de celle de Québec — et DANS les bornes régionales), pas
+ * l'entreprise. Large exprès : une usine en périphérie reste dans le rayon de sa ville.
+ */
+export const RAYON_VALIDATION_KM = 30;
+
+/**
+ * Décide ce qu'une résolution d'entreprise VAUT, connaissant le centre de sa ville.
+ *
+ * PURE — c'est la pièce qu'il ne faut pas se tromper, donc celle qu'on teste : exacte
+ * seulement si Nominatim a rendu un lieu ponctuel plausible À DISTANCE PLAUSIBLE de la
+ * ville attendue ; sinon le centre-ville, en le disant. Jamais de troisième état.
+ */
+export function deciderPrecision(
+  resolution: Coordonnees | null,
+  centreVille: Coordonnees,
+): { lat: number; lon: number; precision: "exacte" | "ville" } {
+  if (resolution !== null && distanceKm(resolution, centreVille) <= RAYON_VALIDATION_KM) {
+    return { ...resolution, precision: "exacte" };
+  }
+  return { ...centreVille, precision: "ville" };
+}
+
+/** Géocode une série de VILLES. */
+export async function geocoderPlusieurs(
+  villes: readonly string[],
+  outils: OutilsGeocodage,
+): Promise<ResultatPasse> {
+  return geocoderSerie(
+    villes.map((nom) => ({ nom, url: urlRecherche(nom) })),
+    outils,
+  );
+}
+
+/**
+ * Géocode une série d'ENTREPRISES (nom + ville).
+ *
+ * Une entreprise « introuvable » n'est PAS une erreur : beaucoup de PME n'existent pas
+ * dans OpenStreetMap. C'est l'appelant qui décide du repli — chez nous, le centre de sa
+ * municipalité, en le DISANT (`precision: "ville"`), jamais présenté comme son adresse.
+ */
+export async function geocoderEntreprises(
+  entreprises: readonly { nom: string; ville: string }[],
+  outils: OutilsGeocodage,
+): Promise<ResultatPasse> {
+  return geocoderSerie(
+    entreprises.map((e) => ({
+      nom: e.nom,
+      url: urlRechercheEntreprise(e.nom, e.ville),
+      lire: lireReponseEntreprise,
+    })),
+    outils,
+  );
 }

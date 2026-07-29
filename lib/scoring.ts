@@ -143,11 +143,19 @@ export function computeScore(input: {
 
 export type Palier = "A" | "B" | "C";
 
+/**
+ * Seuils des paliers — EXPORTÉS pour que la légende de la carte les LISE au lieu de les
+ * recopier : un seuil recopié dans un texte explicatif se met à mentir dès qu'on ajuste
+ * le barème (même règle que les points du barème dans `Panneaux`).
+ */
+export const SEUIL_PALIER_A = 80;
+export const SEUIL_PALIER_B = 65;
+
 /** A = fonce · B = solide · C = opportuniste. Sans note, on ne présume pas : C. */
 export function palier(score: number | null | undefined): Palier {
   if (score == null) return "C";
-  if (score >= 80) return "A";
-  if (score >= 65) return "B";
+  if (score >= SEUIL_PALIER_A) return "A";
+  if (score >= SEUIL_PALIER_B) return "B";
   return "C";
 }
 
