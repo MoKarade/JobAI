@@ -11,6 +11,7 @@ import Link from "next/link";
 import type { Offre } from "@/lib/types";
 import { palier } from "@/lib/scoring";
 import { ControlesOffre } from "./ControlesOffre";
+import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 
 /** Les distances s'écrivent à la française : 3,5 km. */
 function formaterKm(km: number): string {
@@ -34,6 +35,7 @@ function lienSur(brut: string): string | null {
 export function CarteOffre({ offre }: { offre: Offre }) {
   const p = palier(offre.score);
   const href = lienSur(offre.lien);
+  const trajet = lienTrajetGoogleMaps(offre.entreprise);
   const perimee = offre.perimeeLe !== null;
 
   return (
@@ -61,6 +63,13 @@ export function CarteOffre({ offre }: { offre: Offre }) {
         {href ? (
           <a href={href} target="_blank" rel="noopener noreferrer">
             offre ↗
+          </a>
+        ) : null}
+        {/* Le trajet s'ouvre DANS Google Maps, où Marc est connecté : sa maison, ses
+            endroits et la durée réelle y sont — sans que l'app transmette l'origine. */}
+        {trajet ? (
+          <a href={trajet} target="_blank" rel="noopener noreferrer">
+            trajet ↗
           </a>
         ) : null}
       </div>

@@ -1,6 +1,11 @@
 # ADR-0004 — Carte Google Maps : entreprises précises, domicile affiché, trajets
 
-- **Statut** : accepté (décisions de Marc, 2026-07-29, quatre questions tranchées)
+- **Statut** : **ANNULÉ** (décision de Marc, 2026-07-29, quelques heures après acceptation)
+  — remplacé par le **lien d'itinéraire** `lib/lienTrajet.ts` : un lien `maps/dir/?api=1`
+  (URL officielle, gratuite, sans clé) qui ne porte que la DESTINATION. Google, où Marc est
+  connecté à son compte, fournit lui-même l'origine, sa maison, ses endroits et la durée
+  réelle. Résultat : l'essentiel du besoin, zéro facturation, zéro coordonnée transmise —
+  et la révision du garde-fou n°1 devient inutile : il est RÉTABLI dans sa version stricte.
 - **Décideur** : Marc
 
 ## Contexte

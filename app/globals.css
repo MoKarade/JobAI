@@ -777,6 +777,9 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .detail__tete h1 { font-size: 1.3rem; line-height: 1.2; }
 .detail__poste { color: var(--text-soft); margin-top: 0.15rem; }
 .detail__lien { display: inline-block; margin-top: 0.5rem; color: var(--bleu); font-size: 0.85rem; }
+/* Deux liens côte à côte : l'annonce et le trajet. L'espacement les distingue, la couleur
+   ambre marque le trajet — accompagnée du libellé, jamais seule (WCAG 1.4.1). */
+.detail__lien--trajet { margin-left: 1rem; color: var(--ambre); }
 .detail__sans-lien {
   margin-top: 0.5rem;
   font-size: 0.8rem;

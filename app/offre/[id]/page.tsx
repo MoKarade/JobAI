@@ -13,6 +13,7 @@ import { auth } from "@/auth";
 import { lireOffre } from "@/lib/donnees";
 import { palier } from "@/lib/scoring";
 import { ControlesOffre } from "@/components/ControlesOffre";
+import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { Cadre } from "@/components/Cadre";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,7 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
 
   const p = palier(offre.score);
   const href = lienSur(offre.lien);
+  const trajet = lienTrajetGoogleMaps(offre.entreprise);
   const atouts = offre.raisons.filter((r) => r.ton === "atout");
   const reserves = offre.raisons.filter((r) => r.ton === "reserve");
 
@@ -93,6 +95,19 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
             ) : (
               <p className="detail__sans-lien">Aucun lien enregistré pour cette offre.</p>
             )}
+            {/* Le trajet s'ouvre DANS Google Maps : Marc y est connecté à son compte, donc
+                il y voit sa maison, ses endroits enregistrés et la durée réelle avec trafic.
+                Le lien ne porte que la DESTINATION — jamais l'origine (garde-fou n°1). */}
+            {trajet ? (
+              <a
+                href={trajet}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="detail__lien detail__lien--trajet"
+              >
+                Trajet dans Google Maps ↗
+              </a>
+            ) : null}
           </div>
         </header>
 

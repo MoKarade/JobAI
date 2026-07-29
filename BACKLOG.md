@@ -305,30 +305,20 @@
       · L'ambre est `#f2a31b` — la même que l'`app.color` publiée au hub. La changer ici sans
         la changer là désaccorderait le widget.
 
-- [ ] 🔧 **`[UX-07]`** **Refonte de la carte — Google Maps** (décisions de Marc 2026-07-29,
-      [ADR-0004](./docs/adr/0004-carte-google-maps.md) : maison affichée — garde-fou n°1
-      révisé —, facturation Google activée, Places auto + correction, lieux perso in-app +
-      bouton « ouvrir dans Google Maps »). Lots :
-      · **L1 — schéma** : tables `lieux_entreprises` (nom, adresse, lat, lon, place_id,
-        `source` places/manuel) et `lieux_perso` ; migration `0002`. `villes` conservée
-        jusqu'à validation, retirée ensuite (`0003`).
-      · **L2 — résolution** : Server Action Places Text Search (clé SERVEUR), états
-        honnêtes introuvable ≠ panne, correction manuelle qui gèle la position.
-      · **L3 — carte** : `@vis.gl/react-google-maps`, marqueurs entreprises (couleur =
-        palier de la meilleure offre, badge nb d'offres), clic → fiche entreprise + ses
-        offres + lien détail, recherche d'adresse, zoom/pan natifs, épingle maison,
-        bouton « ouvrir dans Google Maps » (place_id, sans API). Liste accessible conservée.
-      · **L4 — trajets** : Routes API côté serveur, domicile → entreprise, durée en cache
-        en base + « recalculer ». Jamais un appel par affichage.
-      · **L5 — lieux perso** : ajout par recherche d'adresse, renommage, retrait.
-      · **L6 — nettoyage** : retrait Leaflet/Nominatim/`BoutonGeocoder`/table `villes`,
-        tests adaptés.
-      👤 **Préalables Marc (bloquants pour l'exercice réel, pas pour le code)** : facturation
-      Google Cloud + APIs Maps JavaScript/Places/Routes + 2 clés (client restreinte au
-      domaine, serveur restreinte aux APIs) + alerte budget 1 $ + vérifier `DOMICILE_LAT`/
-      `DOMICILE_LON` dans Vercel. Détail pas à pas fourni au moment du GO.
-      ⚠️ Les appels réels Google ne sont pas exerçables depuis la session (réseau restreint) :
-      logique testée par injection, premier essai réel = Marc, comme pour Nominatim.
+- [x] ❌ **`[UX-07]`** Refonte carte Google Maps — **ANNULÉ par Marc le 2026-07-29**,
+      quelques heures après l'acceptation de l'ADR-0004 (mis à jour). Remplacé par
+      `[UX-08]`, qui couvre l'essentiel du besoin sans facturation Google ni clé API.
+      La carte Leaflet existante reste en place en attendant la décision de Marc :
+      🧭 garder l'onglet Carte tel quel, ou le retirer ?
+- [x] 🔧 **`[UX-08]`** **Lien « Trajet dans Google Maps »**. ✅ 2026-07-29 — sur chaque
+      offre (liste ET page de détail). URL officielle `maps/dir/?api=1`, gratuite, sans
+      clé. **Le lien ne porte que la DESTINATION** (« Entreprise, Ville, QC ») : l'origine
+      est proposée par Google côté compte — Marc y voit sa maison, ses endroits enregistrés
+      et la durée réelle avec trafic, sans que l'app ne connaisse ni ne transmette une seule
+      coordonnée personnelle. C'est ce qui a permis de RÉTABLIR le garde-fou n°1 strict.
+      Verrou : `tests/lienTrajet.test.ts` — le paramètre `origin` est INTERDIT dans l'URL
+      (l'ajouter « pour aider » enverrait le domicile dans l'historique de navigation), et
+      chaque offre active du seed produit un lien avec sa ville.
 
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
