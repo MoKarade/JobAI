@@ -7,7 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { SEED } from "../lib/seed";
 import { OffreSchema } from "../lib/types";
-import { palier } from "../lib/scoring";
+import { PLAFOND_NOTE_CALCULEE, palier } from "../lib/scoring";
 
 const actives = SEED.filter((o) => !o.histo);
 const historiques = SEED.filter((o) => o.histo);
@@ -15,10 +15,13 @@ const historiques = SEED.filter((o) => o.histo);
 describe("volume", () => {
   // Prouver le volume AVANT d'en dépendre : un tableau vide passerait tous les tests
   // « pour chaque offre… » sans rien vérifier.
-  it("contient les 23 offres actives et les 15 candidatures de 2025", () => {
-    expect(actives).toHaveLength(23);
+  it("contient les 29 offres actives et les 15 candidatures de 2025", () => {
+    // 23 relevées à la main au 2026-07-27, plus 6 trouvées par balayage Indeed le
+    // 2026-07-29. Ce compte est volontairement EN DUR : il doit tomber quand le jeu
+    // change, pour qu'on relise ce qui a été ajouté au lieu de le découvrir en prod.
+    expect(actives).toHaveLength(29);
     expect(historiques).toHaveLength(15);
-    expect(SEED).toHaveLength(38);
+    expect(SEED).toHaveLength(44);
   });
 });
 
@@ -37,12 +40,28 @@ describe("conformité au schéma", () => {
 });
 
 describe("provenance des notes", () => {
-  it("toute offre notée déclare une note MANUELLE", () => {
-    // Le seed vient d'une lecture réelle des offres. Si une entrée se disait « calculée »,
-    // elle échapperait au plafond des notes calculées sans l'avoir mérité.
+  it("toute offre notée déclare sa provenance, et une note CALCULÉE respecte le plafond", () => {
+    // Le jeu de départ venait d'une lecture réelle : tout y était « manuel ». Depuis le
+    // repérage automatique du 2026-07-29, les deux provenances coexistent — c'est prévu
+    // par le barème, pas une entorse. Ce qui doit rester vrai, et qui est le VRAI risque,
+    // c'est qu'une note calculée ne passe jamais devant une note vérifiée à la main :
+    // elle est plafonnée. Une entrée qui se dirait « manuelle » sans l'être échapperait
+    // à ce plafond, d'où la vérification dans les deux sens.
     for (const o of actives.filter((x) => x.score !== null)) {
-      expect(o.scoreSource, `offre ${o.id}`).toBe("manuel");
+      expect(o.scoreSource, `offre ${o.id}`).not.toBeNull();
+      if (o.scoreSource === "calcule") {
+        expect(o.score!, `offre ${o.id}`).toBeLessThanOrEqual(PLAFOND_NOTE_CALCULEE);
+      }
     }
+  });
+
+  it("les notes MANUELLES restent majoritaires — le jeu lu à la main fait autorité", () => {
+    // Un repérage automatique qui noierait les offres lues à la main retournerait le
+    // rapport de force du barème sans que personne ne le décide. Si ce test tombe un
+    // jour, c'est une décision à prendre, pas un chiffre à ajuster.
+    const notees = actives.filter((o) => o.score !== null);
+    const manuelles = notees.filter((o) => o.scoreSource === "manuel");
+    expect(manuelles.length).toBeGreaterThan(notees.length / 2);
   });
 
   it("les candidatures de 2025 n'ont ni note ni justification", () => {
@@ -144,12 +163,25 @@ describe("cohérence du suivi", () => {
     }
   });
 
-  it("les distances des offres actives sont plausibles", () => {
+  it("une distance PRÉSENTE est plausible ; absente, elle est franchement nulle", () => {
+    // Ce que ce test protège, c'est la distance ABERRANTE (un zéro, un millier de km),
+    // pas la distance manquante : le type dit `null = inconnue (pas zéro)`, et une offre
+    // repérée automatiquement n'en a pas — la session ne peut pas la mesurer sans le
+    // domicile. Exiger une distance partout forcerait à en inventer une, ce qui est
+    // exactement le défaut que le reste du fichier interdit.
     for (const o of actives) {
-      expect(o.km, `offre ${o.id}`).not.toBeNull();
-      expect(o.km!, `offre ${o.id}`).toBeGreaterThan(0);
-      expect(o.km!, `offre ${o.id}`).toBeLessThan(100);
+      if (o.km === null) continue;
+      expect(o.km, `offre ${o.id}`).toBeGreaterThan(0);
+      expect(o.km, `offre ${o.id}`).toBeLessThan(100);
     }
+  });
+
+  it("la MAJORITÉ des offres actives portent une distance mesurée", () => {
+    // Filet contre la dérive inverse : si les repérages automatiques finissaient par
+    // dominer, la carte et le barème raisonneraient surtout sur des distances inconnues
+    // (10/20 neutres) sans que personne ne l'ait décidé.
+    const mesurees = actives.filter((o) => o.km !== null);
+    expect(mesurees.length).toBeGreaterThan(actives.length / 2);
   });
 
   it("la seule offre hors rayon est explicitement signalée comme telle", () => {

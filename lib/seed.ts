@@ -603,6 +603,245 @@ export const SEED: Offre[] = [
     userNote: "",
   },
 
+  // ── Repérage du 2026-07-29 ───────────────────────────────────────────────────
+  // Six offres RÉELLES trouvées via le connecteur Indeed de la session de travail, chez
+  // des employeurs qui n'étaient pas encore suivis. Chaque annonce a été LUE : les atouts
+  // et réserves ci-dessous en viennent, ce ne sont pas des impressions.
+  //
+  // Leurs notes sont CALCULÉES (`scoreSource: "calcule"`, plafond 85) — pas manuelles.
+  // Une note manuelle vient de la lecture de Marc, et lui seul peut la poser ; annoncer
+  // « vérifié à la main » pour une note que la machine a produite viderait la distinction
+  // de son sens, alors que c'est elle qui fait autorité dans tout le barème.
+  //
+  // Leur `km` est `null` — INCONNU, jamais un chiffre plausible. Le domicile ne vit que
+  // dans `DOMICILE_LAT`/`DOMICILE_LON` (garde-fou n°1) : la session ne peut pas mesurer
+  // ces distances, et une distance estimée « à peu près » serait exactement la donnée
+  // inventée que le garde-fou n°3 interdit. Le barème traite `null` comme neutre (10/20),
+  // ce qui les pénalise honnêtement face aux offres dont la distance est mesurée.
+  {
+    ...base,
+    id: "specialistes-superviseur-entretien",
+    dateReperage: "2026-07-29",
+    entreprise: "Spécialistes en Services",
+    poste: "Superviseur(e) entretien mécanique",
+    lien: "https://to.indeed.com/aaf97jjqqm94",
+    km: null,
+    salaireAffiche: "à partir de 55 $/h (annoncé)",
+    priorite: "Moyenne",
+    score: 74,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Supervision d'équipe ET planification technique : mécaniciens industriels, tuyauteurs, soudeurs et sous-traitants, avec responsabilité des échéanciers, des budgets et des arrêts planifiés.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "DEC ou DEP en mécanique industrielle suffit, et la gestion de projets n'est qu'un atout — l'exigence de séniorité n'est pas chiffrée.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Poste par agence de placement : l'employeur final n'est pas nommé (« important employeur du secteur manufacturier de la région de Québec »), donc ni la distance ni la culture ne sont vérifiables avant l'entretien.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Le taux annoncé (55 $/h, soit ~114 k$) est inhabituellement élevé pour le titre : à confirmer avant d'en faire un argument de négociation.",
+      },
+    ],
+    notes:
+      "Repérée le 29/07/2026 via Indeed. Publiée le 02/07/2026. Note calculée : le salaire annoncé pèse 15/15, la distance inconnue coûte 10 points sur 20.",
+    userNote: "",
+  },
+  {
+    ...base,
+    id: "apn-coordonnateur-planification",
+    dateReperage: "2026-07-29",
+    entreprise: "APN",
+    poste: "Coordonnateur(trice) à la planification",
+    lien: "https://to.indeed.com/aaflc77z4246",
+    km: null,
+    salaireAffiche: null,
+    priorite: "Moyenne",
+    score: 70,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Coordination avec encadrement réel : supervision de l'équipe de planification, suivi des KPI, amélioration continue des performances opérationnelles.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "Trois ans d'expérience demandés — l'exigence la plus proche du profil parmi les offres de coordination trouvées. Usinage de précision pour l'aéronautique et le médical.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Formation universitaire en administration des affaires demandée, là où le parcours est technique.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Le contenu est logistique (plans de production, inventaires, capacité) plutôt qu'automatisation : le volet technique du profil n'y sert presque pas.",
+      },
+    ],
+    notes:
+      "Repérée le 29/07/2026 via Indeed. Publiée le 23/06/2026. Groupe Schivo (Irlande, Canada, USA, Mexique, Suisse).",
+    userNote: "",
+  },
+  {
+    ...base,
+    id: "dexterra-superviseur-technique",
+    dateReperage: "2026-07-29",
+    entreprise: "Dexterra",
+    poste: "Superviseur technique",
+    lien: "https://to.indeed.com/aarjkhgwpdlm",
+    km: null,
+    salaireAffiche: null,
+    priorite: "Moyenne",
+    score: 68,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Coordination multidisciplinaire : sous-traitants et corps de métier, échéancier directeur, gestion des changements, analyses de coûts et budgets. Aucune exigence de séniorité chiffrée.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Le parc est résidentiel (unités de logement) : entretien de bâtiments, pas d'automatisation industrielle. Le volet technique du profil ne s'y applique guère.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Situé à Courcelette, sur la base militaire de Valcartier : accès au site probablement conditionné à une habilitation, à vérifier avant d'investir du temps.",
+      },
+    ],
+    notes:
+      "Repérée le 29/07/2026 via Indeed. Publiée le 09/03/2026 — annonce ancienne, vérifier qu'elle est toujours ouverte avant de postuler.",
+    userNote: "",
+  },
+  {
+    ...base,
+    id: "techsol-coordonnateur-qualite",
+    dateReperage: "2026-07-29",
+    entreprise: "Techsol Marine",
+    poste: "Coordonnateur qualité",
+    lien: "https://to.indeed.com/aa97ysrqmtmt",
+    km: null,
+    salaireAffiche: null,
+    priorite: "Moyenne",
+    score: 66,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Coordination d'audits ISO 9001, suivi des actions correctives et des projets d'amélioration : de la méthode et du pilotage, dans un environnement d'ingénierie électrique maritime.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "Publiée le jour même du repérage, horaire flexible et télétravail partiel annoncés.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Cinq ans d'expérience minimum dans un rôle similaire, contre environ trois aujourd'hui.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Rôle qualité/documentaire : peu de contenu automatisation, et il relève d'un spécialiste en amélioration continue plutôt que d'une équipe à encadrer.",
+      },
+    ],
+    notes:
+      "Repérée le 29/07/2026 via Indeed, publiée le 29/07/2026. Société liée au Groupe Océan.",
+    userNote: "",
+  },
+  {
+    ...base,
+    id: "honeywell-regulation-cvac",
+    dateReperage: "2026-07-29",
+    entreprise: "Honeywell",
+    poste: "Technicien(ne) en régulation automatique/CVAC",
+    lien: "https://to.indeed.com/aaklqnn9bfnt",
+    km: null,
+    salaireAffiche: null,
+    priorite: "Basse",
+    score: 58,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Deux ans d'expérience seulement, et l'automatisation du bâtiment est acceptée au même titre que l'industrielle : c'est l'exigence de séniorité la plus accessible du lot.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "Contenu technique dense et transférable : programmation, mise en route, protocoles Bacnet, Modbus et OPC, plus la livraison de projets dans les budgets et délais.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Poste de technicien sans équipe à encadrer — un recul par rapport à la coordination visée : le barème le pénalise à 14/40 sur le fit de rôle.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Garde (stand-by) à assurer, déplacements jusqu'à 10 % dans la province, et approbations de sécurité exigées par les clients.",
+      },
+    ],
+    notes:
+      "Repérée le 29/07/2026 via Indeed. Publiée le 22/06/2026. Sainte-Foy, donc probablement proche — mais la distance n'a pas été mesurée.",
+    userNote: "",
+  },
+  {
+    ...base,
+    id: "dracon-controle-qualite",
+    dateReperage: "2026-07-29",
+    entreprise: "Dracon Automatisation",
+    poste: "Technicien — contrôle de qualité (panneaux de contrôle)",
+    lien: "https://to.indeed.com/aazq7jdvxtqy",
+    km: null,
+    salaireAffiche: null,
+    priorite: "Basse",
+    score: 54,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Cœur de métier automatisation et robotique : test et conformité des panneaux de contrôle, collaboration avec les chargés de projets, dépannage technique des clients.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "Formation acceptée large (DEC, AEC ou DEP), partage annuel des profits et REER avec contribution de l'employeur.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Poste de technicien sans encadrement, et trois à cinq ans d'expérience demandés.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Publiée le 11/05/2026 : l'annonce a près de trois mois, son ouverture est à vérifier.",
+      },
+    ],
+    notes:
+      "Repérée le 29/07/2026 via Indeed. À Lévis. Une porte d'entrée chez un intégrateur en automatisation, plus qu'un poste de coordination.",
+    userNote: "",
+  },
+
   // ── Campagne 2025 ────────────────────────────────────────────────────────────
   // 15 candidatures réellement envoyées, 7 réponses, 2 processus avancés. Ce n'est pas
   // de la décoration : c'est ce qui justifie les priorités actuelles.

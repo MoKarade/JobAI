@@ -61,8 +61,11 @@ export interface OffreSurCarte {
 export interface EntrepriseSurCarte {
   nom: string;
   ville: string;
-  /** Distance mesurée de la référence — jamais recalculée depuis l'épingle. */
-  km: number;
+  /**
+   * Distance MESURÉE de la référence — jamais recalculée depuis l'épingle, et `null`
+   * quand elle n'a pas été relevée. La carte le dit plutôt que d'afficher un chiffre.
+   */
+  km: number | null;
   lecture: string;
   offres: OffreSurCarte[];
 }

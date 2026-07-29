@@ -364,6 +364,36 @@
       ⚠️ L'appel réel Nominatim n'est toujours pas exerçable depuis la session : logique
       testée par injection, le premier clic réel fait foi.
 
+- [x] 🔧 **`[UX-10]`** **Six offres réelles ajoutées au jeu** (demande Marc 2026-07-29 :
+      « j'ai réussi à situer les entreprises, y a encore trop peu d'offres »).
+      ✅ 2026-07-29 — 23 → **29 offres actives**, 23 → **29 entreprises cibles**.
+      · **Diagnostic d'abord** : la carte ne cachait RIEN (23 offres vivantes, 23
+        épinglées, 0 hors cibles). Le problème n'était pas l'affichage mais le STOCK —
+        c'est ce qui a évité de « corriger » une carte qui fonctionnait.
+      · Offres trouvées via le **connecteur Indeed de la session** (usage prévu par
+        `[UX-05]` : rafraîchir le jeu au fil des sessions, jamais un fetch de l'app —
+        garde-fou n°4 intact). **Chaque annonce a été lue** : atouts et réserves en
+        viennent. Honeywell, APN, Dracon Automatisation, Techsol Marine, Dexterra,
+        Spécialistes en Services.
+      · **Notes CALCULÉES** (`scoreSource: "calcule"`, 54 à 74, plafond 85 respecté), pas
+        manuelles : une note manuelle vient de la lecture de Marc, et lui seul peut la
+        poser — l'annoncer autrement viderait de son sens la distinction qui fait autorité
+        dans tout le barème.
+      · **`km: null` — non mesuré, jamais estimé.** Le domicile ne vit que dans
+        `DOMICILE_LAT`/`DOMICILE_LON` : la session ne peut pas calculer ces distances, et
+        un chiffre « à peu près » s'afficherait ensuite avec l'assurance d'un relevé.
+        `EntrepriseCible.km` devient donc `number | null`, et les trois surfaces
+        d'affichage (fiches, carte, liste) **disent** « distance non mesurée ».
+        Suite possible : `[DISTANCE-CALCULEE]`.
+      · **Trois invariants de test reformulés, aucun affaibli** : la provenance des notes
+        (une note calculée doit prouver son plafond), les distances (une distance
+        PRÉSENTE est plausible ; absente, elle est franchement nulle), le tri des cibles.
+        Chacun est doublé d'un **filet de majorité** — si les repérages automatiques
+        venaient à dominer les entrées lues à la main, ce sera une décision à prendre, pas
+        un glissement à constater.
+      · Découverte au passage : `[SCORE-SENIORITE-LETTRES]` (années en toutes lettres non
+        détectées par le barème).
+
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
       · **Guichet-Emplois** — flux XML officiel d'EDSC, sur demande. C'est la source
@@ -382,6 +412,23 @@
 ---
 
 ## Découvertes et dette (à trier)
+
+- 🔧 **`[SCORE-SENIORITE-LETTRES]` — le barème ne lit pas les années écrites en toutes
+  lettres.** `scoreSeniorite` cherche `(\d+)…ans d'expérience` : « Posséder **trois à cinq
+  années** d'expérience » (offre Dracon, réelle) ne matche pas et retombe sur la valeur
+  neutre 11/15 au lieu de 9. L'offre est donc surnotée de 2 points. Trouvé en notant les
+  offres du repérage du 2026-07-29. ⚠️ C'est une modification de la NOTATION : protocole
+  `CLAUDE.md` §8 (ADR + tableau avant/après sur les offres du jeu) avant toute ligne de code.
+
+- 🧭 **`[DISTANCE-CALCULEE]` — mesurer les distances au lieu de les écrire à la main.**
+  Depuis `[UX-09]`, les entreprises situées ont leurs coordonnées en base
+  (`entreprises_lieux`), et le domicile vit déjà dans `DOMICILE_LAT`/`DOMICILE_LON` : le
+  serveur a donc les deux bouts pour calculer chaque distance avec `distanceKm`
+  (`lib/geocodage.ts`, déjà écrite et testée). Ça remplirait les `km: null` des entrées
+  ajoutées automatiquement **sans qu'aucune adresse n'entre dans le dépôt**, et rendrait
+  les distances vérifiables au lieu d'être des constantes recopiées. Points à trancher :
+  une distance à vol d'oiseau n'est pas une distance routière (l'afficher comme telle
+  serait malhonnête) ; et le repli quand l'entreprise n'est pas encore située.
 
 - 🧭 **`[NOTE-SALAIRE]` — le salaire affiché n'entre pas dans la note calculée.**
   `scoreSalaire` attend un annuel ; `salaireAffiche` est du texte libre, et les six formes

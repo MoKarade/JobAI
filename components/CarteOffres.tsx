@@ -54,8 +54,11 @@ function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string 
       `<span class="popup-approx">Position approximative — centre de ${echapper(e.ville)}</span>`,
     );
   }
+  // Une distance non relevée se dit ; « null km » ou un zéro seraient pires que rien.
+  const distance =
+    e.km === null ? "distance non mesurée" : `${String(e.km).replace(".", ",")} km`;
   morceaux.push(
-    `<span class="popup-faits">${echapper(e.ville)} · ${echapper(String(e.km).replace(".", ","))} km</span>`,
+    `<span class="popup-faits">${echapper(e.ville)} · ${echapper(distance)}</span>`,
   );
   if (e.lecture) {
     const lecture = e.lecture.length > 160 ? `${e.lecture.slice(0, 157)}…` : e.lecture;

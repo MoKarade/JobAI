@@ -14,7 +14,7 @@ describe("filtres", () => {
 
   it("« actives » masque les candidatures de 2025", () => {
     const r = filtrer(SEED, { ...FILTRES_VIDES, activesSeules: true });
-    expect(r).toHaveLength(23);
+    expect(r).toHaveLength(29);
     expect(r.every((o) => !o.histo)).toBe(true);
   });
 

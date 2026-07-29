@@ -55,7 +55,17 @@ export const SALAIRES_MARCHE: readonly RepereSalaire[] = [
 export interface EntrepriseCible {
   nom: string;
   ville: string;
-  km: number;
+  /**
+   * Distance MESURÉE depuis le domicile, ou `null` quand elle ne l'a pas été.
+   *
+   * `null` n'est pas « zéro » ni « proche » : c'est « on ne sait pas ». Les 23 premières
+   * entrées ont une distance relevée à la main ; celles ajoutées depuis un repérage
+   * automatique n'en ont pas, et la session de travail ne peut pas la calculer — le
+   * domicile ne vit que dans `DOMICILE_LAT`/`DOMICILE_LON` (garde-fou n°1). Écrire une
+   * distance « à peu près » serait exactement la donnée inventée qu'interdit le garde-fou
+   * n°3, et elle passerait ensuite pour mesurée partout où elle s'affiche.
+   */
+  km: number | null;
   /** Pourquoi elle est dans la liste, et ce qu'elle vaut. */
   lecture: string;
 }
@@ -85,6 +95,18 @@ export const ENTREPRISES_CIBLES: readonly EntrepriseCible[] = [
   { nom: "Revtech Systèmes", ville: "Sainte-Marie (Beauce)", km: 44.4, lecture: "Intégrateur certifié ABB, multi-marques. Aucun poste repéré actuellement." },
   { nom: "Exo-s", ville: "Saint-Damien-de-Buckland", km: 51.7, lecture: "Bon fit sur le fond, mais dépasse le rayon de 50 km." },
   { nom: "Alstom", ville: "La Pocatière", km: 110.3, lecture: "À écarter : hors rayon, exige la résidence permanente ou la citoyenneté, et deux refus en 2025." },
+
+  // ── Repérage automatique du 2026-07-29 ───────────────────────────────────────
+  // Employeurs découverts par un balayage Indeed, chacun rattaché à une offre réelle du
+  // jeu de données. Leur `km` est `null` — NON MESURÉ, et surtout pas estimé : la ville
+  // ne donne pas la distance, et un chiffre « à peu près » s'afficherait ensuite avec la
+  // même assurance qu'un relevé. Les 23 entrées ci-dessus, elles, sont mesurées.
+  { nom: "Honeywell", ville: "Québec (Sainte-Foy)", km: null, lecture: "Automatisation du bâtiment (Building Automation). Poste de technicien en régulation : contenu technique dense, mais sans équipe à encadrer." },
+  { nom: "APN", ville: "Québec", km: null, lecture: "Usinage de précision pour l'aéronautique et le médical, groupe Schivo. Coordination de la planification : encadrement réel, contenu logistique plutôt que technique." },
+  { nom: "Dracon Automatisation", ville: "Lévis", km: null, lecture: "Intégrateur en automatisation et robotique. Poste de technicien contrôle qualité sur panneaux de contrôle : porte d'entrée du métier, pas de la coordination." },
+  { nom: "Techsol Marine", ville: "Québec", km: null, lecture: "Électrification et décarbonisation maritime, lié au Groupe Océan. Coordination qualité et audits ISO 9001." },
+  { nom: "Dexterra", ville: "Courcelette", km: null, lecture: "Gestion d'installations. Supervision technique d'un parc résidentiel sur la base de Valcartier : accès au site probablement conditionné à une habilitation." },
+  { nom: "Spécialistes en Services", ville: "Québec", km: null, lecture: "Agence de placement : l'employeur final n'est pas nommé. Supervision d'entretien mécanique en milieu manufacturier, taux annoncé élevé à confirmer." },
 ];
 
 export interface QuadrantSwot {

@@ -226,6 +226,22 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   de géocodeur DANS les bornes régionales n'est pas encore la bonne — la valider par la
   CLASSE du lieu et la DISTANCE au référent attendu, sinon un homonyme d'ailleurs s'inscrit
   « exact » à vie.
+- **Diagnostiquer AVANT de corriger : « trop peu d'offres » n'était pas un bug de carte.**
+  Le réflexe était de retoucher l'affichage. Le comptage a montré l'inverse : 23 offres
+  vivantes, 23 épinglées, zéro hors cibles — la carte montrait 100 % de ce qu'elle avait.
+  Le manque était dans le STOCK, et le remède n'avait rien à voir (alimenter le jeu de
+  données). Une plainte sur ce qu'on VOIT ne désigne pas forcément ce qu'il faut CHANGER :
+  mesurer d'abord, sinon on « corrige » ce qui marche.
+- **Un jeu de données qui change de nature casse les tests qui décrivaient son état — et
+  c'est le moment de distinguer la DESCRIPTION de l'INVARIANT.** Ajouter six offres
+  automatiques a fait tomber sept tests. Trois comptaient (23 → 29 : à mettre à jour).
+  Quatre encodaient des propriétés du seed d'origine — « toute note est manuelle », « toute
+  offre a une distance » — vraies par construction tant que tout était saisi à la main.
+  Les supprimer aurait ouvert un trou ; les garder aurait forcé à inventer des distances.
+  On les REFORMULE en ce qu'ils protègent vraiment (« une note calculée respecte son
+  plafond », « une distance PRÉSENTE est plausible ») et on ajoute un **filet de
+  majorité** : le jour où l'automatique dominera le manuel, ce sera une décision, pas un
+  glissement. Reformuler n'est pas affaiblir — encore faut-il l'écrire dans le test.
 - **Une sonde qui tourne dans un état local différent du distant ne prouve rien.**
   L'avertissement « le tag de la version courante existe-t-il ? » a répondu « tag v1.1.0
   présent » — parce que mon clone portait le tag créé lors d'un `git push` REFUSÉ (403).

@@ -181,7 +181,9 @@ export default async function PageCarte() {
                       de référence et lecture comprises : c'est elle, l'accès clavier et
                       lecteur d'écran, pas un résumé appauvri. */}
                   <p className="carte-liste__faits">
-                    {String(x.km).replace(".", ",")} km du domicile (mesuré)
+                    {x.km === null
+                      ? "distance non mesurée"
+                      : `${String(x.km).replace(".", ",")} km du domicile (mesuré)`}
                   </p>
                   {x.lecture ? <p className="carte-liste__lecture">{x.lecture}</p> : null}
                   {x.offres.length > 0 ? (

@@ -92,10 +92,16 @@ function Entreprises() {
             <article key={e.nom} className="fiche">
               <h3>{e.nom}</h3>
               <p className="fiche__lieu">{e.ville}</p>
-              <p className={`fiche__km${e.km > RAYON_MAX_KM ? " fiche__km--hors" : ""}`}>
-                {e.km.toString().replace(".", ",")} km
-                {e.km > RAYON_MAX_KM ? " — hors rayon" : ""}
-              </p>
+              {/* Une distance non mesurée se DIT. L'afficher comme « 0 km » ou la taire
+                  reviendrait à laisser croire à un relevé qui n'existe pas. */}
+              {e.km === null ? (
+                <p className="fiche__km fiche__km--inconnue">distance non mesurée</p>
+              ) : (
+                <p className={`fiche__km${e.km > RAYON_MAX_KM ? " fiche__km--hors" : ""}`}>
+                  {e.km.toString().replace(".", ",")} km
+                  {e.km > RAYON_MAX_KM ? " — hors rayon" : ""}
+                </p>
+              )}
               <p className="fiche__lecture">{e.lecture}</p>
             </article>
           ))}

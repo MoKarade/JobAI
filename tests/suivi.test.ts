@@ -159,8 +159,8 @@ describe("date d'envoi automatique", () => {
 describe("résumé", () => {
   it("compte séparément le suivi total et les offres actives", () => {
     const r = resumer(SEED);
-    expect(r.total).toBe(38);
-    expect(r.actives).toBe(23);
+    expect(r.total).toBe(44);
+    expect(r.actives).toBe(29);
   });
 
   it("cherche la meilleure offre parmi les ACTIVES seulement", () => {

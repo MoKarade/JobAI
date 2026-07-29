@@ -31,25 +31,39 @@ describe("repères de salaire", () => {
 });
 
 describe("entreprises cibles", () => {
-  it("sont triées de la plus proche à la plus lointaine", () => {
-    const km = ENTREPRISES_CIBLES.map((e) => e.km);
+  it("celles qui ont une distance MESURÉE sont triées de la plus proche à la plus lointaine", () => {
+    // Les entrées sans distance relevée (repérage automatique) sont exclues du tri : les
+    // ranger obligerait à leur prêter une position dans un classement de distances, ce
+    // qu'on ne sait pas. Elles vivent en fin de liste, à part, et le disent.
+    const km = ENTREPRISES_CIBLES.map((e) => e.km).filter((k): k is number => k !== null);
     expect([...km].sort((a, b) => a - b)).toEqual(km);
   });
 
-  it("ont des identités uniques et des distances plausibles", () => {
+  it("ont des identités uniques ; une distance PRÉSENTE est plausible", () => {
     const noms = ENTREPRISES_CIBLES.map((e) => e.nom);
     expect(new Set(noms).size).toBe(noms.length);
     for (const e of ENTREPRISES_CIBLES) {
-      expect(e.km, `entreprise ${e.nom}`).toBeGreaterThan(0);
-      expect(e.km, `entreprise ${e.nom}`).toBeLessThan(200);
+      if (e.km !== null) {
+        expect(e.km, `entreprise ${e.nom}`).toBeGreaterThan(0);
+        expect(e.km, `entreprise ${e.nom}`).toBeLessThan(200);
+      }
       expect(e.ville.length, `entreprise ${e.nom}`).toBeGreaterThan(0);
       expect(e.lecture.length, `entreprise ${e.nom}`).toBeGreaterThan(20);
     }
   });
 
+  it("la MAJORITÉ des cibles portent une distance mesurée", () => {
+    // Le jour où l'ingestion automatique dominera cette liste, la page « distances
+    // réelles » n'en montrera presque plus : ce sera une décision à prendre, pas un
+    // glissement à constater.
+    const mesurees = ENTREPRISES_CIBLES.filter((e) => e.km !== null);
+    expect(mesurees.length).toBeGreaterThan(ENTREPRISES_CIBLES.length / 2);
+  });
+
   it("celles qui sont hors rayon le disent dans leur lecture", () => {
-    // Sinon elles passeraient pour des cibles atteignables.
-    for (const e of ENTREPRISES_CIBLES.filter((x) => x.km > RAYON_MAX_KM)) {
+    // Sinon elles passeraient pour des cibles atteignables. Sans distance mesurée, on ne
+    // peut RIEN affirmer sur le rayon — ces entrées sont donc hors du champ de ce test.
+    for (const e of ENTREPRISES_CIBLES.filter((x) => x.km !== null && x.km > RAYON_MAX_KM)) {
       expect(e.lecture, `entreprise ${e.nom}`).toMatch(/rayon|écarter/i);
     }
   });

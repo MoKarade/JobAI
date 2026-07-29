@@ -730,6 +730,8 @@ code {
 .fiche__lieu { font-size: 0.78rem; color: var(--text-soft); }
 .fiche__km { font-family: var(--mono); font-size: 0.75rem; color: var(--ambre); margin: 0.25rem 0; }
 .fiche__km--hors { color: var(--rouge); }
+/* Distance non relevée : volontairement en retrait, pour ne pas se lire comme un chiffre. */
+.fiche__km--inconnue { color: var(--text-soft); font-style: italic; }
 .fiche__lecture { font-size: 0.8rem; color: var(--text-soft); }
 
 /* Un tableau large défile dans SON conteneur : la page, elle, ne défile jamais
