@@ -842,6 +842,380 @@ export const SEED: Offre[] = [
     userNote: "",
   },
 
+  // ── Balayage du 30/07/2026 ───────────────────────────────────────────────────
+  // Neuf offres lues une à une sur Indeed. Trois candidates repérées à la même passe ont
+  // été ÉCARTÉES après lecture, et c'est le travail utile : Groupe Laberge (« Responsable
+  // de l'entretien et service ») est de l'entretien d'immeubles locatifs — plomberie de
+  // base et déneigement —, et deux annonces d'agences ne nomment pas l'employeur. Un titre
+  // ne dit pas ce qu'est un poste ; seule l'annonce le dit.
+
+  {
+    id: "sanitech-superviseur-technique",
+    source: "seed",
+    dateReperage: "2026-07-30",
+    entreprise: "Groupe Sani-Tech",
+    poste: "Superviseur(e) technique — dessin et conception",
+    lien: "https://to.indeed.com/aa7xftrrxfwl",
+    km: null,
+    salaireAffiche: null,
+    priorite: "Haute",
+    statut: "Identifiee",
+    dateEnvoi: "",
+    score: 70,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "L'annonce chiffre elle-même la répartition : 70 % leadership, 30 % technique. C'est la formulation la plus proche du poste recherché — encadrer sans quitter le contenu technique — vue dans tout le jeu.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "Exigences atteignables : DEC, 3 à 5 ans en manufacturier et 2 à 3 ans en gestion d'équipe, sans baccalauréat ni ordre professionnel.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "Mode hybride (3 jours au bureau, 2 en télétravail) et fins de semaine devancées le vendredi midi — rare pour un poste en usine.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Le volet technique est du dessin d'atelier sur AutoCAD, pas de l'automatisation : la maîtrise d'AutoCAD est demandée comme excellente, et c'est le vrai filtre.",
+      },
+    ],
+    notes:
+      "Repérée le 30/07/2026 via Indeed, publiée le jour même. Lévis. Note calculée : la distance inconnue coûte 10 points sur 20, aucun salaire n'est affiché.",
+    userNote: "",
+    histo: false,
+    perimeeLe: null,
+  },
+
+  {
+    id: "robert-coord-qualite-ac",
+    source: "seed",
+    dateReperage: "2026-07-30",
+    entreprise: "Groupe Robert",
+    poste: "Coordonnateur(ice) qualité, formation et amélioration continue",
+    lien: "https://to.indeed.com/aaqdfvt6mjcy",
+    km: null,
+    salaireAffiche: null,
+    priorite: "Moyenne",
+    statut: "Identifiee",
+    dateEnvoi: "",
+    score: 68,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Coordination transversale réelle : audits internes, implantation de changements, accompagnement des équipes et maintien des certifications.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "Exigence de scolarité très basse (diplôme d'études secondaires) pour 2 à 3 ans d'expérience en qualité ou amélioration continue : le profil dépasse largement le seuil.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Autorité d'influence, pas hiérarchique : on forme et on accompagne, on ne dirige pas d'équipe. Recul par rapport à un poste de supervision.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Centre de distribution logistique : le contenu technique est de la conformité documentaire, pas de l'équipement industriel.",
+      },
+    ],
+    notes:
+      "Repérée le 30/07/2026 via Indeed. Publiée le 27/07/2026. Lévis. Bilinguisme demandé à l'oral comme à l'écrit.",
+    userNote: "",
+    histo: false,
+    perimeeLe: null,
+  },
+
+  {
+    id: "domtar-superviseur-entretien",
+    source: "seed",
+    dateReperage: "2026-07-30",
+    entreprise: "Domtar",
+    poste: "Superviseur entretien",
+    lien: "https://to.indeed.com/aa6jqdcmgyzt",
+    km: null,
+    salaireAffiche: null,
+    priorite: "Moyenne",
+    statut: "Identifiee",
+    dateEnvoi: "",
+    score: 68,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Supervision d'entretien chez un grand manufacturier, poste permanent à temps plein, à Château-Richer — proche de Québec.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "L'annonce ne décrit NI les responsabilités NI les exigences : sous « Expérience pertinente » il n'y a rien. Tout — séniorité, taille d'équipe, quarts — reste à valider au premier contact.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Publiée le 01/03/2026 : cinq mois d'ancienneté, l'ouverture réelle est douteuse.",
+      },
+    ],
+    notes:
+      "Repérée le 30/07/2026 via Indeed. Note calculée sur un texte d'annonce très pauvre : elle vaut moins que d'habitude, et c'est l'annonce qui est en cause.",
+    userNote: "",
+    histo: false,
+    perimeeLe: null,
+  },
+
+  {
+    id: "mundial-tech-amelioration-continue",
+    source: "seed",
+    dateReperage: "2026-07-30",
+    entreprise: "Groupe Mundial",
+    poste: "Technicien(ne) en amélioration continue",
+    lien: "https://to.indeed.com/aaprclwlkty8",
+    km: null,
+    salaireAffiche: null,
+    priorite: "Moyenne",
+    statut: "Identifiee",
+    dateEnvoi: "",
+    score: 68,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Coordination de toutes les phases de projet avec la production, la SST, la qualité et la maintenance : le volet transversal du poste recherché, sans le titre.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "Outillage Lean explicite (VSM, Kaizen, KPI, standardisation) et animation d'ateliers avec les superviseurs — de l'encadrement par l'expertise.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Titre de technicien : pas d'équipe en propre, et l'annonce ne chiffre aucune exigence d'expérience.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Saint-Lambert-de-Lauzon, au sud de Lévis : à vérifier contre le rayon de 50 km.",
+      },
+    ],
+    notes:
+      "Repérée le 30/07/2026 via Indeed. Publiée le 30/06/2026. Division Metal Bernard. Horaire de jour, du lundi au vendredi.",
+    userNote: "",
+    histo: false,
+    perimeeLe: null,
+  },
+
+  {
+    id: "nutriart-adjoint-dir-maintenance",
+    source: "seed",
+    dateReperage: "2026-07-30",
+    entreprise: "Nutriart",
+    poste: "Adjoint(e) au directeur de la maintenance",
+    lien: "https://to.indeed.com/aatxdpb4mygh",
+    km: null,
+    salaireAffiche: "à partir de 20 $/h",
+    priorite: "Basse",
+    statut: "Identifiee",
+    dateEnvoi: "",
+    score: 64,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Coordination directe d'un département de maintenance : planification préventive, tableaux de bord, indicateurs, liaison entre maintenance, production et administration.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Le taux affiché part de 20 $/h, soit environ 41 600 $ par an. C'est très bas pour la responsabilité décrite, et c'est la raison de la priorité basse — le reste du poste, lui, correspond.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Rôle d'adjoint : on soutient le directeur, on ne décide pas. Aucune équipe en propre.",
+      },
+    ],
+    notes:
+      "Repérée le 30/07/2026 via Indeed. Publiée le 27/05/2026. Chocolaterie propriétaire de Laura Secord. Retenue malgré le salaire parce que le contenu du poste, lui, est aligné : à Marc de trancher.",
+    userNote: "",
+    histo: false,
+    perimeeLe: null,
+  },
+
+  {
+    id: "opsens-tech-genie-manufacturier",
+    source: "seed",
+    dateReperage: "2026-07-30",
+    entreprise: "Opsens",
+    poste: "Technicien(ne) en génie manufacturier",
+    lien: "https://to.indeed.com/aa4lk6ytj7gp",
+    km: null,
+    salaireAffiche: "à partir de 80 000 $/an",
+    priorite: "Moyenne",
+    statut: "Identifiee",
+    dateEnvoi: "",
+    score: 59,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Salaire de départ annoncé à 80 000 $ — le plus élevé du jeu pour un titre de technicien, et affiché plutôt que promis.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "Assemblage, qualification et mise en route d'équipements de production et de test, plus projets Lean et Kaizen : le contenu technique est réel.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Aucun encadrement d'équipe : on assiste les ingénieurs manufacturiers. Le barème pénalise ce recul hiérarchique, d'où la note malgré le salaire.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "Domaine médical réglementé : une expérience transférable vers l'aéronautique et le pharmaceutique.",
+      },
+    ],
+    notes:
+      "Repérée le 30/07/2026 via Indeed, publiée le jour même. Québec. Capteurs à fibre optique pour la cardiologie.",
+    userNote: "",
+    histo: false,
+    perimeeLe: null,
+  },
+
+  {
+    id: "opsens-tech-genie-industriel",
+    source: "seed",
+    dateReperage: "2026-07-30",
+    entreprise: "Opsens",
+    poste: "Technicien(ne) en génie industriel",
+    lien: "https://to.indeed.com/aabjmdy6tgvg",
+    km: null,
+    salaireAffiche: "à partir de 80 000 $/an",
+    priorite: "Moyenne",
+    statut: "Identifiee",
+    dateEnvoi: "",
+    score: 59,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Même échelle salariale que le poste voisin (80 000 $ de départ) avec un volet formation des opérateurs et documentation ERP en plus.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Poste très proche de l'autre ouverture Opsens : postuler aux deux demande d'assumer clairement laquelle est visée, sous peine de brouiller la candidature.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Aucun encadrement d'équipe, et l'anglais fonctionnel est exigé plutôt que souhaité.",
+      },
+    ],
+    notes:
+      "Repérée le 30/07/2026 via Indeed. Publiée le 08/06/2026. Québec. Doublon partiel assumé avec l'autre poste Opsens : les deux sont ouverts simultanément.",
+    userNote: "",
+    histo: false,
+    perimeeLe: null,
+  },
+
+  {
+    id: "jeldwen-planificateur-production",
+    source: "seed",
+    dateReperage: "2026-07-30",
+    entreprise: "JELD-WEN",
+    poste: "Planificateur de production",
+    lien: "https://to.indeed.com/aadzc7x9l7tp",
+    km: null,
+    salaireAffiche: null,
+    priorite: "Basse",
+    statut: "Identifiee",
+    dateEnvoi: "",
+    score: 50,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "L'annonce parle de coordination quotidienne d'une équipe et de projets d'amélioration continue, et accepte un DEC avec 3 à 5 ans d'expérience.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Le cœur du poste est le lissage de charge, les kanbans et l'approvisionnement : de la planification logistique, pas de la coordination technique.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Laurier-Station est à une quarantaine de kilomètres de Québec : proche de la limite du rayon déclaré, à mesurer avant de postuler.",
+      },
+    ],
+    notes:
+      "Repérée le 30/07/2026 via Indeed. Publiée le 30/06/2026. JELD-WEN était déjà une entreprise cible sans offre suivie : c'est la première.",
+    userNote: "",
+    histo: false,
+    perimeeLe: null,
+  },
+
+  {
+    id: "tardif-charge-projets-elevation",
+    source: "seed",
+    dateReperage: "2026-07-30",
+    entreprise: "TARDIF",
+    poste: "Chargé(e) de projets — solutions d'élévation",
+    lien: "https://to.indeed.com/aawrv7bwln6v",
+    km: null,
+    salaireAffiche: "75 000 $ à 95 000 $/an",
+    priorite: "Basse",
+    statut: "Identifiee",
+    dateEnvoi: "",
+    score: 47,
+    scoreSource: "calcule",
+    raisons: [
+      {
+        ton: "atout",
+        texte:
+          "Fourchette salariale affichée et large (75 000 à 95 000 $), sur de la gestion de projets manufacturiers complexes de bout en bout.",
+      },
+      {
+        ton: "atout",
+        texte:
+          "Coordination de huit fonctions — estimation, approvisionnement, ingénierie, production, qualité, logistique, installation, client : exactement le rôle de chef d'orchestre visé.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "Barrière ferme : baccalauréat en ingénierie ET appartenance à l'Ordre des ingénieurs du Québec (ou admissibilité). C'est ce qui fait chuter la note, pas le contenu du poste.",
+      },
+      {
+        ton: "reserve",
+        texte:
+          "5 à 10 ans d'expérience en gestion de projets industriels complexes exigés, et l'anglais est requis pour la clientèle hors Québec.",
+      },
+    ],
+    notes:
+      "Repérée le 30/07/2026 via Indeed. Publiée le 07/07/2026. Saint-Augustin-de-Desmaures. Conservée malgré la note : si l'admissibilité à l'OIQ est acquise, le poste remonte immédiatement.",
+    userNote: "",
+    histo: false,
+    perimeeLe: null,
+  },
+
   // ── Campagne 2025 ────────────────────────────────────────────────────────────
   // 15 candidatures réellement envoyées, 7 réponses, 2 processus avancés. Ce n'est pas
   // de la décoration : c'est ce qui justifie les priorités actuelles.

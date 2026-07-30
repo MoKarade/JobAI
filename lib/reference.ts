@@ -107,6 +107,13 @@ export const ENTREPRISES_CIBLES: readonly EntrepriseCible[] = [
   { nom: "Techsol Marine", ville: "Québec", km: null, lecture: "Électrification et décarbonisation maritime, lié au Groupe Océan. Coordination qualité et audits ISO 9001." },
   { nom: "Dexterra", ville: "Courcelette", km: null, lecture: "Gestion d'installations. Supervision technique d'un parc résidentiel sur la base de Valcartier : accès au site probablement conditionné à une habilitation." },
   { nom: "Spécialistes en Services", ville: "Québec", km: null, lecture: "Agence de placement : l'employeur final n'est pas nommé. Supervision d'entretien mécanique en milieu manufacturier, taux annoncé élevé à confirmer." },
+  { nom: "Groupe Sani-Tech", ville: "Lévis", km: null, lecture: "Produits architecturaux (écoles, hôpitaux, centres aquatiques) depuis 1998, usine récemment agrandie. Le poste de superviseur technique y est annoncé 70 % leadership / 30 % technique — la répartition la plus proche du profil vue jusqu'ici." },
+  { nom: "Groupe Robert", ville: "Lévis", km: null, lecture: "Transport et logistique québécois. Coordination qualité, formation et amélioration continue dans un centre de distribution : encadrement par l'influence plutôt que hiérarchique." },
+  { nom: "Opsens", ville: "Québec", km: null, lecture: "Capteurs à fibre optique pour le médical (cardiologie), domaine réglementé. Deux postes de technicien en génie ouverts à 80 k$ et plus : contenu Lean et mise en route d'équipements, mais sans encadrement d'équipe." },
+  { nom: "Domtar", ville: "Château-Richer", km: null, lecture: "Produits du bois à valeur ajoutée, grand manufacturier. Poste de superviseur entretien ouvert depuis mars : l'annonce est avare en détails, tout reste à valider en entretien." },
+  { nom: "Groupe Mundial", ville: "Saint-Lambert-de-Lauzon", km: null, lecture: "Division Metal Bernard. Amélioration continue outillée (VSM, Kaizen, KPI) avec coordination transversale production, SST, qualité et maintenance." },
+  { nom: "TARDIF", ville: "Saint-Augustin-de-Desmaures", km: null, lecture: "Solutions d'élévation sur mesure. Gestion de projets manufacturiers complexes à 75-95 k$, mais l'annonce exige un baccalauréat en ingénierie et l'appartenance à l'OIQ." },
+  { nom: "Nutriart", ville: "Québec", km: null, lecture: "Chocolaterie (propriétaire de Laura Secord). Coordination du département de maintenance, mais le taux affiché part de 20 $/h — nettement sous le marché pour la responsabilité décrite." },
 ];
 
 export interface QuadrantSwot {

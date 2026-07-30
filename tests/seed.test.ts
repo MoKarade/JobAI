@@ -15,13 +15,13 @@ const historiques = SEED.filter((o) => o.histo);
 describe("volume", () => {
   // Prouver le volume AVANT d'en dépendre : un tableau vide passerait tous les tests
   // « pour chaque offre… » sans rien vérifier.
-  it("contient les 29 offres actives et les 15 candidatures de 2025", () => {
+  it("contient les 38 offres actives et les 15 candidatures de 2025", () => {
     // 23 relevées à la main au 2026-07-27, plus 6 trouvées par balayage Indeed le
     // 2026-07-29. Ce compte est volontairement EN DUR : il doit tomber quand le jeu
     // change, pour qu'on relise ce qui a été ajouté au lieu de le découvrir en prod.
-    expect(actives).toHaveLength(29);
+    expect(actives).toHaveLength(38);
     expect(historiques).toHaveLength(15);
-    expect(SEED).toHaveLength(44);
+    expect(SEED).toHaveLength(53);
   });
 });
 

@@ -3,7 +3,7 @@
 // Deux dangers opposés, et le test doit tenir les deux bouts :
 //   - périmer trop vite : le suivi se remplit d'offres ouvertes marquées mortes, et Marc
 //     ne peut le détecter qu'en rouvrant chaque lien ;
-//   - ne jamais périmer : la liste enfle de postes pourvus, et « 29 offres actives »
+//   - ne jamais périmer : la liste enfle de postes pourvus, et « 38 offres actives »
 //     devient un chiffre faux.
 // Le seuil d'absences et la résurrection sont ce qui arbitre. Ils se testent tous les deux.
 
@@ -100,7 +100,7 @@ describe("ce que la veille NE TOUCHE PAS", () => {
     expect(r.journal["lue-a-la-main"]).toBeUndefined();
   });
 
-  it("sur le VRAI jeu de départ : un balayage vide ne périme aucune des 29 actives", () => {
+  it("sur le VRAI jeu de départ : un balayage vide ne périme aucune des 38 actives", () => {
     const avant = SEED.filter((o) => !o.histo && o.perimeeLe === null).length;
     const r = appliquerBalayage(SEED, [], {}, "2026-07-30");
     const apres = r.offres.filter((o) => !o.histo && o.perimeeLe === null).length;

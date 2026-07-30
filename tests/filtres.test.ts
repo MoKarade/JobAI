@@ -14,7 +14,7 @@ describe("filtres", () => {
 
   it("« actives » masque les candidatures de 2025", () => {
     const r = filtrer(SEED, { ...FILTRES_VIDES, activesSeules: true });
-    expect(r).toHaveLength(29);
+    expect(r).toHaveLength(38);
     expect(r.every((o) => !o.histo)).toBe(true);
   });
 
@@ -102,7 +102,12 @@ describe("offres périmées", () => {
 
   it("restent visibles dans la vue historique", () => {
     // L'historique sert justement à regarder ce qui est derrière soi.
-    const histoPerimee = { ...SEED[30]!, id: "histo-perimee", perimeeLe: "2026-07-20T00:00:00.000Z" };
+    // L'offre de base est choisie par son PRÉDICAT, jamais par un index dans SEED :
+    // `SEED[30]` désignait une candidature de 2025 jusqu'à ce qu'un balayage insère des
+    // offres avant elle, et le test s'est mis à vérifier tout autre chose en silence.
+    const histo = SEED.find((o) => o.histo);
+    if (!histo) throw new Error("aucune offre historique dans SEED : le test ne teste rien");
+    const histoPerimee = { ...histo, id: "histo-perimee", perimeeLe: "2026-07-20T00:00:00.000Z" };
     const r = filtrer([...SEED, histoPerimee], { ...FILTRES_VIDES, historique: true });
     expect(r.some((o) => o.id === "histo-perimee")).toBe(true);
   });

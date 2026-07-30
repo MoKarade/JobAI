@@ -403,12 +403,11 @@
         7 h heure du Québec) qui réveille une session, laquelle balaye, applique la
         décision, passe le gate, commit et pousse. L'app, elle, ne fait toujours aucun
         `fetch` vers une source d'offres — garde-fou n°4 intact.
-      · 👤 **ACTION REQUISE — la Routine n'a PAS le connecteur Indeed.** L'API des Routines
-        refuse de l'attacher pour cette organisation (`connectors parameter is not available
-        for this organization`). Il faut la **recréer depuis l'interface Routines de
-        claude.ai** en y cochant Indeed. En attendant, son prompt porte une garde : sans
-        connecteur, la session le DIT et ne commit rien — elle ne rapportera jamais
-        « aucune nouvelle offre » alors qu'elle n'a pas pu chercher.
+      · ⚠️ **Pas de Routine — décision de Marc, 2026-07-30.** La Routine créée plus tôt a été
+        **supprimée** à sa demande (« je veux que tu fasses tout toi-même sans routine »).
+        Conséquence à assumer : **la veille n'est PAS automatique**. Elle tourne quand Marc
+        la demande en session, et rien ne se déclenche seul le matin. Le module de décision
+        reste ce qui la rend sûre à chaque passage.
       · **La péremption est le vrai risque, pas l'ajout.** « Absente d'un balayage » ne veut
         pas dire « fermée » : le classement de la source ou un mot-clé qui ne matche pas ce
         jour-là suffisent à la faire disparaître. D'où **3 absences consécutives** avant
@@ -420,6 +419,15 @@
         vide périmerait les 29 offres actives d'un coup**.
       · `lib/veille.ts` (pur, 15 tests), état dans `lib/veille-journal.json`. La date est
         un **paramètre** — Vercel tourne en UTC et Marc vit à UTC−4.
+      · **Premier balayage réel, 30/07/2026** : 17 offres vues, dont 7 déjà suivies —
+        confirmées vivantes, compteur d'absences remis à zéro. **9 offres ajoutées**
+        (29 → 38 actives) et **7 entreprises cibles** (Groupe Sani-Tech, Groupe Robert,
+        Opsens, Domtar, Groupe Mundial, TARDIF, Nutriart). Aucune péremption :
+        `techsol-coordonnateur-qualite` est **en sursis à 1 absence sur 3**.
+        Trois candidates ont été **écartées après lecture** — Groupe Laberge
+        (« Responsable de l'entretien et service ») est de l'entretien d'immeubles
+        locatifs, et deux annonces d'agence ne nomment pas l'employeur. Le titre ne dit
+        pas ce qu'est un poste ; c'est pour ça que chaque annonce se lit en entier.
 
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :

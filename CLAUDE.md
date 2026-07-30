@@ -235,13 +235,23 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   de ce que le traitement n'a jamais vu lui-même (les entrées saisies à la main ne relèvent
   pas d'une requête automatique). Sans la troisième, un balayage vide périmait les 29 offres
   d'un coup — mesuré, pas supposé.
-- **Un mécanisme planifié qui ne peut pas atteindre sa source doit le DIRE, pas rendre un
-  résultat vide.** La Routine de veille n'a pas pu recevoir le connecteur Indeed (refusé par
-  l'API pour cette organisation). Sans garde, elle se serait réveillée chaque matin pour
-  rapporter « aucune nouvelle offre » — une phrase vraie sur la forme et fausse sur le fond,
-  impossible à distinguer d'un marché calme. Son prompt vérifie donc sa source AVANT tout, et
-  s'arrête en le disant. Vaut pour tout travail de fond : l'absence de résultat et
-  l'incapacité de chercher ne se rendent jamais de la même façon.
+- **Un mécanisme qui ne peut pas atteindre sa source doit le DIRE, pas rendre un résultat
+  vide.** L'absence de résultat et l'incapacité de chercher se ressemblent — « aucune
+  nouvelle offre » est une phrase vraie sur la forme et fausse sur le fond quand la source
+  n'a jamais été interrogée. Tout travail de fond vérifie donc sa source AVANT de conclure,
+  et rapporte l'empêchement plutôt qu'un vide trompeur.
+- **Un `| grep` masque le code de sortie : ne jamais chaîner un gate derrière lui.**
+  `npm run test 2>&1 | grep -E "×|Tests " && echo VERT` affiche « VERT » alors que deux
+  tests échouent — c'est `grep` qui a réussi, pas la suite. Vérifié en direct sur ce dépôt.
+  Un gate se juge sur l'exit code de CHAQUE commande (`cmd > /dev/null; echo $?`), jamais
+  sur la sortie d'un filtre placé après. Même famille que « ne jamais juger un `git push`
+  via `| tail` ».
+- **Un test qui désigne une donnée par son INDEX se met à tester autre chose en silence.**
+  `SEED[30]` visait une candidature de 2025 ; neuf offres insérées plus haut ont décalé
+  l'indice, et le test s'est mis à vérifier une offre active — sans rien signaler d'autre
+  qu'un échec cryptique. Désigner par PRÉDICAT (`SEED.find(o => o.histo)`) avec une garde
+  qui lève si le prédicat ne trouve rien : sinon le jour où il ne trouve plus rien, le test
+  passe à vide.
 - **Diagnostiquer AVANT de corriger : « trop peu d'offres » n'était pas un bug de carte.**
   Le réflexe était de retoucher l'affichage. Le comptage a montré l'inverse : 23 offres
   vivantes, 23 épinglées, zéro hors cibles — la carte montrait 100 % de ce qu'elle avait.
