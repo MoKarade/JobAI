@@ -226,6 +226,22 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   de géocodeur DANS les bornes régionales n'est pas encore la bonne — la valider par la
   CLASSE du lieu et la DISTANCE au référent attendu, sinon un homonyme d'ailleurs s'inscrit
   « exact » à vie.
+- **Un traitement automatique qui RETIRE quelque chose se conçoit à l'envers : d'abord ce
+  qu'il n'a pas le droit de toucher.** « Enlève les offres qui ne sont plus dispos » se code
+  en trois lignes et détruit le jeu de données. Une offre absente d'un balayage n'est pas
+  fermée — le classement de la source suffit à la faire disparaître d'une requête. Trois
+  gardes, chacune prouvée par sonde : un SEUIL d'absences consécutives (pas une), une
+  RÉSURRECTION automatique (un faux positif ne doit jamais être définitif), et l'exclusion
+  de ce que le traitement n'a jamais vu lui-même (les entrées saisies à la main ne relèvent
+  pas d'une requête automatique). Sans la troisième, un balayage vide périmait les 29 offres
+  d'un coup — mesuré, pas supposé.
+- **Un mécanisme planifié qui ne peut pas atteindre sa source doit le DIRE, pas rendre un
+  résultat vide.** La Routine de veille n'a pas pu recevoir le connecteur Indeed (refusé par
+  l'API pour cette organisation). Sans garde, elle se serait réveillée chaque matin pour
+  rapporter « aucune nouvelle offre » — une phrase vraie sur la forme et fausse sur le fond,
+  impossible à distinguer d'un marché calme. Son prompt vérifie donc sa source AVANT tout, et
+  s'arrête en le disant. Vaut pour tout travail de fond : l'absence de résultat et
+  l'incapacité de chercher ne se rendent jamais de la même façon.
 - **Diagnostiquer AVANT de corriger : « trop peu d'offres » n'était pas un bug de carte.**
   Le réflexe était de retoucher l'affichage. Le comptage a montré l'inverse : 23 offres
   vivantes, 23 épinglées, zéro hors cibles — la carte montrait 100 % de ce qu'elle avait.

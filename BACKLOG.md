@@ -394,6 +394,33 @@
       · Découverte au passage : `[SCORE-SENIORITE-LETTRES]` (années en toutes lettres non
         détectées par le barème).
 
+- [x] 🔧 **`[VEILLE-01]`** **Veille quotidienne : ajouter les nouvelles offres, retirer celles
+      qui ne sont plus disponibles** (demande Marc 2026-07-30). ✅ 2026-07-30 — la DÉCISION
+      est livrée et testée ; le déclenchement quotidien attend une action de Marc (ci-dessous).
+      · **Où tourne le balayage, et pourquoi pas dans la CI** : le connecteur Indeed vit
+        dans une session Claude, pas dans l'app ni dans GitHub Actions. Un workflow CI ne
+        peut donc pas balayer. C'est une **Routine** (`trig_01KGVHdBHi2QJwSfpoKeQi1D`,
+        7 h heure du Québec) qui réveille une session, laquelle balaye, applique la
+        décision, passe le gate, commit et pousse. L'app, elle, ne fait toujours aucun
+        `fetch` vers une source d'offres — garde-fou n°4 intact.
+      · 👤 **ACTION REQUISE — la Routine n'a PAS le connecteur Indeed.** L'API des Routines
+        refuse de l'attacher pour cette organisation (`connectors parameter is not available
+        for this organization`). Il faut la **recréer depuis l'interface Routines de
+        claude.ai** en y cochant Indeed. En attendant, son prompt porte une garde : sans
+        connecteur, la session le DIT et ne commit rien — elle ne rapportera jamais
+        « aucune nouvelle offre » alors qu'elle n'a pas pu chercher.
+      · **La péremption est le vrai risque, pas l'ajout.** « Absente d'un balayage » ne veut
+        pas dire « fermée » : le classement de la source ou un mot-clé qui ne matche pas ce
+        jour-là suffisent à la faire disparaître. D'où **3 absences consécutives** avant
+        péremption (`SEUIL_ABSENCES_PEREMPTION`), la **résurrection automatique** d'une
+        offre revue (un faux positif ne doit jamais être définitif), et surtout : une offre
+        **jamais vue par un balayage n'est JAMAIS périmée** — les 23 offres relevées à la
+        main ne viennent pas d'une requête Indeed, leur absence ne prouve rien.
+        ⚠️ Discrimination prouvée par sonde : sans cette dernière protection, **un balayage
+        vide périmerait les 29 offres actives d'un coup**.
+      · `lib/veille.ts` (pur, 15 tests), état dans `lib/veille-journal.json`. La date est
+        un **paramètre** — Vercel tourne en UTC et Marc vit à UTC−4.
+
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
       · **Guichet-Emplois** — flux XML officiel d'EDSC, sur demande. C'est la source

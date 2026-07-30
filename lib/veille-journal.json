@@ -1,0 +1,33 @@
+{
+  "_lisez-moi": "État de la veille quotidienne, écrit par la Routine et lu par lib/veille.ts. Une offre entre ici quand un BALAYAGE l'a vue — jamais autrement : les 23 offres relevées à la main n'y figurent pas, et c'est ce qui les protège d'une péremption automatique fondée sur le silence d'une requête Indeed. `absences` compte les balayages consécutifs sans la voir ; à 3, l'offre passe en périmée (réversible : un balayage qui la revoit la rouvre).",
+  "specialistes-superviseur-entretien": {
+    "premiereVue": "2026-07-29",
+    "derniereVue": "2026-07-29",
+    "absences": 0
+  },
+  "apn-coordonnateur-planification": {
+    "premiereVue": "2026-07-29",
+    "derniereVue": "2026-07-29",
+    "absences": 0
+  },
+  "dexterra-superviseur-technique": {
+    "premiereVue": "2026-07-29",
+    "derniereVue": "2026-07-29",
+    "absences": 0
+  },
+  "techsol-coordonnateur-qualite": {
+    "premiereVue": "2026-07-29",
+    "derniereVue": "2026-07-29",
+    "absences": 0
+  },
+  "honeywell-regulation-cvac": {
+    "premiereVue": "2026-07-29",
+    "derniereVue": "2026-07-29",
+    "absences": 0
+  },
+  "dracon-controle-qualite": {
+    "premiereVue": "2026-07-29",
+    "derniereVue": "2026-07-29",
+    "absences": 0
+  }
+}
