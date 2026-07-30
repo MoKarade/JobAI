@@ -25,6 +25,12 @@ export function estCheminPublic(chemin: string): boolean {
   if (chemin === "/connexion" || chemin.startsWith("/connexion/")) return true;
   if (chemin.startsWith("/api/auth/")) return true;
   if (chemin === "/api/hub/summary") return true;
+  // Même statut que l'endpoint du hub : pas « ouverte », mais gardée AUTREMENT — par
+  // `CRON_SECRET`, vérifié en temps constant dans la route, avec échec fermé (503 si le
+  // secret n'est pas configuré, 401 s'il est faux). Sans cette ligne, l'appel de Vercel
+  // recevrait une redirection vers l'écran de connexion, et la veille ne tournerait
+  // jamais — en silence, puisque le cron ne remonte pas les redirections comme des échecs.
+  if (chemin === "/api/cron/veille") return true;
 
   if (
     chemin.startsWith("/_next/static/") ||

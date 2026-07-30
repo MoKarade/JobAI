@@ -24,6 +24,11 @@ const EXEMPTIONS: Readonly<Record<string, string>> = {
     "Gardée AUTREMENT — par le jeton x-hub-token vérifié dans la route. La mettre derrière " +
     "la garde de session renverrait au hub une redirection HTML au lieu du JSON attendu.",
   "/api/auth/[...nextauth]": "Routes d'Auth.js : elles portent le flux de connexion lui-même.",
+  "/api/cron/veille":
+    "Gardée AUTREMENT — par CRON_SECRET, comparé en temps constant dans la route, avec " +
+    "échec fermé : 503 si le secret n'est pas configuré, 401 s'il est faux. Derrière la " +
+    "garde de session, l'appel quotidien de Vercel recevrait une redirection HTML et la " +
+    "veille ne tournerait jamais, sans qu'aucune alerte ne se déclenche.",
 };
 
 /** Parcourt `app/` et rend la route de chaque `page.tsx` / `route.ts`. */

@@ -462,6 +462,49 @@
         sans attendre. Le script appelle désormais le MÊME `appliquerSeed` que l'app.
       · Migration `drizzle/0003_*.sql`. 13 tests dédiés, 371 au total.
 
+- [x] 🔧 **`[INGEST-01]`** **Veille quotidienne automatique, multi-sources** (demande Marc
+      2026-07-30 : « je veux que automatiquement chaque jour ça se fasse », « au moins 6 sites
+      + les sites d'entreprises directement »). ✅ 2026-07-30 — l'app le fait seule, chaque
+      jour à 7 h (heure du Québec), via un cron Vercel.
+      · 👤 **ACTION REQUISE, une seule fois** : poser **`CRON_SECRET`** dans les variables
+        Vercel (Production) et **`npm run db:migrate`** pour la table `sync_state`. Sans le
+        secret, la route répond **503** — une route qui ÉCRIT ne s'ouvre jamais par oubli.
+      · **Sources : uniquement ce que les sites PUBLIENT pour être lu** (décision Marc).
+        Le RSS officiel du Guichet-Emplois (8 recherches alignées sur le profil) et les API
+        d'ATS des entreprises (Greenhouse, Lever, Recruitee, Workable, SmartRecruiters) —
+        c'est ça, « chercher sur les sites d'entreprises directement », en version durable.
+        **Jamais** le HTML d'Indeed, LinkedIn, Jobboom ou Jobillico : leurs conditions
+        l'interdisent et ils bloquent activement. Un moissonneur banni ne rapporte plus
+        rien, en silence.
+      · ⚠️ **Le filtre par note TOTALE ne filtrait RIEN — mesuré.** « Caissier », « Commis
+        d'entrepôt » et « Préposé à l'entretien ménager » notent tous **48/100**, au-dessus
+        d'un plancher naïf à 45 : les points accordés aux INCONNUES (distance non mesurée
+        10/20, salaire non affiché 9/15, aucune exigence détectée 11/15) s'accumulent quel
+        que soit le métier. Le seuil porte donc sur **`fitRole` ≥ 14/40**, la seule
+        composante qui mesure l'adéquation. Les écartées sont **comptées** dans le rapport.
+      · 🐛 **Bug du barème corrigé au passage** : « Chargé(e) de projets » notait **8 au lieu
+        de 28** — le `(e)` coupe l'expression « chargé de projet » en deux. Les mots isolés
+        (« coordonnateur(trice) ») s'en sortaient par hasard, les EXPRESSIONS étaient toutes
+        cassées. L'écriture inclusive est la norme dans les annonces québécoises :
+        `normaliserTitre` la retire avant tout appariement.
+      · **La péremption réutilise `lib/veille.ts`** — aucune règle réécrite. Une offre déjà
+        suivie que la veille revoit est marquée vue **sans repasser par le filtre** : son
+        titre peut noter sous le plancher (le plancher juge une offre INCONNUE, pas une que
+        Marc suit déjà), et la filtrer la ferait périmer en trois jours alors qu'elle est
+        publiée sous nos yeux.
+      · **Rotation des sources** : 14 par exécution, avec un curseur — sans lui, les
+        dernières de la liste ne seraient jamais interrogées.
+      · **Rapport PAR SOURCE**, jamais un total : avec six sources, un zéro ne dit pas si le
+        marché est calme ou si tout est muet depuis trois semaines.
+      · ⚠️ **Aucune source n'a pu être testée** : le proxy de la session de développement
+        bloque tout accès sortant (vérifié sur cinq domaines). Les analyseurs sont purs et
+        testés sur les formats documentés (35 tests), mais **la validation contre le réel se
+        fera sur le déploiement** — c'est précisément pourquoi chaque source rend un compte
+        séparé.
+      · 407 tests. `lib/ingest/` est le seul endroit autorisé à contacter une source
+        (garde-fou n°4) ; la route est exemptée de session avec motif écrit, verrouillé par
+        `tests/routesGardees.test.ts`.
+
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
       · **Guichet-Emplois** — flux XML officiel d'EDSC, sur demande. C'est la source

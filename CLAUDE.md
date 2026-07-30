@@ -235,6 +235,19 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   de ce que le traitement n'a jamais vu lui-même (les entrées saisies à la main ne relèvent
   pas d'une requête automatique). Sans la troisième, un balayage vide périmait les 29 offres
   d'un coup — mesuré, pas supposé.
+- **Un seuil se pose sur la composante qui MESURE, pas sur le total.** Un plancher sur la
+  note globale ne filtrait rien : « Caissier » et « Préposé à l'entretien ménager » notent
+  48/100, parce que les points accordés aux INCONNUES (distance non mesurée, salaire non
+  affiché, aucune exigence détectée) s'accumulent quel que soit le métier — un poste sans
+  aucun rapport part déjà avec 40 points. Avant de fixer un seuil sur une note composite,
+  INSTANCIER des cas volontairement hors sujet et regarder ce qu'ils obtiennent ; c'est ce
+  qui révèle que seule une composante discrimine vraiment.
+- **Une expression composée ne survit pas à l'écriture inclusive.** « Chargé(e) de projets »
+  ne correspondait pas à « chargé de projet » : le `(e)` coupe l'expression en deux, et le
+  poste tombait de 28 à 8 sur 40. Les mots isolés (« coordonnateur(trice) ») s'en tiraient
+  par hasard, la marque tombant après le mot — donc le bug était invisible sur la moitié des
+  cas. Au Québec, c'est la forme NORMALE d'une annonce : toute recherche de motif dans un
+  titre doit d'abord normaliser (`normaliserTitre`).
 - **Supprimer un geste manuel déplace son coût : il faut le borner AVANT de le supprimer.**
   Le bouton « Situer » servait de limiteur de débit humain — Marc cliquait une fois de temps
   en temps. Lancé automatiquement à chaque affichage de la carte, le même code enverrait une

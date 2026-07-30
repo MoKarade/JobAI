@@ -51,8 +51,25 @@ const MOTS_DISQUALIFIANTS = [
 ];
 
 /** 40 pts — le poste combine-t-il coordination d'équipe ET contenu technique ? */
+/**
+ * Retire les marques d'écriture inclusive avant toute recherche de motif.
+ *
+ * Sans ça, « Chargé(e) de projets » ne correspond PAS à « chargé de projet » : le `(e)`
+ * coupe l'expression en deux et le poste tombe à 8 sur 40 — le score d'un métier sans
+ * aucun rapport. Les mots isolés (« coordonnateur(trice) ») s'en sortaient par hasard,
+ * la marque tombant après le mot ; les EXPRESSIONS, elles, étaient toutes cassées.
+ * L'écriture inclusive est la norme dans les annonces québécoises : c'est le cas
+ * courant, pas l'exception.
+ */
+export function normaliserTitre(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\((?:e|s|es|ne|nes|trice|trices|ice|ices|euse|euses|rice|rices)\)/g, "")
+    .replace(/\s+/g, " ");
+}
+
 export function scoreFitRole(titre: string, description = ""): number {
-  const t = `${titre} ${description}`.toLowerCase();
+  const t = normaliserTitre(`${titre} ${description}`);
   const coord = MOTS_COORDINATION.some((m) => t.includes(m));
   const tech = MOTS_TECHNIQUE.some((m) => t.includes(m));
   // « technicien » sans encadrement = recul hiérarchique par rapport au poste actuel.
