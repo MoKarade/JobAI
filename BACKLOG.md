@@ -429,6 +429,39 @@
         locatifs, et deux annonces d'agence ne nomment pas l'employeur. Le titre ne dit
         pas ce qu'est un poste ; c'est pour ça que chaque annonce se lit en entier.
 
+- [x] 🔧 **`[AUTO-01]`** **Plus aucune commande à taper** (demande Marc 2026-07-30 : « je veux
+      pas avoir à faire des commandes à chaque fois, je veux que ce soit automatique »).
+      ✅ 2026-07-30 — les deux gestes manuels qui restaient sont supprimés.
+      · **`npm run db:seed` → automatique.** `lireOffres()` appelle `assurerSeedAJour()` :
+        au premier affichage qui suit un déploiement, la base se met au niveau du jeu de
+        départ. Le reste du temps, **une lecture et rien d'autre** — l'écriture n'a lieu
+        que si le jeu de départ a réellement changé.
+      · **Pourquoi une EMPREINTE (`sync_state`) et pas un compte d'offres** : comparer les
+        53 offres à chaque affichage coûterait une centaine de requêtes pour, presque
+        toujours, ne rien faire ; un simple compte, lui, ne verrait pas une note corrigée
+        ou une justification réécrite — la base servirait l'ancienne version sans que rien
+        ne cloche. L'empreinte ignore les champs de Marc, sinon **chacun de ses clics
+        déclencherait une réécriture complète** (prouvé par sonde : ajouter `statut` à
+        l'empreinte fait tomber le test dédié).
+      · **Verrou** : la valeur vaut `en-cours:<empreinte>` pendant l'application, et
+        l'empreinte finale n'est posée qu'APRÈS succès — deux instances ne peuvent pas
+        écrire ensemble, et une application interrompue est reprise au passage suivant au
+        lieu de passer pour terminée.
+      · **Bouton « Situer » → automatique.** La carte lance la passe manquante via
+        `after()` de Next 15 : **après** la réponse, jamais pendant — la passe enchaîne des
+        requêtes Nominatim à 1,1 s d'intervalle, et la faire dans le rendu ajouterait ces
+        secondes à chaque affichage. `passeGeocodage` a été extraite de `situerEntreprises`
+        pour être appelable sans clic ; elle n'écrit que des positions, jamais rien
+        d'irréversible — c'est ce qui autorise son passage à l'automatique.
+      · ⚠️ **Contre-pression obligatoire** : `reserverPasse` borne à **une passe / 5 min**,
+        via la base (une variable de module ne bornerait rien en serverless). Sans elle,
+        chaque rechargement enverrait une salve à Nominatim — service gratuit qui BANNIT
+        les appelants insistants : supprimer le clic aurait coûté la carte entière. Défaut
+        sûr : si la réservation échoue, **pas de passe**.
+      · Le bouton et `npm run db:seed` restent — pour amorcer une base neuve et pour forcer
+        sans attendre. Le script appelle désormais le MÊME `appliquerSeed` que l'app.
+      · Migration `drizzle/0003_*.sql`. 13 tests dédiés, 371 au total.
+
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
       · **Guichet-Emplois** — flux XML officiel d'EDSC, sur demande. C'est la source

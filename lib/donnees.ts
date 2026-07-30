@@ -8,6 +8,7 @@
 import { asc, desc, eq } from "drizzle-orm";
 import { db } from "./db";
 import { offerReasons, offers } from "./db/schema";
+import { assurerSeedAJour } from "./synchro";
 import type { Offre, Raison } from "./types";
 
 /**
@@ -16,6 +17,12 @@ import type { Offre, Raison } from "./types";
  */
 export async function lireOffres(): Promise<Offre[] | null> {
   if (!process.env.DATABASE_URL) return null;
+
+  // Met la base au niveau du jeu de départ si un déploiement l'a fait changer. Presque
+  // toujours une seule lecture puis retour immédiat ; l'écriture n'a lieu qu'au premier
+  // affichage suivant un balayage. Volontairement AVANT la lecture, sinon Marc verrait
+  // l'ancienne liste une fois de plus avant que la nouvelle apparaisse.
+  await assurerSeedAJour(db);
 
   const [lignes, raisons] = await Promise.all([
     db

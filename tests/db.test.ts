@@ -67,7 +67,7 @@ function hash(s: string): number {
 }
 
 describe("migration", () => {
-  it("crée les quatre tables attendues", async () => {
+  it("crée les cinq tables attendues", async () => {
     const r = await pg.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' ORDER BY table_name`,
@@ -76,6 +76,10 @@ describe("migration", () => {
       "entreprises_lieux",
       "offer_reasons",
       "offers",
+      // Ce que la base sait avoir déjà appliqué : empreinte du jeu de départ, et
+      // temporisation des passes de fond. C'est ce qui permet à l'app de se synchroniser
+      // seule sans réécrire les offres à chaque affichage.
+      "sync_state",
       "villes",
     ]);
   });

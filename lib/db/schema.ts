@@ -236,9 +236,32 @@ export const entreprisesLieux = pgTable(
   ],
 );
 
+/**
+ * Ce que la base sait avoir déjà appliqué. Une seule ligne aujourd'hui : `seed`.
+ *
+ * POURQUOI UNE EMPREINTE ET PAS UN COMPTE D'OFFRES
+ * Sans marqueur, la seule façon de savoir si le jeu de départ a changé serait de comparer
+ * les 53 offres à chaque affichage — une centaine de requêtes SQL pour, presque toujours,
+ * ne rien avoir à faire. Un simple compte, lui, ne verrait PAS une note corrigée ou une
+ * justification réécrite : la base afficherait l'ancienne version sans que rien ne cloche.
+ * L'empreinte du contenu voit tout changement et ne coûte qu'une lecture.
+ *
+ * La valeur porte aussi le VERROU : pendant l'application, elle vaut `en-cours:<empreinte>`.
+ * Deux instances qui démarrent ensemble ne peuvent donc pas écrire en même temps — la
+ * seconde voit le verrou et passe son tour. Et si une application échoue en plein milieu,
+ * la valeur reste différente de la cible : le passage suivant reprend au lieu de croire
+ * l'affaire réglée.
+ */
+export const syncState = pgTable("sync_state", {
+  cle: text("cle").primaryKey(),
+  valeur: text("valeur").notNull(),
+  majLe: timestamp("maj_le", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type OfferRow = typeof offers.$inferSelect;
 export type NewOfferRow = typeof offers.$inferInsert;
 export type OfferReasonRow = typeof offerReasons.$inferSelect;
+export type SyncStateRow = typeof syncState.$inferSelect;
 export type VilleRow = typeof villes.$inferSelect;
 export type EntrepriseLieuRow = typeof entreprisesLieux.$inferSelect;
 export type NewOfferReasonRow = typeof offerReasons.$inferInsert;

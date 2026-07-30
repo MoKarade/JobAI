@@ -235,6 +235,23 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   de ce que le traitement n'a jamais vu lui-même (les entrées saisies à la main ne relèvent
   pas d'une requête automatique). Sans la troisième, un balayage vide périmait les 29 offres
   d'un coup — mesuré, pas supposé.
+- **Supprimer un geste manuel déplace son coût : il faut le borner AVANT de le supprimer.**
+  Le bouton « Situer » servait de limiteur de débit humain — Marc cliquait une fois de temps
+  en temps. Lancé automatiquement à chaque affichage de la carte, le même code enverrait une
+  salve à Nominatim à chaque rechargement, et un service gratuit bannit les appelants
+  insistants : le confort aurait coûté la fonctionnalité. Toute automatisation d'un geste
+  humain hérite donc d'une contre-pression explicite (ici une passe / 5 min), stockée là où
+  toutes les instances la voient — en serverless, une variable de module ne borne rien.
+  Défaut sûr en cas d'échec de la borne : ne rien faire.
+- **Un travail de fond va APRÈS la réponse, pas dedans.** Une passe de géocodage enchaîne
+  des requêtes espacées de 1,1 s ; l'exécuter pendant le rendu ajouterait ces secondes à
+  chaque affichage. `after()` (Next 15) la sort du chemin critique : la page s'affiche à sa
+  vitesse normale et se complète au passage suivant.
+- **Un déclencheur automatique se calibre sur ce qui doit VRAIMENT le réveiller.** L'app se
+  synchronise sur une empreinte du contenu du jeu de départ — pas sur un compte d'offres,
+  qui ne verrait pas une note corrigée, et surtout pas sur les champs de Marc, sinon chacun
+  de ses clics déclencherait une réécriture complète. Le test qui le prouve doit être
+  discriminant : ajouter `statut` à l'empreinte doit le faire tomber.
 - **Un mécanisme qui ne peut pas atteindre sa source doit le DIRE, pas rendre un résultat
   vide.** L'absence de résultat et l'incapacité de chercher se ressemblent — « aucune
   nouvelle offre » est une phrase vraie sur la forme et fausse sur le fond quand la source

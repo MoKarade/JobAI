@@ -58,7 +58,7 @@ export type ResultatAjout =
  * atteint tuerait le processus AVANT l'enregistrement de l'acquis, ce qui est pire qu'une
  * passe courte.
  */
-export async function situerEntreprises(): Promise<
+export type ResultatPasse =
   | {
       ok: true;
       exactes: number;
@@ -68,14 +68,33 @@ export async function situerEntreprises(): Promise<
       insituables: string[];
       panne: string | null;
     }
-  | { ok: false; erreur: string }
-> {
+  | { ok: false; erreur: string };
+
+/** Le clic du bouton « Situer » : la garde de session, puis la passe. */
+export async function situerEntreprises(): Promise<ResultatPasse> {
   try {
     await exigerSession();
   } catch {
     return { ok: false, erreur: "Authentification requise." };
   }
+  const r = await passeGeocodage();
+  if (r.ok) revalidatePath("/carte");
+  return r;
+}
 
+/**
+ * La passe elle-même, SANS garde de session.
+ *
+ * Extraite pour que la carte puisse la lancer en arrière-plan après son propre rendu (elle
+ * a déjà exigé la session et redirigé sinon), sans que Marc ait à cliquer. Tout appelant
+ * doit donc avoir vérifié la session AVANT — c'est la contrepartie de l'extraction, et
+ * elle se vérifie à l'œil sur deux appelants, pas plus.
+ *
+ * N'a AUCUN effet destructif : elle n'écrit que des positions, en `onConflictDoNothing`.
+ * C'est ce qui rend son passage à l'automatique sûr — une opération irréversible n'aurait
+ * pas eu le droit de quitter le chemin manuel.
+ */
+export async function passeGeocodage(): Promise<ResultatPasse> {
   try {
     const [dejaSituees, villesConnues] = await Promise.all([
       db.select({ nom: entreprisesLieux.nom }).from(entreprisesLieux),
@@ -152,7 +171,6 @@ export async function situerEntreprises(): Promise<
       await db.insert(entreprisesLieux).values(lignes).onConflictDoNothing();
     }
 
-    revalidatePath("/carte");
     return {
       ok: true,
       exactes,

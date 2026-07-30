@@ -13,6 +13,7 @@
 // le dit — en légende, dans la fenêtre, et dans la liste. La distance affichée reste celle
 // du suivi, MESURÉE, jamais recalculée depuis l'épingle.
 
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
@@ -27,6 +28,8 @@ import { classerPanne, type Panne } from "@/lib/panne";
 import { Cadre } from "@/components/Cadre";
 import { CarteOffres } from "@/components/CarteOffres";
 import { BoutonSituer } from "@/components/BoutonSituer";
+import { passeGeocodage } from "@/lib/actions";
+import { CLE_GEOCODAGE, DELAI_PASSE_AUTO_MS, reserverPasse } from "@/lib/synchro";
 
 export const dynamic = "force-dynamic";
 // La passe de localisation enchaîne des requêtes Nominatim à ~1,1 s d'intervalle : la
@@ -55,6 +58,35 @@ export default async function PageCarte() {
     // La MÊME classification que l'accueil (`lib/panne.ts`) : écrite à part, elle a déjà
     // divergé une fois, et l'écran s'est mis à mentir.
     panne = classerPanne(err);
+  }
+
+  // Situer les entreprises qui manquent, sans que Marc ait à cliquer (demande du
+  // 2026-07-30 : « je veux pas avoir à faire des commandes »).
+  //
+  // APRÈS la réponse, jamais pendant : la passe enchaîne des requêtes Nominatim espacées
+  // de 1,1 s, et la faire dans le rendu ajouterait ces secondes à CHAQUE affichage de la
+  // carte. `after()` la déplace hors du chemin critique — la page s'affiche à sa vitesse
+  // normale et se complète au rechargement suivant.
+  //
+  // Bornée par `reserverPasse` : une passe toutes les cinq minutes au plus, quel que soit
+  // le nombre de rechargements. Nominatim est gratuit et bannit les appelants insistants ;
+  // supprimer le clic ne doit pas revenir à marteler le service à sa place.
+  if (offres !== null && panne === null) {
+    const manquantes = ENTREPRISES_CIBLES.filter((c) => !positions.has(c.nom)).length;
+    if (manquantes > 0) {
+      after(async () => {
+        try {
+          if (!(await reserverPasse(db, CLE_GEOCODAGE, DELAI_PASSE_AUTO_MS, new Date()))) return;
+          const r = await passeGeocodage();
+          if (!r.ok) console.error("[carte] passe automatique refusée :", r.erreur);
+          else if (r.panne) console.error("[carte] passe automatique dégradée :", r.panne);
+        } catch (err) {
+          // Le fond ne doit jamais faire échouer une réponse déjà envoyée — mais il ne
+          // doit pas non plus disparaître sans laisser de trace.
+          console.error("[carte] passe automatique impossible", err);
+        }
+      });
+    }
   }
 
   if (panne === "schema-absent") {
