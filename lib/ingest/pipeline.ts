@@ -172,6 +172,61 @@ export function trier(
   return { retenues, souslePlancher, doublons, horsRegion, lieuInconnu, refusees };
 }
 
+/** Une ville à écrire sur une offre DÉJÀ suivie qui n'en avait pas. */
+export interface VilleACompleter {
+  id: string;
+  ville: string;
+}
+
+/**
+ * Les villes manquantes qu'un lot permet de rattraper, sur les offres DÉJÀ suivies.
+ *
+ * POURQUOI ÇA EXISTE
+ * Une offre déjà en base est comptée « doublon » et le lot n'en fait plus rien — juste
+ * tant que le dépôt n'apporte rien de neuf. Ce n'est plus vrai : les 40 premières offres
+ * déposées l'ont été avant que la colonne `ville` soit écrite, et sans ville un employeur
+ * hors des cibles ne peut pas être géocodé, donc reste sans distance et hors de la carte.
+ * Le même dépôt rejoué porte pourtant la ville manquante.
+ *
+ * TROIS GARDES, ET CHACUNE A UNE RAISON
+ *   1. On COMPLÈTE, on n'écrase jamais : une ville déjà connue vient d'une source
+ *      antérieure et n'a pas à être remplacée par un lot plus récent.
+ *   2. Un employeur NON NOMMÉ ne rattrape rien. L'appariement passe par
+ *      `idOffre(entreprise, titre)` ; avec une entreprise vide, deux annonces d'agence au
+ *      titre générique (« Technicien ») produisent le MÊME identifiant. Dans `trier`, une
+ *      telle collision coûte une offre non ajoutée — ici elle écrirait la ville de l'un
+ *      sur la fiche de l'autre, c'est-à-dire ALTÉRERAIT une donnée existante. Le refus
+ *      est plus étroit que le risque, et c'est le bon sens.
+ *   3. Une seule écriture par offre, même si le lot la mentionne deux fois.
+ *
+ * PURE et testable : c'est une décision, et les décisions de ce dépôt vivent hors des I/O.
+ */
+export function villesACompleter(
+  brutes: readonly OffreBrute[],
+  connues: readonly Offre[],
+): VilleACompleter[] {
+  const parId = new Map(connues.map((o) => [o.id, o]));
+  const faites = new Set<string>();
+  const liste: VilleACompleter[] = [];
+
+  for (const b of brutes) {
+    const ville = b.ville.trim();
+    const entreprise = b.entreprise.trim();
+    if (ville === "" || entreprise === "") continue;
+
+    const id = idOffre(entreprise, b.titre);
+    if (faites.has(id)) continue;
+
+    const existante = parId.get(id);
+    if (!existante || existante.ville !== null) continue;
+
+    faites.add(id);
+    liste.push({ id, ville });
+  }
+
+  return liste;
+}
+
 /**
  * Justifications d'une offre trouvée automatiquement.
  *

@@ -162,10 +162,20 @@ export function construireVue(
   const sansLieu = new Set<string>();
 
   for (const o of vivantes) {
-    // Une offre se rattache à UNE entreprise : la cible qui apparie, sinon l'employeur tel
-    // que l'offre le nomme. L'appariement est borné par le plancher de longueur.
+    // Une offre se rattache à UNE entreprise : la cible qui apparie, sinon un employeur
+    // déjà rencontré qui apparie, sinon l'employeur tel que l'offre le nomme.
+    //
+    // Le second essai compte : deux sources nomment le même employeur différemment
+    // (« Groupe Test » et « Groupe Test Canada »), et sans lui la carte porterait DEUX
+    // épingles pour un seul lieu — plus un géocodage inutile chacune. L'appariement reste
+    // borné par le plancher de longueur : un sigle court (« ISS ») exige l'égalité stricte
+    // et ne fusionne donc pas, ce qui est voulu — sous quatre lettres, la sous-chaîne
+    // apparierait n'importe quoi.
     const cible = cibles.find((c) => apparier(o.entreprise, c.nom));
-    const nom = cible?.nom ?? o.entreprise;
+    const nom =
+      cible?.nom ??
+      [...parEntreprise.keys()].find((connu) => apparier(o.entreprise, connu)) ??
+      o.entreprise;
     const villeOffre = o.ville ? (villeGeocodable(o.ville) ?? o.ville) : "";
 
     let entreprise = parEntreprise.get(nom);

@@ -55,6 +55,13 @@ export function empreinteSeed(seed: readonly Offre[] = SEED): string {
     poste: o.poste,
     lien: o.lien,
     km: o.km,
+    // `ville` a MANQUÉ ici jusqu'au 2026-07-31, et c'était le même défaut que celui qui a
+    // coûté 40 villes : une liste de champs recopiée à la main, un champ oublié, aucun
+    // signal. Sans elle, corriger la ville d'une offre du jeu de départ ne changeait pas
+    // l'empreinte — donc `assurerSeedAJour` répondait « à jour » et la correction ne
+    // partait jamais en base. Mesuré : deux seeds ne différant que par `ville` rendaient
+    // une empreinte IDENTIQUE.
+    ville: o.ville,
     salaireAffiche: o.salaireAffiche,
     score: o.score,
     scoreSource: o.scoreSource,

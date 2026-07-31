@@ -264,6 +264,31 @@ describe("la carte part des OFFRES, pas d'une liste tenue à la main", () => {
     );
   });
 
+  it("deux NOMS du même employeur hors cibles ne font qu'UNE épingle", () => {
+    // Deux sources nomment le même employeur différemment. Sans appariement entre
+    // employeurs hors cibles, la carte porterait deux épingles pour un seul lieu — et
+    // chacune aurait coûté un géocodage. Vérifié par sonde avant correction : 2 épingles.
+    const vue = construireVue(
+      [
+        offre({ id: "1", entreprise: "Groupe Test", ville: "Québec" }),
+        offre({ id: "2", entreprise: "Groupe Test Canada", ville: "Québec" }),
+      ],
+      ENTREPRISES_CIBLES,
+      positions([["Groupe Test", "exacte", 46.81, -71.22]]),
+    );
+    const avecTest = vue.epingles.filter((e) =>
+      e.entreprises.some((x) => x.nom.startsWith("Groupe Test")),
+    );
+    expect(avecTest).toHaveLength(1);
+    expect(avecTest[0]!.entreprises[0]!.offres).toHaveLength(2);
+  });
+
+  it("mais un SIGLE court ne fusionne pas : sous quatre lettres, tout apparierait", () => {
+    // Le plancher de longueur est un garde-fou, pas une lacune : « ISS » apparierait la
+    // moitié de la liste par sous-chaîne. Le comportement est donc assumé et testé.
+    expect(apparier("ISS", "ISS Facility Services")).toBe(false);
+  });
+
   it("une cible SANS offre reste affichée : c'est la liste de chasse", () => {
     const vue = construireVue(
       [],

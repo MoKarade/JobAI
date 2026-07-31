@@ -5,8 +5,8 @@
 // vérifiées alors que personne ne les a lues. Les trois se testent ici.
 
 import { describe, it, expect } from "vitest";
-import { FIT_ROLE_PLANCHER, idOffre, trier } from "../lib/ingest/pipeline";
-import { OffreSchema } from "../lib/types";
+import { FIT_ROLE_PLANCHER, idOffre, trier, villesACompleter } from "../lib/ingest/pipeline";
+import { OffreSchema, type Offre } from "../lib/types";
 import type { OffreBrute } from "../lib/ingest/types";
 
 function brute(champs: Partial<OffreBrute> = {}): OffreBrute {
@@ -210,5 +210,73 @@ describe("ce qui est écarté est NOMMÉ, pas seulement compté", () => {
     expect(compte("lieu-inconnu")).toBe(r.lieuInconnu);
     expect(compte("doublon")).toBe(r.doublons);
     expect(r.refusees.length + r.retenues.length).toBe(4);
+  });
+});
+
+describe("rattrapage des villes manquantes", () => {
+  // Les 40 offres du premier lot réel sont entrées AVANT que la colonne `ville` soit
+  // écrite : sans elle, leur employeur n'est pas géocodable, donc sans distance et hors
+  // de la carte. Rejouer le même dépôt doit les compléter — sans rien abîmer au passage.
+  const suivie = (champs: Partial<Offre> = {}): Offre =>
+    OffreSchema.parse({
+      id: idOffre("Exemple inc.", "Coordonnateur de projets en automatisation"),
+      source: "jobbank",
+      dateReperage: "2026-07-30",
+      entreprise: "Exemple inc.",
+      poste: "Coordonnateur de projets en automatisation",
+      lien: "https://exemple.test/1",
+      km: null,
+      ville: null,
+      salaireAffiche: null,
+      priorite: "Moyenne",
+      statut: "Identifiee",
+      dateEnvoi: "",
+      score: 60,
+      scoreSource: "calcule",
+      raisons: [],
+      notes: "",
+      userNote: "",
+      histo: false,
+      perimeeLe: null,
+      ...champs,
+    });
+
+  it("complète une offre suivie dont la ville manque", () => {
+    const r = villesACompleter([brute({ ville: "Lévis, QC" })], [suivie()]);
+    expect(r).toEqual([{ id: suivie().id, ville: "Lévis, QC" }]);
+  });
+
+  it("n'ÉCRASE JAMAIS une ville déjà connue", () => {
+    // Une ville en base vient d'une source antérieure : un lot plus récent n'a pas
+    // autorité pour la remplacer.
+    expect(villesACompleter([brute({ ville: "Québec" })], [suivie({ ville: "Lévis" })])).toEqual([]);
+  });
+
+  it("ne complète pas une offre INCONNUE du suivi — elle passe par `trier`", () => {
+    expect(villesACompleter([brute({ entreprise: "Jamais Vue" })], [suivie()])).toEqual([]);
+  });
+
+  it("REFUSE un employeur non nommé : deux annonces d'agence partageraient un identifiant", () => {
+    // `idOffre("", "Technicien")` est le même pour deux offres réellement différentes.
+    // Dans `trier`, la collision coûte une offre non ajoutée ; ici elle écrirait la ville
+    // de l'une sur la fiche de l'autre — une donnée existante ALTÉRÉE, pas juste absente.
+    const anonyme = suivie({ id: idOffre("Employeur non nommé", "Technicien") });
+    expect(villesACompleter([brute({ entreprise: "", titre: "Technicien" })], [anonyme])).toEqual(
+      [],
+    );
+  });
+
+  it("ignore une ville vide plutôt que d'écrire du vide", () => {
+    expect(villesACompleter([brute({ ville: "   " })], [suivie()])).toEqual([]);
+  });
+
+  it("une seule écriture même si le lot mentionne l'offre deux fois", () => {
+    const r = villesACompleter(
+      [brute({ ville: "Lévis" }), brute({ ville: "Québec", refSource: "2" })],
+      [suivie()],
+    );
+    expect(r).toHaveLength(1);
+    // La PREMIÈRE mention gagne, comme pour le dédoublonnage de `trier`.
+    expect(r[0]!.ville).toBe("Lévis");
   });
 });

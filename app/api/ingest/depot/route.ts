@@ -30,7 +30,7 @@ import { db } from "@/lib/db";
 import { offerReasons, offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { colonnesOffre } from "@/lib/persistance";
-import { idOffre, trier } from "@/lib/ingest/pipeline";
+import { trier, villesACompleter } from "@/lib/ingest/pipeline";
 import { appliquerBalayage, type JournalVeille } from "@/lib/veille";
 
 export const dynamic = "force-dynamic";
@@ -165,31 +165,13 @@ export async function POST(requete: Request) {
 
     // RATTRAPAGE DE LA VILLE SUR LES OFFRES DÉJÀ SUIVIES.
     //
-    // Une offre déjà en base est comptée « doublon » et le lot n'en fait plus rien — ce qui
-    // était juste tant que le dépôt n'apportait aucune information nouvelle. Ce n'est plus
-    // vrai : les 40 premières offres déposées ont été écrites AVANT que la colonne `ville`
-    // soit remplie, et sans ville un employeur hors des entreprises cibles ne peut pas être
-    // géocodé — il reste sans distance et absent de la carte, à vie. Le même dépôt rejoué
-    // porte pourtant la ville manquante.
-    //
-    // ON COMPLÈTE, ON N'ÉCRASE JAMAIS : seule une ville ABSENTE est écrite. Une ville déjà
-    // connue vient d'une source antérieure et n'a pas à être remplacée par un lot plus
-    // récent — et `ville` n'est pas un champ de Marc (garde-fou n°2), mais l'opération
-    // reste volontairement la plus étroite possible : un seul champ, et seulement quand il
-    // est vide.
-    const parId = new Map(connues.map((o) => [o.id, o]));
-    const villesEcrites = new Set<string>();
-
-    for (const b of brutes) {
-      const ville = b.ville.trim();
-      if (ville === "") continue;
-
-      const id = idOffre(b.entreprise.trim() || "Employeur non nommé", b.titre);
-      const existante = parId.get(id);
-      if (!existante || existante.ville !== null || villesEcrites.has(id)) continue;
-
+    // La DÉCISION vit dans `villesACompleter` (pure, testée) : ce qu'on complète, ce qu'on
+    // n'écrase jamais, et pourquoi un employeur non nommé n'y a pas droit. Ici il ne reste
+    // que l'écriture. `ville` n'est pas un champ de Marc (garde-fou n°2), mais l'opération
+    // reste la plus étroite possible : un seul champ, et seulement quand il est vide.
+    const aCompleter = villesACompleter(brutes, connues);
+    for (const { id, ville } of aCompleter) {
       await db.update(offers).set({ ville, majLe: new Date() }).where(eq(offers.id, id));
-      villesEcrites.add(id);
     }
 
     // La péremption réutilise `lib/veille.ts` sans rien réécrire : une offre déjà suivie que
@@ -237,7 +219,7 @@ export async function POST(requete: Request) {
         // Combien d'offres DÉJÀ suivies ont gagné leur ville grâce à ce dépôt. Compté et
         // rendu : un rattrapage muet ne se vérifierait pas, et c'est précisément ce qui a
         // permis à 40 offres de rester sans ville sans que rien ne le signale.
-        villesCompletees: villesEcrites.size,
+        villesCompletees: aCompleter.length,
         perimees: balayage.perimees.length,
         revenues: balayage.revenues.length,
         titres: tri.retenues.map((o) => `${o.score} — ${o.entreprise} — ${o.poste}`),

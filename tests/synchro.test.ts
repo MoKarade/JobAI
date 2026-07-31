@@ -51,6 +51,17 @@ describe("empreinte du jeu de départ", () => {
     expect(empreinteSeed(modifie)).not.toBe(empreinteSeed(SEED));
   });
 
+  it("change quand une VILLE change", () => {
+    // Le champ avait été oublié de l'empreinte — cinquième liste de champs recopiée à la
+    // main dans ce dépôt, cinquième occasion d'en perdre un. Sans ce test, corriger la
+    // ville d'une offre du jeu de départ laisserait l'empreinte identique : la synchro
+    // répondrait « à jour » et la correction ne partirait jamais en base. Mesuré avant le
+    // correctif : les deux empreintes étaient rigoureusement égales.
+    const modifie = [...SEED];
+    modifie[0] = { ...modifie[0]!, ville: "Ville Différente" };
+    expect(empreinteSeed(modifie)).not.toBe(empreinteSeed(SEED));
+  });
+
   it("IGNORE les champs de Marc : son suivi ne déclenche jamais de réécriture", () => {
     // Garde-fou n°2 vu sous l'angle du déclenchement. Si l'empreinte prenait `statut`,
     // cocher « CV envoyé » ferait croire à un jeu de départ modifié et relancerait une

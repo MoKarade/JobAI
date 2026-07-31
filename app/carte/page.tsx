@@ -77,40 +77,62 @@ export default async function PageCarte() {
   // Bornée par `reserverPasse` : une passe toutes les cinq minutes au plus, quel que soit
   // le nombre de rechargements. Nominatim est gratuit et bannit les appelants insistants ;
   // supprimer le clic ne doit pas revenir à marteler le service à sa place.
-  if (offres !== null && panne === null) {
-    const lues = offres;
-    const ciblesManquantes = ENTREPRISES_CIBLES.filter((c) => !positions.has(c.nom)).length;
-    if (ciblesManquantes > 0) {
-      after(async () => {
-        try {
-          if (!(await reserverPasse(db, CLE_GEOCODAGE, DELAI_PASSE_AUTO_MS, new Date()))) return;
-          const r = await passeGeocodage();
-          if (!r.ok) console.error("[carte] passe automatique refusée :", r.erreur);
-          else if (r.panne) console.error("[carte] passe automatique dégradée :", r.panne);
-        } catch (err) {
-          // Le fond ne doit jamais faire échouer une réponse déjà envoyée — mais il ne
-          // doit pas non plus disparaître sans laisser de trace.
-          console.error("[carte] passe automatique impossible", err);
-        }
-      });
-    }
+  const ciblesManquantes = ENTREPRISES_CIBLES.filter((c) => !positions.has(c.nom)).length;
 
+  if (offres !== null && panne === null) {
     // `passeGeocodage` ne situe QUE les entreprises cibles. Depuis que la carte part des
     // offres, un employeur apporté par l'ingestion doit l'être aussi — c'est
     // `mesurerDistances` qui sait le faire (elle géocode `offre.entreprise` à partir de la
-    // ville de l'offre, puis mesure). Sans ce second déclencheur, ces employeurs
-    // resteraient « à situer » indéfiniment sur la page qui les montre.
-    const employeursNonSitues = lues.some(
-      (o) => !o.histo && o.perimeeLe === null && !positions.has(o.entreprise),
+    // ville de l'offre, puis mesure). Sans ce second travail, ces employeurs resteraient
+    // « à situer » indéfiniment sur la page qui les montre.
+    // ⚠️ LE CRITÈRE EST LA DISTANCE MANQUANTE, PAS L'ABSENCE DE POSITION.
+    //
+    // `!positions.has(o.entreprise)` semblait plus direct, mais il ne CONVERGE PAS : la
+    // position d'un employeur peut être inscrite sous un autre nom que celui de l'offre
+    // (« Laserax » côté cible, « Laserax inc. » côté annonce). `construireVue` sait
+    // rapprocher les deux, cette comparaison littérale non — le gate resterait donc vrai à
+    // vie et relancerait une passe de fond à chaque affichage, sans que rien ne progresse.
+    // `km === null` s'éteint dès que la mesure a réussi, quel que soit le nom. C'est aussi
+    // le critère de l'accueil : deux pages qui déclenchent le même travail doivent le
+    // déclencher sur la même condition.
+    const employeursNonSitues = offres.some(
+      (o) => !o.histo && o.perimeeLe === null && o.km === null,
     );
-    if (employeursNonSitues) {
+
+    // ⚠️ UN SEUL `after()`, ET LES DEUX TRAVAUX EN SÉRIE.
+    //
+    // Deux `after()` distincts s'exécuteraient EN PARALLÈLE : la file de Next est créée
+    // sans limite de concurrence (mesuré — `p-queue` par défaut = `Infinity`). Chacun
+    // respecterait sa cadence de 1,1 s dans son coin, mais Nominatim verrait deux flux
+    // simultanés — ce que sa politique interdit, et le bannissement coûterait la carte
+    // entière. Les deux réservations restent SÉPARÉES (chacune borne son propre travail,
+    // et l'accueil déclenche la mesure de son côté) ; c'est l'EXÉCUTION qui est sérialisée.
+    if (ciblesManquantes > 0 || employeursNonSitues) {
       after(async () => {
-        try {
-          if (!(await reserverPasse(db, CLE_DISTANCES, DELAI_MESURE_AUTO_MS, new Date()))) return;
-          const r = await mesurerDistances();
-          if (!r.ok) console.error("[carte] mesure des distances refusée :", r.erreur);
-        } catch (err) {
-          console.error("[carte] mesure des distances impossible", err);
+        if (ciblesManquantes > 0) {
+          try {
+            if (await reserverPasse(db, CLE_GEOCODAGE, DELAI_PASSE_AUTO_MS, new Date())) {
+              const r = await passeGeocodage();
+              if (!r.ok) console.error("[carte] passe automatique refusée :", r.erreur);
+              else if (r.panne) console.error("[carte] passe automatique dégradée :", r.panne);
+            }
+          } catch (err) {
+            // Le fond ne doit jamais faire échouer une réponse déjà envoyée — mais il ne
+            // doit pas non plus disparaître sans laisser de trace. Et l'échec du premier
+            // travail ne doit pas emporter le second : d'où deux `try` et non un seul.
+            console.error("[carte] passe automatique impossible", err);
+          }
+        }
+
+        if (employeursNonSitues) {
+          try {
+            if (await reserverPasse(db, CLE_DISTANCES, DELAI_MESURE_AUTO_MS, new Date())) {
+              const r = await mesurerDistances();
+              if (!r.ok) console.error("[carte] mesure des distances refusée :", r.erreur);
+            }
+          } catch (err) {
+            console.error("[carte] mesure des distances impossible", err);
+          }
         }
       });
     }
@@ -206,7 +228,12 @@ export default async function PageCarte() {
         <span>pointillé = position approximative</span>
       </p>
 
-      <BoutonSituer restantes={vue.aSituer.length} />
+      {/* Le compte du bouton est celui des CIBLES, pas de `vue.aSituer` : le clic appelle
+          `passeGeocodage`, qui ne traite que les entreprises cibles. Annoncer 37 pour une
+          action qui n'en résout que 36 ferait attendre un effet qui ne viendra pas — les
+          employeurs venus de l'ingestion se situent par la mesure des distances, en fond.
+          Ce qu'il reste est dit sous la carte, avec le bon remède. */}
+      <BoutonSituer restantes={ciblesManquantes} />
 
       <CarteOffres epingles={vue.epingles} cadre={cadre} />
 
