@@ -19,7 +19,8 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
     <ul className="carte-liste">
       {epingles.flatMap((e) =>
         e.entreprises.map((x) => {
-          const trajet = lienTrajetGoogleMaps(x.nom);
+          // La ville de l'entreprise est connue ici : elle rend le lien Maps sans ambiguïté.
+          const trajet = lienTrajetGoogleMaps(x.nom, undefined, x.ville);
           return (
             <li key={x.nom} className="carte-liste__ville">
               <h2 className="carte-liste__titre">
@@ -34,7 +35,8 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                   au centre de sa ville n'a pas d'adresse connue, et en afficher une
                   plausible serait pire que le silence. */}
               <p className="carte-liste__adresse">
-                {x.adresse ?? "Adresse inconnue d’OpenStreetMap — position approximative."}
+                {x.adresse ??
+                  "Adresse non publiée dans OpenStreetMap — le lien Maps ci-dessous la retrouve par le nom."}
               </p>
               <p className="carte-liste__faits">
                 {x.km === null

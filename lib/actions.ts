@@ -12,7 +12,7 @@
 // pire que l'échec — d'où le journal côté serveur.
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { entreprisesLieux, offers, syncState, villes } from "./db/schema";
 import { exigerSession } from "./session";
@@ -199,6 +199,58 @@ export async function passeGeocodage(): Promise<ResultatPasse> {
 }
 
 /**
+ * Récupère l'adresse des entreprises DÉJÀ situées qui n'en ont pas.
+ *
+ * ⚠️ POURQUOI CETTE FONCTION EXISTE — LA MÊME ERREUR, UNE TROISIÈME FOIS
+ * La colonne `adresse` a été ajoutée après coup. Or les deux chemins de géocodage écartent
+ * explicitement ce qui est déjà situé (`!deja.has(c.nom)`, `!positions.has(e.nom)`) : une
+ * entreprise géocodée AVANT l'ajout de la colonne ne serait donc jamais retentée, et son
+ * adresse resterait vide À VIE. C'est mot pour mot ce qui est arrivé à `ville` le matin
+ * même. Une colonne ajoutée à une table que le traitement saute quand l'entrée existe déjà
+ * est une colonne morte pour tout l'existant — il faut TOUJOURS le chemin de rattrapage
+ * avec la colonne, dans le même lot.
+ *
+ * CE QU'ELLE NE TOUCHE PAS : `lat`, `lon`, `precision`. La position en base a déjà été
+ * validée (`deciderPrecision`) ; on ne la rejoue pas, on complète seulement ce qui manque.
+ *
+ * Seules les positions EXACTES sont concernées. Un repli au centre-ville n'a pas d'adresse
+ * d'entreprise à récupérer — l'adresse rendue serait celle de la municipalité, et les
+ * retenter à chaque passage serait un martèlement sans fin pour une réponse qui ne viendra
+ * jamais.
+ */
+async function rattraperAdresses(
+  villeDe: (nom: string) => string | null,
+  max: number,
+  budgetMs: number | null,
+): Promise<number> {
+  const lignes = await db
+    .select()
+    .from(entreprisesLieux)
+    .where(and(eq(entreprisesLieux.precision, "exacte"), isNull(entreprisesLieux.adresse)));
+
+  const tentables = lignes
+    .map((l) => ({ nom: l.nom, ville: villeDe(l.nom) }))
+    .filter((e): e is { nom: string; ville: string } => e.ville !== null)
+    .slice(0, max);
+
+  if (tentables.length === 0) return 0;
+
+  const r = await geocoderEntreprises(tentables, outilsNominatim(), budgetMs);
+  let ecrites = 0;
+
+  for (const t of r.trouvees) {
+    if (!t.adresse) continue;
+    await db
+      .update(entreprisesLieux)
+      .set({ adresse: t.adresse })
+      .where(eq(entreprisesLieux.nom, t.nom));
+    ecrites++;
+  }
+
+  return ecrites;
+}
+
+/**
  * Le domicile de référence, lu depuis l'environnement.
  *
  * GARDE-FOU N°1 — c'est le SEUL endroit de l'app qui lit ces coordonnées, et elles ne
@@ -280,7 +332,13 @@ async function domicile(): Promise<{ lat: number; lon: number } | null> {
 export async function mesurerDistances(
   options: { maxSituations?: number; budgetGeocodageMs?: number } = {},
 ): Promise<
-  | { ok: true; mesurees: number; situees: number; villesRattrapees: number }
+  | {
+      ok: true;
+      mesurees: number;
+      situees: number;
+      villesRattrapees: number;
+      adressesRattrapees: number;
+    }
   | { ok: false; erreur: string }
 > {
   const chezMoi = await domicile();
@@ -348,6 +406,17 @@ export async function mesurerDistances(
       }
     }
 
+    // 1 bis. Récupérer les adresses manquantes des entreprises déjà situées — sans quoi
+    //        la colonne resterait vide pour tout ce qui existait avant elle.
+    let adresses = 0;
+    try {
+      adresses = await rattraperAdresses(villeDe, maxSituations, options.budgetGeocodageMs ?? null);
+    } catch (err) {
+      // Un échec ici ne doit pas empêcher la MESURE, qui est l'essentiel : la distance est
+      // le critère n°1, l'adresse est un confort.
+      console.error("[actions] rattrapage des adresses impossible", err);
+    }
+
     // 2. Mesurer. Le domicile ne sort pas de cette closure.
     const majs = planifierDistances(offres, positions, (p) => distanceKm(chezMoi, p));
     for (const m of majs) {
@@ -358,7 +427,13 @@ export async function mesurerDistances(
 
     revalidatePath("/");
     revalidatePath("/carte");
-    return { ok: true, mesurees: majs.length, situees, villesRattrapees: aRattraper.length };
+    return {
+      ok: true,
+      mesurees: majs.length,
+      situees,
+      villesRattrapees: aRattraper.length,
+      adressesRattrapees: adresses,
+    };
   } catch (err) {
     console.error("[actions] mesure des distances impossible", err);
     return { ok: false, erreur: "Mesure impossible. Réessaie plus tard." };

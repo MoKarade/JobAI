@@ -378,6 +378,17 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   écrivait moins que les autres (ici `perimeeLe`, que la synchro du seed ne touchait pas et
   qui aurait ressuscité les offres périmées). Lister ces écarts AVANT d'unifier, et les
   nommer dans le code.
+- **Une colonne ajoutée à une table dont le traitement SAUTE les entrées déjà présentes est
+  une colonne morte pour tout l'existant.** Vécu TROIS FOIS le même jour : `ville` (l'insert
+  ne l'écrivait pas), `ville` encore (`empreinteSeed` l'ignorait), puis `adresse` — les deux
+  passes de géocodage écartent explicitement ce qui est déjà situé (`!deja.has(nom)`), donc
+  toute entreprise géocodée avant l'ajout de la colonne ne serait jamais retentée. Le
+  symptôme est toujours le même : ça marche pour les nouvelles entrées, donc les tests
+  passent et l'écran a l'air correct, pendant que le stock existant reste vide à vie. La
+  règle : **le chemin de rattrapage se livre DANS le même lot que la colonne**, jamais
+  « plus tard ». Et la question à se poser en ajoutant un champ : « qu'est-ce qui le
+  remplira pour ce qui est DÉJÀ en base ? » — si la réponse est « rien », le lot est
+  incomplet.
 - **« Cette liste-là sert à autre chose » n'immunise pas contre l'oubli qu'on vient de
   corriger.** En unifiant les quatre listes de colonnes, j'ai écarté une CINQUIÈME liste de
   champs (`empreinteSeed`) au motif qu'elle répond à une autre question — et j'ai écrit ce

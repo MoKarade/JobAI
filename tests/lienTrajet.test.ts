@@ -85,3 +85,41 @@ describe("sur le vrai jeu de départ", () => {
     }
   });
 });
+
+describe("la ville fournie par l'appelant", () => {
+  // Un employeur hors liste de chasse n'a pas de ville dans `ENTREPRISES_CIBLES` : le lien
+  // partait en « Nom, QC ». Google s'en sort souvent — Marc l'a constaté — mais deux
+  // homonymes dans la province n'ont aucune raison de se départager.
+
+  /** La DESTINATION telle que Google la recevra — décodée, pas sa forme encodée. */
+  function destination(lien: string | null): string | null {
+    if (lien === null) return null;
+    return new URL(lien).searchParams.get("destination");
+  }
+
+  it("PRIME sur la liste de chasse", () => {
+    expect(destination(lienTrajetGoogleMaps("Laserax", ENTREPRISES_CIBLES, "Lévis"))).toBe(
+      "Laserax, Lévis, QC",
+    );
+  });
+
+  it("sert quand l'employeur est absent de la liste", () => {
+    expect(
+      destination(lienTrajetGoogleMaps("Employeur Jamais Vu", ENTREPRISES_CIBLES, "Beauport")),
+    ).toBe("Employeur Jamais Vu, Beauport, QC");
+  });
+
+  it("retombe sur la liste de chasse quand elle est vide ou absente", () => {
+    // Non-vacuité : sans ce cas, une implémentation qui ignorerait la liste passerait.
+    const sans = lienTrajetGoogleMaps("Laserax", ENTREPRISES_CIBLES, "   ");
+    const defaut = lienTrajetGoogleMaps("Laserax", ENTREPRISES_CIBLES);
+    expect(sans).toBe(defaut);
+    expect(defaut).not.toBeNull();
+  });
+
+  it("ne dit toujours RIEN du domicile — garde-fou n°1", () => {
+    const lien = lienTrajetGoogleMaps("Laserax", ENTREPRISES_CIBLES, "Lévis")!;
+    expect(lien).not.toContain("origin");
+    expect(lien).toContain("destination");
+  });
+});

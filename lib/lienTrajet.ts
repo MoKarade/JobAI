@@ -30,11 +30,20 @@ import { ENTREPRISES_CIBLES, type EntrepriseCible } from "./reference";
 export function lienTrajetGoogleMaps(
   entreprise: string,
   cibles: readonly EntrepriseCible[] = ENTREPRISES_CIBLES,
+  /**
+   * La ville quand l'appelant la connaît — elle PRIME sur la liste de chasse.
+   *
+   * Sans elle, un employeur hors cibles partait en « Nom, QC » : Google s'en sort la
+   * plupart du temps (Marc l'a constaté), mais deux entreprises homonymes dans la province
+   * n'ont aucune raison de se départager. La carte connaît la ville de chaque offre depuis
+   * `[CARTE-01]` ; s'en priver ici serait garder une imprécision qu'on sait lever.
+   */
+  villeConnue?: string | null,
 ): string | null {
   const nom = entreprise.trim();
   if (nom.length === 0) return null;
 
-  const libelle = villeDeLEntreprise(nom, cibles);
+  const libelle = villeConnue?.trim() || villeDeLEntreprise(nom, cibles);
   // « Québec (Beauport) » → « Québec » : la parenthèse est un repère de lecture, pas une
   // adresse — la laisser dégraderait la recherche Google au lieu de l'aider.
   const ville = libelle === null ? null : villeGeocodable(libelle);
