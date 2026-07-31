@@ -611,6 +611,14 @@
       que le clic ne pouvait pas honorer, un doublon d'épingle, et l'extraction du rattrapage
       de ville en fonction pure testée. Détail dans le message de commit.
 
+- [ ] 🔧 **`[MIGR-01]`** **Deux chemins de lecture, un seul applique les migrations.**
+      `lireOffres` appelle `assurerMigrations` ; `getTrackerState` (le endpoint hub) fait un
+      `db.select()` direct et ne l'appelle pas. Sans conséquence aujourd'hui — le hub ne lit
+      aucune colonne récente — mais le jour où une migration ajoutera une colonne qu'il lit,
+      un déploiement dont SEUL le hub est appelé échouerait jusqu'à la première visite de
+      Marc. Constaté le 2026-07-31 en cherchant si la migration 0005 pouvait s'appliquer
+      sans intervention : elle ne le peut pas par ce chemin.
+
 - [x] 🔧 **`[DIST-02]`** **`lib/distances.ts` ne connaît pas les alias d'entreprise.**
       *Livré le 2026-07-31* : la règle vit dans `lib/employeurs.ts` (`apparier`, `positionDe`)
       et les trois consommateurs l'appellent. Discrimination prouvée — les deux tests de
