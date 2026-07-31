@@ -176,6 +176,8 @@ export async function GET(requete: Request) {
         revenues: rapport.revenues.length,
         enSursis: rapport.enSursis,
         ecartees: rapport.tri.souslePlancher,
+        horsRegion: rapport.tri.horsRegion,
+        lieuInconnu: rapport.tri.lieuInconnu,
         doublons: rapport.tri.doublons,
         // Le détail par source : sans lui, un total de zéro ne dit pas si le marché est
         // calme ou si les six sources sont muettes.

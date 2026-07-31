@@ -11,6 +11,7 @@
 //      explication est pire qu'une liste longue.
 
 import { computeScore } from "../scoring";
+import { situer } from "./region";
 import type { Offre } from "../types";
 import type { OffreBrute } from "./types";
 
@@ -39,6 +40,12 @@ export interface Tri {
   souslePlancher: number;
   /** Doublons entre sources ou avec le suivi existant. */
   doublons: number;
+  /** Écartées parce que trop loin — un compte DISTINCT du plancher. */
+  horsRegion: number;
+  /** Écartées faute de lieu exploitable. Distinct de « trop loin » : si ce compte
+   *  explose, c'est qu'une source a cessé d'indiquer les villes, pas que le marché
+   *  s'est éloigné. */
+  lieuInconnu: number;
 }
 
 /**
@@ -84,6 +91,8 @@ export function trier(
   const vues = new Set<string>();
   let souslePlancher = 0;
   let doublons = 0;
+  let horsRegion = 0;
+  let lieuInconnu = 0;
 
   for (const brute of recoltes) {
     const entreprise = brute.entreprise.trim() || "Employeur non nommé";
@@ -94,6 +103,21 @@ export function trier(
       continue;
     }
     vues.add(cle);
+
+    // LE LIEU D'ABORD, avant même de noter. Le barème ne peut pas trancher ça : il
+    // pénalise une distance INCONNUE de 10 points sur 20, ce qui laisse de quoi passer
+    // un seuil — « inconnue » et « à 2 000 km » y sont traitées pareil. C'est ainsi
+    // qu'un poste de campement minier au Manitoba est entré à 68/100 lors de la
+    // première sonde sur les vraies sources.
+    const lieu = situer(brute.ville, brute.description);
+    if (lieu === "hors-region") {
+      horsRegion++;
+      continue;
+    }
+    if (lieu === "lieu-inconnu") {
+      lieuInconnu++;
+      continue;
+    }
 
     // La note vient du barème, avec `km: null` : la distance ne se déduit pas d'un nom de
     // ville, elle se mesure. Le barème sait déjà traiter l'inconnu (10 points sur 20).
@@ -125,7 +149,7 @@ export function trier(
     });
   }
 
-  return { retenues, souslePlancher, doublons };
+  return { retenues, souslePlancher, doublons, horsRegion, lieuInconnu };
 }
 
 /**

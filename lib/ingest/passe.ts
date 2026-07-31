@@ -125,7 +125,12 @@ export async function executerPasse(
   return {
     sources: compte,
     trouvees: brutes.length,
-    tri: { souslePlancher: tri.souslePlancher, doublons: tri.doublons },
+    tri: {
+      souslePlancher: tri.souslePlancher,
+      doublons: tri.doublons,
+      horsRegion: tri.horsRegion,
+      lieuInconnu: tri.lieuInconnu,
+    },
     nouvelles: tri.retenues.map((o) => o.id),
     perimees: balayage.perimees,
     revenues: balayage.revenues,
