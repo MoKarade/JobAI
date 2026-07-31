@@ -248,6 +248,12 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   où on attend le second prouve que la requête n'atteint jamais la route — donc que le code
   n'est pas déployé, pas que le secret est faux. Distinguer les messages d'erreur par
   couche, c'est se donner un diagnostic gratuit.
+- **Un flux VALIDE n'est pas un flux UTILE : lire le contenu, pas le format.** Le RSS
+  d'Espresso-Jobs répond 200, en XML bien formé, avec 20 entrées — tous les voyants au vert.
+  La première s'intitule « TI : peut-on encore se priver des femmes ? » : c'est leur blogue,
+  pas leurs offres. Un analyseur qui compte les entrées aurait déclaré la source
+  fonctionnelle. Toujours faire remonter un ÉCHANTILLON du contenu jusqu'à l'œil humain —
+  c'est la seule vérification qu'aucun code ne remplace.
 - **Un HTTP 200 ne prouve rien tant qu'on n'a pas mesuré ce que l'API répond à une question
   ABSURDE.** La découverte de pages carrières annonçait « 36 entreprises trouvées » : c'était
   faux, le code prenait un 200 pour une preuve. Un TÉMOIN NÉGATIF a tranché en une requête —

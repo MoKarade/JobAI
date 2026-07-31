@@ -525,6 +525,26 @@
         (garde-fou n°4) ; la route est exemptée de session avec motif écrit, verrouillé par
         `tests/routesGardees.test.ts`.
 
+- [x] 🔧 **`[INGEST-03]`** **Les sites québécois offrent-ils un flux ?** (demande Marc
+      2026-07-31 : « jobillico »). ✅ Mesuré — **aucun des quatre n'expose ses offres.**
+      | Site | robots.txt | Flux d'offres |
+      |---|---|---|
+      | Jobillico | 38 chemins interdits, pas `/` | ❌ RSS 404, API 404, `?rss=1` rend la page HTML |
+      | Québec emploi | 15 chemins interdits | ❌ le « flux » est une page TYPO3 |
+      | Espresso-Jobs | 5 interdits (permissif) | ⚠️ flux XML valide — mais c'est leur BLOGUE |
+      | Isarta | 31 chemins interdits | ❌ 404 |
+      · ⚠️ **Le piège d'Espresso-Jobs** : 200, XML, 20 entrées — tous les voyants au vert.
+        La première s'intitule « TI : peut-on encore se priver des femmes ? ». Sans LIRE le
+        contenu, on annonçait une source qui marche. Un flux valide n'est pas un flux utile.
+      · **Piste ouverte, mais elle demande un arbitrage** : le sitemap de Jobillico répond en
+        XML. Un sitemap est fait pour les robots — c'est sa raison d'être. Il donne les URL
+        des offres, **pas leur contenu** : titre, ville et salaire exigeraient de visiter
+        chaque page, donc du moissonnage, écarté par la décision du 30/07. À rouvrir
+        seulement si Marc assouplit cette règle.
+      · **Conclusion de la série INGEST** : la voie « sources officielles » est épuisée pour
+        le marché de Québec. Les employeurs d'ici publient sur Indeed, et Indeed n'est
+        accessible que depuis une session Claude.
+
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
       · **Guichet-Emplois** — flux XML officiel d'EDSC, sur demande. C'est la source
