@@ -378,6 +378,26 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   écrivait moins que les autres (ici `perimeeLe`, que la synchro du seed ne touchait pas et
   qui aurait ressuscité les offres périmées). Lister ces écarts AVANT d'unifier, et les
   nommer dans le code.
+- **« Cette liste-là sert à autre chose » n'immunise pas contre l'oubli qu'on vient de
+  corriger.** En unifiant les quatre listes de colonnes, j'ai écarté une CINQUIÈME liste de
+  champs (`empreinteSeed`) au motif qu'elle répond à une autre question — et j'ai écrit ce
+  motif dans le message de commit. Elle avait pourtant perdu `ville` exactement pareil : une
+  ville corrigée dans le jeu de départ ne changeait pas l'empreinte, donc la synchro
+  répondait « à jour » et la correction ne partait jamais en base. Quand on corrige un champ
+  oublié, RECENSER toutes les listes qui l'énumèrent — écriture, empreinte, sérialisation,
+  export — et vérifier chacune par une sonde, pas par un raisonnement sur sa finalité.
+- **Un travail de fond a besoin d'un gate qui CONVERGE, pas d'un gate qui a l'air juste.**
+  « Cet employeur n'a pas de position » se code en comparant son nom à la table des
+  positions — et ne s'éteint jamais quand la position est inscrite sous un autre nom
+  (« Laserax » vs « Laserax inc. »). Le bon critère est celui du RÉSULTAT visé (`km === null`
+  : la distance est-elle mesurée ?), pas celui du moyen. Corollaire : deux pages qui
+  déclenchent le même travail doivent le déclencher sur la MÊME condition, sinon l'une des
+  deux boucle.
+- **Deux `after()` ne s'exécutent pas l'un après l'autre.** La file de Next est créée sans
+  limite de concurrence (mesuré : `p-queue` par défaut = `Infinity`). Deux travaux de fond
+  qui respectent chacun leur cadence de 1,1 s produisent donc DEUX flux simultanés vers un
+  service qui interdit la concurrence. Un seul `after()`, les travaux `await`és en série —
+  et un `try` par travail, sinon l'échec du premier emporte le second.
 - **Une plainte sur ce qu'on VOIT ne désigne presque jamais ce qu'il faut CHANGER.**
   « Les offres ne sont pas sur la carte » : le réflexe est la carte, la cause était une
   colonne jamais écrite deux couches plus bas. Déjà vécu avec « trop peu d'offres », qui

@@ -604,6 +604,23 @@
       recherche en pill qui se soulève au focus, filtres en chips, cartes qui s'élèvent au
       survol. Variantes de thème sombre explicites — un noir translucide y disparaît.
 
+- [x] 🔧 **`[CARTE-02]`** **Correctifs du panel sur `[CARTE-01]`** — quatre défauts réels,
+      dont le même bug une cinquième fois (`empreinteSeed` ignorait `ville`), deux `after()`
+      qui tournaient en parallèle vers Nominatim (mesuré : `p-queue` par défaut = `Infinity`),
+      un gate de travail de fond qui ne convergeait pas, un bouton qui annonçait un compte
+      que le clic ne pouvait pas honorer, un doublon d'épingle, et l'extraction du rattrapage
+      de ville en fonction pure testée. Détail dans le message de commit.
+
+- [ ] 🔧 **`[DIST-02]`** **`lib/distances.ts` ne connaît pas les alias d'entreprise.**
+      `construireVue` rapproche « Laserax » et « Laserax inc. » (`apparier`), mais
+      `employeursASituer` et `planifierDistances` comparent les noms LITTÉRALEMENT. Une
+      offre dont l'employeur est déjà situé sous son nom canonique peut donc être
+      re-géocodée sous son autre nom — un appel Nominatim inutile et une ligne dupliquée
+      dans `entreprises_lieux`. Rien de faux à l'écran, mais contraire à l'usage parcimonieux
+      qu'impose le garde-fou n°4. Le vrai correctif est une source unique d'appariement
+      partagée entre la carte et les distances — pas une seconde copie de `apparier`.
+      *(Trouvé par le panel du 2026-07-31, mesuré ; pré-existant à `[CARTE-01]`.)*
+
 - [ ] 🔧 **`[UX-12]`** **Brancher le suivi des relances à l'interface.** `lib/relances.ts`
       est livré et testé (seuils 14 j / 45 j, `Relance` n'est PAS une réponse du recruteur,
       une date future est une saisie en cours et non un envoi) — mais **rien ne l'affiche**.
