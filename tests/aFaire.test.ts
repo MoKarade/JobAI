@@ -13,6 +13,7 @@ import {
   joursEntre,
   prochainesActions,
 } from "../lib/aFaire";
+import { SEUIL_SILENCE_JOURS } from "../lib/relances";
 import { SEED } from "../lib/seed";
 import type { Offre } from "../lib/types";
 
@@ -153,8 +154,26 @@ describe("ce qu'il ne doit JAMAIS suggérer", () => {
     // expliquant pourquoi — relancer est un geste de MARC, pas une réponse du recruteur.
     // La candidature attend toujours. L'ancienne version la faisait disparaître à jamais
     // du panneau, ce que Marc a constaté directement (« pourquoi je vois pas relances »).
-    const a = prochainesActions([offre({ id: "l", statut: "Relance", dateEnvoi: ilYA(60) })], AUJ);
+    // ⚠️ 20 jours, pas 60 : au-delà de `SEUIL_SILENCE_JOURS` (45) l'état devient
+    // « sans-suite », dont la branche produit AUSSI `genre: "relancer"` — l'assertion
+    // aurait donc été vraie sans rien prouver du cas qu'on veut couvrir. Le titre est
+    // vérifié pour la même raison : c'est lui qui distingue les deux branches.
+    const a = prochainesActions([offre({ id: "l", statut: "Relance", dateEnvoi: ilYA(20) })], AUJ);
     expect(a.map((x) => x.genre)).toEqual(["relancer"]);
+    expect(a[0]?.titre).toContain("Relancer");
+    expect(a[0]?.titre).not.toContain("Classer");
+  });
+
+  it("après un silence très long, propose de CLASSER, pas seulement de relancer", () => {
+    // L'autre branche, distinguée par le titre et le motif : au-delà de
+    // `SEUIL_SILENCE_JOURS`, relancer n'a plus grand sens — le silence est une réponse, et
+    // le suivi doit pouvoir se refermer.
+    const a = prochainesActions(
+      [offre({ id: "s", statut: "CVenvoye", dateEnvoi: ilYA(SEUIL_SILENCE_JOURS + 5) })],
+      AUJ,
+    );
+    expect(a[0]?.titre).toContain("Classer ou relancer");
+    expect(a[0]?.motif).toContain("silence est une réponse");
   });
 
   it("pas de relance sur un CV dont la date d'envoi est inconnue", () => {

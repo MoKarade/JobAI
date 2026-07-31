@@ -19,6 +19,7 @@ import { exigerSession } from "./session";
 import { MiseAJourOffreSchema } from "./types";
 import { NouvelleOffreSchema, aujourdhui, construireOffre, identifiantPour } from "./ajout";
 import {
+  RAYON_VALIDATION_KM,
   deciderPrecision,
   distanceKm,
   geocoderEntreprises,
@@ -226,20 +227,59 @@ async function rattraperAdresses(
   const lignes = await db
     .select()
     .from(entreprisesLieux)
-    .where(and(eq(entreprisesLieux.precision, "exacte"), isNull(entreprisesLieux.adresse)));
+    .where(and(eq(entreprisesLieux.precision, "exacte"), isNull(entreprisesLieux.adresse)))
+    // LA MOINS RÉCEMMENT TENTÉE D'ABORD — et c'est ce qui fait CONVERGER le rattrapage.
+    //
+    // Sans `ORDER BY`, Postgres sert les lignes dans l'ordre du heap : le même lot
+    // reviendrait à chaque passage et le fond de la file n'aurait jamais son tour. Trier
+    // par nom ne suffirait pas non plus — une entreprise qu'OpenStreetMap ne connaîtra
+    // JAMAIS resterait éternellement en tête et consommerait le quota à la place des
+    // autres. En triant par `geocodeLe`, et en le marquant à CHAQUE tentative (réussie ou
+    // non, voir plus bas), la file tourne : tout le monde passe, et un cas insoluble
+    // retombe naturellement en queue au lieu de bloquer les suivants.
+    .orderBy(entreprisesLieux.geocodeLe)
+    .limit(max);
+
+  // La position DÉJÀ VALIDÉE sert de référent : c'est elle qu'on cherche à confirmer.
+  const referent = new Map(lignes.map((l) => [l.nom, { lat: l.lat, lon: l.lon }]));
 
   const tentables = lignes
     .map((l) => ({ nom: l.nom, ville: villeDe(l.nom) }))
-    .filter((e): e is { nom: string; ville: string } => e.ville !== null)
-    .slice(0, max);
+    .filter((e): e is { nom: string; ville: string } => e.ville !== null);
 
   if (tentables.length === 0) return 0;
 
   const r = await geocoderEntreprises(tentables, outilsNominatim(), budgetMs);
   let ecrites = 0;
 
+  // Marquer la TENTATIVE avant d'écrire quoi que ce soit : c'est ce qui fait tourner la
+  // file. Seules les entreprises réellement interrogées sont marquées — celles que le
+  // garde-temps a écartées ne le sont pas, et repasseront en tête au prochain tour, ce qui
+  // est exactement ce qu'on veut.
+  const interrogees = new Set([...r.trouvees.map((t) => t.nom), ...r.introuvables]);
+  for (const nom of interrogees) {
+    await db
+      .update(entreprisesLieux)
+      .set({ geocodeLe: new Date() })
+      .where(eq(entreprisesLieux.nom, nom));
+  }
+
   for (const t of r.trouvees) {
     if (!t.adresse) continue;
+
+    // ⚠️ VALIDATION PAR LA DISTANCE — sans elle, cette fonction réintroduit l'incident que
+    // le projet a déjà payé une fois (la brasserie Labatt de Montréal résolue pour celle de
+    // Québec, ~247 km). Les bornes régionales du géocodeur vont de Montréal à la Gaspésie :
+    // une résolution « dans les bornes » n'est pas encore la bonne.
+    //
+    // Le référent est la position DÉJÀ EN BASE, pas le centre-ville — c'est plus strict, et
+    // c'est la bonne question : on ne cherche pas « une entreprise plausible de cette
+    // ville », on cherche à CONFIRMER celle qui est déjà épinglée. Une adresse qui ne
+    // correspond pas au point affiché serait une donnée plausible et fausse, exactement ce
+    // qu'interdit le garde-fou n°3 — et pire que pas d'adresse du tout.
+    const ancre = referent.get(t.nom);
+    if (!ancre || distanceKm({ lat: t.lat, lon: t.lon }, ancre) > RAYON_VALIDATION_KM) continue;
+
     await db
       .update(entreprisesLieux)
       .set({ adresse: t.adresse })
@@ -389,6 +429,19 @@ export async function mesurerDistances(
     // Chaque requête Nominatim est espacée de 1,1 s par `lib/geocodage.ts` — c'est le
     // nombre qui change, jamais la cadence.
     const maxSituations = Math.max(1, options.maxSituations ?? 6);
+
+    // ⚠️ UN SEUL CHRONO POUR TOUT LE GÉOCODAGE DE CETTE PASSE.
+    //
+    // `situerLot` et `rattraperAdresses` appellent chacun `geocoderSerie`, qui démarre SA
+    // propre horloge. Leur passer la même valeur brute donnait donc DEUX fenêtres
+    // consécutives et indépendantes — 25 s + 25 s, plus le dépassement d'une requête en
+    // cours de chaque côté : le cron pouvait à lui seul consommer les 60 s de la fonction,
+    // ingestion comprise, et se faire tuer sans exécuter le moindre `catch`. Le budget se
+    // DÉCOMPTE désormais du temps déjà consommé.
+    const departGeocodage = Date.now();
+    const budgetTotal = options.budgetGeocodageMs ?? null;
+    const budgetRestant = (): number | null =>
+      budgetTotal === null ? null : Math.max(0, budgetTotal - (Date.now() - departGeocodage));
     const manquants = employeursASituer(offres, positions, villeDe);
     let situees = 0;
     if (manquants.length > 0) {
@@ -396,7 +449,7 @@ export async function mesurerDistances(
         manquants.slice(0, maxSituations),
         positions,
         maxSituations,
-        options.budgetGeocodageMs ?? null,
+        budgetRestant(),
       );
       situees = r;
       const relues = await db.select().from(entreprisesLieux);
@@ -410,7 +463,7 @@ export async function mesurerDistances(
     //        la colonne resterait vide pour tout ce qui existait avant elle.
     let adresses = 0;
     try {
-      adresses = await rattraperAdresses(villeDe, maxSituations, options.budgetGeocodageMs ?? null);
+      adresses = await rattraperAdresses(villeDe, maxSituations, budgetRestant());
     } catch (err) {
       // Un échec ici ne doit pas empêcher la MESURE, qui est l'essentiel : la distance est
       // le critère n°1, l'adresse est un confort.
