@@ -603,7 +603,9 @@ code {
    d'écran. La liste sous elle porte exactement la même information — c'est
    elle, l'accès réel, pas un pis-aller. */
 .carte-offres {
-  height: 26rem;
+  /* 34rem plutôt que 26 : à la hauteur précédente, une région de 50 km tenait dans un
+     timbre-poste et les épingles du centre-ville se chevauchaient. */
+  height: 34rem;
   margin: var(--pas-2) 0;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -993,4 +995,23 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 }
 .relances__reste {
   margin-top: 10px;
+}
+
+/* Les outils de la carte : agrandir, et le renvoi au trafic. Même allure que les filtres —
+   ce sont des contrôles de la même famille, ils n'ont pas à s'inventer un style. */
+.carte-outils {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: var(--pas-2) 0 0;
+}
+.carte-outils .filtre {
+  text-decoration: none;
+}
+
+/* Agrandie : presque toute la hauteur de la fenêtre, sans la remplir — on doit continuer
+   de voir qu'il y a une page autour, sinon on ne sait plus comment en sortir. */
+.carte-offres--agrandie {
+  height: 82vh;
 }

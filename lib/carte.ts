@@ -299,3 +299,21 @@ export function cadrage(
 
   return { latMin, latMax, lonMin, lonMax };
 }
+
+/**
+ * Le centre du cadrage — le point autour duquel ouvrir une carte externe.
+ *
+ * GARDE-FOU N°1 : il se déduit des seules ÉPINGLES, donc des entreprises, exactement comme
+ * `cadrage`. Centrer sur le domicile le révélerait à qui regarde l'URL, et une URL se
+ * partage, se met en favori et finit dans un historique. Rend `null` sans épingle plutôt
+ * qu'un point arbitraire.
+ */
+export function centreDuCadrage(
+  cadre: { latMin: number; latMax: number; lonMin: number; lonMax: number } | null,
+): { lat: number; lon: number } | null {
+  if (cadre === null) return null;
+  return {
+    lat: (cadre.latMin + cadre.latMax) / 2,
+    lon: (cadre.lonMin + cadre.lonMax) / 2,
+  };
+}

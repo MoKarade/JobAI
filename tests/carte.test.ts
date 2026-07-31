@@ -11,6 +11,7 @@ import {
   LONGUEUR_MIN_APPARIEMENT,
   apparier,
   cadrage,
+  centreDuCadrage,
   construireVue,
   villeDeLEntreprise,
   type PositionEntreprise,
@@ -381,5 +382,41 @@ describe("l'adresse, quand on la connaît", () => {
     const vue = construireVue([], ENTREPRISES_CIBLES, new Map());
     expect(vue.aSituer.length).toBeGreaterThan(0);
     expect(vue.epingles).toEqual([]);
+  });
+});
+
+describe("centre du cadrage — garde-fou n°1", () => {
+  // Il sert à ouvrir une carte EXTERNE (le trafic, qu'OpenStreetMap ne fournit pas). Une
+  // URL se partage, se met en favori et finit dans un historique : elle ne doit donc rien
+  // porter du domicile.
+
+  it("est le milieu des épingles, jamais un point de référence", () => {
+    const c = centreDuCadrage({ latMin: 46.7, latMax: 46.9, lonMin: -71.4, lonMax: -71.2 })!;
+    // `toBeCloseTo` et non `toEqual` : (-71.4 + -71.2) / 2 vaut -71.30000000000001 en
+    // virgule flottante. Comparer à l'exact ferait échouer un calcul pourtant juste.
+    expect(c.lat).toBeCloseTo(46.8, 6);
+    expect(c.lon).toBeCloseTo(-71.3, 6);
+  });
+
+  it("tient sur une seule épingle", () => {
+    const c = centreDuCadrage({ latMin: 46.8, latMax: 46.8, lonMin: -71.2, lonMax: -71.2 })!;
+    expect(c.lat).toBeCloseTo(46.8, 6);
+    expect(c.lon).toBeCloseTo(-71.2, 6);
+  });
+
+  it("rend null sans cadrage plutôt qu'un point arbitraire", () => {
+    expect(centreDuCadrage(null)).toBeNull();
+  });
+
+  it("suit VRAIMENT les épingles : deux jeux distincts donnent deux centres distincts", () => {
+    // Discrimination : sans ce cas, une implémentation qui rendrait toujours le centre de
+    // Québec passerait les trois précédents.
+    const quebec = centreDuCadrage(
+      cadrage([...positions([["A", "exacte", 46.7, -71.4], ["B", "exacte", 46.9, -71.2]]).values()]
+        .map((p) => ({ ...p, ville: "Québec", entreprises: [] }))),
+    )!;
+    const montreal = centreDuCadrage({ latMin: 45.4, latMax: 45.6, lonMin: -73.7, lonMax: -73.5 })!;
+    expect(quebec.lat).toBeCloseTo(46.8, 6);
+    expect(quebec.lat).not.toBeCloseTo(montreal.lat, 1);
   });
 });

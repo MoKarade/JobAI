@@ -21,7 +21,7 @@
 // touche pas `window`, et sans elle les tuiles s'empilent en désordre sans erreur en console.
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
-import type { Epingle, EntrepriseSurCarte } from "@/lib/carte";
+import { centreDuCadrage, type Epingle, type EntrepriseSurCarte } from "@/lib/carte";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { palier } from "@/lib/scoring";
 
@@ -104,7 +104,10 @@ export function CarteOffres({
   cadre: { latMin: number; latMax: number; lonMin: number; lonMax: number } | null;
 }) {
   const conteneur = useRef<HTMLDivElement>(null);
+  /** L'instance Leaflet, pour que l'agrandissement puisse lui dire de se remesurer. */
+  const instanceRef = useRef<{ invalidateSize: () => void } | null>(null);
   const [echec, setEchec] = useState<string | null>(null);
+  const [agrandie, setAgrandie] = useState(false);
 
   useEffect(() => {
     if (!conteneur.current || !cadre || epingles.length === 0) return;
@@ -117,16 +120,24 @@ export function CarteOffres({
         const L = (await import("leaflet")).default;
         if (annule || !conteneur.current) return;
 
-        // La molette est inerte jusqu'au premier clic : sinon, faire défiler la PAGE zoome
-        // la carte dès que le pointeur la survole — le piège classique des cartes pleine
-        // largeur. Après un clic, l'intention est claire, le zoom molette s'active.
+        // MOLETTE ACTIVE (demande de Marc, 2026-07-31). Elle était inerte jusqu'au premier
+        // clic pour éviter le piège classique — faire défiler la page zoome la carte dès
+        // que le pointeur la survole. Le compromis retenu : la molette répond tout de
+        // suite, et le bouton « Agrandir » donne une carte assez haute pour qu'on n'ait
+        // plus à la traverser au défilement. Si le défilement de page devient pénible,
+        // c'est cette ligne qu'il faut revoir, pas la molette qu'il faut supprimer.
+        //
         // `keyboard: false` : le conteneur est `aria-hidden`, et Leaflet pose sinon
         // `tabIndex=0` dessus — un élément focalisable au clavier mais invisible aux
         // lecteurs d'écran est un piège (WCAG 4.1.2). Toute l'information est dans la
         // liste sous la carte, qui est le VRAI accès clavier.
-        const instance = L.map(conteneur.current, { scrollWheelZoom: false, keyboard: false });
-        instance.once("click", () => instance.scrollWheelZoom.enable());
+        const instance = L.map(conteneur.current, { scrollWheelZoom: true, keyboard: false });
         carte = instance;
+        instanceRef.current = instance;
+
+        // L'échelle : sans elle, « proche » et « loin » se jugent à l'œil, alors que la
+        // distance est le critère numéro un de Marc.
+        L.control.scale({ imperial: false, metric: true }).addTo(instance);
 
         // Même logique pour ce que Leaflet injecte de focalisable (boutons de zoom,
         // liens d'attribution, liens des fenêtres) : hors du parcours clavier, puisque
@@ -142,7 +153,9 @@ export function CarteOffres({
         instance.on("popupopen", neutraliserTab);
 
         L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 18,
+          // 19 : le niveau où les numéros de porte apparaissent. C'est le maximum que
+          // publie OpenStreetMap — au-delà, les tuiles n'existent pas.
+          maxZoom: 19,
           // La mention de source est une OBLIGATION de la licence des tuiles, pas un ornement.
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         }).addTo(instance);
@@ -196,11 +209,26 @@ export function CarteOffres({
 
     return () => {
       annule = true;
+      instanceRef.current = null;
       carte?.remove();
     };
   }, [epingles, cadre]);
 
   if (epingles.length === 0 || !cadre) return null;
+
+  // Le centre du cadrage — il sert au lien trafic. Il se déduit des seules ENTREPRISES,
+  // jamais du domicile (garde-fou n°1), exactement comme `cadrage`.
+  const centre = centreDuCadrage(cadre)!;
+  const lienTrafic = `https://www.google.com/maps/@${centre.lat.toFixed(4)},${centre.lon.toFixed(4)},12z/data=!5m1!1e1`;
+
+  function basculerTaille() {
+    setAgrandie((a) => !a);
+    // Leaflet mesure son conteneur au montage : après un changement de hauteur, il faut le
+    // lui dire, sinon les tuiles restent calées sur l'ancienne taille et laissent des
+    // bandes grises. `requestAnimationFrame` attend que le navigateur ait appliqué la
+    // nouvelle classe — appelé trop tôt, il remesurerait l'ancienne.
+    requestAnimationFrame(() => instanceRef.current?.invalidateSize());
+  }
 
   return (
     <>
@@ -209,9 +237,44 @@ export function CarteOffres({
           {echec}
         </p>
       ) : null}
+
+      {/* Ces contrôles sont HORS du conteneur `aria-hidden` : ce sont de vrais boutons,
+          utilisables au clavier et annoncés. */}
+      <div className="carte-outils">
+        <button
+          type="button"
+          className="filtre"
+          onClick={basculerTaille}
+          aria-pressed={agrandie}
+        >
+          {agrandie ? "Réduire la carte" : "Agrandir la carte"}
+        </button>
+
+        {/* LE TRAFIC N'EXISTE PAS SUR CETTE CARTE, et c'est une limite, pas un oubli.
+            OpenStreetMap publie un fond de carte, pas de données de circulation ; les
+            seules sources (Google, TomTom, HERE) exigent une clé d'API, et une carte
+            Google a déjà été écartée de ce projet. Plutôt qu'une couche vide ou une
+            estimation inventée, un lien vers Google Maps centré sur la région, où le
+            trafic habituel est réel. Le lien ne porte QUE le centre des entreprises —
+            jamais le domicile. */}
+        <a
+          href={lienTrafic}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="filtre"
+          title="OpenStreetMap ne fournit pas de données de circulation : le trafic s’affiche dans Google Maps."
+        >
+          Trafic dans Google Maps ↗
+        </a>
+      </div>
+
       {/* `aria-hidden` : une carte de tuiles n'est pas explorable au lecteur d'écran. La
           liste sous la carte porte exactement la même information, elle, accessible. */}
-      <div ref={conteneur} className="carte-offres" aria-hidden="true" />
+      <div
+        ref={conteneur}
+        className={`carte-offres${agrandie ? " carte-offres--agrandie" : ""}`}
+        aria-hidden="true"
+      />
     </>
   );
 }
