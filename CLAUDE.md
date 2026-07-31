@@ -235,6 +235,19 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   de ce que le traitement n'a jamais vu lui-même (les entrées saisies à la main ne relèvent
   pas d'une requête automatique). Sans la troisième, un balayage vide périmait les 29 offres
   d'un coup — mesuré, pas supposé.
+- **« Redeploy » rejoue le commit du déploiement existant, PAS le dernier commit.** Vécu le
+  2026-07-31 : `CRON_SECRET` posé, redéploiement fait, tout semblait en place — mais la
+  production servait encore le commit précédent, et le code de la veille n'était nulle part.
+  Le webhook GitHub → Vercel avait manqué le push, et un redéploiement ne le rattrape pas :
+  il rejoue le MÊME commit avec les nouvelles variables. Vérifier un déploiement, c'est donc
+  comparer le SHA servi au SHA attendu (`latestDeployment` / `githubCommitSha`), jamais se
+  fier au fait qu'un déploiement récent existe. Même famille que « CI verte ≠ code en
+  production » : le statut d'une opération ne dit pas ce qui tourne.
+- **Le FORMAT d'une erreur dit d'où elle vient.** `{"error":"non_authentifie"}` est le
+  middleware ; `{"ok":false,"erreur":"non autorisé"}` est la route. Recevoir le premier là
+  où on attend le second prouve que la requête n'atteint jamais la route — donc que le code
+  n'est pas déployé, pas que le secret est faux. Distinguer les messages d'erreur par
+  couche, c'est se donner un diagnostic gratuit.
 - **Un seuil se pose sur la composante qui MESURE, pas sur le total.** Un plancher sur la
   note globale ne filtrait rien : « Caissier » et « Préposé à l'entretien ménager » notent
   48/100, parce que les points accordés aux INCONNUES (distance non mesurée, salaire non
