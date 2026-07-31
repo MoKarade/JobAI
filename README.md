@@ -1,8 +1,8 @@
 # JobAI
 
-Suivi et analyse de recherche d'emploi dans la région de Québec : offres notées selon un
-barème pondéré par le profil, statuts de candidature, détection des réponses de recruteurs,
-et assistance IA pour l'analyse d'offres et la rédaction de CV et lettres ciblés.
+Suivi de recherche d'emploi dans la région de Québec : offres notées selon un barème pondéré
+par le profil, distance depuis le domicile, carte des lieux, statuts de candidature et suivi
+des relances.
 
 App de l'écosystème hub perso, aux côtés de FinanceAI, DriveAI et BatchChef.
 Destination : **`emploi.hubperso.com`**. Widget publié au hub via
@@ -14,20 +14,43 @@ Destination : **`emploi.hubperso.com`**. Widget publié au hub via
 
 ## État
 
-**Chantier #00 — bootstrap.** Le fork est personnalisé et l'endpoint hub répond, mais rien
-n'est déployé : ni base de données, ni auth utilisateur, ni interface. Le suivi vit encore
-dans un artifact HTML autonome, hors du dépôt.
+**En service, avec des données réelles.** Base Neon branchée, migrations appliquées
+automatiquement au démarrage, auth Google mono-adresse, interface livrée. Le premier lot réel
+de la veille est arrivé le 2026-07-31 (45 offres reçues, 40 ajoutées).
 
-L'état courant fait foi dans **[`HANDOVER.md`](./HANDOVER.md)** — à lire en premier.
-Les tâches sont dans [`BACKLOG.md`](./BACKLOG.md), les décisions dans [`docs/adr/`](./docs/adr/).
+L'état courant fait foi dans **[`HANDOVER.md`](./HANDOVER.md)** — à lire en premier, il est
+plus fin et plus à jour que ce README. Les tâches sont dans [`BACKLOG.md`](./BACKLOG.md),
+les décisions dans [`docs/adr/`](./docs/adr/).
 
 ## Ce qui est branché aujourd'hui
 
-- **`app/api/hub/summary/route.ts`** — endpoint consommé par le hub. Vérifie `x-hub-token` en
-  temps constant, répond en `Cache-Control: no-store`, et renvoie un summary honnêtement
-  `building` tant qu'aucune donnée réelle n'existe.
-- **`lib/hubToken.ts`** — comparaison de jeton en temps constant (SHA-256 + `timingSafeEqual`).
-- TypeScript strict, tests Vitest validés contre le **vrai** schéma du contrat.
+- **Suivi des offres** — notation pondérée par le profil, statuts de candidature, filtres,
+  export. Interface : accueil (`/`), fiche d'offre (`/offre/[id]`), carte (`/carte`),
+  références (`/references`).
+- **Veille** — `POST /api/ingest/depot` reçoit des lots d'offres (une Routine claude.ai
+  envoie, l'app trie : filtre régional, plancher de score, dédoublonnage). Le cron
+  `/api/cron/veille` applique les mêmes règles. ⚠️ Les sources automatiques sont mortes
+  (Guichet-Emplois 404, ATS américains sans employeur local, pas de flux chez Jobillico /
+  Québec emploi / Isarta) — le dépôt est aujourd'hui le vrai chemin d'entrée.
+- **Distance et carte** — domicile géocodé une fois et conservé en base, mesure automatique
+  après réponse, bornée à une passe / 5 min.
+- **Migrations automatiques** (`lib/migrations.ts`) — appliquées au démarrage, mémorisées par
+  processus. Aucune commande à lancer à la main après un déploiement.
+- **Endpoint hub** (`app/api/hub/summary/route.ts`) — jeton `x-hub-token` vérifié en temps
+  constant, `Cache-Control: no-store`, summary honnêtement `building` tant qu'aucune donnée
+  réelle n'existe.
+- TypeScript strict, **473 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
+
+### Ce qui n'existe PAS encore
+
+À dire explicitement, parce que ce README a déjà menti dans l'autre sens : **il n'y a aucun
+appel LLM dans l'app**. Pas de SDK Anthropic, pas d'analyse d'offre par IA, pas de rédaction
+de CV ou de lettre. La notation est un barème déterministe. JobAI n'a donc **aucun coût d'API
+à publier** au bloc `usage` du contrat, et apparaît légitimement « non suivie » dans la page
+« Coûts & quotas » du hub — une absence honnête, pas un oubli.
+
+Le suivi des relances (`lib/relances.ts`, seuils 14 j / 45 j) est **codé et testé mais pas
+branché à l'interface** : la logique existe, rien ne l'affiche encore.
 
 ## Contrat d'échec du endpoint
 
@@ -68,8 +91,16 @@ node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
 ```
 
 La **même** valeur doit être posée dans `HUB_TOKEN` (côté JobAI) et `HUB_TOKEN_JOBAI`
-(côté hub). Déclarer aussi l'app dans `lib/sources.ts` du dépôt Hubperso — c'est du **code**,
-donc ça exige un redéploiement du hub, pas seulement une variable d'environnement.
+(côté hub). L'app est déjà déclarée dans `lib/sources.ts` du dépôt Hubperso — c'est du **code**,
+donc toute modification exige un redéploiement du hub, pas seulement une variable d'environnement.
+
+### Version du contrat
+
+`@mokarade/hub-contract` est épinglé sur un **SHA de commit**, pas sur un tag : le tag `v1.1.0`
+n'a jamais pu être poussé (le proxy git de l'environnement d'exécution refuse les push de tags,
+403). Les quatre apps du hub épinglent donc le **même** SHA `2d37a61…` — c'est le contenu de
+la v1.1.0 (bloc `usage` additif). Ne pas revenir à `#v1.0.0` : cette version ignore le bloc
+`usage` et une app qui la consomme ne peut pas publier ses coûts le jour où elle en a.
 
 ## CORS : rien à faire
 
