@@ -19,7 +19,7 @@
 //     quel nom. D'où le TÉMOIN NÉGATIF : on interroge un nom d'entreprise absurde, et si
 //     l'ATS répond pareil que pour une vraie, c'est que sa réponse ne prouve rien.
 
-import { RECHERCHES_GUICHET, entetes, jetonProbable, urlAts } from "../lib/ingest/sources";
+import { RECHERCHES_GUICHET_CANDIDATES, entetes, jetonProbable, urlAts } from "../lib/ingest/sources";
 import { analyseurAts } from "../lib/ingest/sources";
 import { analyserRss } from "../lib/ingest/analyseurs";
 import { FAMILLES_ATS, type FamilleAts } from "../lib/ingest/types";
@@ -69,7 +69,7 @@ function urlsCandidatesGuichet(recherche: string): { nom: string; url: string }[
 
 async function bancEssaiGuichet(): Promise<void> {
   console.log("\n═══ BANC D'ESSAI — quelle URL du Guichet-Emplois répond ? ═══\n");
-  const recherche = RECHERCHES_GUICHET[0]!;
+  const recherche = RECHERCHES_GUICHET_CANDIDATES[0]!;
 
   for (const c of urlsCandidatesGuichet(recherche)) {
     try {

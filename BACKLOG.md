@@ -462,10 +462,30 @@
         sans attendre. Le script appelle désormais le MÊME `appliquerSeed` que l'app.
       · Migration `drizzle/0003_*.sql`. 13 tests dédiés, 371 au total.
 
-- [x] 🔧 **`[INGEST-01]`** **Veille quotidienne automatique, multi-sources** (demande Marc
+- [ ] 🔧 **`[INGEST-01]`** **Veille quotidienne automatique, multi-sources** (demande Marc
       2026-07-30 : « je veux que automatiquement chaque jour ça se fasse », « au moins 6 sites
-      + les sites d'entreprises directement »). ✅ 2026-07-30 — l'app le fait seule, chaque
-      jour à 7 h (heure du Québec), via un cron Vercel.
+      + les sites d'entreprises directement »).
+      ⚠️ **RE-OUVERT le 2026-07-31 — la MÉCANIQUE tourne, les SOURCES ne rapportent rien.**
+      Le cron, l'authentification, le tri, la péremption et l'écriture sont déployés et
+      vérifiés en production. Mais deux sondes sur les VRAIES sources ont montré qu'il n'y a
+      rien à récolter par cette voie. Cocher cet item aurait fait croire à une veille qui
+      fonctionne : elle s'exécute, elle ne trouve rien.
+      · **Guichet-Emplois : aucune adresse ne répond.** Cinq formes testées — deux 404, deux
+        délais dépassés, une page HTML « Temporary Foreign Workers Search ». Il n'expose pas
+        de flux public, et les délais suggèrent qu'il ralentit les appels automatisés.
+        Désactivé, avec la preuve écrite dans `lib/ingest/sources.ts`. Piste suivante : leur
+        API partenaire, qui demande une clé.
+      · **ATS : les employeurs de la région n'y sont pas.** Après correction du témoin
+        négatif, 10 pages vérifiées au lieu de 36 — dont 7 vides, Dexterra (100 offres,
+        toutes hors Québec) et deux HOMONYMES néerlandais (« ace », « robert » à Amsterdam).
+        **Zéro offre locale.** Les PME de Québec publient sur Indeed et Jobillico, pas sur
+        des ATS américains.
+      · ✅ Ce qui est acquis et vérifié : le filtre géographique (106 brutes → 0 retenue, tout
+        le hors-région écarté), le témoin négatif, le rapport par source, et la mécanique
+        complète. Le jour où une source locale sera trouvée, tout est prêt à la recevoir.
+      · **La seule source qui produit reste Indeed** — 9 offres réelles le 30/07, annonces
+        lues, 3 écartées à raison. Elle exige une Routine claude.ai avec le connecteur.
+      Suite : `[INGEST-02]`.
       · 👤 **ACTION REQUISE, une seule fois** : poser **`CRON_SECRET`** dans les variables
         Vercel (Production) et **`npm run db:migrate`** pour la table `sync_state`. Sans le
         secret, la route répond **503** — une route qui ÉCRIT ne s'ouvre jamais par oubli.

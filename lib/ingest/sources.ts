@@ -63,8 +63,30 @@ function messageErreur(err: unknown): string {
   return String(err);
 }
 
-/** Les recherches lancées sur le Guichet-Emplois, alignées sur le profil de Marc. */
-export const RECHERCHES_GUICHET = [
+/**
+ * Les recherches du Guichet-Emplois — DÉSACTIVÉES le 2026-07-31.
+ *
+ * ⚠️ MESURÉ, PAS SUPPOSÉ : aucune URL de flux ne répond. Cinq formes testées sur un runner
+ * au réseau ouvert (`scripts/sonder-sources.ts`, banc d'essai) :
+ *   · `jobsearch/rss?…`                    → 404
+ *   · `rss?…`                              → 404
+ *   · `jobsearch/jobsearch?fsrc=32&…`      → 200, mais une page HTML « Temporary Foreign
+ *                                             Workers Search » : pas un flux
+ *   · `guichetemplois.gc.ca/rechercheemploi/rss` → délai dépassé
+ *   · `jobsearch/jobsearch?…` (page)       → délai dépassé
+ *
+ * Le Guichet-Emplois n'expose donc pas de flux public à ces adresses, et les délais
+ * dépassés suggèrent qu'il ralentit les appels automatisés. Les laisser dans la liste
+ * active ferait huit requêtes vouées à l'échec chaque matin — du bruit dans le rapport,
+ * et l'habitude de voir des sources en erreur.
+ *
+ * Le code d'analyse RSS reste en place et testé : il servira le jour où une adresse
+ * valide sera trouvée (leur API partenaire, sur clé, est la piste suivante).
+ */
+export const RECHERCHES_GUICHET: readonly string[] = [];
+
+/** Ce qu'on interrogerait si le flux répondait. Gardé pour le banc d'essai de la sonde. */
+export const RECHERCHES_GUICHET_CANDIDATES = [
   "coordonnateur de projets",
   "chargé de projet",
   "superviseur maintenance",

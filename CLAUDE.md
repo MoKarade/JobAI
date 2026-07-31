@@ -248,6 +248,22 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   où on attend le second prouve que la requête n'atteint jamais la route — donc que le code
   n'est pas déployé, pas que le secret est faux. Distinguer les messages d'erreur par
   couche, c'est se donner un diagnostic gratuit.
+- **Un HTTP 200 ne prouve rien tant qu'on n'a pas mesuré ce que l'API répond à une question
+  ABSURDE.** La découverte de pages carrières annonçait « 36 entreprises trouvées » : c'était
+  faux, le code prenait un 200 pour une preuve. Un TÉMOIN NÉGATIF a tranché en une requête —
+  on interroge un nom qu'aucune entreprise ne porte : Greenhouse, Lever, Recruitee et
+  Workable répondent 404 (leur réponse est donc exploitable), SmartRecruiters répond 200
+  (la sienne ne vaut rien sans offres réelles). Avant de croire un signal de présence,
+  vérifier ce que la source répond à une ABSENCE.
+- **Un identifiant deviné trouve des homonymes, et ils sont crédibles.** `recruitee/ace` et
+  `recruitee/robert` ont bien répondu — avec des postes à Amsterdam. Une résolution par nom
+  normalisé n'a aucune valeur tant que le CONTENU n'a pas été confronté à ce qu'on attend
+  (ici la région) : deux vérifications indépendantes, jamais une seule.
+- **Ne jamais laisser tourner une source prouvée morte.** Le flux du Guichet-Emplois répond
+  404 sur toutes les adresses testées. Le garder dans la liste active ferait huit requêtes
+  vouées à l'échec chaque matin : du bruit dans le rapport, et surtout l'habitude de voir des
+  sources en erreur — après quoi une vraie panne ne se remarque plus. Désactiver, avec la
+  preuve écrite à côté.
 - **Un seuil se pose sur la composante qui MESURE, pas sur le total.** Un plancher sur la
   note globale ne filtrait rien : « Caissier » et « Préposé à l'entretien ménager » notent
   48/100, parce que les points accordés aux INCONNUES (distance non mesurée, salaire non
