@@ -30,5 +30,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Sonder
+      - name: Sonder les sources actuelles
         run: npx tsx scripts/sonder-sources.ts
+
+      - name: Sonder les sources québécoises
+        run: npx tsx scripts/sonder-quebec.ts
