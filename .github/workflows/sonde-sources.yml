@@ -1,0 +1,34 @@
+# Sonde des sources d'offres — à la demande, lecture seule.
+#
+# La session de développement n'a aucun accès sortant : les analyseurs d'ingestion y sont
+# testés sur des formats documentés, jamais sur une vraie réponse. Ce workflow tourne là où
+# le réseau est ouvert et confronte le code au réel.
+#
+# Il n'a AUCUN secret et n'écrit nulle part : ni base, ni dépôt. On peut donc le relancer
+# autant qu'on veut, et il ne peut rien abîmer.
+
+name: Sonde des sources
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sonder:
+    name: Interroger les sources et rapporter
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Sonder
+        run: npx tsx scripts/sonder-sources.ts
