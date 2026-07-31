@@ -611,7 +611,13 @@
       que le clic ne pouvait pas honorer, un doublon d'épingle, et l'extraction du rattrapage
       de ville en fonction pure testée. Détail dans le message de commit.
 
-- [ ] 🔧 **`[DIST-02]`** **`lib/distances.ts` ne connaît pas les alias d'entreprise.**
+- [x] 🔧 **`[DIST-02]`** **`lib/distances.ts` ne connaît pas les alias d'entreprise.**
+      *Livré le 2026-07-31* : la règle vit dans `lib/employeurs.ts` (`apparier`, `positionDe`)
+      et les trois consommateurs l'appellent. Discrimination prouvée — les deux tests de
+      non-régression tombent sur l'ancienne comparaison littérale. Deux culs-de-sac fermés
+      dans la foulée : la ville est saisissable à l'ajout manuel (une offre hors cibles était
+      insituable à vie), et le rattrapage de ville s'applique aussi à la veille quotidienne.
+      *Description d'origine :*
       `construireVue` rapproche « Laserax » et « Laserax inc. » (`apparier`), mais
       `employeursASituer` et `planifierDistances` comparent les noms LITTÉRALEMENT. Une
       offre dont l'employeur est déjà situé sous son nom canonique peut donc être

@@ -386,6 +386,15 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   répondait « à jour » et la correction ne partait jamais en base. Quand on corrige un champ
   oublié, RECENSER toutes les listes qui l'énumèrent — écriture, empreinte, sérialisation,
   export — et vérifier chacune par une sonde, pas par un raisonnement sur sa finalité.
+- **Un écart « assumé par un commentaire » reste un écart.** Le rattrapage de ville
+  n'existait que dans le point de dépôt, et un commentaire disait que le cron ne le faisait
+  pas — ce qui laissait la veille quotidienne aveugle au même manque, pour la seule raison
+  qu'on avait codé le remède ailleurs. Écrire « c'est voulu » ne rend pas une lacune
+  voulue : ou bien le second chemin n'en a réellement pas besoin, et on dit POURQUOI, ou
+  bien il en a besoin et le commentaire ne fait que différer le travail. Même chose pour un
+  cul-de-sac silencieux : une offre saisie sans ville était insituable À VIE, `ville`
+  n'étant modifiable nulle part — une donnée qu'on ne peut ni fournir ni corriger n'est pas
+  une limite de produit, c'est un défaut.
 - **Un travail de fond a besoin d'un gate qui CONVERGE, pas d'un gate qui a l'air juste.**
   « Cet employeur n'a pas de position » se code en comparant son nom à la table des
   positions — et ne s'éteint jamais quand la position est inscrite sous un autre nom
