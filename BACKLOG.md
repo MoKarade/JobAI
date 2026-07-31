@@ -545,6 +545,31 @@
         le marché de Québec. Les employeurs d'ici publient sur Indeed, et Indeed n'est
         accessible que depuis une session Claude.
 
+- [x] 🔧 **`[INGEST-04/05]`** **La veille FONCTIONNE — premier vrai lot le 2026-07-31.**
+      45 offres réelles reçues, **40 ajoutées** (38 → 78 actives). HTTP 200 vérifié
+      indépendamment dans les journaux Vercel, pas seulement dans le rapport du déposant.
+      · **Le blocage était mal posé.** Une Routine claude.ai a le connecteur Indeed mais
+        AUCUN accès au dépôt GitHub (jeton de session ≠ compte de Marc) ; ma session de
+        développement a le dépôt mais aucun réseau sortant. Chacune détenait la moitié.
+        La solution n'était pas de donner à l'une ce qui manquait, mais de constater que
+        **les offres n'ont pas à passer par un commit** : `POST /api/ingest/depot`, tout
+        va en base.
+      · **Le tri a fait son travail sur du réel** : 0 hors-région, 2 sans lieu, 2 sous le
+        plancher (Magasinier, Analyste ventes — hors profil), 1 doublon. Et **une offre
+        périmée a été RESSUSCITÉE** : le mécanisme de résurrection a tourné sur du vrai.
+      · **Défaut corrigé dans la foulée** : l'endpoint comptait les refus sans les nommer.
+        « 5 écartées » ne se vérifie pas — Marc aurait dû rouvrir chaque lien, c'est-à-dire
+        refaire à la main ce que la veille doit lui épargner. Chaque refus porte maintenant
+        son motif, et un test vérifie que compteurs et liste nommée concordent.
+      · ⚠️ **Rate limit Indeed — le vrai risque opérationnel**, mesuré par le déposant :
+        fenêtre GLISSANTE d'environ 45 s, réarmée par CHAQUE tentative, même refusée.
+        8 offres sur 53 n'ont pas pu être lues. Le prompt de la Routine doit lire par lots
+        de 10 avec 60 s de pause, et 90 s d'arrêt complet après un throttle. Une offre non
+        lue n'est JAMAIS envoyée — la règle a tenu sous pression, c'est ce qui compte.
+      · Ce qui reste vrai de `[INGEST-01]` : aucune source AUTOMATIQUE (Guichet-Emplois,
+        ATS, sites québécois) ne couvre le marché de Québec. Indeed via Routine est la
+        seule voie qui produit — et elle produit.
+
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
       · **Guichet-Emplois** — flux XML officiel d'EDSC, sur demande. C'est la source

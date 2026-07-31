@@ -248,6 +248,18 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   où on attend le second prouve que la requête n'atteint jamais la route — donc que le code
   n'est pas déployé, pas que le secret est faux. Distinguer les messages d'erreur par
   couche, c'est se donner un diagnostic gratuit.
+- **Quand deux acteurs détiennent chacun la moitié d'un accès, la solution n'est pas de
+  compléter l'un — c'est de vérifier que l'accès manquant est nécessaire.** Une Routine a
+  Indeed sans le dépôt GitHub ; ma session a le dépôt sans réseau. J'ai d'abord cherché à
+  donner le dépôt à la Routine. La vraie question était : les offres doivent-elles passer
+  par un commit ? Non — elles vont en base. Un point d'entrée HTTP a fait disparaître le
+  blocage au lieu de le contourner. Avant de chercher à élargir une permission, se demander
+  si le chemin qui l'exige est le bon.
+- **Compter un refus ne suffit pas : il faut le NOMMER.** « 5 écartées » ne se vérifie pas —
+  ça ne dit pas si le filtre a bien travaillé ou s'il vient de jeter la meilleure offre du
+  jour, et le seul moyen de trancher serait de tout rouvrir à la main : exactement ce que
+  l'automatisation doit épargner. Tout rejet automatique porte son motif et son objet. Deux
+  façons de compter la même réalité (total et liste) se vérifient l'une l'autre par test.
 - **Un flux VALIDE n'est pas un flux UTILE : lire le contenu, pas le format.** Le RSS
   d'Espresso-Jobs répond 200, en XML bien formé, avec 20 entrées — tous les voyants au vert.
   La première s'intitule « TI : peut-on encore se priver des femmes ? » : c'est leur blogue,
