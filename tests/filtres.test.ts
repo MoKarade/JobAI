@@ -5,7 +5,14 @@
 
 import { describe, it, expect } from "vitest";
 import { SEED } from "../lib/seed";
-import { FILTRES_VIDES, SEUIL_PROCHE_KM, filtrer } from "../lib/filtres";
+import type { EtatFiltres } from "../lib/filtres";
+import {
+  FILTRES_VIDES,
+  PALIERS_DISTANCE_KM,
+  filtrer,
+  sansDistanceMesuree,
+  unFiltreEstActif,
+} from "../lib/filtres";
 
 describe("filtres", () => {
   it("sans filtre, tout passe", () => {
@@ -39,12 +46,41 @@ describe("filtres", () => {
     expect(r.every((o) => o.score !== null)).toBe(true);
   });
 
-  it("« proche » exclut les distances inconnues", () => {
-    // Ici, contrairement au filtre de rayon, l'inconnu est EXCLU : « montre-moi ce qui est
-    // proche » est une demande de certitude, pas de tolérance.
-    const r = filtrer(SEED, { ...FILTRES_VIDES, proches: true });
-    expect(r.every((o) => o.km !== null && o.km <= SEUIL_PROCHE_KM)).toBe(true);
+  it("un seuil de distance exclut les distances INCONNUES", () => {
+    // « montre-moi ce qui est à 25 km » est une demande de certitude, pas de tolérance :
+    // une offre dont on ignore la distance ne peut pas y répondre. Ce que ça écarte est
+    // compté à part (`sansDistanceMesuree`) pour ne pas passer pour une absence d'offres.
+    const seuil = PALIERS_DISTANCE_KM[1]!;
+    const r = filtrer(SEED, { ...FILTRES_VIDES, distanceMaxKm: seuil });
+    expect(r.every((o) => o.km !== null && o.km <= seuil)).toBe(true);
     expect(r.every((o) => !o.histo)).toBe(true); // l'historique n'a pas de distance
+  });
+
+  it("chaque palier est plus large que le précédent", () => {
+    // Les cas DÉRIVENT des paliers : codés « 10 » et « 25 », ils mentiraient au premier
+    // ajustement de la constante.
+    const tailles = PALIERS_DISTANCE_KM.map(
+      (km) => filtrer(SEED, { ...FILTRES_VIDES, distanceMaxKm: km }).length,
+    );
+    for (let i = 1; i < tailles.length; i++) {
+      expect(tailles[i]!).toBeGreaterThanOrEqual(tailles[i - 1]!);
+    }
+    // Non vacuité : sans ça, trois zéros passeraient le test.
+    expect(tailles[tailles.length - 1]!).toBeGreaterThan(0);
+  });
+
+  it("sans seuil, aucune offre n'est écartée pour distance inconnue", () => {
+    expect(sansDistanceMesuree(SEED, FILTRES_VIDES)).toBe(0);
+  });
+
+  it("compte ce qu'un seuil écarte FAUTE DE MESURE, et pas ce qui est loin", () => {
+    const seuil = PALIERS_DISTANCE_KM[0]!;
+    const filtres = { ...FILTRES_VIDES, distanceMaxKm: seuil };
+    const attendu = SEED.filter((o) => o.perimeeLe === null && o.km === null).length;
+    expect(sansDistanceMesuree(SEED, filtres)).toBe(attendu);
+    // Non vacuité : le jeu de départ DOIT contenir des offres sans distance, sinon ce
+    // test ne mesure rien.
+    expect(attendu).toBeGreaterThan(0);
   });
 
   it("la recherche couvre l'entreprise, le poste, les notes et les justifications", () => {
@@ -70,15 +106,17 @@ describe("filtres", () => {
     const r = filtrer(SEED, {
       ...FILTRES_VIDES,
       activesSeules: true,
-      proches: true,
+      distanceMaxKm: PALIERS_DISTANCE_KM[1]!,
       notees80Plus: true,
     });
-    expect(r.every((o) => !o.histo && o.km! <= SEUIL_PROCHE_KM && o.score! >= 80)).toBe(true);
+    expect(r.every((o) => !o.histo && o.km! <= PALIERS_DISTANCE_KM[1]! && o.score! >= 80)).toBe(
+      true,
+    );
   });
 
   it("ne modifie jamais le tableau d'entrée", () => {
     const avant = SEED.map((o) => o.id);
-    filtrer(SEED, { ...FILTRES_VIDES, texte: "laserax", proches: true });
+    filtrer(SEED, { ...FILTRES_VIDES, texte: "laserax", distanceMaxKm: PALIERS_DISTANCE_KM[0]! });
     expect(SEED.map((o) => o.id)).toEqual(avant);
   });
 });
@@ -110,5 +148,35 @@ describe("offres périmées", () => {
     const histoPerimee = { ...histo, id: "histo-perimee", perimeeLe: "2026-07-20T00:00:00.000Z" };
     const r = filtrer([...SEED, histoPerimee], { ...FILTRES_VIDES, historique: true });
     expect(r.some((o) => o.id === "histo-perimee")).toBe(true);
+  });
+});
+
+describe("« un filtre est-il posé ? »", () => {
+  // La carte s'en sert pour décider si elle montre encore les entreprises cibles SANS
+  // offre. Une réponse fausse ferait croire qu'une épingle satisfait un filtre.
+
+  it("dit non quand rien n'est posé", () => {
+    expect(unFiltreEstActif(FILTRES_VIDES)).toBe(false);
+  });
+
+  it("ne prend PAS des espaces pour une recherche", () => {
+    expect(unFiltreEstActif({ ...FILTRES_VIDES, texte: "   " })).toBe(false);
+    expect(unFiltreEstActif({ ...FILTRES_VIDES, texte: " laserax " })).toBe(true);
+  });
+
+  it("répond oui pour CHAQUE filtre, un par un", () => {
+    // Un par un, pas « au moins un » : c'est ce qui attrape le filtre oublié dans la
+    // condition. Les valeurs de test sont DÉRIVÉES du type, jamais recopiées.
+    const cas: EtatFiltres[] = [
+      { ...FILTRES_VIDES, texte: "laserax" },
+      { ...FILTRES_VIDES, activesSeules: true },
+      { ...FILTRES_VIDES, notees80Plus: true },
+      { ...FILTRES_VIDES, distanceMaxKm: PALIERS_DISTANCE_KM[0]! },
+      { ...FILTRES_VIDES, historique: true },
+      { ...FILTRES_VIDES, avecPerimees: true },
+    ];
+    for (const f of cas) expect(unFiltreEstActif(f)).toBe(true);
+    // Volume prouvé : un filtre AJOUTÉ au type sans cas ici ferait tomber ce compte.
+    expect(cas).toHaveLength(Object.keys(FILTRES_VIDES).length);
   });
 });

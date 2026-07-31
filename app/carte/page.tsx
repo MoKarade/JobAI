@@ -15,19 +15,16 @@
 
 import { after } from "next/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { entreprisesLieux } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
-import { cadrage, construireVue, type PositionEntreprise } from "@/lib/carte";
+import type { PositionEntreprise } from "@/lib/carte";
 import { ENTREPRISES_CIBLES } from "@/lib/reference";
-import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
-import { SEUIL_PALIER_A, SEUIL_PALIER_B, palier } from "@/lib/scoring";
+import { SEUIL_PALIER_A, SEUIL_PALIER_B } from "@/lib/scoring";
 import { classerPanne, type Panne } from "@/lib/panne";
 import { Cadre } from "@/components/Cadre";
-import { CarteOffres } from "@/components/CarteOffres";
-import { BoutonSituer } from "@/components/BoutonSituer";
+import { CarteFiltrable } from "@/components/CarteFiltrable";
 import { mesurerDistances, passeGeocodage } from "@/lib/actions";
 import {
   CLE_DISTANCES,
@@ -172,21 +169,6 @@ export default async function PageCarte() {
     );
   }
 
-  const vue = construireVue(offres, ENTREPRISES_CIBLES, positions);
-  const cadre = cadrage(vue.epingles);
-  const situees = vue.epingles.reduce((n, e) => n + e.entreprises.length, 0);
-  const exactes = vue.epingles
-    .filter((e) => e.precision === "exacte")
-    .reduce((n, e) => n + e.entreprises.length, 0);
-  const offresAffichees = vue.epingles.reduce(
-    (n, e) => n + e.entreprises.reduce((m, x) => m + x.offres.length, 0),
-    0,
-  );
-  // Le DÉNOMINATEUR : les offres vivantes que la carte ne montre pas encore (cibles à
-  // situer, employeurs hors cibles) doivent se compter — la revue a montré que le compte
-  // sans dénominateur masquait jusqu'à 5 offres actives sans aucun signal.
-  const offresVivantes = offres.filter((o) => !o.histo && o.perimeeLe === null).length;
-
   return (
     <Cadre actif="/carte" titre="Carte des offres">
       <p className="intro-section">
@@ -194,16 +176,6 @@ export default async function PageCarte() {
         en <strong>pointillé</strong> regroupe celles qu’OpenStreetMap ne connaît pas, posées
         au centre de leur ville — la position est alors approximative, et la fiche le dit.
         Clique une épingle pour l’entreprise, ses offres et le trajet.
-      </p>
-
-      {/* Le compte AVANT la carte : savoir ce qui est précis, approximatif et manquant
-          change la lecture de ce qu'on regarde. */}
-      <p className="carte__compte">
-        {situees} entreprise{situees > 1 ? "s" : ""} sur la carte ({exactes} précise
-        {exactes > 1 ? "s" : ""}, {situees - exactes} au centre-ville) ·{" "}
-        {offresAffichees} offre{offresAffichees > 1 ? "s" : ""} active
-        {offresAffichees > 1 ? "s" : ""} rattachée{offresAffichees > 1 ? "s" : ""} sur{" "}
-        {offresVivantes}.
       </p>
 
       {/* Les couleurs des cercles portent le palier : la légende le DIT, avec les seuils
@@ -228,100 +200,15 @@ export default async function PageCarte() {
         <span>pointillé = position approximative</span>
       </p>
 
-      {/* Le compte du bouton est celui des CIBLES, pas de `vue.aSituer` : le clic appelle
-          `passeGeocodage`, qui ne traite que les entreprises cibles. Annoncer 37 pour une
-          action qui n'en résout que 36 ferait attendre un effet qui ne viendra pas — les
-          employeurs venus de l'ingestion se situent par la mesure des distances, en fond.
-          Ce qu'il reste est dit sous la carte, avec le bon remède. */}
-      <BoutonSituer restantes={ciblesManquantes} />
-
-      <CarteOffres epingles={vue.epingles} cadre={cadre} />
-
-      {vue.epingles.length === 0 ? (
-        <div className="etat">
-          <h2>Aucune entreprise située pour l’instant</h2>
-          <p>
-            {vue.aSituer.length > 0
-              ? "Les entreprises n’ont pas encore été localisées. Le bouton ci-dessus lance une passe."
-              : "Aucune entreprise cible n’est définie dans les Références."}
-          </p>
-        </div>
-      ) : (
-        // La même information que la carte, LISIBLE AU CLAVIER ET AU LECTEUR D'ÉCRAN. Une
-        // carte de tuiles n'est pas explorable autrement ; sans cette liste, la page serait
-        // inutilisable pour qui n'utilise pas la souris.
-        <ul className="carte-liste">
-          {vue.epingles.flatMap((e) =>
-            e.entreprises.map((x) => {
-              const trajet = lienTrajetGoogleMaps(x.nom);
-              return (
-                <li key={x.nom} className="carte-liste__ville">
-                  <h2 className="carte-liste__titre">
-                    {x.nom}{" "}
-                    <span className="carte-liste__n">
-                      {x.ville}
-                      {e.precision === "ville" ? " · position approximative" : ""}
-                    </span>
-                  </h2>
-                  {/* La liste porte TOUT ce que la fenêtre de la carte porte — distance
-                      de référence et lecture comprises : c'est elle, l'accès clavier et
-                      lecteur d'écran, pas un résumé appauvri. */}
-                  <p className="carte-liste__faits">
-                    {x.km === null
-                      ? "distance non mesurée"
-                      : `${String(x.km).replace(".", ",")} km du domicile (mesuré)`}
-                  </p>
-                  {x.lecture ? <p className="carte-liste__lecture">{x.lecture}</p> : null}
-                  {x.offres.length > 0 ? (
-                    <ul>
-                      {x.offres.map((o) => (
-                        <li
-                          key={o.id}
-                          className={`carte-liste__offre carte-liste__offre--${palier(o.score)}`}
-                        >
-                          <Link href={`/offre/${o.id}`}>{o.poste}</Link>
-                          <span className="carte-liste__faits">
-                            {o.score === null ? "note –" : `${o.score}/100`}
-                            {o.km === null ? "" : ` · ${String(o.km).replace(".", ",")} km`}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="carte-liste__faits">Aucune offre active repérée.</p>
-                  )}
-                  {trajet ? (
-                    <a
-                      href={trajet}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="carte-liste__trajet"
-                      aria-label={`Trajet vers ${x.nom} dans Google Maps`}
-                    >
-                      Trajet dans Google Maps ↗
-                    </a>
-                  ) : null}
-                </li>
-              );
-            }),
-          )}
-        </ul>
-      )}
-
-      {vue.aSituer.length > 0 ? (
-        <p className="carte__manquants">
-          Pas encore situé{vue.aSituer.length > 1 ? "es" : "e"} — la prochaine passe de
-          localisation s’en charge : {vue.aSituer.join(", ")}.
-        </p>
-      ) : null}
-
-      {vue.sansLieu.length > 0 ? (
-        <p className="carte__manquants">
-          Hors de la carte faute de ville annoncée par la source :{" "}
-          {vue.sansLieu.join(", ")}. Aucune passe n’y changera rien — la ville doit venir de
-          l’offre.
-        </p>
-      ) : null}
+      {/* Le filtrage et l'assemblage des épingles vivent côté client : c'est ce qui rend
+          les filtres instantanés ET identiques à ceux de la liste (`construireVue` est
+          pure, elle tourne aussi bien ici que sur le serveur). */}
+      <CarteFiltrable
+        offres={offres}
+        cibles={[...ENTREPRISES_CIBLES]}
+        positions={[...positions.entries()]}
+        ciblesManquantes={ciblesManquantes}
+      />
     </Cadre>
   );
 }

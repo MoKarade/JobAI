@@ -1,0 +1,135 @@
+"use client";
+
+// components/CarteFiltrable.tsx — la carte, avec les MÊMES filtres que la liste.
+//
+// POURQUOI CE COMPOSANT EXISTE
+// Demande de Marc (2026-07-31) : « je veux pouvoir filtrer dans la carte aussi, par distance
+// et par tout le reste des filtres, et je veux que les filtres soient les mêmes partout ».
+// La page carte était entièrement rendue côté serveur ; filtrer y demandait un aller-retour
+// par clic. Ici, la page passe les offres et les positions, et le filtrage se fait en
+// mémoire — le volume est de quelques dizaines de lignes.
+//
+// UNE SEULE RÈGLE POUR DEUX SURFACES
+// `filtrer` (pure, testée) et la barre `Filtres` sont EXACTEMENT celles de la liste. Rien
+// n'est réimplémenté ici : un second filtrage « équivalent » finirait par ne plus l'être,
+// et la carte se mettrait à montrer autre chose que la liste sans que rien ne le signale.
+//
+// `construireVue` est pure : elle tourne aussi bien ici que sur le serveur. C'est ce qui
+// permet de recalculer les épingles à chaque frappe sans rien redemander.
+//
+// GARDE-FOU N°1 : le domicile n'entre pas ici — ni en props, ni dans le cadrage, qui se
+// déduit des seules épingles. Le trajet passe par un lien Google Maps qui ne porte que la
+// destination.
+
+import { useMemo, useState } from "react";
+import type { EntrepriseCible } from "@/lib/reference";
+import type { Offre } from "@/lib/types";
+import { cadrage, construireVue, type PositionEntreprise } from "@/lib/carte";
+import {
+  FILTRES_VIDES,
+  filtrer,
+  sansDistanceMesuree,
+  unFiltreEstActif,
+  type EtatFiltres,
+} from "@/lib/filtres";
+import { CompteFiltre, Filtres } from "./Filtres";
+import { CarteOffres } from "./CarteOffres";
+import { ListeCarte } from "./ListeCarte";
+import { BoutonSituer } from "./BoutonSituer";
+
+export function CarteFiltrable({
+  offres,
+  cibles,
+  positions,
+  ciblesManquantes,
+}: {
+  offres: Offre[];
+  cibles: EntrepriseCible[];
+  /** Positions déjà géocodées, sérialisées par la page (une `Map` ne traverse pas). */
+  positions: [string, PositionEntreprise][];
+  /** Ce que le bouton « Situer » peut réellement traiter — les cibles, pas les employeurs. */
+  ciblesManquantes: number;
+}) {
+  const [filtres, setFiltres] = useState<EtatFiltres>(FILTRES_VIDES);
+
+  const table = useMemo(() => new Map(positions), [positions]);
+  const retenues = useMemo(() => filtrer(offres, filtres), [offres, filtres]);
+  const sansDistance = useMemo(() => sansDistanceMesuree(offres, filtres), [offres, filtres]);
+
+  // ⚠️ Les cibles ne sont montrées SANS OFFRE que lorsqu'aucun filtre n'est posé.
+  //
+  // Une cible sans offre active est une information de carte quand on regarde le marché
+  // (« Poly-Robotics — candidature spontanée possible »). Mais dès que Marc filtre, il pose
+  // une QUESTION : « qu'est-ce qui est à 25 km ? ». Y répondre avec des entreprises qui
+  // n'ont aucune offre correspondante serait répondre à côté — et lui faire croire que ces
+  // épingles satisfont son filtre.
+  const filtreActif = unFiltreEstActif(filtres);
+
+  const vue = useMemo(
+    () => construireVue(retenues, filtreActif ? [] : cibles, table),
+    [retenues, cibles, table, filtreActif],
+  );
+  const cadre = useMemo(() => cadrage(vue.epingles), [vue.epingles]);
+
+  const entreprises = vue.epingles.reduce((n, e) => n + e.entreprises.length, 0);
+  const exactes = vue.epingles
+    .filter((e) => e.precision === "exacte")
+    .reduce((n, e) => n + e.entreprises.length, 0);
+
+  return (
+    <>
+      {/* La MÊME barre que la liste : un seul composant, une seule règle. */}
+      <Filtres
+        filtres={filtres}
+        onChange={setFiltres}
+        etiquetteRecherche="Filtrer (entreprise, poste, note)…"
+      >
+        <BoutonSituer restantes={ciblesManquantes} />
+      </Filtres>
+
+      <CompteFiltre
+        affichees={entreprises}
+        total={entreprises + vue.aSituer.length + vue.sansLieu.length}
+        sansDistance={sansDistance}
+        nom="entreprise"
+      />
+
+      <p className="carte__compte">
+        {exactes} à leur adresse, {entreprises - exactes} au centre-ville
+        {vue.aSituer.length > 0 ? ` · ${vue.aSituer.length} en attente de localisation` : ""}
+        {filtreActif ? " · filtre actif : seules les entreprises qui ont une offre correspondante" : ""}
+      </p>
+
+      <CarteOffres epingles={vue.epingles} cadre={cadre} />
+
+      {vue.epingles.length === 0 ? (
+        <div className="etat">
+          <h2>Aucune entreprise à afficher</h2>
+          <p>
+            {filtreActif
+              ? "Aucune entreprise ne correspond aux filtres. En retirer un ramènera des épingles."
+              : vue.aSituer.length > 0
+                ? "Les entreprises n’ont pas encore été localisées. Ça se fait tout seul, au fil des passages — le bouton ci-dessus force une passe."
+                : "Aucune offre active et aucune entreprise cible à montrer."}
+          </p>
+        </div>
+      ) : (
+        <ListeCarte epingles={vue.epingles} />
+      )}
+
+      {vue.aSituer.length > 0 ? (
+        <p className="carte__manquants">
+          Pas encore situé{vue.aSituer.length > 1 ? "es" : "e"} — la localisation se complète
+          toute seule, à chaque passage et chaque nuit : {vue.aSituer.join(", ")}.
+        </p>
+      ) : null}
+
+      {vue.sansLieu.length > 0 ? (
+        <p className="carte__manquants">
+          Hors de la carte faute de ville annoncée par la source : {vue.sansLieu.join(", ")}.
+          Aucune passe n’y changera rien — la ville doit venir de l’offre.
+        </p>
+      ) : null}
+    </>
+  );
+}

@@ -11,58 +11,36 @@
 
 import { useMemo, useState } from "react";
 import type { Offre } from "@/lib/types";
-import { FILTRES_VIDES, SEUIL_PROCHE_KM, filtrer, type EtatFiltres } from "@/lib/filtres";
+import { FILTRES_VIDES, filtrer, sansDistanceMesuree, type EtatFiltres } from "@/lib/filtres";
 import { CarteOffre } from "./CarteOffre";
 import { BoutonExport } from "./BoutonExport";
-
-const BOUTONS: readonly { cle: keyof Omit<EtatFiltres, "texte">; libelle: string }[] = [
-  { cle: "activesSeules", libelle: "Actives" },
-  { cle: "notees80Plus", libelle: "Note 80+" },
-  { cle: "proches", libelle: `≤ ${SEUIL_PROCHE_KM} km` },
-  { cle: "historique", libelle: "Historique 2025" },
-  { cle: "avecPerimees", libelle: "Voir les périmées" },
-];
+import { CompteFiltre, Filtres } from "./Filtres";
 
 export function ListeOffres({ offres }: { offres: Offre[] }) {
   const [filtres, setFiltres] = useState<EtatFiltres>(FILTRES_VIDES);
   const visibles = useMemo(() => filtrer(offres, filtres), [offres, filtres]);
 
-  function basculer(cle: keyof Omit<EtatFiltres, "texte">) {
-    setFiltres((f) => ({ ...f, [cle]: !f[cle] }));
-  }
+  const sansDistance = useMemo(() => sansDistanceMesuree(offres, filtres), [offres, filtres]);
 
   return (
     <>
-      <div className="controles">
-        <input
-          type="search"
-          className="controles__recherche"
-          placeholder="Filtrer (entreprise, poste, note)…"
-          aria-label="Filtrer les offres"
-          value={filtres.texte}
-          onChange={(e) => setFiltres((f) => ({ ...f, texte: e.target.value }))}
-        />
-        {BOUTONS.map(({ cle, libelle }) => (
-          <button
-            key={cle}
-            type="button"
-            className={`filtre${filtres[cle] ? " filtre--actif" : ""}`}
-            aria-pressed={filtres[cle]}
-            onClick={() => basculer(cle)}
-          >
-            {libelle}
-          </button>
-        ))}
+      {/* La MÊME barre que la carte (`components/Filtres.tsx`) : deux copies auraient
+          divergé, et Marc a demandé des filtres identiques partout. */}
+      <Filtres
+        filtres={filtres}
+        onChange={setFiltres}
+        etiquetteRecherche="Filtrer (entreprise, poste, note)…"
+      >
         {/* L'export suit les filtres : ce qu'on télécharge est ce qu'on voit. */}
         <BoutonExport offres={visibles} />
-      </div>
+      </Filtres>
 
-      {/* Le compte est annoncé aux lecteurs d'écran : sans lui, un filtre qui vide la liste
-          est un changement silencieux. */}
-      <p className="controles__compte" role="status">
-        {visibles.length} offre{visibles.length > 1 ? "s" : ""} affichée
-        {visibles.length > 1 ? "s" : ""} sur {offres.length}
-      </p>
+      <CompteFiltre
+        affichees={visibles.length}
+        total={offres.length}
+        sansDistance={sansDistance}
+        nom="offre"
+      />
 
       {visibles.length === 0 ? (
         <p className="vide">Aucune offre ne correspond aux filtres.</p>
