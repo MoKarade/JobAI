@@ -627,7 +627,10 @@
       partagée entre la carte et les distances — pas une seconde copie de `apparier`.
       *(Trouvé par le panel du 2026-07-31, mesuré ; pré-existant à `[CARTE-01]`.)*
 
-- [ ] 🔧 **`[UX-12]`** **Brancher le suivi des relances à l'interface.** `lib/relances.ts`
+- [x] 🔧 **`[UX-12]`** **Brancher le suivi des relances à l'interface.** *Livré le 2026-07-31* —
+      et la vraie trouvaille était ailleurs : `lib/aFaire.ts` portait une SECONDE règle de
+      relance qui ne surveillait que `CVenvoye`, donc une candidature déjà relancée
+      disparaissait à jamais des suggestions. Les deux modules sont consolidés. `lib/relances.ts`
       est livré et testé (seuils 14 j / 45 j, `Relance` n'est PAS une réponse du recruteur,
       une date future est une saisie en cours et non un envoi) — mais **rien ne l'affiche**.
       Une logique juste que personne ne voit ne suit rien.
