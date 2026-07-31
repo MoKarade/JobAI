@@ -29,7 +29,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { offerReasons, offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
-import { trier } from "@/lib/ingest/pipeline";
+import { colonnesOffre } from "@/lib/persistance";
+import { idOffre, trier } from "@/lib/ingest/pipeline";
 import { appliquerBalayage, type JournalVeille } from "@/lib/veille";
 
 export const dynamic = "force-dynamic";
@@ -154,30 +155,41 @@ export async function POST(requete: Request) {
     const tri = trier(brutes, dejaSuivies, lot.jour);
 
     for (const o of tri.retenues) {
-      await db.insert(offers).values({
-        id: o.id,
-        source: o.source,
-        dateReperage: o.dateReperage,
-        entreprise: o.entreprise,
-        poste: o.poste,
-        lien: o.lien,
-        km: o.km,
-        salaireAffiche: o.salaireAffiche,
-        priorite: o.priorite,
-        statut: o.statut,
-        dateEnvoi: o.dateEnvoi,
-        score: o.score,
-        scoreSource: o.scoreSource,
-        notes: o.notes,
-        userNote: o.userNote,
-        histo: o.histo,
-        majLe: new Date(),
-      });
+      await db.insert(offers).values({ ...colonnesOffre(o), majLe: new Date() });
       if (o.raisons.length > 0) {
         await db.insert(offerReasons).values(
           o.raisons.map((r, i) => ({ offerId: o.id, ton: r.ton, texte: r.texte, ordre: i })),
         );
       }
+    }
+
+    // RATTRAPAGE DE LA VILLE SUR LES OFFRES DÉJÀ SUIVIES.
+    //
+    // Une offre déjà en base est comptée « doublon » et le lot n'en fait plus rien — ce qui
+    // était juste tant que le dépôt n'apportait aucune information nouvelle. Ce n'est plus
+    // vrai : les 40 premières offres déposées ont été écrites AVANT que la colonne `ville`
+    // soit remplie, et sans ville un employeur hors des entreprises cibles ne peut pas être
+    // géocodé — il reste sans distance et absent de la carte, à vie. Le même dépôt rejoué
+    // porte pourtant la ville manquante.
+    //
+    // ON COMPLÈTE, ON N'ÉCRASE JAMAIS : seule une ville ABSENTE est écrite. Une ville déjà
+    // connue vient d'une source antérieure et n'a pas à être remplacée par un lot plus
+    // récent — et `ville` n'est pas un champ de Marc (garde-fou n°2), mais l'opération
+    // reste volontairement la plus étroite possible : un seul champ, et seulement quand il
+    // est vide.
+    const parId = new Map(connues.map((o) => [o.id, o]));
+    const villesEcrites = new Set<string>();
+
+    for (const b of brutes) {
+      const ville = b.ville.trim();
+      if (ville === "") continue;
+
+      const id = idOffre(b.entreprise.trim() || "Employeur non nommé", b.titre);
+      const existante = parId.get(id);
+      if (!existante || existante.ville !== null || villesEcrites.has(id)) continue;
+
+      await db.update(offers).set({ ville, majLe: new Date() }).where(eq(offers.id, id));
+      villesEcrites.add(id);
     }
 
     // La péremption réutilise `lib/veille.ts` sans rien réécrire : une offre déjà suivie que
@@ -222,6 +234,10 @@ export async function POST(requete: Request) {
         lieuInconnu: tri.lieuInconnu,
         sousLePlancher: tri.souslePlancher,
         doublons: tri.doublons,
+        // Combien d'offres DÉJÀ suivies ont gagné leur ville grâce à ce dépôt. Compté et
+        // rendu : un rattrapage muet ne se vérifierait pas, et c'est précisément ce qui a
+        // permis à 40 offres de rester sans ville sans que rien ne le signale.
+        villesCompletees: villesEcrites.size,
         perimees: balayage.perimees.length,
         revenues: balayage.revenues.length,
         titres: tri.retenues.map((o) => `${o.score} — ${o.entreprise} — ${o.poste}`),

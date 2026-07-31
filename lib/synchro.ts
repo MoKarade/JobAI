@@ -25,6 +25,7 @@ import { and, eq } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import type * as schema from "./db/schema";
 import { offerReasons, offers, syncState } from "./db/schema";
+import { colonnesSeed } from "./persistance";
 import { SEED } from "./seed";
 import { fusionner } from "./suivi";
 import type { Offre } from "./types";
@@ -151,25 +152,9 @@ export async function appliquerSeed(db: Db): Promise<{ crees: number; majs: numb
   let majs = 0;
 
   for (const o of aEcrire) {
-    const valeurs = {
-      id: o.id,
-      source: o.source,
-      dateReperage: o.dateReperage,
-      entreprise: o.entreprise,
-      poste: o.poste,
-      lien: o.lien,
-      km: o.km,
-      salaireAffiche: o.salaireAffiche,
-      priorite: o.priorite,
-      statut: o.statut,
-      dateEnvoi: o.dateEnvoi,
-      score: o.score,
-      scoreSource: o.scoreSource,
-      notes: o.notes,
-      userNote: o.userNote,
-      histo: o.histo,
-      majLe: new Date(),
-    };
+    // `colonnesSeed` et non `colonnesOffre` : le jeu de départ n'écrit pas `perimeeLe`,
+    // sinon il ressusciterait les offres que la veille a constatées fermées.
+    const valeurs = { ...colonnesSeed(o), majLe: new Date() };
 
     if (connues.has(o.id)) {
       await db.update(offers).set(valeurs).where(eq(offers.id, o.id));

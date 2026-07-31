@@ -13,9 +13,14 @@
 // un lien Google Maps qui ne porte que la destination, `lib/lienTrajet.ts`), et le contenu
 // personnel des offres (`notes`, `userNote`) qui ne sert pas à la carte.
 //
-// CE QUI MANQUE EST COMPTÉ, JAMAIS MASQUÉ : entreprises restant à situer, employeurs hors
-// des cibles. Une carte qui affiche 12 épingles pour 20 entreprises sans le signaler laisse
-// croire à une couverture qu'elle n'a pas.
+// LA CARTE PART DES OFFRES, PAS D'UNE LISTE TENUE À LA MAIN (2026-07-31). Tout employeur
+// portant une offre vivante y a sa place dès qu'il est situé, qu'il figure ou non dans les
+// entreprises cibles — sinon la carte montre la liste de chasse et non le marché.
+//
+// CE QUI MANQUE EST COMPTÉ, JAMAIS MASQUÉ, et les deux manques ne se valent pas :
+// `aSituer` se réglera à la prochaine passe de géocodage, `sansLieu` jamais sans que la
+// source annonce une ville. Une carte qui affiche 12 épingles pour 20 entreprises sans le
+// signaler laisse croire à une couverture qu'elle n'a pas.
 
 import type { EntrepriseCible } from "./reference";
 import type { Offre } from "./types";
@@ -85,10 +90,18 @@ export interface Epingle {
 
 export interface VueCarte {
   epingles: Epingle[];
-  /** Entreprises cibles SANS position en base : une passe de géocodage les fera apparaître. */
+  /**
+   * Entreprises SANS position en base mais dont la ville est connue : une passe de
+   * géocodage les fera apparaître. Cibles et employeurs d'offres confondus — depuis que la
+   * carte part des offres, être hors de la liste de chasse n'empêche plus d'être situé.
+   */
   aSituer: string[];
-  /** Employeurs d'offres vivantes absents des entreprises cibles : insituables. */
-  horsCibles: string[];
+  /**
+   * Employeurs d'offres vivantes qu'on ne peut PAS situer : la source n'a annoncé aucune
+   * ville, et « ISS » seul est une recherche mondiale. Ce n'est pas un oubli de la liste de
+   * chasse — c'est une donnée manquante à la source, et aucune passe n'y changera rien.
+   */
+  sansLieu: string[];
 }
 
 export interface PositionEntreprise {
@@ -103,12 +116,20 @@ function estVivante(o: Offre): boolean {
 }
 
 /**
- * Assemble la vue, en partant des ENTREPRISES CIBLES — pas des offres.
+ * Assemble la vue, en partant des OFFRES autant que des entreprises cibles.
  *
- * Une cible sans offre active reste sur la carte : c'est la liste de chasse de Marc
- * (« Poly-Robotics — candidature spontanée possible » est une information de carte, pas un
- * vide à masquer). Les offres s'y rattachent ; celles dont l'employeur n'apparie aucune
- * cible sont COMPTÉES dans `horsCibles`, jamais perdues en silence.
+ * ⚠️ CHANGEMENT DU 2026-07-31, DEMANDE DE MARC : « je veux que pour toutes les offres elles
+ * soient visibles sur la carte ». La version précédente bouclait sur les seules
+ * `ENTREPRISES_CIBLES` — une liste tenue à la main. Tout employeur apporté par l'ingestion
+ * (ISS, LSM…) était donc invisible, quelle que soit sa note et même une fois sa position
+ * connue : la carte montrait la liste de chasse, pas le marché.
+ *
+ * Une cible sans offre active reste affichée : « Poly-Robotics — candidature spontanée
+ * possible » est une information de carte, pas un vide à masquer.
+ *
+ * CE QUI MANQUE RESTE COMPTÉ, et la distinction est utile : `aSituer` se réglera tout seul
+ * à la prochaine passe de géocodage ; `sansLieu` ne se réglera jamais sans que la source
+ * annonce une ville. Les confondre ferait attendre un remède qui ne viendra pas.
  */
 export function construireVue(
   offres: readonly Offre[],
@@ -117,19 +138,56 @@ export function construireVue(
 ): VueCarte {
   const vivantes = offres.filter(estVivante);
 
-  // Rattachement offre → cible. Une offre ne se rattache qu'à UNE entreprise : la première
-  // qui apparie (l'appariement est déjà borné par le plancher de longueur).
-  const offresParCible = new Map<string, OffreSurCarte[]>();
-  const horsCibles = new Set<string>();
+  /** Une entreprise en cours d'assemblage, avant qu'on sache si elle a une position. */
+  interface Brouillon extends EntrepriseSurCarte {
+    /** Noms tels que les offres les portent — la position peut être inscrite sous l'un d'eux. */
+    alias: Set<string>;
+  }
+
+  const parEntreprise = new Map<string, Brouillon>();
+
+  // Les cibles d'abord : leur nom fait autorité, et leurs faits relevés à la main
+  // (distance de référence, lecture) valent mieux que ce qu'une offre en dit.
+  for (const c of cibles) {
+    parEntreprise.set(c.nom, {
+      nom: c.nom,
+      ville: villeGeocodable(c.ville) ?? c.ville,
+      km: c.km,
+      lecture: c.lecture,
+      offres: [],
+      alias: new Set([c.nom]),
+    });
+  }
+
+  const sansLieu = new Set<string>();
 
   for (const o of vivantes) {
+    // Une offre se rattache à UNE entreprise : la cible qui apparie, sinon l'employeur tel
+    // que l'offre le nomme. L'appariement est borné par le plancher de longueur.
     const cible = cibles.find((c) => apparier(o.entreprise, c.nom));
-    if (!cible) {
-      horsCibles.add(o.entreprise);
-      continue;
+    const nom = cible?.nom ?? o.entreprise;
+    const villeOffre = o.ville ? (villeGeocodable(o.ville) ?? o.ville) : "";
+
+    let entreprise = parEntreprise.get(nom);
+    if (!entreprise) {
+      entreprise = {
+        nom,
+        ville: villeOffre,
+        // Pas de distance de référence pour un employeur hors liste : elle sera reprise
+        // des offres plus bas, MESURÉE, jamais déduite de l'épingle.
+        km: null,
+        lecture: "",
+        offres: [],
+        alias: new Set(),
+      };
+      parEntreprise.set(nom, entreprise);
     }
-    const liste = offresParCible.get(cible.nom) ?? [];
-    liste.push({
+
+    entreprise.alias.add(o.entreprise);
+    // La ville d'une cible fait foi ; pour les autres, la première ville annoncée sert.
+    if (entreprise.ville === "" && villeOffre !== "") entreprise.ville = villeOffre;
+
+    entreprise.offres.push({
       id: o.id,
       entreprise: o.entreprise,
       poste: o.poste,
@@ -137,7 +195,6 @@ export function construireVue(
       km: o.km,
       statut: o.statut,
     });
-    offresParCible.set(cible.nom, liste);
   }
 
   const epingles: Epingle[] = [];
@@ -146,36 +203,56 @@ export function construireVue(
   // liste ses entreprises — dix cercles empilés au centre-ville se masqueraient l'un l'autre.
   const groupesVille = new Map<string, Epingle>();
 
-  for (const c of cibles) {
-    const position = positions.get(c.nom);
+  for (const brouillon of parEntreprise.values()) {
+    const { alias, ...entreprise } = brouillon;
+
+    // La position peut avoir été inscrite sous le nom de la cible OU sous celui qu'une
+    // offre porte : la mesure des distances géocode `offre.entreprise`, la passe de la
+    // carte géocode `cible.nom`. Chercher les deux évite une entreprise « à situer » dont
+    // la position existe déjà sous son autre nom.
+    let position = positions.get(entreprise.nom);
     if (!position) {
-      aSituer.push(c.nom);
+      for (const a of alias) {
+        const p = positions.get(a);
+        if (p) {
+          position = p;
+          break;
+        }
+      }
+    }
+
+    if (!position) {
+      // Sans ville, aucune passe ne pourra la situer : le dire plutôt que de la faire
+      // patienter dans une file qui n'avancera pas.
+      if (entreprise.ville === "") sansLieu.add(entreprise.nom);
+      else aSituer.push(entreprise.nom);
       continue;
     }
 
-    const offresDeLaCible = offresParCible.get(c.nom) ?? [];
     // La meilleure note en tête : c'est elle qui teinte l'épingle.
-    offresDeLaCible.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+    entreprise.offres.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 
-    const ville = villeGeocodable(c.ville) ?? c.ville;
-    const entreprise: EntrepriseSurCarte = {
-      nom: c.nom,
-      ville,
-      km: c.km,
-      lecture: c.lecture,
-      offres: offresDeLaCible,
-    };
+    // Un employeur hors liste de chasse n'a pas de distance relevée à la main : celle de
+    // ses offres est MESURÉE (`mesurerDistances`), donc utilisable telle quelle. Sans ça,
+    // la fiche dirait « distance non mesurée » à côté d'offres qui affichent leur km.
+    if (entreprise.km === null) {
+      entreprise.km = entreprise.offres.find((o) => o.km !== null)?.km ?? null;
+    }
 
     if (position.precision === "exacte") {
-      epingles.push({ ...position, ville, entreprises: [entreprise] });
+      epingles.push({ ...position, ville: entreprise.ville, entreprises: [entreprise] });
       continue;
     }
 
-    const groupe = groupesVille.get(ville);
+    const groupe = groupesVille.get(entreprise.ville);
     if (groupe) groupe.entreprises.push(entreprise);
     else {
-      const nouveau: Epingle = { ...position, ville, entreprises: [entreprise] };
-      groupesVille.set(ville, nouveau);
+      const nouveau: Epingle = {
+        ...position,
+        ville: entreprise.ville,
+        entreprises: [entreprise],
+      };
+      groupesVille.set(entreprise.ville, nouveau);
       epingles.push(nouveau);
     }
   }
@@ -193,7 +270,7 @@ export function construireVue(
   return {
     epingles,
     aSituer: aSituer.sort((a, b) => a.localeCompare(b, "fr-CA")),
-    horsCibles: [...horsCibles].sort((a, b) => a.localeCompare(b, "fr-CA")),
+    sansLieu: [...sansLieu].sort((a, b) => a.localeCompare(b, "fr-CA")),
   };
 }
 

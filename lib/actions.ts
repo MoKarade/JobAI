@@ -28,6 +28,7 @@ import {
 import { ENTREPRISES_CIBLES } from "./reference";
 import { employeursASituer, planifierDistances } from "./distances";
 import { lireOffres } from "./donnees";
+import { colonnesOffre } from "./persistance";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -406,25 +407,7 @@ export async function ajouterOffre(saisie: unknown): Promise<ResultatAjout> {
       aujourdhui: aujourdhui(new Date()),
     });
 
-    await db.insert(offers).values({
-      id: offre.id,
-      source: offre.source,
-      dateReperage: offre.dateReperage,
-      entreprise: offre.entreprise,
-      poste: offre.poste,
-      lien: offre.lien,
-      km: offre.km,
-      salaireAffiche: offre.salaireAffiche,
-      priorite: offre.priorite,
-      statut: offre.statut,
-      dateEnvoi: offre.dateEnvoi,
-      score: offre.score,
-      scoreSource: offre.scoreSource,
-      notes: offre.notes,
-      userNote: offre.userNote,
-      histo: offre.histo,
-      perimeeLe: null,
-    });
+    await db.insert(offers).values(colonnesOffre(offre));
 
     revalidatePath("/");
     return { ok: true, id: offre.id };

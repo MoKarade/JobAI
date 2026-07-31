@@ -150,43 +150,129 @@ describe("ce qui manque est COMPTÉ, jamais masqué", () => {
     expect(vue.aSituer.length).toBe(ENTREPRISES_CIBLES.length);
   });
 
-  it("signale un employeur d'offre vivante hors des cibles, sans doublon", () => {
+  it("un employeur hors cibles AVEC ville attend une passe, sans doublon", () => {
     const vue = construireVue(
       [
-        offre({ id: "1", entreprise: "Employeur Jamais Vu" }),
-        offre({ id: "2", entreprise: "Employeur Jamais Vu" }),
+        offre({ id: "1", entreprise: "Employeur Jamais Vu", ville: "Lévis" }),
+        offre({ id: "2", entreprise: "Employeur Jamais Vu", ville: "Lévis" }),
       ],
       ENTREPRISES_CIBLES,
       new Map(),
     );
-    expect(vue.horsCibles).toEqual(["Employeur Jamais Vu"]);
+    expect(vue.aSituer).toContain("Employeur Jamais Vu");
+    expect(vue.sansLieu).toEqual([]);
+    // Une seule entrée pour deux offres : c'est un compte de NOMS.
+    expect(vue.aSituer.filter((n) => n === "Employeur Jamais Vu")).toHaveLength(1);
   });
 
-  it("aucune offre vivante ne disparaît : épinglée, hors cibles, ou en attente", () => {
+  it("un employeur SANS ville est insituable, et c'est un manque DIFFÉRENT", () => {
+    // La distinction n'est pas cosmétique : `aSituer` se règle à la prochaine passe,
+    // `sansLieu` jamais tant que la source n'annonce pas de ville. Les confondre ferait
+    // attendre un remède qui ne viendra pas.
+    const vue = construireVue(
+      [offre({ id: "1", entreprise: "Employeur Jamais Vu", ville: null })],
+      ENTREPRISES_CIBLES,
+      new Map(),
+    );
+    expect(vue.sansLieu).toEqual(["Employeur Jamais Vu"]);
+    expect(vue.aSituer).not.toContain("Employeur Jamais Vu");
+  });
+
+  it("aucune offre vivante ne disparaît : épinglée, à situer, ou insituable", () => {
     // L'invariant qui compte, sur le VRAI jeu — PLUS deux offres d'un MÊME employeur hors
-    // cibles. La revue a montré (sonde) que la première version additionnait un compte
-    // d'OFFRES à `horsCibles.length`, un compte de NOMS dédupliqués : invariant vacant dès
-    // qu'un employeur hors cibles porte deux offres. On compte donc PAR OFFRE, des deux
-    // côtés, et l'égalité est EXACTE — toutes les cibles étant situées, chaque offre
-    // vivante est soit épinglée, soit hors cibles, jamais un troisième état.
+    // cibles. La revue a montré (sonde) qu'une première version additionnait un compte
+    // d'OFFRES à un compte de NOMS dédupliqués : invariant vacant dès qu'un employeur hors
+    // cibles porte deux offres. On compte donc PAR OFFRE des deux côtés, et l'égalité est
+    // EXACTE — chaque offre vivante est dans un état, jamais un quatrième.
     const vivantes = [
       ...SEED.filter((o) => !o.histo && o.perimeeLe === null),
-      offre({ id: "hc-1", entreprise: "Employeur Jamais Vu" }),
-      offre({ id: "hc-2", entreprise: "Employeur Jamais Vu" }),
+      offre({ id: "hc-1", entreprise: "Employeur Jamais Vu", ville: "Lévis" }),
+      offre({ id: "hc-2", entreprise: "Employeur Jamais Vu", ville: "Lévis" }),
     ];
     const pos = positions(ENTREPRISES_CIBLES.map((c) => [c.nom, "exacte", 46.8, -71.2]));
     const vue = construireVue(vivantes, ENTREPRISES_CIBLES, pos);
+
     const epinglees = vue.epingles.reduce(
       (n, e) => n + e.entreprises.reduce((m, x) => m + x.offres.length, 0),
       0,
     );
-    const horsCiblesParOffre = vivantes.filter(
-      (o) => !ENTREPRISES_CIBLES.some((c) => apparier(o.entreprise, c.nom)),
-    ).length;
-    // L'entrée piège est bien dans le jeu : sans elle, ce test redeviendrait le précédent.
-    expect(horsCiblesParOffre).toBeGreaterThanOrEqual(2);
-    expect(epinglees + horsCiblesParOffre).toBe(vivantes.length);
-    expect(vue.aSituer).toEqual([]);
+    const enAttente = new Set([...vue.aSituer, ...vue.sansLieu]);
+    const enAttenteParOffre = vivantes.filter((o) => {
+      const cible = ENTREPRISES_CIBLES.find((c) => apparier(o.entreprise, c.nom));
+      return enAttente.has(cible?.nom ?? o.entreprise);
+    }).length;
+
+    // L'entrée piège est bien dans le jeu : sans elle, ce test ne mesurerait plus rien.
+    expect(enAttenteParOffre).toBeGreaterThanOrEqual(2);
+    expect(epinglees + enAttenteParOffre).toBe(vivantes.length);
+  });
+});
+
+describe("la carte part des OFFRES, pas d'une liste tenue à la main", () => {
+  // Demande de Marc du 2026-07-31 : « je veux que pour toutes les offres elles soient
+  // visibles sur la carte ». La version précédente bouclait sur les seules entreprises
+  // cibles — un employeur apporté par l'ingestion restait invisible même une fois situé.
+  it("un employeur hors cibles APPARAÎT dès qu'il a une position", () => {
+    const vue = construireVue(
+      [offre({ id: "1", entreprise: "ISS", poste: "Technicien", ville: "Québec", km: 9.4 })],
+      ENTREPRISES_CIBLES,
+      positions([["ISS", "exacte", 46.81, -71.22]]),
+    );
+
+    const epingle = vue.epingles.find((e) => e.entreprises.some((x) => x.nom === "ISS"));
+    expect(epingle, "un employeur hors cibles doit être sur la carte").toBeDefined();
+    const iss = epingle!.entreprises.find((x) => x.nom === "ISS")!;
+    expect(iss.offres.map((o) => o.poste)).toEqual(["Technicien"]);
+    expect(vue.aSituer).not.toContain("ISS");
+    expect(vue.sansLieu).toEqual([]);
+  });
+
+  it("reprend la distance MESURÉE de ses offres, faute de distance de référence", () => {
+    // Sans ça, la fiche dirait « distance non mesurée » à côté d'offres qui affichent leur
+    // km — et un employeur hors liste paraîtrait moins renseigné qu'il ne l'est.
+    const vue = construireVue(
+      [offre({ id: "1", entreprise: "ISS", ville: "Québec", km: 9.4 })],
+      ENTREPRISES_CIBLES,
+      positions([["ISS", "exacte", 46.81, -71.22]]),
+    );
+    const iss = vue.epingles.flatMap((e) => e.entreprises).find((x) => x.nom === "ISS")!;
+    expect(iss.km).toBe(9.4);
+  });
+
+  it("n'INVENTE pas de distance quand aucune offre n'en porte", () => {
+    const vue = construireVue(
+      [offre({ id: "1", entreprise: "ISS", ville: "Québec", km: null })],
+      ENTREPRISES_CIBLES,
+      positions([["ISS", "exacte", 46.81, -71.22]]),
+    );
+    const iss = vue.epingles.flatMap((e) => e.entreprises).find((x) => x.nom === "ISS")!;
+    expect(iss.km).toBeNull();
+  });
+
+  it("retrouve la position inscrite sous le nom que porte l'OFFRE", () => {
+    // Deux chemins géocodent : la passe de la carte inscrit `cible.nom`, la mesure des
+    // distances inscrit `offre.entreprise`. Une entreprise cible dont seule la seconde a
+    // tourné serait dite « à situer » alors que sa position existe déjà.
+    const vue = construireVue(
+      [offre({ id: "1", entreprise: "Laserax inc.", ville: "Québec" })],
+      ENTREPRISES_CIBLES,
+      positions([["Laserax inc.", "exacte", 46.75, -71.29]]),
+    );
+    expect(vue.aSituer).not.toContain("Laserax");
+    expect(vue.epingles.flatMap((e) => e.entreprises).some((x) => x.nom === "Laserax")).toBe(
+      true,
+    );
+  });
+
+  it("une cible SANS offre reste affichée : c'est la liste de chasse", () => {
+    const vue = construireVue(
+      [],
+      ENTREPRISES_CIBLES,
+      positions([["Laserax", "exacte", 46.75, -71.29]]),
+    );
+    const laserax = vue.epingles.flatMap((e) => e.entreprises).find((x) => x.nom === "Laserax");
+    expect(laserax).toBeDefined();
+    expect(laserax!.offres).toEqual([]);
   });
 });
 

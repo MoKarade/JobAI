@@ -28,8 +28,14 @@ import { classerPanne, type Panne } from "@/lib/panne";
 import { Cadre } from "@/components/Cadre";
 import { CarteOffres } from "@/components/CarteOffres";
 import { BoutonSituer } from "@/components/BoutonSituer";
-import { passeGeocodage } from "@/lib/actions";
-import { CLE_GEOCODAGE, DELAI_PASSE_AUTO_MS, reserverPasse } from "@/lib/synchro";
+import { mesurerDistances, passeGeocodage } from "@/lib/actions";
+import {
+  CLE_DISTANCES,
+  CLE_GEOCODAGE,
+  DELAI_MESURE_AUTO_MS,
+  DELAI_PASSE_AUTO_MS,
+  reserverPasse,
+} from "@/lib/synchro";
 
 export const dynamic = "force-dynamic";
 // La passe de localisation enchaîne des requêtes Nominatim à ~1,1 s d'intervalle : la
@@ -72,8 +78,9 @@ export default async function PageCarte() {
   // le nombre de rechargements. Nominatim est gratuit et bannit les appelants insistants ;
   // supprimer le clic ne doit pas revenir à marteler le service à sa place.
   if (offres !== null && panne === null) {
-    const manquantes = ENTREPRISES_CIBLES.filter((c) => !positions.has(c.nom)).length;
-    if (manquantes > 0) {
+    const lues = offres;
+    const ciblesManquantes = ENTREPRISES_CIBLES.filter((c) => !positions.has(c.nom)).length;
+    if (ciblesManquantes > 0) {
       after(async () => {
         try {
           if (!(await reserverPasse(db, CLE_GEOCODAGE, DELAI_PASSE_AUTO_MS, new Date()))) return;
@@ -84,6 +91,26 @@ export default async function PageCarte() {
           // Le fond ne doit jamais faire échouer une réponse déjà envoyée — mais il ne
           // doit pas non plus disparaître sans laisser de trace.
           console.error("[carte] passe automatique impossible", err);
+        }
+      });
+    }
+
+    // `passeGeocodage` ne situe QUE les entreprises cibles. Depuis que la carte part des
+    // offres, un employeur apporté par l'ingestion doit l'être aussi — c'est
+    // `mesurerDistances` qui sait le faire (elle géocode `offre.entreprise` à partir de la
+    // ville de l'offre, puis mesure). Sans ce second déclencheur, ces employeurs
+    // resteraient « à situer » indéfiniment sur la page qui les montre.
+    const employeursNonSitues = lues.some(
+      (o) => !o.histo && o.perimeeLe === null && !positions.has(o.entreprise),
+    );
+    if (employeursNonSitues) {
+      after(async () => {
+        try {
+          if (!(await reserverPasse(db, CLE_DISTANCES, DELAI_MESURE_AUTO_MS, new Date()))) return;
+          const r = await mesurerDistances();
+          if (!r.ok) console.error("[carte] mesure des distances refusée :", r.erreur);
+        } catch (err) {
+          console.error("[carte] mesure des distances impossible", err);
         }
       });
     }
@@ -254,10 +281,18 @@ export default async function PageCarte() {
         </ul>
       )}
 
-      {vue.horsCibles.length > 0 ? (
+      {vue.aSituer.length > 0 ? (
         <p className="carte__manquants">
-          Hors de la carte, faute d’entreprise cible correspondante :{" "}
-          {vue.horsCibles.join(", ")}. Les ajouter aux Références les fera apparaître.
+          Pas encore situé{vue.aSituer.length > 1 ? "es" : "e"} — la prochaine passe de
+          localisation s’en charge : {vue.aSituer.join(", ")}.
+        </p>
+      ) : null}
+
+      {vue.sansLieu.length > 0 ? (
+        <p className="carte__manquants">
+          Hors de la carte faute de ville annoncée par la source :{" "}
+          {vue.sansLieu.join(", ")}. Aucune passe n’y changera rien — la ville doit venir de
+          l’offre.
         </p>
       ) : null}
     </Cadre>

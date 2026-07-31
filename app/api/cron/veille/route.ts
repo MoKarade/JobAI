@@ -19,6 +19,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { offerReasons, offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
+import { colonnesOffre } from "@/lib/persistance";
 import { executerPasse } from "@/lib/ingest/passe";
 import { recuperer } from "@/lib/ingest/sources";
 import type { AtsEntreprise } from "@/lib/ingest/types";
@@ -124,25 +125,7 @@ export async function GET(requete: Request) {
     // gagné des offres et rejoué une passe, pas perdu du travail.
     const nouvelles = rapport.offres.filter((o) => rapport.nouvelles.includes(o.id));
     for (const o of nouvelles) {
-      await db.insert(offers).values({
-        id: o.id,
-        source: o.source,
-        dateReperage: o.dateReperage,
-        entreprise: o.entreprise,
-        poste: o.poste,
-        lien: o.lien,
-        km: o.km,
-        salaireAffiche: o.salaireAffiche,
-        priorite: o.priorite,
-        statut: o.statut,
-        dateEnvoi: o.dateEnvoi,
-        score: o.score,
-        scoreSource: o.scoreSource,
-        notes: o.notes,
-        userNote: o.userNote,
-        histo: o.histo,
-        majLe: new Date(),
-      });
+      await db.insert(offers).values({ ...colonnesOffre(o), majLe: new Date() });
       if (o.raisons.length > 0) {
         await db.insert(offerReasons).values(
           o.raisons.map((r, i) => ({ offerId: o.id, ton: r.ton, texte: r.texte, ordre: i })),
