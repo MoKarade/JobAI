@@ -143,6 +143,9 @@ code {
     --violet: oklch(74% 0.13 300);
     /* Sur fond sombre, les teintes claires passent largement (ambre 8,7:1, bleu 7,2:1). */
     --ambre-texte: oklch(78% 0.14 75);
+    /* Un noir translucide disparaît sur fond sombre : on éclaircit au lieu d'assombrir. */
+    --survol: oklch(100% 0 0 / 0.06);
+    --actif: oklch(78% 0.14 75 / 0.18);
     --bleu-texte: oklch(72% 0.12 250);
   }
 }
@@ -150,6 +153,28 @@ code {
 /* Échelle d'espacement UNIQUE (ADR-0003). Avant, chaque bloc choisissait sa marge dans son
    coin — d'où l'impression de mur : rien ne se répondait verticalement. */
 :root {
+  /* ── Direction visuelle (demande de Marc, 2026-07-31 : « style Google très épuré »)
+     Ce qui fait le style Google n'est PAS sa couleur, c'est sa FORME : de l'espace, des
+     rayons généreux, des ombres qui portent l'élévation à la place des bordures, et une
+     typographie claire plutôt que technique. L'ambre de JobAI reste l'accent unique —
+     c'est l'identité publiée au hub (`app.color`), elle n'avait pas à changer. */
+
+  /* Rayons. Le pill (999px) sur tout ce qui se clique ou se remplit ; 12px sur les
+     surfaces. C'est le geste le plus reconnaissable de la famille. */
+  /* Teintes d'interaction. Très légères : un survol qui se voit trop fatigue, un survol
+     qu'on ne voit pas laisse douter que l'élément soit cliquable. */
+  --survol: oklch(0% 0 0 / 0.045);
+  --actif: oklch(62% 0.15 75 / 0.14);
+
+  --r-pill: 999px;
+  --r-carte: 12px;
+  --r-champ: 24px;
+
+  /* Ombres. Deux couches très douces : une pour poser, une pour diffuser. Elles
+     REMPLACENT les bordures — une carte qui a les deux paraît lourde. */
+  --ombre-1: 0 1px 2px oklch(0% 0 0 / 0.06), 0 1px 3px 1px oklch(0% 0 0 / 0.04);
+  --ombre-2: 0 1px 3px oklch(0% 0 0 / 0.10), 0 4px 8px 3px oklch(0% 0 0 / 0.06);
+
   --pas: 0.5rem;
   --pas-2: 1rem;
   --pas-3: 1.5rem;
@@ -157,20 +182,23 @@ code {
 }
 
 .page {
-  max-width: 78rem;
+  max-width: 72rem;
   margin: 0 auto;
-  padding: var(--pas-3) var(--pas-2) var(--pas-4);
+  /* Plus large en haut et sur les côtés : l'espace EST le style. */
+  padding: clamp(1.5rem, 1rem + 2vw, 2.5rem) clamp(1rem, 0.5rem + 2vw, 2rem) 4rem;
 }
 
 .entete { display: flex; flex-direction: column; gap: 0.15rem; }
 .entete__marque {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.5rem;
+  /* Le mot-symbole garde le mono — c'est une invite de terminal, c'est le logo. Le RESTE
+     de l'interface passe à la typographie du système : lisible, pas technique. */
   font-family: var(--mono);
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: var(--text);
   text-decoration: none;
   align-self: flex-start;
@@ -180,9 +208,9 @@ code {
 .entete__mark { width: 1.15em; height: 1.15em; color: var(--ambre); flex: none; }
 .entete__accent { color: var(--ambre); }
 .entete__sous {
-  font-family: var(--mono);
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   color: var(--text-soft);
+  margin-top: 0.15rem;
 }
 
 /* ── Onglets ──────────────────────────────────────────────────────────────
@@ -191,25 +219,22 @@ code {
    seule ne porte jamais l'information (WCAG 1.4.1). */
 .onglets {
   display: flex;
-  gap: var(--pas);
+  gap: 0.25rem;
   margin: var(--pas-3) 0 var(--pas-2);
-  border-bottom: 1px solid var(--border);
+  /* Plus de trait sous les onglets : l'état actif se porte par la pastille elle-même. */
 }
 .onglet {
-  padding: 0.45rem 0.9rem;
-  font-family: var(--mono);
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.95rem;
   color: var(--text-soft);
   text-decoration: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
+  border-radius: var(--r-pill);
+  transition: background-color 120ms ease, color 120ms ease;
 }
-.onglet:hover { color: var(--text); }
+.onglet:hover { color: var(--text); background: var(--survol); }
 .onglet--actif {
   color: var(--text);
-  border-bottom-color: var(--ambre);
+  background: var(--actif);
   font-weight: 600;
 }
 .onglet:focus-visible { outline: 2px solid var(--ambre); outline-offset: -2px; }
@@ -246,68 +271,94 @@ code {
 .stat {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--ambre);
-  padding: 0.6rem 0.75rem;
+  border-radius: var(--r-carte);
+  padding: 1.1rem 1.25rem;
+  /* Plus de barre de couleur à gauche : c'est le geste qui datait le plus l'interface.
+     La hiérarchie passe par la taille du chiffre et l'espace autour. */
 }
 .stat--envoi { border-left-color: var(--vert); }
 .stat--reponse { border-left-color: var(--bleu); }
 .stat--haut { border-left-color: var(--violet); }
 .stat--neutre { border-left-color: var(--border); }
-.stat__n { font-family: var(--mono); font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+.stat__n {
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
 .stat__l {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 0.85rem;
   color: var(--text-soft);
-  margin-top: 0.15rem;
+  margin-top: 0.3rem;
 }
 
 /* ── Contrôles ───────────────────────────────────────────────────────────── */
 .controles { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .controles__recherche {
-  flex: 1 1 12rem;
-  max-width: 20rem;
-  padding: 0.5rem 0.75rem;
+  flex: 1 1 16rem;
+  max-width: 28rem;
+  padding: 0.7rem 1.15rem;
   font: inherit;
+  font-size: 0.95rem;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.3rem;
+  border-radius: var(--r-champ);
+  transition: box-shadow 140ms ease, border-color 140ms ease;
+}
+/* Le geste le plus caractéristique : au focus, le champ se SOULÈVE et sa bordure
+   s'efface. L'élévation dit « c'est ici que ça se passe » mieux qu'un contour. */
+.controles__recherche:hover { box-shadow: var(--ombre-1); }
+.controles__recherche:focus {
+  outline: none;
+  border-color: transparent;
+  box-shadow: var(--ombre-2);
 }
 .filtre {
-  padding: 0.45rem 0.75rem;
-  font-family: var(--mono);
-  font-size: 0.75rem;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: 0.875rem;
   color: var(--text-soft);
-  background: var(--surface);
+  background: transparent;
   border: 1px solid var(--border);
-  border-radius: 0.3rem;
+  border-radius: var(--r-pill);
   cursor: pointer;
   /* Cible tactile confortable : au moins 40 px de haut sur mobile. */
   min-height: 2.5rem;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-.filtre--actif { color: var(--ambre); border-color: var(--ambre); }
-.controles__recherche:focus-visible,
-.filtre:focus-visible { outline: 2px solid var(--ambre); outline-offset: 1px; }
+.filtre:hover { background: var(--survol); color: var(--text); }
+/* L'état actif se porte par le REMPLISSAGE, pas par une bordure colorée : plus lisible
+   d'un coup d'œil, et la couleur n'est pas le seul signal (le fond change aussi). */
+.filtre--actif {
+  color: var(--ambre-texte);
+  background: var(--actif);
+  border-color: transparent;
+  font-weight: 600;
+}
+.filtre:focus-visible { outline: 2px solid var(--ambre-texte); outline-offset: 2px; }
+.controles__recherche:focus-visible { outline: 2px solid var(--ambre-texte); outline-offset: 2px; }
 .controles__compte {
-  font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   color: var(--text-soft);
-  margin: 0.7rem 0 0.5rem;
+  margin: 1.1rem 0 0.6rem;
 }
 
 /* ── Cartes d'offre ──────────────────────────────────────────────────────── */
-.liste { display: flex; flex-direction: column; gap: 0.5rem; }
+.liste { display: flex; flex-direction: column; gap: 0.75rem; }
 .carte {
-  display: grid;
-  grid-template-columns: 3.25rem 1fr;
-  gap: 0.4rem 0.9rem;
-  align-items: start;
-  padding: 0.8rem 0.9rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
+  border-radius: var(--r-carte);
+  padding: 1.15rem 1.35rem;
+  display: grid;
+  gap: 0.6rem;
+  transition: box-shadow 140ms ease, border-color 140ms ease;
 }
+/* L'élévation au survol remplace la bordure de couleur : elle dit « cliquable » sans
+   rien ajouter à l'écran quand on ne survole pas. */
+.carte:hover { box-shadow: var(--ombre-1); border-color: transparent; }
 .carte--A { border-left-color: var(--vert); }
 .carte--B { border-left-color: var(--ambre); }
 .carte--C { border-left-color: var(--text-soft); }
@@ -347,11 +398,14 @@ code {
 
 .carte__meta { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.75rem; }
 .etiquette {
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  padding: 0.1rem 0.45rem;
-  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.8rem;
   color: var(--text-soft);
+  background: var(--survol);
+  border-radius: var(--r-pill);
 }
 .etiquette--km { color: var(--ambre); }
 .etiquette--salaire { color: var(--vert); }
@@ -364,12 +418,15 @@ code {
 }
 
 .pastille {
+  grid-column: 1 / -1;
   justify-self: start;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.03em;
-  padding: 0.15rem 0.55rem;
-  border: 1px solid currentColor;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: var(--r-pill);
+  background: var(--survol);
 }
 .pastille--Identifiee { color: var(--bleu); }
 .pastille--CVenvoye { color: var(--vert); }
