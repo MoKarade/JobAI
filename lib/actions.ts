@@ -27,6 +27,7 @@ import {
 } from "./geocodage";
 import { ENTREPRISES_CIBLES } from "./reference";
 import { employeursASituer, planifierDistances } from "./distances";
+import { villesARattraper } from "./ingest/pipeline";
 import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
 
@@ -268,8 +269,11 @@ async function domicile(): Promise<{ lat: number; lon: number } | null> {
  *
  * Ne touche ni les distances déjà connues, ni les notes manuelles (`lib/distances.ts`).
  */
-export async function mesurerDistances(): Promise<
-  { ok: true; mesurees: number; situees: number } | { ok: false; erreur: string }
+export async function mesurerDistances(
+  options: { maxSituations?: number } = {},
+): Promise<
+  | { ok: true; mesurees: number; situees: number; villesRattrapees: number }
+  | { ok: false; erreur: string }
 > {
   const chezMoi = await domicile();
   if (!chezMoi) {
@@ -277,8 +281,27 @@ export async function mesurerDistances(): Promise<
   }
 
   try {
-    const offres = await lireOffres();
-    if (offres === null) return { ok: false, erreur: "Base non configurée." };
+    const offresLues = await lireOffres();
+    if (offresLues === null) return { ok: false, erreur: "Base non configurée." };
+
+    // 0. RATTRAPER LES VILLES MANQUANTES, avant tout le reste.
+    //
+    // Les 40 premières offres déposées sont entrées avant que la colonne `ville` soit
+    // écrite. Sans ville, leur employeur n'est pas géocodable : ni position, ni distance,
+    // ni épingle — et rien n'y changeait quoi que ce soit, puisque `ville` n'est modifiable
+    // par aucun formulaire. Leurs justifications portent pourtant la ville que la source
+    // avait annoncée (`villeDepuisRaisons`). Ce rattrapage n'appelle RIEN sur le réseau :
+    // c'est une relecture, donc il peut tourner à chaque passe sans contre-pression.
+    const aRattraper = villesARattraper(offresLues);
+    for (const { id, ville } of aRattraper) {
+      await db.update(offers).set({ ville, majLe: new Date() }).where(eq(offers.id, id));
+    }
+    // Refléter le rattrapage en mémoire : sans ça, la suite de CETTE passe croirait encore
+    // ces offres sans ville et attendrait un affichage de plus pour les situer.
+    const villesEcrites = new Map(aRattraper.map((v) => [v.id, v.ville]));
+    const offres = offresLues.map((o) =>
+      villesEcrites.has(o.id) ? { ...o, ville: villesEcrites.get(o.id) ?? null } : o,
+    );
 
     const lignes = await db.select().from(entreprisesLieux);
     const positions = new Map(
@@ -295,10 +318,15 @@ export async function mesurerDistances(): Promise<
       return avecVille?.ville ? (villeGeocodable(avecVille.ville) ?? avecVille.ville) : null;
     };
 
+    // Le débit par passe : 6 par défaut (déclenchée après un affichage, elle doit rester
+    // discrète), davantage depuis le cron qui tourne la nuit sans personne devant l'écran.
+    // Chaque requête Nominatim est espacée de 1,1 s par `lib/geocodage.ts` — c'est le
+    // nombre qui change, jamais la cadence.
+    const maxSituations = Math.max(1, options.maxSituations ?? 6);
     const manquants = employeursASituer(offres, positions, villeDe);
     let situees = 0;
     if (manquants.length > 0) {
-      const r = await situerLot(manquants.slice(0, 4), positions);
+      const r = await situerLot(manquants.slice(0, maxSituations), positions, maxSituations);
       situees = r;
       const relues = await db.select().from(entreprisesLieux);
       positions.clear();
@@ -317,7 +345,7 @@ export async function mesurerDistances(): Promise<
 
     revalidatePath("/");
     revalidatePath("/carte");
-    return { ok: true, mesurees: majs.length, situees };
+    return { ok: true, mesurees: majs.length, situees, villesRattrapees: aRattraper.length };
   } catch (err) {
     console.error("[actions] mesure des distances impossible", err);
     return { ok: false, erreur: "Mesure impossible. Réessaie plus tard." };
@@ -328,6 +356,7 @@ export async function mesurerDistances(): Promise<
 async function situerLot(
   aSituer: readonly { nom: string; ville: string }[],
   positions: ReadonlyMap<string, { lat: number; lon: number; precision: "exacte" | "ville" }>,
+  max = 2,
 ): Promise<number> {
   const villesConnues = await db.select().from(villes);
   const coordVilles = new Map(villesConnues.map((v) => [v.nom, { lat: v.lat, lon: v.lon }]));
@@ -336,7 +365,7 @@ async function situerLot(
     (v) => !coordVilles.has(v),
   );
   if (villesRequises.length > 0) {
-    const rv = await geocoderPlusieurs(villesRequises.slice(0, 2), outilsNominatim());
+    const rv = await geocoderPlusieurs(villesRequises.slice(0, max), outilsNominatim());
     if (rv.trouvees.length > 0) {
       await db
         .insert(villes)
@@ -349,11 +378,11 @@ async function situerLot(
   const tentables = aSituer.filter((e) => coordVilles.has(e.ville) && !positions.has(e.nom));
   if (tentables.length === 0) return 0;
 
-  const r = await geocoderEntreprises(tentables.slice(0, 2), outilsNominatim());
+  const r = await geocoderEntreprises(tentables.slice(0, max), outilsNominatim());
   const resolues = new Map(r.trouvees.map((t) => [t.nom, { lat: t.lat, lon: t.lon }]));
   const inscrire: { nom: string; lat: number; lon: number; precision: "exacte" | "ville" }[] = [];
 
-  for (const e of tentables.slice(0, 2)) {
+  for (const e of tentables.slice(0, max)) {
     if (!resolues.has(e.nom) && !r.introuvables.includes(e.nom)) continue;
     const centre = coordVilles.get(e.ville);
     if (!centre) continue;

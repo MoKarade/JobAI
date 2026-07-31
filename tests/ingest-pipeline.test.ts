@@ -5,8 +5,16 @@
 // vérifiées alors que personne ne les a lues. Les trois se testent ici.
 
 import { describe, it, expect } from "vitest";
-import { FIT_ROLE_PLANCHER, idOffre, trier, villesACompleter } from "../lib/ingest/pipeline";
+import {
+  FIT_ROLE_PLANCHER,
+  idOffre,
+  trier,
+  villeDepuisRaisons,
+  villesACompleter,
+  villesARattraper,
+} from "../lib/ingest/pipeline";
 import { OffreSchema, type Offre } from "../lib/types";
+import { SEED } from "../lib/seed";
 import type { OffreBrute } from "../lib/ingest/types";
 
 function brute(champs: Partial<OffreBrute> = {}): OffreBrute {
@@ -278,5 +286,104 @@ describe("rattrapage des villes manquantes", () => {
     expect(r).toHaveLength(1);
     // La PREMIÈRE mention gagne, comme pour le dédoublonnage de `trier`.
     expect(r[0]!.ville).toBe("Lévis");
+  });
+});
+
+describe("relire la ville dans les justifications", () => {
+  // Les 40 premières offres déposées sont entrées avant que la colonne `ville` soit
+  // écrite. Leur ville n'est pas perdue pour autant : le tri l'avait recopiée dans leurs
+  // justifications. La relire n'est pas une déduction — c'est la même donnée, ailleurs.
+
+  it("fait l'ALLER-RETOUR avec ce que le tri écrit vraiment", () => {
+    // LE test qui compte : il part de `trier()` — pas d'une chaîne recopiée à la main —
+    // donc il tombe le jour où la phrase change de forme. Sans lui, la relecture
+    // cesserait de trouver quoi que ce soit sans la moindre erreur.
+    const r = trier([brute({ ville: "Saint-Augustin-de-Desmaures" })], new Set(), "2026-07-31");
+    const retenue = r.retenues[0];
+    expect(retenue, "l'offre témoin doit être retenue, sinon le test ne mesure rien").toBeDefined();
+    expect(villeDepuisRaisons(retenue!.raisons)).toBe("Saint-Augustin-de-Desmaures");
+  });
+
+  it("garde la ville telle quelle, virgule de province comprise", () => {
+    const r = trier([brute({ ville: "Lévis, QC" })], new Set(), "2026-07-31");
+    expect(villeDepuisRaisons(r.retenues[0]!.raisons)).toBe("Lévis, QC");
+  });
+
+  it("rend null quand aucune justification ne porte de ville", () => {
+    expect(villeDepuisRaisons([])).toBeNull();
+    expect(
+      villeDepuisRaisons([{ ton: "reserve", texte: "Trouvée automatiquement : la note vient…" }]),
+    ).toBeNull();
+  });
+
+  it("n'invente rien à partir d'une phrase tronquée", () => {
+    expect(villeDepuisRaisons([{ ton: "reserve", texte: "Annoncée à " }])).toBeNull();
+    expect(villeDepuisRaisons([{ ton: "reserve", texte: "Annoncée à    — la distance" }])).toBeNull();
+  });
+
+  it("tolère l'absence du reste de la phrase", () => {
+    expect(villeDepuisRaisons([{ ton: "reserve", texte: "Annoncée à Québec" }])).toBe("Québec");
+  });
+});
+
+describe("rattraper les villes sans rien demander à personne", () => {
+  // Ce rattrapage-ci ne dépend ni d'un nouveau dépôt, ni d'un clic, ni du réseau :
+  // l'information est déjà en base, une colonne plus loin. C'est ce qui débloque les 40
+  // offres entrées avant que `ville` soit écrite.
+  const suivie = (champs: Partial<Offre>): Offre =>
+    OffreSchema.parse({
+      id: "x",
+      source: "jobbank",
+      dateReperage: "2026-07-30",
+      entreprise: "Exemple inc.",
+      poste: "Coordonnateur",
+      lien: "https://exemple.test/1",
+      km: null,
+      ville: null,
+      salaireAffiche: null,
+      priorite: "Moyenne",
+      statut: "Identifiee",
+      dateEnvoi: "",
+      score: 60,
+      scoreSource: "calcule",
+      raisons: [],
+      notes: "",
+      userNote: "",
+      histo: false,
+      perimeeLe: null,
+      ...champs,
+    });
+
+  const raisonVille = (v: string) => ({
+    ton: "reserve" as const,
+    texte: `Annoncée à ${v} — la distance reste à mesurer, elle n'est pas déduite du nom de la ville.`,
+  });
+
+  it("trouve la ville que la justification porte", () => {
+    const r = villesARattraper([suivie({ id: "a", raisons: [raisonVille("Lévis")] })]);
+    expect(r).toEqual([{ id: "a", ville: "Lévis" }]);
+  });
+
+  it("laisse tranquille une offre qui a DÉJÀ sa ville", () => {
+    expect(
+      villesARattraper([suivie({ id: "a", ville: "Québec", raisons: [raisonVille("Lévis")] })]),
+    ).toEqual([]);
+  });
+
+  it("ignore l'historique : les candidatures de 2025 n'ont pas à être situées", () => {
+    expect(
+      villesARattraper([suivie({ id: "a", histo: true, raisons: [raisonVille("Lévis")] })]),
+    ).toEqual([]);
+  });
+
+  it("ne rend rien quand aucune justification ne porte de ville", () => {
+    expect(villesARattraper([suivie({ id: "a", raisons: [] })])).toEqual([]);
+  });
+
+  it("sur le VRAI jeu de départ, ne fabrique aucune ville", () => {
+    // Les offres du seed portent leur ville en clair ou n'en ont pas ; aucune ne doit
+    // gagner une ville par ce chemin. Sans ce cas, une régression qui inventerait des
+    // villes passerait inaperçue.
+    expect(villesARattraper(SEED)).toEqual([]);
   });
 });

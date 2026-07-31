@@ -172,10 +172,67 @@ export function trier(
   return { retenues, souslePlancher, doublons, horsRegion, lieuInconnu, refusees };
 }
 
+/**
+ * Le début de la justification qui porte la ville annoncée.
+ *
+ * Exporté pour que `raisonsAutomatiques` l'ÉCRIVE et que `villeDepuisRaisons` la RELISE
+ * depuis la même constante : deux littéraux qui doivent coïncider finissent toujours par
+ * diverger, et ici la divergence serait muette (plus aucune ville relue, sans erreur).
+ * Un test prouve l'aller-retour.
+ */
+export const PREFIXE_VILLE_ANNONCEE = "Annoncée à ";
+
+/**
+ * La ville qu'une offre déjà suivie porte dans ses justifications.
+ *
+ * POURQUOI CETTE FONCTION EXISTE
+ * Les 40 premières offres déposées sont entrées AVANT que la colonne `ville` soit écrite :
+ * elles l'ont donc vide, et sans ville leur employeur n'est pas géocodable — pas de
+ * position, pas de distance, pas d'épingle sur la carte. Mais l'information n'est pas
+ * perdue : au moment du tri, on a écrit « Annoncée à Lévis — … » dans leurs justifications.
+ *
+ * ⚠️ CE N'EST PAS UNE DÉDUCTION. La ville n'est pas devinée depuis le nom de l'employeur ni
+ * depuis le texte de l'annonce : elle est RELUE là où notre propre code l'avait recopiée
+ * telle que la source l'annonçait. C'est la même donnée, à un autre endroit — pas une
+ * reconstitution, et donc pas une entorse au garde-fou n°3.
+ *
+ * Rend `null` quand aucune justification ne porte de ville : mieux vaut une offre qui reste
+ * insituable et le DIT qu'une ville approximative écrite en base.
+ */
+export function villeDepuisRaisons(raisons: readonly Offre["raisons"][number][]): string | null {
+  for (const r of raisons) {
+    if (!r.texte.startsWith(PREFIXE_VILLE_ANNONCEE)) continue;
+    // Le tiret cadratin sépare la ville du reste de la phrase. Un tiret ASCII ne
+    // conviendrait pas : c'est « — » que le code écrit.
+    const reste = r.texte.slice(PREFIXE_VILLE_ANNONCEE.length);
+    const fin = reste.indexOf(" — ");
+    const ville = (fin === -1 ? reste : reste.slice(0, fin)).trim();
+    if (ville !== "") return ville;
+  }
+  return null;
+}
+
 /** Une ville à écrire sur une offre DÉJÀ suivie qui n'en avait pas. */
 export interface VilleACompleter {
   id: string;
   ville: string;
+}
+
+/**
+ * Les offres dont la ville manque en base alors que leurs justifications la portent.
+ *
+ * C'est le rattrapage qui ne dépend de PERSONNE : ni d'un nouveau dépôt, ni d'un clic, ni
+ * du réseau. L'information est déjà là, une colonne plus loin. L'historique est laissé de
+ * côté — ce sont des candidatures de 2025, elles n'ont pas à être situées.
+ */
+export function villesARattraper(offres: readonly Offre[]): VilleACompleter[] {
+  const liste: VilleACompleter[] = [];
+  for (const o of offres) {
+    if (o.histo || o.ville !== null) continue;
+    const ville = villeDepuisRaisons(o.raisons);
+    if (ville !== null) liste.push({ id: o.id, ville });
+  }
+  return liste;
 }
 
 /**
@@ -245,7 +302,10 @@ function raisonsAutomatiques(brute: OffreBrute, note: number): Offre["raisons"] 
   if (brute.ville.trim() !== "") {
     r.push({
       ton: "reserve",
-      texte: `Annoncée à ${brute.ville.trim()} — la distance reste à mesurer, elle n'est pas déduite du nom de la ville.`,
+      // Le préfixe vient de la constante partagée : `villeDepuisRaisons` relit cette
+      // phrase pour rattraper une ville manquante, et deux littéraux finiraient par
+      // diverger en silence.
+      texte: `${PREFIXE_VILLE_ANNONCEE}${brute.ville.trim()} — la distance reste à mesurer, elle n'est pas déduite du nom de la ville.`,
     });
   }
   if (note >= 70) {

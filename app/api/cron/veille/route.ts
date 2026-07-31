@@ -20,6 +20,7 @@ import { db } from "@/lib/db";
 import { offerReasons, offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { colonnesOffre } from "@/lib/persistance";
+import { mesurerDistances } from "@/lib/actions";
 import { executerPasse } from "@/lib/ingest/passe";
 import { recuperer } from "@/lib/ingest/sources";
 import type { AtsEntreprise } from "@/lib/ingest/types";
@@ -30,6 +31,16 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const CLE_JOURNAL = "veille-journal";
+
+/**
+ * Employeurs situés par passage du cron.
+ *
+ * Douze : à 1,1 s entre deux requêtes Nominatim, une passe complète (villes + entreprises)
+ * tient largement sous les 60 s de la fonction, ingestion comprise. C'est aussi ce qui fait
+ * converger un stock de quarante employeurs en quelques nuits sans que Marc ouvre l'app —
+ * les passes déclenchées par un affichage restent volontairement plus discrètes.
+ */
+const MAX_SITUATIONS_CRON = 12;
 const CLE_ATS = "veille-ats";
 const CLE_CURSEUR = "veille-curseur";
 
@@ -154,6 +165,29 @@ export async function GET(requete: Request) {
     }
 
     await ecrireEtat(CLE_JOURNAL, rapport.journal);
+
+    // LOCALISER ET MESURER, ICI AUSSI — sans quoi « toujours à jour » dépendrait de Marc.
+    //
+    // Les passes de géocodage et de mesure ne tournaient qu'APRÈS l'affichage d'une page :
+    // une carte jamais ouverte ne se complétait jamais. Le cron, lui, passe chaque nuit
+    // sans personne devant l'écran — c'est le seul endroit d'où le rattrapage avance tout
+    // seul. Le débit y est plus large qu'après un affichage (personne n'attend la réponse),
+    // mais la cadence vers Nominatim reste la même : 1,1 s entre deux requêtes.
+    //
+    // ⚠️ APRÈS l'ingestion et APRÈS l'écriture du journal, et dans son propre `try` : une
+    // panne de géocodage ne doit jamais faire perdre les offres que la passe vient de
+    // trouver. C'est du confort ; l'ingestion est l'essentiel.
+    let localisation = "non tentée";
+    try {
+      const m = await mesurerDistances({ maxSituations: MAX_SITUATIONS_CRON });
+      localisation = m.ok
+        ? `${m.villesRattrapees} ville(s) rattrapée(s), ${m.situees} située(s), ${m.mesurees} mesurée(s)`
+        : `refusée : ${m.erreur}`;
+      if (!m.ok) console.error("[cron] localisation refusée :", m.erreur);
+    } catch (err) {
+      console.error("[cron] localisation impossible", err);
+      localisation = "échec — voir les journaux";
+    }
     await ecrireEtat(CLE_CURSEUR, curseur + rapport.sources.length);
 
     return NextResponse.json(
@@ -170,6 +204,10 @@ export async function GET(requete: Request) {
         horsRegion: rapport.tri.horsRegion,
         lieuInconnu: rapport.tri.lieuInconnu,
         doublons: rapport.tri.doublons,
+        villesCompletees: rapport.villesACompleter.length,
+        // Ce que la passe de localisation a fait — compté et dit : une carte qui ne se
+        // remplit pas doit pouvoir se diagnostiquer sans ouvrir la base.
+        localisation,
         // Le détail par source : sans lui, un total de zéro ne dit pas si le marché est
         // calme ou si les six sources sont muettes.
         sources: rapport.sources,
