@@ -60,6 +60,11 @@ function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string 
   morceaux.push(
     `<span class="popup-faits">${echapper(e.ville)} · ${echapper(distance)}</span>`,
   );
+  // L'ADRESSE quand OpenStreetMap la connaît. Sur un repli au centre-ville il n'y en a pas,
+  // et on ne dit rien plutôt que d'afficher celle de la mairie pour une usine.
+  if (e.adresse) {
+    morceaux.push(`<span class="popup-adresse">${echapper(e.adresse)}</span>`);
+  }
   if (e.lecture) {
     const lecture = e.lecture.length > 160 ? `${e.lecture.slice(0, 157)}…` : e.lecture;
     morceaux.push(`<span class="popup-lecture">${echapper(lecture)}</span>`);

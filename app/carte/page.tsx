@@ -1,7 +1,12 @@
 // app/carte/page.tsx — où sont les entreprises, et leurs offres.
 //
-// Server Component : il lit la base, assemble la vue avec `construireVue` (pure et testée)
-// et n'envoie au navigateur que des entreprises et leurs offres.
+// Server Component : il lit la base, garde la session, et confie le reste à
+// `CarteFiltrable` (client) — le filtrage doit être instantané et surtout IDENTIQUE à celui
+// de la liste, ce qu'un aller-retour serveur par clic ne donnerait pas.
+//
+// Il envoie donc au navigateur les offres COMPLÈTES (`notes`, `userNote` comprises), que la
+// recherche libre parcourt. Même session, même navigateur, et l'accueil le fait déjà : ce
+// n'est pas une exposition nouvelle — mais c'est à dire, pas à taire.
 //
 // GARDE-FOU N°1 : le domicile de Marc n'entre JAMAIS dans cette page. Ni en props, ni dans
 // le cadrage — qui se déduit des seules entreprises. Le TRAJET passe par un lien Google
@@ -53,7 +58,10 @@ export default async function PageCarte() {
     if (offres !== null) {
       const lignes = await db.select().from(entreprisesLieux);
       positions = new Map(
-        lignes.map((l) => [l.nom, { lat: l.lat, lon: l.lon, precision: l.precision }]),
+        lignes.map((l) => [
+          l.nom,
+          { lat: l.lat, lon: l.lon, precision: l.precision, adresse: l.adresse },
+        ]),
       );
     }
   } catch (err) {

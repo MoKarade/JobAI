@@ -182,6 +182,9 @@ export function trier(
  */
 export const PREFIXE_VILLE_ANNONCEE = "Annoncée à ";
 
+/** La longueur qu'`OffreSchema` accepte pour `ville` — la relecture s'y tient. */
+const LONGUEUR_MAX_VILLE = 120;
+
 /**
  * La ville qu'une offre déjà suivie porte dans ses justifications.
  *
@@ -206,7 +209,11 @@ export function villeDepuisRaisons(raisons: readonly Offre["raisons"][number][])
     // conviendrait pas : c'est « — » que le code écrit.
     const reste = r.texte.slice(PREFIXE_VILLE_ANNONCEE.length);
     const fin = reste.indexOf(" — ");
-    const ville = (fin === -1 ? reste : reste.slice(0, fin)).trim();
+    // BORNÉE à la longueur que le schéma accepte pour `ville`. Sans tiret cadratin, tout
+    // le reste de la phrase serait pris pour un nom de lieu — et ce texte part ensuite
+    // vers Nominatim. Ni la création d'offre ni le rattrapage ne repassent par
+    // `OffreSchema`, donc la borne doit être ici.
+    const ville = (fin === -1 ? reste : reste.slice(0, fin)).trim().slice(0, LONGUEUR_MAX_VILLE);
     if (ville !== "") return ville;
   }
   return null;

@@ -86,7 +86,7 @@ describe("requête", () => {
 
 describe("lecture de la réponse", () => {
   it("lit une coordonnée de la région", () => {
-    expect(lireReponse(ok(46.81, -71.21))).toEqual({ lat: 46.81, lon: -71.21 });
+    expect(lireReponse(ok(46.81, -71.21))).toEqual({ lat: 46.81, lon: -71.21, adresse: null });
   });
 
   it("refuse une réponse vide ou malformée", () => {
@@ -163,7 +163,7 @@ describe("lecture d'une réponse d'ENTREPRISE", () => {
   const avecClasse = (classe: string) => [{ lat: "46.75", lon: "-71.29", class: classe }];
 
   it("accepte un lieu ponctuel plausible, classe connue ou absente", () => {
-    expect(lireReponseEntreprise(avecClasse("building"))).toEqual({ lat: 46.75, lon: -71.29 });
+    expect(lireReponseEntreprise(avecClasse("building"))).toEqual({ lat: 46.75, lon: -71.29, adresse: null });
     expect(lireReponseEntreprise(avecClasse("amenity"))).not.toBeNull();
     // Nominatim rend toujours une classe ; son absence ne doit pas rejeter à tort.
     expect(lireReponseEntreprise(ok(46.75, -71.29))).not.toBeNull();
@@ -202,22 +202,31 @@ describe("validation d'une résolution par la DISTANCE au centre-ville", () => {
 
   it("une résolution PROCHE de sa ville est exacte, aux coordonnées résolues", () => {
     const proche = decalageLat(RAYON_VALIDATION_KM - 5);
-    expect(deciderPrecision(proche, quebec)).toEqual({ ...proche, precision: "exacte" });
+    expect(deciderPrecision(proche, quebec)).toEqual({
+      ...proche,
+      precision: "exacte",
+      adresse: null,
+    });
   });
 
   it("REJETTE un homonyme d'ailleurs : repli au centre-ville, et le DIT", () => {
     // Le cas de la revue : la brasserie Labatt de MONTRÉAL est dans les bornes régionales
     // mais à ~230 km du centre de Québec — un homonyme, pas l'entreprise cherchée.
     const labattMontreal = { lat: 45.502, lon: -73.567 };
-    expect(deciderPrecision(labattMontreal, quebec)).toEqual({ ...quebec, precision: "ville" });
+    expect(deciderPrecision(labattMontreal, quebec)).toEqual({
+      ...quebec,
+      precision: "ville",
+      adresse: null,
+    });
     expect(deciderPrecision(decalageLat(RAYON_VALIDATION_KM + 5), quebec)).toEqual({
       ...quebec,
       precision: "ville",
+      adresse: null,
     });
   });
 
   it("sans résolution : repli au centre-ville", () => {
-    expect(deciderPrecision(null, quebec)).toEqual({ ...quebec, precision: "ville" });
+    expect(deciderPrecision(null, quebec)).toEqual({ ...quebec, precision: "ville", adresse: null });
   });
 });
 
@@ -227,6 +236,7 @@ describe("une ville", () => {
     await expect(geocoderVille("Québec", { recuperer })).resolves.toEqual({
       lat: 46.81,
       lon: -71.21,
+      adresse: null,
     });
     expect(appels[0]).toContain("nominatim.openstreetmap.org");
   });
@@ -319,5 +329,48 @@ describe("une passe complète", () => {
     const r = await geocoderPlusieurs([], { recuperer, ...sansAttente });
     expect(appels).toHaveLength(0);
     expect(r).toEqual({ trouvees: [], introuvables: [], panne: null });
+  });
+});
+
+describe("garde-temps : la série s'arrête avant le mur de l'appelant", () => {
+  // Le plafond en NOMBRE ne borne pas la DURÉE — une revue l'a mesuré : chaque requête peut
+  // aller jusqu'à `DELAI_MAX_REQUETE_MS`, donc deux séries de huit valent ~80 s dans le pire
+  // cas, au-delà des 60 s d'une fonction Vercel. Un mur atteint tue le processus sans
+  // exécuter le moindre `catch` : ni trace, ni acquis enregistré.
+
+  it("cesse d'interroger quand le budget est consommé", async () => {
+    // Horloge simulée : chaque lecture avance de 10 s. Le budget de 25 s laisse donc passer
+    // les premières requêtes, puis coupe — sans attendre le mur.
+    let t = 0;
+    const maintenant = () => (t += 10_000);
+    const { recuperer, appels } = faussetFetch([
+      ok(46.81, -71.21),
+      ok(46.82, -71.22),
+      ok(46.83, -71.23),
+      ok(46.84, -71.24),
+    ]);
+
+    const r = await geocoderPlusieurs(
+      ["Québec", "Lévis", "Beauport", "Charlesbourg"],
+      { recuperer, attendre: async () => {}, maintenant },
+      25_000,
+    );
+
+    // Le point qui compte : la série s'est ARRÊTÉE, elle n'a pas tout parcouru.
+    expect(appels.length).toBeLessThan(4);
+    expect(appels.length).toBeGreaterThan(0);
+    // Ce qui n'a pas été traité n'est NI trouvé NI introuvable : il reste simplement à
+    // situer, et la passe suivante le reprendra. Le confondre avec « introuvable » le
+    // condamnerait à ne jamais être retenté.
+    expect(r.trouvees.length + r.introuvables.length).toBe(appels.length);
+    expect(r.panne).toBeNull();
+  });
+
+  it("sans budget, parcourt toute la série", async () => {
+    // Non-vacuité du test précédent : sans ce cas, une fonction qui ne ferait plus RIEN
+    // passerait les deux.
+    const { recuperer, appels } = faussetFetch([ok(46.81, -71.21), ok(46.82, -71.22)]);
+    await geocoderPlusieurs(["Québec", "Lévis"], { recuperer, attendre: async () => {} });
+    expect(appels).toHaveLength(2);
   });
 });

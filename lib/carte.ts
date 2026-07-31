@@ -10,8 +10,14 @@
 // employeur serait du fake data — le dire est la condition pour l'afficher.
 //
 // CE QUE LA CARTE NE MONTRE PAS : le domicile de Marc (garde-fou n°1 — le trajet passe par
-// un lien Google Maps qui ne porte que la destination, `lib/lienTrajet.ts`), et le contenu
-// personnel des offres (`notes`, `userNote`) qui ne sert pas à la carte.
+// un lien Google Maps qui ne porte que la destination, `lib/lienTrajet.ts`).
+//
+// ⚠️ En revanche, depuis que les filtres sont partagés avec la liste, la page carte envoie
+// au navigateur les offres COMPLÈTES — `notes` et `userNote` incluses. La recherche libre
+// les parcourt, et c'est ce qui rend les filtres identiques des deux côtés. Ce n'est pas
+// une extension d'exposition : l'accueil le fait déjà, même session, même navigateur. Mais
+// ce commentaire a affirmé le contraire pendant une journée, et une garantie fausse est
+// pire qu'une absence de garantie — un audit s'y fierait.
 //
 // LA CARTE PART DES OFFRES, PAS D'UNE LISTE TENUE À LA MAIN (2026-07-31). Tout employeur
 // portant une offre vivante y a sa place dès qu'il est situé, qu'il figure ou non dans les
@@ -58,6 +64,14 @@ export interface EntrepriseSurCarte {
    * quand elle n'a pas été relevée. La carte le dit plutôt que d'afficher un chiffre.
    */
   km: number | null;
+  /**
+   * L'adresse d'OpenStreetMap, ou `null`.
+   *
+   * Présente UNIQUEMENT sur une position exacte : sur un repli au centre-ville, ce serait
+   * l'adresse de la mairie qu'on afficherait pour une usine. `null` se dit à l'écran
+   * (« adresse inconnue ») — c'est honnête, contrairement à une adresse plausible et fausse.
+   */
+  adresse: string | null;
   lecture: string;
   offres: OffreSurCarte[];
 }
@@ -95,6 +109,7 @@ export interface PositionEntreprise {
   lat: number;
   lon: number;
   precision: PrecisionEpingle;
+  adresse: string | null;
 }
 
 /** Les offres qu'une carte de recherche d'emploi doit montrer : celles qui sont vivantes. */
@@ -134,6 +149,7 @@ export function construireVue(
       nom: c.nom,
       ville: villeGeocodable(c.ville) ?? c.ville,
       km: c.km,
+      adresse: null,
       lecture: c.lecture,
       offres: [],
     });
@@ -166,6 +182,7 @@ export function construireVue(
         // Pas de distance de référence pour un employeur hors liste : elle sera reprise
         // des offres plus bas, MESURÉE, jamais déduite de l'épingle.
         km: null,
+        adresse: null,
         lecture: "",
         offres: [],
       };
@@ -205,6 +222,10 @@ export function construireVue(
       else aSituer.push(entreprise.nom);
       continue;
     }
+
+    // L'adresse vient de la POSITION retenue : c'est elle qui a été géocodée, et elle n'en
+    // porte une que si la résolution est exacte (`deciderPrecision`).
+    entreprise.adresse = position.adresse;
 
     // La meilleure note en tête : c'est elle qui teinte l'épingle.
     entreprise.offres.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));

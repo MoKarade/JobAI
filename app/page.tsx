@@ -14,6 +14,7 @@ import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "@/lib/synchr
 import { db } from "@/lib/db";
 import { resumer } from "@/lib/suivi";
 import { prochainesActions } from "@/lib/aFaire";
+import { aSurveiller, resumerRelances } from "@/lib/relances";
 import { aujourdhui } from "@/lib/ajout";
 import { classerPanne, type Panne } from "@/lib/panne";
 import type { Offre } from "@/lib/types";
@@ -21,6 +22,7 @@ import { TableauBord } from "@/components/TableauBord";
 import { ListeOffres } from "@/components/ListeOffres";
 import { FormulaireAjout } from "@/components/FormulaireAjout";
 import { AFaire } from "@/components/AFaire";
+import { Relances } from "@/components/Relances";
 import { Cadre } from "@/components/Cadre";
 
 // Le suivi change à chaque geste de Marc : jamais de page mise en cache.
@@ -126,6 +128,14 @@ export default async function Accueil() {
           {/* « Quoi faire » avant « où on en est » : c'est la question qu'on se pose en
               ouvrant l'app. La date vient du serveur, dans le fuseau de Marc. */}
           <AFaire actions={prochainesActions(offres, aujourdhui(new Date()))} />
+          {/* Les relances juste après « à faire » : ce sont des candidatures VIVANTES qui
+              attendent une décision, pas un historique. La logique existait depuis des
+              jours sans que rien ne l'affiche — un test vert n'a jamais mis une
+              information à l'écran. */}
+          <Relances
+            surveillance={aSurveiller(offres, aujourdhui(new Date()))}
+            resume={resumerRelances(offres, aujourdhui(new Date()))}
+          />
           <TableauBord resume={resumer(offres)} />
           <FormulaireAjout />
           <ListeOffres offres={offres} />

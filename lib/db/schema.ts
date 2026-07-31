@@ -232,6 +232,19 @@ export const entreprisesLieux = pgTable(
     lat: real("lat").notNull(),
     lon: real("lon").notNull(),
     precision: text("precision", { enum: ["exacte", "ville"] }).notNull(),
+    /**
+     * L'adresse telle qu'OpenStreetMap la donne, ou `null`.
+     *
+     * ⚠️ RENSEIGNÉE UNIQUEMENT QUAND `precision = 'exacte'`. Sur un repli au centre-ville,
+     * l'adresse retournée serait celle de la MUNICIPALITÉ, pas de l'employeur : l'écrire
+     * ici reviendrait à publier une adresse inventée pour une entreprise (garde-fou n°3).
+     * Mieux vaut ne rien dire que dire « 2 rue de l'Hôtel-de-Ville » pour une usine.
+     *
+     * Ce n'est pas une donnée personnelle : c'est l'adresse publique d'un employeur, en
+     * base et jamais dans un fichier versionné — le garde-fou n°1 vise le domicile de Marc
+     * et le code, pas les coordonnées publiques d'une entreprise.
+     */
+    adresse: text("adresse"),
     geocodeLe: timestamp("geocode_le", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

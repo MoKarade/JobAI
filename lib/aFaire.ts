@@ -14,9 +14,19 @@
 // changent AUCUNE donnée et ne notent rien.
 
 import type { Offre } from "./types";
+import { SEUIL_RELANCE_JOURS, etatRelance } from "./relances";
 
-/** Sans réponse après ce délai, une relance se justifie. */
-export const DELAI_RELANCE_JOURS = 14;
+/**
+ * Sans réponse après ce délai, une relance se justifie.
+ *
+ * ⚠️ RÉ-EXPORTÉE depuis `lib/relances.ts`, jamais redéfinie. Les deux modules ont porté
+ * chacun leur constante à 14 et chacun leur logique — deux règles pour une même question,
+ * et la moins complète gagnait ici : ce fichier ne surveillait que le statut `CVenvoye`,
+ * si bien qu'une candidature DÉJÀ relancée une fois (statut `Relance`) disparaissait des
+ * suggestions à jamais, alors qu'elle attend toujours une réponse. C'est ce que Marc a
+ * constaté (« pourquoi je vois pas relances », 2026-07-31).
+ */
+export const DELAI_RELANCE_JOURS = SEUIL_RELANCE_JOURS;
 
 /** Une offre repérée et jamais traitée depuis ce délai est probablement fermée. */
 export const DELAI_PEREMPTION_PROBABLE_JOURS = 30;
@@ -87,16 +97,22 @@ export function prochainesActions(
       continue;
     }
 
-    if (o.statut === "CVenvoye" && o.dateEnvoi) {
+    // La décision vient de `lib/relances.ts` — la MÊME que la section Relances de
+    // l'accueil. Elle couvre aussi le statut `Relance` : relancer n'est pas une réponse du
+    // recruteur, la candidature attend toujours.
+    const etat = etatRelance(o, aujourdhui);
+    if (etat === "a-relancer" || etat === "sans-suite") {
       const jours = joursEntre(o.dateEnvoi, aujourdhui);
-      if (jours >= DELAI_RELANCE_JOURS) {
-        actions.push({
-          offreId: o.id,
-          genre: "relancer",
-          titre: `Relancer ${o.entreprise}`,
-          motif: `CV envoyé ${ilYA(jours)}, sans réponse (seuil : ${DELAI_RELANCE_JOURS} jours).`,
-        });
-      }
+      actions.push({
+        offreId: o.id,
+        genre: "relancer",
+        titre:
+          etat === "sans-suite" ? `Classer ou relancer ${o.entreprise}` : `Relancer ${o.entreprise}`,
+        motif:
+          etat === "sans-suite"
+            ? `CV envoyé ${ilYA(jours)}, toujours sans réponse — le silence est une réponse.`
+            : `CV envoyé ${ilYA(jours)}, sans réponse (seuil : ${DELAI_RELANCE_JOURS} jours).`,
+      });
       continue;
     }
 

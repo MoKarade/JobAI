@@ -133,16 +133,28 @@ describe("ce qu'il ne doit JAMAIS suggérer", () => {
     expect(a).toEqual([]);
   });
 
-  it("rien sur une candidature déjà refusée ou déjà relancée", () => {
+  it("rien sur une candidature qui a REÇU une réponse", () => {
+    // Refus ou offre : dans les deux cas le recruteur a répondu, il n'y a plus rien à
+    // relancer. `Relance` n'en fait PAS partie — voir le cas suivant.
     const a = prochainesActions(
       [
         offre({ id: "r", statut: "Refusee", dateEnvoi: ilYA(60) }),
-        offre({ id: "l", statut: "Relance", dateEnvoi: ilYA(60) }),
         offre({ id: "o", statut: "Offre", dateEnvoi: ilYA(60) }),
       ],
       AUJ,
     );
     expect(a).toEqual([]);
+  });
+
+  it("mais une candidature DÉJÀ RELANCÉE continue d'apparaître", () => {
+    // ⚠️ Ce test dit l'INVERSE de ce qu'il disait avant le 2026-07-31, et c'est une
+    // décision, pas un glissement. Deux modules portaient chacun leur règle de relance :
+    // `aFaire` ne surveillait que `CVenvoye`, `lib/relances.ts` incluait `Relance` en
+    // expliquant pourquoi — relancer est un geste de MARC, pas une réponse du recruteur.
+    // La candidature attend toujours. L'ancienne version la faisait disparaître à jamais
+    // du panneau, ce que Marc a constaté directement (« pourquoi je vois pas relances »).
+    const a = prochainesActions([offre({ id: "l", statut: "Relance", dateEnvoi: ilYA(60) })], AUJ);
+    expect(a.map((x) => x.genre)).toEqual(["relancer"]);
   });
 
   it("pas de relance sur un CV dont la date d'envoi est inconnue", () => {

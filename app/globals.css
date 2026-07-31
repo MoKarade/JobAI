@@ -933,3 +933,64 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   border: 1px solid currentColor;
 }
 .bouton--reouvrir { border-color: var(--vert); color: var(--vert); }
+
+/* L'adresse d'une entreprise : l'information qu'on vient chercher pour se déplacer. Plus
+   lisible que les faits secondaires, sans crier — c'est du texte utile, pas un titre. */
+.carte-liste__adresse {
+  margin: 2px 0 6px;
+  font-size: 0.9rem;
+  color: var(--texte);
+}
+.popup-adresse {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85rem;
+}
+
+/* Les relances : une liste de travail, pas une alerte. Même trame que « à faire », un ton
+   plus sobre — ce sont des dossiers qui attendent, pas des urgences. */
+.relances {
+  margin: 24px 0;
+  padding: 16px 18px;
+  border-radius: var(--r-carte);
+  background: var(--surface);
+  box-shadow: var(--ombre-1);
+}
+.relances__titre {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+.relances__resume,
+.relances__rien,
+.relances__reste {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--texte-doux);
+}
+.relances__liste {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.relances__item {
+  display: grid;
+  gap: 2px;
+  padding-left: 10px;
+  border-left: 2px solid var(--bordure);
+}
+/* Le silence prolongé se distingue de la relance due : ce ne sont pas les mêmes gestes. */
+.relances__item--sans-suite {
+  border-left-color: var(--accent);
+}
+.relances__lien {
+  font-weight: 500;
+}
+.relances__motif {
+  font-size: 0.85rem;
+  color: var(--texte-doux);
+}
+.relances__reste {
+  margin-top: 10px;
+}

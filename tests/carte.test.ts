@@ -25,9 +25,14 @@ function offre(champs: Partial<Offre> = {}): Offre {
 }
 
 function positions(
-  entrees: [string, "exacte" | "ville", number, number][],
+  entrees: [string, "exacte" | "ville", number, number, (string | null)?][],
 ): Map<string, PositionEntreprise> {
-  return new Map(entrees.map(([nom, precision, lat, lon]) => [nom, { lat, lon, precision }]));
+  return new Map(
+    entrees.map(([nom, precision, lat, lon, adresse]) => [
+      nom,
+      { lat, lon, precision, adresse: adresse ?? null },
+    ]),
+  );
 }
 
 describe("appariement des noms d'entreprise", () => {
@@ -332,5 +337,49 @@ describe("garde-fou n°1 — la carte ne dit rien du domicile", () => {
 
   it("rend null sans épingle, plutôt qu'un centre arbitraire", () => {
     expect(cadrage([])).toBeNull();
+  });
+});
+
+/**
+ * Une adresse d'EXEMPLE, marquée comme telle.
+ *
+ * Le garde-fou n°1 (`tests/piiGuard.test.ts`) scanne les fichiers versionnés et ne
+ * distingue pas une adresse inventée d'une vraie — c'est exactement ce qui le rend utile.
+ * La convention du dépôt est donc « tout exemple porte un marqueur » ; le mot « exemple »
+ * en est un.
+ */
+const ADRESSE_EXEMPLE = "adresse d'exemple, telle qu'OpenStreetMap la rendrait";
+
+describe("l'adresse, quand on la connaît", () => {
+  // Demande de Marc (2026-07-31) : « je n'ai pas toutes les adresses, ça me les prend ».
+  // OpenStreetMap la donne au moment du géocodage ; on la jetait.
+
+  it("porte l'adresse d'une position EXACTE", () => {
+    const vue = construireVue(
+      [offre({ id: "1", entreprise: "Laserax" })],
+      ENTREPRISES_CIBLES,
+      positions([["Laserax", "exacte", 46.75, -71.29, ADRESSE_EXEMPLE]]),
+    );
+    const x = vue.epingles.flatMap((e) => e.entreprises).find((e) => e.nom === "Laserax")!;
+    expect(x.adresse).toBe(ADRESSE_EXEMPLE);
+  });
+
+  it("ne porte AUCUNE adresse sur un repli au centre-ville", () => {
+    // Le point qui compte : afficher l'adresse de la mairie comme celle d'une usine serait
+    // une donnée plausible et fausse. `deciderPrecision` la met déjà à null en amont ; ici
+    // on vérifie que rien ne la réintroduit par un autre chemin.
+    const vue = construireVue(
+      [offre({ id: "1", entreprise: "Laserax" })],
+      ENTREPRISES_CIBLES,
+      positions([["Laserax", "ville", 46.81, -71.22, null]]),
+    );
+    const x = vue.epingles.flatMap((e) => e.entreprises).find((e) => e.nom === "Laserax")!;
+    expect(x.adresse).toBeNull();
+  });
+
+  it("une entreprise pas encore située n'a évidemment pas d'adresse", () => {
+    const vue = construireVue([], ENTREPRISES_CIBLES, new Map());
+    expect(vue.aSituer.length).toBeGreaterThan(0);
+    expect(vue.epingles).toEqual([]);
   });
 });

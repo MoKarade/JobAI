@@ -21,6 +21,7 @@ import { offerReasons, offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { colonnesOffre } from "@/lib/persistance";
 import { mesurerDistances } from "@/lib/actions";
+import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "@/lib/synchro";
 import { executerPasse } from "@/lib/ingest/passe";
 import { recuperer } from "@/lib/ingest/sources";
 import type { AtsEntreprise } from "@/lib/ingest/types";
@@ -40,7 +41,18 @@ const CLE_JOURNAL = "veille-journal";
  * converger un stock de quarante employeurs en quelques nuits sans que Marc ouvre l'app —
  * les passes déclenchées par un affichage restent volontairement plus discrètes.
  */
-const MAX_SITUATIONS_CRON = 12;
+const MAX_SITUATIONS_CRON = 8;
+
+/**
+ * Temps accordé au géocodage du cron, villes et entreprises confondues.
+ *
+ * Le plafond en NOMBRE ne borne pas la DURÉE — une revue l'a mesuré : deux séries de huit
+ * requêtes valent ~80 s dans le pire cas (chacune peut aller jusqu'à `DELAI_MAX_REQUETE_MS`),
+ * bien au-delà des 60 s de la fonction. Un mur atteint tue le processus sans exécuter le
+ * moindre `catch` : ni trace, ni acquis enregistré. Vingt-cinq secondes laissent de la marge
+ * à l'ingestion, qui passe AVANT et qui est l'essentiel.
+ */
+const BUDGET_GEOCODAGE_CRON_MS = 25_000;
 const CLE_ATS = "veille-ats";
 const CLE_CURSEUR = "veille-curseur";
 
@@ -179,11 +191,25 @@ export async function GET(requete: Request) {
     // trouver. C'est du confort ; l'ingestion est l'essentiel.
     let localisation = "non tentée";
     try {
-      const m = await mesurerDistances({ maxSituations: MAX_SITUATIONS_CRON });
-      localisation = m.ok
-        ? `${m.villesRattrapees} ville(s) rattrapée(s), ${m.situees} située(s), ${m.mesurees} mesurée(s)`
-        : `refusée : ${m.erreur}`;
-      if (!m.ok) console.error("[cron] localisation refusée :", m.erreur);
+      // ⚠️ LA MÊME RÉSERVATION QUE LES PAGES, ET POUR LA MÊME RAISON.
+      //
+      // Le cron est un TROISIÈME déclencheur de la même action. Sans passer par
+      // `reserverPasse`, une nuit où Marc consulte l'app ferait tourner deux flux
+      // simultanés vers Nominatim — exactement la classe de bug corrigée le jour même sur
+      // les deux `after()` de la carte, réintroduite par un chemin qui n'avait pas hérité
+      // du verrou. Sauter une nuit est sans conséquence : la passe suivante reprend.
+      if (await reserverPasse(db, CLE_DISTANCES, DELAI_MESURE_AUTO_MS, new Date())) {
+        const m = await mesurerDistances({
+          maxSituations: MAX_SITUATIONS_CRON,
+          budgetGeocodageMs: BUDGET_GEOCODAGE_CRON_MS,
+        });
+        localisation = m.ok
+          ? `${m.villesRattrapees} ville(s) rattrapée(s), ${m.situees} située(s), ${m.mesurees} mesurée(s)`
+          : `refusée : ${m.erreur}`;
+        if (!m.ok) console.error("[cron] localisation refusée :", m.erreur);
+      } else {
+        localisation = "sautée — une passe vient d'avoir lieu";
+      }
     } catch (err) {
       console.error("[cron] localisation impossible", err);
       localisation = "échec — voir les journaux";

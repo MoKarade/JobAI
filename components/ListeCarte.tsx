@@ -29,6 +29,13 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                   {e.precision === "ville" ? " · position approximative" : ""}
                 </span>
               </h2>
+              {/* L'ADRESSE d'abord : c'est ce qu'on cherche quand on prépare un
+                  déplacement ou une candidature. Absente, on le DIT — une entreprise posée
+                  au centre de sa ville n'a pas d'adresse connue, et en afficher une
+                  plausible serait pire que le silence. */}
+              <p className="carte-liste__adresse">
+                {x.adresse ?? "Adresse inconnue d’OpenStreetMap — position approximative."}
+              </p>
               <p className="carte-liste__faits">
                 {x.km === null
                   ? "distance non mesurée"

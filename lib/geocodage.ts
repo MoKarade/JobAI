@@ -88,9 +88,22 @@ export function urlRechercheEntreprise(nom: string, ville: string): string {
   return `https://nominatim.openstreetmap.org/search?${p.toString()}`;
 }
 
-export interface Coordonnees {
+/** Un point, sans plus : c'est tout ce qu'il faut pour mesurer ou cadrer. */
+export interface Point {
   lat: number;
   lon: number;
+}
+
+export interface Coordonnees extends Point {
+  /**
+   * L'adresse telle qu'OpenStreetMap la donne (`display_name`), ou `null`.
+   *
+   * ⚠️ Elle ne vaut QUE si la résolution est jugée « exacte » ensuite
+   * (`deciderPrecision`) : sur un repli au centre-ville, c'est l'adresse de la MAIRIE
+   * qu'on tiendrait pour celle de l'employeur. C'est l'appelant qui décide de la garder ou
+   * non — ici on se contente de ne pas jeter ce que la source a dit.
+   */
+  adresse: string | null;
 }
 
 /**
@@ -107,7 +120,7 @@ export interface Coordonnees {
 export function lireReponse(charge: unknown): Coordonnees | null {
   if (!Array.isArray(charge) || charge.length === 0) return null;
 
-  const premier = charge[0] as { lat?: unknown; lon?: unknown };
+  const premier = charge[0] as { lat?: unknown; lon?: unknown; display_name?: unknown };
   const lat = Number(premier?.lat);
   const lon = Number(premier?.lon);
 
@@ -115,7 +128,11 @@ export function lireReponse(charge: unknown): Coordonnees | null {
   if (lat < BORNES.latMin || lat > BORNES.latMax) return null;
   if (lon < BORNES.lonMin || lon > BORNES.lonMax) return null;
 
-  return { lat, lon };
+  // L'adresse est BORNÉE : `display_name` peut être très long (Nominatim empile le pays,
+  // la région, le code postal…), et rien ne garantit sa forme. Une chaîne vide vaut
+  // absence — on ne stocke pas du vide qui aurait l'air d'une adresse.
+  const brute = typeof premier?.display_name === "string" ? premier.display_name.trim() : "";
+  return { lat, lon, adresse: brute === "" ? null : brute.slice(0, 300) };
 }
 
 /**
@@ -132,6 +149,8 @@ export interface OutilsGeocodage {
   courrielContact?: string | undefined;
   /** Injecté pour que les tests ne dorment pas réellement. */
   attendre?: (ms: number) => Promise<void>;
+  /** L'horloge, injectable : sans elle, le garde-temps ne serait pas testable. */
+  maintenant?: () => number;
 }
 
 const dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -160,7 +179,7 @@ export async function geocoderVille(
 }
 
 export interface ResultatPasse {
-  trouvees: { nom: string; lat: number; lon: number }[];
+  trouvees: { nom: string; lat: number; lon: number; adresse: string | null }[];
   introuvables: string[];
   panne: string | null;
 }
@@ -179,14 +198,28 @@ export interface ResultatPasse {
 async function geocoderSerie(
   requetes: readonly { nom: string; url: string; lire?: (charge: unknown) => Coordonnees | null }[],
   outils: OutilsGeocodage,
+  budgetMs: number | null = null,
 ): Promise<ResultatPasse> {
   const attendre = outils.attendre ?? dormir;
-  const trouvees: { nom: string; lat: number; lon: number }[] = [];
+  const maintenant = outils.maintenant ?? (() => Date.now());
+  const debut = maintenant();
+  const trouvees: ResultatPasse["trouvees"] = [];
   const introuvables: string[] = [];
 
   const aTraiter = requetes.slice(0, MAX_VILLES_PAR_PASSE);
 
   for (const [i, r] of aTraiter.entries()) {
+    // GARDE-TEMPS — la boucle s'arrête d'elle-même avant le mur de l'appelant.
+    //
+    // Le plafond en NOMBRE ne borne pas la DURÉE : chaque requête peut aller jusqu'à
+    // `DELAI_MAX_REQUETE_MS`, donc huit requêtes valent ~40 s dans le pire cas, et deux
+    // séries enchaînées dépassent les 60 s d'une fonction Vercel. Un mur atteint tue le
+    // processus AVANT l'enregistrement de l'acquis et sans exécuter le moindre `catch` :
+    // pas de trace, et le travail déjà fait est perdu pour rien. Ce qui n'a pas été
+    // traité n'est ni « trouvé » ni « introuvable » — il reste simplement à situer, et la
+    // passe suivante le reprendra.
+    if (budgetMs !== null && maintenant() - debut >= budgetMs) break;
+
     // Cadence AVANT la requête, sauf pour la première : ne jamais attendre pour rien.
     if (i > 0) await attendre(DELAI_ENTRE_REQUETES_MS);
 
@@ -273,23 +306,34 @@ export const RAYON_VALIDATION_KM = 30;
  * ville attendue ; sinon le centre-ville, en le disant. Jamais de troisième état.
  */
 export function deciderPrecision(
-  resolution: Coordonnees | null,
-  centreVille: Coordonnees,
-): { lat: number; lon: number; precision: "exacte" | "ville" } {
+  resolution: (Point & { adresse?: string | null }) | null,
+  centreVille: Point,
+): { lat: number; lon: number; precision: "exacte" | "ville"; adresse: string | null } {
   if (resolution !== null && distanceKm(resolution, centreVille) <= RAYON_VALIDATION_KM) {
-    return { ...resolution, precision: "exacte" };
+    return {
+      lat: resolution.lat,
+      lon: resolution.lon,
+      precision: "exacte",
+      adresse: resolution.adresse ?? null,
+    };
   }
-  return { ...centreVille, precision: "ville" };
+  // ⚠️ `adresse: null` sur un REPLI, et c'est le point important : l'adresse rendue par
+  // Nominatim serait alors celle du CENTRE-VILLE. La garder reviendrait à publier
+  // « 2 rue de l'Hôtel-de-Ville » comme adresse d'une usine — précisément le genre de
+  // chiffre plausible et faux qu'interdit le garde-fou n°3.
+  return { lat: centreVille.lat, lon: centreVille.lon, precision: "ville", adresse: null };
 }
 
 /** Géocode une série de VILLES. */
 export async function geocoderPlusieurs(
   villes: readonly string[],
   outils: OutilsGeocodage,
+  budgetMs: number | null = null,
 ): Promise<ResultatPasse> {
   return geocoderSerie(
     villes.map((nom) => ({ nom, url: urlRecherche(nom) })),
     outils,
+    budgetMs,
   );
 }
 
@@ -303,6 +347,7 @@ export async function geocoderPlusieurs(
 export async function geocoderEntreprises(
   entreprises: readonly { nom: string; ville: string }[],
   outils: OutilsGeocodage,
+  budgetMs: number | null = null,
 ): Promise<ResultatPasse> {
   return geocoderSerie(
     entreprises.map((e) => ({
@@ -311,5 +356,6 @@ export async function geocoderEntreprises(
       lire: lireReponseEntreprise,
     })),
     outils,
+    budgetMs,
   );
 }

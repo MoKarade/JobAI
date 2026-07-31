@@ -144,7 +144,13 @@ export async function passeGeocodage(): Promise<ResultatPasse> {
     }
 
     // 2. Les entreprises dont le centre-ville est connu, dans le budget restant.
-    const lignes: { nom: string; lat: number; lon: number; precision: "exacte" | "ville" }[] = [];
+    const lignes: {
+      nom: string;
+      lat: number;
+      lon: number;
+      precision: "exacte" | "ville";
+      adresse: string | null;
+    }[] = [];
     let exactes = 0;
 
     const tentables = aSituer.filter((e) => coordVilles.has(e.ville));
@@ -157,7 +163,9 @@ export async function passeGeocodage(): Promise<ResultatPasse> {
       // si Nominatim a rendu un lieu ponctuel À DISTANCE PLAUSIBLE du centre de sa ville.
       // La revue a prouvé qu'un homonyme DANS les bornes régionales (la brasserie Labatt
       // de Montréal, à ~247 km) serait sinon inscrit exact à vie.
-      const resolues = new Map(r.trouvees.map((t) => [t.nom, { lat: t.lat, lon: t.lon }]));
+      const resolues = new Map(
+        r.trouvees.map((t) => [t.nom, { lat: t.lat, lon: t.lon, adresse: t.adresse }]),
+      );
       for (const e of passe) {
         // Une entreprise que la panne a empêché d'interroger n'est PAS un « introuvable » :
         // elle n'apparaît ni dans trouvees ni dans introuvables, et ne s'inscrit pas.
@@ -270,7 +278,7 @@ async function domicile(): Promise<{ lat: number; lon: number } | null> {
  * Ne touche ni les distances déjà connues, ni les notes manuelles (`lib/distances.ts`).
  */
 export async function mesurerDistances(
-  options: { maxSituations?: number } = {},
+  options: { maxSituations?: number; budgetGeocodageMs?: number } = {},
 ): Promise<
   | { ok: true; mesurees: number; situees: number; villesRattrapees: number }
   | { ok: false; erreur: string }
@@ -326,7 +334,12 @@ export async function mesurerDistances(
     const manquants = employeursASituer(offres, positions, villeDe);
     let situees = 0;
     if (manquants.length > 0) {
-      const r = await situerLot(manquants.slice(0, maxSituations), positions, maxSituations);
+      const r = await situerLot(
+        manquants.slice(0, maxSituations),
+        positions,
+        maxSituations,
+        options.budgetGeocodageMs ?? null,
+      );
       situees = r;
       const relues = await db.select().from(entreprisesLieux);
       positions.clear();
@@ -357,7 +370,20 @@ async function situerLot(
   aSituer: readonly { nom: string; ville: string }[],
   positions: ReadonlyMap<string, { lat: number; lon: number; precision: "exacte" | "ville" }>,
   max = 2,
+  /**
+   * Temps total accordé au géocodage, villes ET entreprises confondues.
+   *
+   * Le plafond en NOMBRE ne borne pas la DURÉE : chaque requête peut aller jusqu'à
+   * `DELAI_MAX_REQUETE_MS`, donc deux séries de huit valent ~80 s dans le pire cas — au-delà
+   * du mur de 60 s d'une fonction Vercel, qui tue le processus sans exécuter le moindre
+   * `catch`. `null` = pas de borne (chemin manuel, où c'est l'appelant qui attend).
+   */
+  budgetMs: number | null = null,
 ): Promise<number> {
+  const debutGeocodage = Date.now();
+  /** Ce qu'il reste du budget — les deux séries se le PARTAGENT, elles ne le doublent pas. */
+  const reste = (): number | null =>
+    budgetMs === null ? null : Math.max(0, budgetMs - (Date.now() - debutGeocodage));
   const villesConnues = await db.select().from(villes);
   const coordVilles = new Map(villesConnues.map((v) => [v.nom, { lat: v.lat, lon: v.lon }]));
 
@@ -365,7 +391,7 @@ async function situerLot(
     (v) => !coordVilles.has(v),
   );
   if (villesRequises.length > 0) {
-    const rv = await geocoderPlusieurs(villesRequises.slice(0, max), outilsNominatim());
+    const rv = await geocoderPlusieurs(villesRequises.slice(0, max), outilsNominatim(), reste());
     if (rv.trouvees.length > 0) {
       await db
         .insert(villes)
@@ -378,9 +404,17 @@ async function situerLot(
   const tentables = aSituer.filter((e) => coordVilles.has(e.ville) && !positions.has(e.nom));
   if (tentables.length === 0) return 0;
 
-  const r = await geocoderEntreprises(tentables.slice(0, max), outilsNominatim());
-  const resolues = new Map(r.trouvees.map((t) => [t.nom, { lat: t.lat, lon: t.lon }]));
-  const inscrire: { nom: string; lat: number; lon: number; precision: "exacte" | "ville" }[] = [];
+  const r = await geocoderEntreprises(tentables.slice(0, max), outilsNominatim(), reste());
+  const resolues = new Map(
+    r.trouvees.map((t) => [t.nom, { lat: t.lat, lon: t.lon, adresse: t.adresse }]),
+  );
+  const inscrire: {
+    nom: string;
+    lat: number;
+    lon: number;
+    precision: "exacte" | "ville";
+    adresse: string | null;
+  }[] = [];
 
   for (const e of tentables.slice(0, max)) {
     if (!resolues.has(e.nom) && !r.introuvables.includes(e.nom)) continue;
