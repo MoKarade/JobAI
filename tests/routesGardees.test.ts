@@ -24,6 +24,11 @@ const EXEMPTIONS: Readonly<Record<string, string>> = {
     "Gardée AUTREMENT — par le jeton x-hub-token vérifié dans la route. La mettre derrière " +
     "la garde de session renverrait au hub une redirection HTML au lieu du JSON attendu.",
   "/api/auth/[...nextauth]": "Routes d'Auth.js : elles portent le flux de connexion lui-même.",
+  "/api/ingest/depot":
+    "Gardée AUTREMENT — par INGEST_TOKEN, comparé en temps constant, échec fermé (503 " +
+    "sans secret, 401 si faux). C'est le point de dépôt d'une Routine, qui a le connecteur " +
+    "Indeed mais aucun accès au dépôt GitHub ni session Google : la garde de session lui " +
+    "renverrait une redirection HTML au lieu du JSON attendu.",
   "/api/cron/veille":
     "Gardée AUTREMENT — par CRON_SECRET, comparé en temps constant dans la route, avec " +
     "échec fermé : 503 si le secret n'est pas configuré, 401 s'il est faux. Derrière la " +

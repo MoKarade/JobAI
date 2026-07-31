@@ -31,6 +31,10 @@ export function estCheminPublic(chemin: string): boolean {
   // recevrait une redirection vers l'écran de connexion, et la veille ne tournerait
   // jamais — en silence, puisque le cron ne remonte pas les redirections comme des échecs.
   if (chemin === "/api/cron/veille") return true;
+  // Même famille : gardée par `INGEST_TOKEN`, en temps constant, échec fermé. C'est le
+  // point d'entrée par lequel une Routine dépose ce qu'elle a trouvé — elle a le
+  // connecteur Indeed mais aucun accès au dépôt, et aucune session Google.
+  if (chemin === "/api/ingest/depot") return true;
 
   if (
     chemin.startsWith("/_next/static/") ||
