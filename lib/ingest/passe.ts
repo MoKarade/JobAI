@@ -16,7 +16,7 @@
 
 import { appliquerBalayage, resumerBalayage, type JournalVeille } from "../veille";
 import type { Offre } from "../types";
-import { idOffre, trier, type Tri } from "./pipeline";
+import { idOffre, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
 import { RECHERCHES_GUICHET, sourceAts, sourceGuichet } from "./sources";
 import type { AtsEntreprise, OffreBrute, Recuperateur, ResultatSource } from "./types";
 
@@ -33,6 +33,17 @@ export interface RapportPasse {
   perimees: string[];
   revenues: string[];
   enSursis: number;
+  /**
+   * Villes manquantes que cette passe permet de rattraper sur des offres DÉJÀ suivies.
+   *
+   * Une offre connue est comptée « doublon » et le tri n'en fait plus rien — juste tant
+   * que la source n'apporte rien de neuf. Mais une offre entrée avant que la ville soit
+   * écrite n'est pas géocodable, donc reste sans distance et hors de la carte : la source
+   * qui la republie porte pourtant l'information. Le point de dépôt faisait déjà ce
+   * rattrapage ; ne pas le faire ici laissait la veille quotidienne aveugle au même
+   * manque, pour la seule raison qu'on l'avait codé ailleurs.
+   */
+  villesACompleter: VilleACompleter[];
   /** Le suivi après la passe, prêt à écrire. */
   offres: Offre[];
   journal: JournalVeille;
@@ -133,6 +144,7 @@ export async function executerPasse(
       refusees: tri.refusees,
     },
     nouvelles: tri.retenues.map((o) => o.id),
+    villesACompleter: villesACompleter(brutes, connues),
     perimees: balayage.perimees,
     revenues: balayage.revenues,
     enSursis: balayage.enSursis.length,

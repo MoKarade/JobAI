@@ -18,6 +18,7 @@
 // c'est lui qui décide. Fonctions PURES : la décision se teste sans base ni réseau.
 
 import { computeScore, PLAFOND_NOTE_CALCULEE } from "./scoring";
+import { positionDe } from "./employeurs";
 import type { Offre } from "./types";
 
 /** Une position géocodée, avec ce qu'elle vaut vraiment. */
@@ -64,7 +65,10 @@ export function planifierDistances(
     // précédent. La recalculer à chaque passage ferait bouger l'affichage sans raison.
     if (o.km !== null) continue;
 
-    const pos = positions.get(o.entreprise);
+    // `positionDe` : l'employeur peut être situé sous un autre nom que celui de l'annonce
+    // (« Laserax » côté liste de chasse, « Laserax inc. » côté offre). La comparaison
+    // littérale d'avant laissait l'offre sans distance alors que la position existait.
+    const pos = positionDe(o.entreprise, positions);
     if (!pos) continue;
 
     const km = arrondirKm(distance(pos));
@@ -118,7 +122,10 @@ export function employeursASituer(
 
   for (const o of offres) {
     if (o.histo || o.km !== null) continue;
-    if (positions.has(o.entreprise) || vus.has(o.entreprise)) continue;
+    // Même règle que partout : un employeur déjà situé sous un autre nom n'est PAS à
+    // situer. Sans ça, on redemande à Nominatim ce qu'on sait déjà — un appel de plus à
+    // un service bénévole, et une seconde ligne pour un même lieu.
+    if (positionDe(o.entreprise, positions) !== null || vus.has(o.entreprise)) continue;
     vus.add(o.entreprise);
 
     const ville = villeConnue(o.entreprise);

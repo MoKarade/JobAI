@@ -162,6 +162,30 @@ describe("validation de la saisie", () => {
   });
 });
 
+describe("la ville saisie à la main", () => {
+  // Sans ville, une offre ajoutée pour un employeur absent des entreprises cibles n'est
+  // pas géocodable — « ISS » seul est une recherche mondiale — donc sans distance et hors
+  // de la carte. Le formulaire ne la demandait pas, et `ville` n'est pas modifiable
+  // ensuite : l'offre restait dans ce cul-de-sac à vie.
+  const ctx = { id: "fabrique-nord-coordonnateur", aujourdhui: "2026-07-28" };
+
+  it("est conservée telle que Marc l'a écrite", () => {
+    expect(construireOffre(saisie({ ville: "Saint-Augustin-de-Desmaures" }), ctx).ville).toBe(
+      "Saint-Augustin-de-Desmaures",
+    );
+  });
+
+  it("reste FACULTATIVE : ne pas la connaître n'empêche pas d'ajouter l'offre", () => {
+    expect(construireOffre(saisie(), ctx).ville).toBeNull();
+  });
+
+  it("une saisie vide vaut ABSENCE, jamais une chaîne vide", () => {
+    // Une chaîne vide partirait au géocodage et ferait chercher « » — et la carte ne
+    // pourrait plus dire honnêtement « aucun lieu annoncé ».
+    expect(construireOffre(saisie({ ville: "   " }), ctx).ville).toBeNull();
+  });
+});
+
 describe("construction de l'offre", () => {
   const ctx = { id: "fabrique-nord-coordonnateur", aujourdhui: "2026-07-28" };
 

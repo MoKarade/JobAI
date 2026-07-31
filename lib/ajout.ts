@@ -106,6 +106,16 @@ export const NouvelleOffreSchema = z.object({
   // 500 km : très au-delà du rayon de 50 km, mais une saisie doit pouvoir être aberrante
   // et rejetée honnêtement plutôt que silencieusement acceptée à 4 chiffres.
   km: z.number().finite().min(0).max(500, "Distance invraisemblable.").nullable().default(null),
+  /**
+   * Ville de l'employeur. Facultative, mais c'est elle qui rend l'offre SITUABLE.
+   *
+   * Sans elle, une offre saisie à la main pour un employeur absent des entreprises cibles
+   * ne peut pas être géocodée — « ISS » seul est une recherche mondiale — et reste donc
+   * sans distance et hors de la carte, à vie. Le formulaire ne la demandait pas ; l'offre
+   * partait avec `ville: null` et personne ne pouvait plus la corriger, `ville` n'étant
+   * pas non plus un champ modifiable. C'était un cul-de-sac silencieux.
+   */
+  ville: z.string().trim().max(120).nullable().default(null),
   salaireAffiche: z.string().trim().max(80).nullable().default(null),
   priorite: PrioriteSchema.default("Moyenne"),
   /** Note vérifiée à la main. `null` = « calcule-la pour moi ». */
@@ -141,6 +151,9 @@ export function construireOffre(
     poste: saisie.poste,
     lien: saisie.lien,
     km: saisie.km,
+    // Une chaîne vide vaut « pas de ville » : le géocodage ne doit pas recevoir « » à
+    // chercher, et la carte doit pouvoir dire honnêtement « pas de lieu annoncé ».
+    ville: saisie.ville === null || saisie.ville === "" ? null : saisie.ville,
     salaireAffiche: saisie.salaireAffiche,
     priorite: saisie.priorite,
     // Une offre qu'on vient de repérer n'a rien d'envoyé : le statut initial n'est pas un

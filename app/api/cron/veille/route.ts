@@ -133,6 +133,14 @@ export async function GET(requete: Request) {
       }
     }
 
+    // Le rattrapage des villes manquantes : une offre déjà suivie que la source republie
+    // apporte parfois la ville qu'elle n'avait pas. Sans elle, son employeur n'est pas
+    // géocodable — donc sans distance et hors de la carte. La décision est prise par
+    // `villesACompleter` (pure, testée), qui n'écrase jamais une ville connue.
+    for (const { id, ville } of rapport.villesACompleter) {
+      await db.update(offers).set({ ville, majLe: new Date() }).where(eq(offers.id, id));
+    }
+
     // Les péremptions : une DATE de constat, jamais un drapeau. Le suivi de Marc n'est pas
     // touché — la veille n'écrit que `perimeeLe` (garde-fou n°2).
     for (const id of rapport.perimees) {

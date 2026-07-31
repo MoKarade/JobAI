@@ -25,32 +25,19 @@
 import type { EntrepriseCible } from "./reference";
 import type { Offre } from "./types";
 import { villeGeocodable } from "./geocodage";
+import { apparier as apparierNoms, positionDe } from "./employeurs";
 
-/**
- * Deux noms d'entreprise désignent-ils le même employeur ?
- *
- * Règle par SOUS-CHAÎNE, avec une longueur minimale. Le suivi écrit « Groupe Leclerc » là
- * où la référence écrit « Groupe Leclerc », mais aussi « Laserax » face à « Laserax ». Sans
- * plancher de longueur, un nom de deux lettres apparierait la moitié de la liste — c'est le
- * piège classique du matching par sous-chaîne, et il ne se voit qu'une fois le mal fait.
- */
-export const LONGUEUR_MIN_APPARIEMENT = 4;
-
-export function apparier(a: string, b: string): boolean {
-  const x = a.trim().toLowerCase();
-  const y = b.trim().toLowerCase();
-  if (x.length < LONGUEUR_MIN_APPARIEMENT || y.length < LONGUEUR_MIN_APPARIEMENT) {
-    return x === y && x.length > 0;
-  }
-  return x === y || x.includes(y) || y.includes(x);
-}
+// L'appariement des noms d'employeur vit dans `lib/employeurs.ts` : la carte n'est pas
+// seule à s'en servir, et la mesure des distances comparait les noms littéralement — deux
+// règles pour une même question, dont la moins bonne gagnait là où on ne regardait pas.
+export { LONGUEUR_MIN_APPARIEMENT, apparier } from "./employeurs";
 
 /** Le libellé de ville de la référence, ou `null` si l'employeur n'y figure pas. */
 export function villeDeLEntreprise(
   entreprise: string,
   cibles: readonly EntrepriseCible[],
 ): string | null {
-  return cibles.find((c) => apparier(entreprise, c.nom))?.ville ?? null;
+  return cibles.find((c) => apparierNoms(entreprise, c.nom))?.ville ?? null;
 }
 
 export interface OffreSurCarte {
@@ -138,13 +125,7 @@ export function construireVue(
 ): VueCarte {
   const vivantes = offres.filter(estVivante);
 
-  /** Une entreprise en cours d'assemblage, avant qu'on sache si elle a une position. */
-  interface Brouillon extends EntrepriseSurCarte {
-    /** Noms tels que les offres les portent — la position peut être inscrite sous l'un d'eux. */
-    alias: Set<string>;
-  }
-
-  const parEntreprise = new Map<string, Brouillon>();
+  const parEntreprise = new Map<string, EntrepriseSurCarte>();
 
   // Les cibles d'abord : leur nom fait autorité, et leurs faits relevés à la main
   // (distance de référence, lecture) valent mieux que ce qu'une offre en dit.
@@ -155,7 +136,6 @@ export function construireVue(
       km: c.km,
       lecture: c.lecture,
       offres: [],
-      alias: new Set([c.nom]),
     });
   }
 
@@ -171,10 +151,10 @@ export function construireVue(
     // borné par le plancher de longueur : un sigle court (« ISS ») exige l'égalité stricte
     // et ne fusionne donc pas, ce qui est voulu — sous quatre lettres, la sous-chaîne
     // apparierait n'importe quoi.
-    const cible = cibles.find((c) => apparier(o.entreprise, c.nom));
+    const cible = cibles.find((c) => apparierNoms(o.entreprise, c.nom));
     const nom =
       cible?.nom ??
-      [...parEntreprise.keys()].find((connu) => apparier(o.entreprise, connu)) ??
+      [...parEntreprise.keys()].find((connu) => apparierNoms(o.entreprise, connu)) ??
       o.entreprise;
     const villeOffre = o.ville ? (villeGeocodable(o.ville) ?? o.ville) : "";
 
@@ -188,12 +168,10 @@ export function construireVue(
         km: null,
         lecture: "",
         offres: [],
-        alias: new Set(),
       };
       parEntreprise.set(nom, entreprise);
     }
 
-    entreprise.alias.add(o.entreprise);
     // La ville d'une cible fait foi ; pour les autres, la première ville annoncée sert.
     if (entreprise.ville === "" && villeOffre !== "") entreprise.ville = villeOffre;
 
@@ -213,23 +191,12 @@ export function construireVue(
   // liste ses entreprises — dix cercles empilés au centre-ville se masqueraient l'un l'autre.
   const groupesVille = new Map<string, Epingle>();
 
-  for (const brouillon of parEntreprise.values()) {
-    const { alias, ...entreprise } = brouillon;
-
-    // La position peut avoir été inscrite sous le nom de la cible OU sous celui qu'une
-    // offre porte : la mesure des distances géocode `offre.entreprise`, la passe de la
-    // carte géocode `cible.nom`. Chercher les deux évite une entreprise « à situer » dont
-    // la position existe déjà sous son autre nom.
-    let position = positions.get(entreprise.nom);
-    if (!position) {
-      for (const a of alias) {
-        const p = positions.get(a);
-        if (p) {
-          position = p;
-          break;
-        }
-      }
-    }
+  for (const entreprise of parEntreprise.values()) {
+    // `positionDe` et non `positions.get` : la position peut avoir été inscrite sous le nom
+    // de la cible OU sous celui que porte une annonce — la mesure des distances géocode
+    // `offre.entreprise`, la passe de la carte géocode `cible.nom`. La règle est partagée
+    // avec `lib/distances.ts` (`lib/employeurs.ts`), sinon les deux divergent.
+    const position = positionDe(entreprise.nom, positions);
 
     if (!position) {
       // Sans ville, aucune passe ne pourra la situer : le dire plutôt que de la faire

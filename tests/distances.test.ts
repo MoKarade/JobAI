@@ -134,3 +134,41 @@ describe("arrondi", () => {
     expect(arrondirKm(0.04)).toBe(0);
   });
 });
+
+describe("un employeur situé sous un AUTRE nom est quand même reconnu", () => {
+  // Deux chemins géocodent sans employer le même nom : la passe de la carte inscrit le nom
+  // de la liste de chasse (« Laserax »), la mesure inscrit celui de l'annonce (« Laserax
+  // inc. »). La comparaison littérale d'avant faisait deux dégâts silencieux, tous deux
+  // mesurés par la revue : l'offre restait sans distance, et l'entreprise était renvoyée
+  // au géocodage alors que sa position existait déjà.
+
+  it("mesure la distance à partir de la position inscrite sous l'autre nom", () => {
+    const majs = planifierDistances(
+      [offre({ id: "a", entreprise: "Laserax inc." })],
+      new Map([["Laserax", POS_PROCHE]]),
+      dist(9.4),
+    );
+    expect(majs.map((m) => m.id)).toEqual(["a"]);
+    expect(majs[0]!.km).toBe(9.4);
+  });
+
+  it("ne le renvoie PAS au géocodage : sa position est connue", () => {
+    const r = employeursASituer(
+      [offre({ id: "a", entreprise: "Laserax inc." })],
+      new Map([["Laserax", POS_PROCHE]]),
+      () => "Québec",
+    );
+    expect(r).toEqual([]);
+  });
+
+  it("mais un employeur réellement inconnu reste à situer", () => {
+    // Sans ce cas, le test précédent passerait aussi si la fonction ne rendait plus jamais
+    // rien — l'assertion serait vraie et vide de sens.
+    const r = employeursASituer(
+      [offre({ id: "a", entreprise: "Employeur Jamais Vu" })],
+      new Map([["Laserax", POS_PROCHE]]),
+      () => "Québec",
+    );
+    expect(r).toEqual([{ nom: "Employeur Jamais Vu", ville: "Québec" }]);
+  });
+});

@@ -33,6 +33,7 @@ const VIDE = {
   entreprise: "",
   poste: "",
   lien: "",
+  ville: "",
   km: "",
   salaireAffiche: "",
   priorite: "Moyenne" as Priorite,
@@ -72,6 +73,7 @@ export function FormulaireAjout() {
         entreprise: champs.entreprise,
         poste: champs.poste,
         lien: champs.lien.trim(),
+        ville: champs.ville.trim() || null,
         km: nombreOuNull(champs.km),
         salaireAffiche: champs.salaireAffiche.trim() || null,
         priorite: champs.priorite,
@@ -149,6 +151,27 @@ export function FormulaireAjout() {
           />
           {erreursChamp.lien ? (
             <span className="ajout__erreur-champ">{erreursChamp.lien}</span>
+          ) : null}
+        </label>
+
+        <label className="controle">
+          <span className="controle__l">Ville</span>
+          <input
+            className="select"
+            type="text"
+            placeholder="Québec, Lévis…"
+            value={champs.ville}
+            disabled={enCours}
+            aria-invalid={erreursChamp.ville ? true : undefined}
+            aria-describedby="aide-ville"
+            onChange={(e) => modifier("ville", e.target.value)}
+          />
+          <span id="aide-ville" className="ajout__aide">
+            Facultative, mais c’est elle qui permet de situer l’employeur et de mesurer la
+            distance automatiquement.
+          </span>
+          {erreursChamp.ville ? (
+            <span className="ajout__erreur-champ">{erreursChamp.ville}</span>
           ) : null}
         </label>
 
