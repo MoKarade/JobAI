@@ -386,6 +386,20 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   répondait « à jour » et la correction ne partait jamais en base. Quand on corrige un champ
   oublié, RECENSER toutes les listes qui l'énumèrent — écriture, empreinte, sérialisation,
   export — et vérifier chacune par une sonde, pas par un raisonnement sur sa finalité.
+- **Une heuristique peut grouper ce qu'on REGARDE, jamais décider ce qu'on ÉCRIT.**
+  En unifiant l'appariement des noms d'employeur, j'ai fait passer une règle de sous-chaîne
+  de l'affichage (grouper deux annonces sur une épingle) à l'écriture (choisir la position
+  qui donne la distance et la note d'une offre) — dans le fichier même dont l'en-tête
+  interdisait ce glissement. Mesuré : `apparier("Robert", "Groupe Robert")` est vrai, donc
+  une offre de « Robert » aurait reçu en silence la distance de « Groupe Robert ». Deux
+  usages, deux règles : floue pour regrouper un affichage (une erreur se voit), stricte pour
+  décider d'une donnée (une erreur s'écrit en base sans bruit). Et quand on unifie deux
+  implémentations, se demander laquelle des deux était la PLUS STRICTE — c'est elle qui
+  protégeait quelque chose.
+- **Un choix qui dépend de l'ordre d'un `SELECT` sans `ORDER BY` est un tirage au sort.**
+  Postgres ne garantit aucun ordre sans tri explicite. Un « premier candidat qui apparie »
+  change donc d'une requête à l'autre — et se fige en base à la première écriture, ce qui
+  le rend indébogable après coup. Trier avant de choisir, et le tester.
 - **Un écart « assumé par un commentaire » reste un écart.** Le rattrapage de ville
   n'existait que dans le point de dépôt, et un commentaire disait que le cron ne le faisait
   pas — ce qui laissait la veille quotidienne aveugle au même manque, pour la seule raison

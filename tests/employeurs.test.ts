@@ -1,12 +1,25 @@
 // tests/employeurs.test.ts — le même employeur sous deux noms.
 //
-// La règle vivait dans `lib/carte.ts` et n'était appliquée QUE par la carte : la mesure des
-// distances comparait les noms littéralement. Une entreprise déjà située sous « Laserax »
-// était donc re-géocodée sous « Laserax inc. » — un appel de plus à un service bénévole, et
-// une ligne en double. Ces tests verrouillent la règle partagée.
+// DEUX règles, et c'est la frontière entre elles qui compte le plus ici.
+//
+// `apparier` (sous-chaîne) GROUPE un affichage : elle vivait dans `lib/carte.ts` et n'était
+// appliquée que par la carte, si bien que la mesure des distances comparait les noms
+// littéralement et re-géocodait « Laserax inc. » alors que « Laserax » était déjà situé.
+//
+// `memeEmployeur` (égalité après normalisation) décide de DONNÉES : quelle position sert à
+// écrire une distance et une note. La première version de ce module laissait `positionDe`
+// employer la règle floue — mesuré : une offre de « Robert » aurait pris la position de
+// « Groupe Robert ». Les tests du bas verrouillent cette séparation.
 
 import { describe, it, expect } from "vitest";
-import { LONGUEUR_MIN_APPARIEMENT, apparier, positionDe } from "../lib/employeurs";
+import {
+  LONGUEUR_MIN_APPARIEMENT,
+  apparier,
+  memeEmployeur,
+  normaliserNomEmployeur,
+  positionDe,
+} from "../lib/employeurs";
+import { ENTREPRISES_CIBLES } from "../lib/reference";
 
 describe("appariement des noms", () => {
   it("apparie une désignation plus longue à sa forme courte", () => {
@@ -66,5 +79,69 @@ describe("retrouver une position sous n'importe lequel des deux noms", () => {
 
   it("ne trouve rien dans une table vide, sans lever", () => {
     expect(positionDe("Laserax", new Map())).toBeNull();
+  });
+});
+
+describe("l'égalité STRICTE, celle qui décide des données", () => {
+  // `apparier` groupe un affichage ; `memeEmployeur` décide quelle position sert à écrire
+  // une distance et une note. Confondre les deux a un coût mesuré, verrouillé plus bas.
+
+  it("ignore la forme juridique, la casse et la ponctuation", () => {
+    expect(memeEmployeur("Laserax", "Laserax inc.")).toBe(true);
+    expect(memeEmployeur("LASERAX INC", "laserax")).toBe(true);
+    expect(memeEmployeur("Machin ltée", "Machin")).toBe(true);
+    expect(memeEmployeur("Truc Corp.", "truc")).toBe(true);
+  });
+
+  it("retire les formes juridiques EMPILÉES", () => {
+    expect(normaliserNomEmployeur("Machin inc. ltée")).toBe("machin");
+  });
+
+  it("ne rapproche PAS deux employeurs qu'une sous-chaîne suffirait à confondre", () => {
+    // LE cas qui a motivé la séparation des deux règles. Mesuré avant correction :
+    // `apparier` rendait `true`, donc une offre de « Robert » recevait la position, la
+    // distance et la note de « Groupe Robert » — sans un mot dans les journaux.
+    expect(apparier("Robert", "Groupe Robert")).toBe(true);
+    expect(memeEmployeur("Robert", "Groupe Robert")).toBe(false);
+    expect(memeEmployeur("Leclerc", "Groupe Leclerc")).toBe(false);
+    expect(memeEmployeur("Boulangerie Leclerc", "Groupe Leclerc")).toBe(false);
+  });
+
+  it("un nom vide n'apparie rien, pas même un autre nom vide", () => {
+    expect(memeEmployeur("", "")).toBe(false);
+    expect(memeEmployeur("  inc.  ", "")).toBe(false);
+  });
+
+  it("aucune entreprise cible n'en confond une autre", () => {
+    // Volume prouvé : sans cette borne, une liste vidée ferait passer le test à vide.
+    expect(ENTREPRISES_CIBLES.length).toBeGreaterThan(20);
+    const confusions: string[] = [];
+    for (const a of ENTREPRISES_CIBLES) {
+      for (const b of ENTREPRISES_CIBLES) {
+        if (a.nom !== b.nom && memeEmployeur(a.nom, b.nom)) confusions.push(`${a.nom} ~ ${b.nom}`);
+      }
+    }
+    expect(confusions).toEqual([]);
+  });
+});
+
+describe("positionDe ne décide jamais au hasard", () => {
+  it("n'utilise PAS la règle floue : un homonyme partiel n'a pas de position", () => {
+    const positions = new Map([["Groupe Robert", { lat: 46.7, lon: -71.15 }]]);
+    expect(positionDe("Robert", positions)).toBeNull();
+  });
+
+  it("rend le MÊME résultat quel que soit l'ordre de la table", () => {
+    // `db.select()` sans `ORDER BY` ne garantit aucun ordre. Sans tri, le gagnant d'une
+    // ambiguïté changerait d'une requête à l'autre — puis serait figé en base par la
+    // première mesure de distance, donc indébogable après coup.
+    const entrees: [string, { lat: number; lon: number }][] = [
+      ["Machin ltée", { lat: 1, lon: 1 }],
+      ["Machin inc.", { lat: 2, lon: 2 }],
+    ];
+    const a = positionDe("Machin", new Map(entrees));
+    const b = positionDe("Machin", new Map([...entrees].reverse()));
+    expect(a).toEqual(b);
+    expect(a).not.toBeNull();
   });
 });

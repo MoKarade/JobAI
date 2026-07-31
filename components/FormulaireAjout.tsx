@@ -163,10 +163,10 @@ export function FormulaireAjout() {
             value={champs.ville}
             disabled={enCours}
             aria-invalid={erreursChamp.ville ? true : undefined}
-            aria-describedby="aide-ville"
+            aria-describedby="ajout-aide-ville"
             onChange={(e) => modifier("ville", e.target.value)}
           />
-          <span id="aide-ville" className="ajout__aide">
+          <span id="ajout-aide-ville" className="ajout__aide">
             Facultative, mais c’est elle qui permet de situer l’employeur et de mesurer la
             distance automatiquement.
           </span>
