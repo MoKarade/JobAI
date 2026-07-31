@@ -82,6 +82,11 @@ export const OffreSchema = z.object({
   lien: z.string().url().or(z.literal("")),
   /** Distance à vol d'oiseau, en km. null = inconnue (pas zéro). */
   km: z.number().finite().min(0).nullable(),
+  /**
+   * Ville de l'employeur, telle qu'annoncée par la source. `null` si inconnue.
+   * Sert au géocodage : « ISS » seul est une recherche mondiale, « ISS, Québec » non.
+   */
+  ville: z.string().max(120).nullable().default(null),
   /** Salaire TEL QU'AFFICHÉ, en texte. null si l'offre n'en donne aucun. */
   salaireAffiche: z.string().max(80).nullable(),
   priorite: PrioriteSchema,

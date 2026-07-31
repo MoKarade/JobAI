@@ -152,6 +152,9 @@ export function trier(
       poste: brute.titre,
       lien: brute.lien,
       km: null,
+      // La ville est CONSERVÉE : sans elle, un employeur hors des cibles ne peut pas être
+      // géocodé plus tard, et sa distance — le critère n°1 — resterait inconnue à vie.
+      ville: brute.ville.trim() || null,
       salaireAffiche: null,
       priorite: "Moyenne",
       statut: "Identifiee",

@@ -257,3 +257,15 @@ export const CLE_GEOCODAGE = "geocodage-auto";
  * temporisé — un geste explicite de Marc n'a pas à attendre.
  */
 export const DELAI_PASSE_AUTO_MS = 5 * 60 * 1000;
+
+/** Clé de la temporisation de la mesure des distances. */
+export const CLE_DISTANCES = "distances-auto";
+
+/**
+ * Intervalle minimal entre deux mesures automatiques.
+ *
+ * Plus court que le géocodage (5 min) : la mesure elle-même ne coûte rien — c'est du
+ * calcul local. Ce qu'elle borne, c'est le géocodage des employeurs manquants qu'elle
+ * déclenche en amont, lequel appelle Nominatim. D'où un délai du même ordre.
+ */
+export const DELAI_MESURE_AUTO_MS = 5 * 60 * 1000;

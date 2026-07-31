@@ -21,6 +21,9 @@ import type { Offre } from "./types";
 /** Raccourci de lecture : toutes les entrées du jeu de départ ont la même provenance. */
 const base = {
   source: "seed",
+  // Les entrées d'origine portent déjà leur distance, relevée à la main : la ville ne leur
+  // sert pas au géocodage. Celles des balayages la renseignent, elle.
+  ville: null,
   statut: "Identifiee",
   dateEnvoi: "",
   histo: false,
@@ -852,6 +855,7 @@ export const SEED: Offre[] = [
   {
     id: "sanitech-superviseur-technique",
     source: "seed",
+    ville: "Lévis",
     dateReperage: "2026-07-30",
     entreprise: "Groupe Sani-Tech",
     poste: "Superviseur(e) technique — dessin et conception",
@@ -895,6 +899,7 @@ export const SEED: Offre[] = [
   {
     id: "robert-coord-qualite-ac",
     source: "seed",
+    ville: "Lévis",
     dateReperage: "2026-07-30",
     entreprise: "Groupe Robert",
     poste: "Coordonnateur(ice) qualité, formation et amélioration continue",
@@ -938,6 +943,7 @@ export const SEED: Offre[] = [
   {
     id: "domtar-superviseur-entretien",
     source: "seed",
+    ville: "Château-Richer",
     dateReperage: "2026-07-30",
     entreprise: "Domtar",
     poste: "Superviseur entretien",
@@ -976,6 +982,7 @@ export const SEED: Offre[] = [
   {
     id: "mundial-tech-amelioration-continue",
     source: "seed",
+    ville: "Saint-Lambert-de-Lauzon",
     dateReperage: "2026-07-30",
     entreprise: "Groupe Mundial",
     poste: "Technicien(ne) en amélioration continue",
@@ -1019,6 +1026,7 @@ export const SEED: Offre[] = [
   {
     id: "nutriart-adjoint-dir-maintenance",
     source: "seed",
+    ville: "Québec",
     dateReperage: "2026-07-30",
     entreprise: "Nutriart",
     poste: "Adjoint(e) au directeur de la maintenance",
@@ -1057,6 +1065,7 @@ export const SEED: Offre[] = [
   {
     id: "opsens-tech-genie-manufacturier",
     source: "seed",
+    ville: "Québec",
     dateReperage: "2026-07-30",
     entreprise: "Opsens",
     poste: "Technicien(ne) en génie manufacturier",
@@ -1100,6 +1109,7 @@ export const SEED: Offre[] = [
   {
     id: "opsens-tech-genie-industriel",
     source: "seed",
+    ville: "Québec",
     dateReperage: "2026-07-30",
     entreprise: "Opsens",
     poste: "Technicien(ne) en génie industriel",
@@ -1138,6 +1148,7 @@ export const SEED: Offre[] = [
   {
     id: "jeldwen-planificateur-production",
     source: "seed",
+    ville: "Laurier-Station",
     dateReperage: "2026-07-30",
     entreprise: "JELD-WEN",
     poste: "Planificateur de production",
@@ -1176,6 +1187,7 @@ export const SEED: Offre[] = [
   {
     id: "tardif-charge-projets-elevation",
     source: "seed",
+    ville: "Saint-Augustin-de-Desmaures",
     dateReperage: "2026-07-30",
     entreprise: "TARDIF",
     poste: "Chargé(e) de projets — solutions d'élévation",
@@ -1254,6 +1266,7 @@ function historique(
     poste,
     lien: "",
     km: null,
+    ville: null,
     salaireAffiche: null,
     priorite: "Basse" as const,
     statut,

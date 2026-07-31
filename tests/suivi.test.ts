@@ -16,6 +16,7 @@ function offre(champs: Partial<Offre> = {}): Offre {
     dateReperage: "2026-07-01",
     entreprise: "Entreprise",
     poste: "Poste",
+    ville: null,
     lien: "",
     km: 10,
     salaireAffiche: null,

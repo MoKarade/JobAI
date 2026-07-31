@@ -52,6 +52,16 @@ export const offers = pgTable(
     km: real("km"),
 
     /**
+     * Ville de l'employeur, telle que la source l'a annoncée.
+     *
+     * Ajoutée le 2026-07-31 : sans elle, un employeur qui n'est pas dans les entreprises
+     * cibles (ISS, LSM… apportés par l'ingestion) ne peut pas être géocodé — « ISS » seul
+     * est une recherche mondiale — et sa distance reste inconnue à vie. C'est le critère
+     * numéro un de Marc : il ne peut pas dépendre d'une liste tenue à la main.
+     */
+    ville: text("ville"),
+
+    /**
      * Salaire TEL QU'AFFICHÉ dans l'offre, en texte libre (« 40 $/h+ », « 52 260 – 120 727 $ »,
      * « non affiché »). Volontairement pas un nombre : convertir ici, c'est inventer une
      * précision que l'offre ne donne pas. La notation fait sa propre lecture.

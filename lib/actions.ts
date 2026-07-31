@@ -20,11 +20,14 @@ import { MiseAJourOffreSchema } from "./types";
 import { NouvelleOffreSchema, aujourdhui, construireOffre, identifiantPour } from "./ajout";
 import {
   deciderPrecision,
+  distanceKm,
   geocoderEntreprises,
   geocoderPlusieurs,
   villeGeocodable,
 } from "./geocodage";
 import { ENTREPRISES_CIBLES } from "./reference";
+import { employeursASituer, planifierDistances } from "./distances";
+import { lireOffres } from "./donnees";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -183,6 +186,131 @@ export async function passeGeocodage(): Promise<ResultatPasse> {
     console.error("[actions] localisation des entreprises impossible", err);
     return { ok: false, erreur: "Localisation impossible. Réessaie plus tard." };
   }
+}
+
+/**
+ * Le domicile de référence, lu depuis l'environnement.
+ *
+ * GARDE-FOU N°1 — c'est le SEUL endroit de l'app qui lit ces coordonnées, et elles ne
+ * quittent jamais cette fonction : seule la DISTANCE calculée est écrite et affichée.
+ * `null` si les variables ne sont pas posées — auquel cas aucune distance n'est mesurée,
+ * et `km` reste honnêtement inconnu plutôt que faux.
+ */
+function domicile(): { lat: number; lon: number } | null {
+  const lat = Number(process.env.DOMICILE_LAT);
+  const lon = Number(process.env.DOMICILE_LON);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return { lat, lon };
+}
+
+/**
+ * Mesure la distance des offres qui n'en ont pas, et met leur note à jour.
+ *
+ * POURQUOI ÇA MANQUAIT : les offres ingérées arrivent avec `km: null` — un déposant ne peut
+ * pas mesurer une distance, et il a raison de ne pas en inventer. Mais le barème accorde 10
+ * points sur 20 à une distance INCONNUE, autant qu'à 25 km : une offre hors rayon pouvait
+ * donc figurer haut dans la liste, sur le critère que Marc place en premier.
+ *
+ * Ne touche ni les distances déjà connues, ni les notes manuelles (`lib/distances.ts`).
+ */
+export async function mesurerDistances(): Promise<
+  { ok: true; mesurees: number; situees: number } | { ok: false; erreur: string }
+> {
+  const chezMoi = domicile();
+  if (!chezMoi) {
+    return { ok: false, erreur: "DOMICILE_LAT / DOMICILE_LON non configurés." };
+  }
+
+  try {
+    const offres = await lireOffres();
+    if (offres === null) return { ok: false, erreur: "Base non configurée." };
+
+    const lignes = await db.select().from(entreprisesLieux);
+    const positions = new Map(
+      lignes.map((l) => [l.nom, { lat: l.lat, lon: l.lon, precision: l.precision }]),
+    );
+
+    // 1. Situer les employeurs manquants — y compris ceux qui ne sont PAS des entreprises
+    //    cibles : l'ingestion en amène (ISS, LSM…), et sans position leur distance reste
+    //    inconnue à vie. La ville vient de l'offre elle-même, sinon des cibles.
+    const villeDe = (nom: string): string | null => {
+      const cible = ENTREPRISES_CIBLES.find((c) => c.nom === nom);
+      if (cible) return villeGeocodable(cible.ville) ?? cible.ville;
+      const avecVille = offres.find((o) => o.entreprise === nom && o.ville);
+      return avecVille?.ville ? (villeGeocodable(avecVille.ville) ?? avecVille.ville) : null;
+    };
+
+    const manquants = employeursASituer(offres, positions, villeDe);
+    let situees = 0;
+    if (manquants.length > 0) {
+      const r = await situerLot(manquants.slice(0, 4), positions);
+      situees = r;
+      const relues = await db.select().from(entreprisesLieux);
+      positions.clear();
+      for (const l of relues) {
+        positions.set(l.nom, { lat: l.lat, lon: l.lon, precision: l.precision });
+      }
+    }
+
+    // 2. Mesurer. Le domicile ne sort pas de cette closure.
+    const majs = planifierDistances(offres, positions, (p) => distanceKm(chezMoi, p));
+    for (const m of majs) {
+      const valeurs: { km: number; majLe: Date; score?: number } = { km: m.km, majLe: new Date() };
+      if (m.score !== null) valeurs.score = m.score;
+      await db.update(offers).set(valeurs).where(eq(offers.id, m.id));
+    }
+
+    revalidatePath("/");
+    revalidatePath("/carte");
+    return { ok: true, mesurees: majs.length, situees };
+  } catch (err) {
+    console.error("[actions] mesure des distances impossible", err);
+    return { ok: false, erreur: "Mesure impossible. Réessaie plus tard." };
+  }
+}
+
+/** Situe un petit lot d'employeurs. Rend le nombre réellement inscrit. */
+async function situerLot(
+  aSituer: readonly { nom: string; ville: string }[],
+  positions: ReadonlyMap<string, { lat: number; lon: number; precision: "exacte" | "ville" }>,
+): Promise<number> {
+  const villesConnues = await db.select().from(villes);
+  const coordVilles = new Map(villesConnues.map((v) => [v.nom, { lat: v.lat, lon: v.lon }]));
+
+  const villesRequises = [...new Set(aSituer.map((e) => e.ville))].filter(
+    (v) => !coordVilles.has(v),
+  );
+  if (villesRequises.length > 0) {
+    const rv = await geocoderPlusieurs(villesRequises.slice(0, 2), outilsNominatim());
+    if (rv.trouvees.length > 0) {
+      await db
+        .insert(villes)
+        .values(rv.trouvees.map((v) => ({ nom: v.nom, lat: v.lat, lon: v.lon })))
+        .onConflictDoNothing();
+      for (const v of rv.trouvees) coordVilles.set(v.nom, { lat: v.lat, lon: v.lon });
+    }
+  }
+
+  const tentables = aSituer.filter((e) => coordVilles.has(e.ville) && !positions.has(e.nom));
+  if (tentables.length === 0) return 0;
+
+  const r = await geocoderEntreprises(tentables.slice(0, 2), outilsNominatim());
+  const resolues = new Map(r.trouvees.map((t) => [t.nom, { lat: t.lat, lon: t.lon }]));
+  const inscrire: { nom: string; lat: number; lon: number; precision: "exacte" | "ville" }[] = [];
+
+  for (const e of tentables.slice(0, 2)) {
+    if (!resolues.has(e.nom) && !r.introuvables.includes(e.nom)) continue;
+    const centre = coordVilles.get(e.ville);
+    if (!centre) continue;
+    // La MÊME validation que la carte : une résolution trop loin du centre-ville est un
+    // homonyme, et on retombe honnêtement sur le centre plutôt que d'inscrire un faux.
+    inscrire.push({ nom: e.nom, ...deciderPrecision(resolues.get(e.nom) ?? null, centre) });
+  }
+
+  if (inscrire.length > 0) {
+    await db.insert(entreprisesLieux).values(inscrire).onConflictDoNothing();
+  }
+  return inscrire.length;
 }
 
 /** Les outils réseau de Nominatim — un seul endroit, pour que rien ne diverge. */

@@ -7,7 +7,11 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { after } from "next/server";
 import { lireOffres } from "@/lib/donnees";
+import { mesurerDistances } from "@/lib/actions";
+import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "@/lib/synchro";
+import { db } from "@/lib/db";
 import { resumer } from "@/lib/suivi";
 import { prochainesActions } from "@/lib/aFaire";
 import { aujourdhui } from "@/lib/ajout";
@@ -40,6 +44,22 @@ export default async function Accueil() {
     // La classification vit dans `lib/panne.ts`, partagée avec la page Carte : écrite deux
     // fois à la main, elle a déjà divergé une fois — et l'écran s'est mis à mentir.
     panne = classerPanne(err);
+  }
+
+  // Mesurer la distance des offres qui n'en ont pas — le critère n°1 de Marc, absent de
+  // toutes les offres ingérées (un déposant ne peut pas mesurer, et a raison de ne pas
+  // inventer). APRÈS la réponse : la mesure peut déclencher un géocodage, qui appelle
+  // Nominatim à 1,1 s par requête. Bornée à une passe / 5 min, comme la carte.
+  if (offres !== null && panne === null && offres.some((o) => !o.histo && o.km === null)) {
+    after(async () => {
+      try {
+        if (!(await reserverPasse(db, CLE_DISTANCES, DELAI_MESURE_AUTO_MS, new Date()))) return;
+        const r = await mesurerDistances();
+        if (!r.ok) console.error("[accueil] mesure des distances refusée :", r.erreur);
+      } catch (err) {
+        console.error("[accueil] mesure des distances impossible", err);
+      }
+    });
   }
 
   return (
