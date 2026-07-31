@@ -168,3 +168,47 @@ describe("honnêteté de ce qui entre", () => {
     expect(r.retenues[0]!.entreprise).toBe("Employeur non nommé");
   });
 });
+
+describe("ce qui est écarté est NOMMÉ, pas seulement compté", () => {
+  it("chaque refus porte son motif", () => {
+    // Signalé par le premier vrai dépôt : « le serveur donne les compteurs mais ne
+    // ventile pas offre par offre ». Un compte seul ne se vérifie pas — « 5 écartées »
+    // ne dit pas si le filtre a bien travaillé ou s'il vient de jeter la meilleure
+    // offre du jour.
+    const r = trier(
+      [
+        brute({ titre: "Caissier", description: "Épicerie.", ville: "Québec, QC" }),
+        brute({ entreprise: "Ailleurs inc.", ville: "Toronto, ON" }),
+        brute({ entreprise: "Nulle part", ville: "" }),
+      ],
+      new Set(),
+      "2026-07-31",
+    );
+
+    expect(r.refusees).toHaveLength(3);
+    const parMotif = Object.fromEntries(r.refusees.map((x) => [x.motif, x.entreprise]));
+    expect(parMotif["sous-le-plancher"]).toBe("Exemple inc.");
+    expect(parMotif["hors-region"]).toBe("Ailleurs inc.");
+    expect(parMotif["lieu-inconnu"]).toBe("Nulle part");
+  });
+
+  it("les comptes et la liste nommée disent la MÊME chose", () => {
+    // Deux façons de compter la même réalité : si elles divergent, l'une des deux ment.
+    const r = trier(
+      [
+        brute({ titre: "Caissier", description: "Épicerie." }),
+        brute({ entreprise: "Loin", ville: "Winnipeg, MB" }),
+        brute(),
+        brute(), // doublon du précédent
+      ],
+      new Set(),
+      "2026-07-31",
+    );
+    const compte = (m: string) => r.refusees.filter((x) => x.motif === m).length;
+    expect(compte("sous-le-plancher")).toBe(r.souslePlancher);
+    expect(compte("hors-region")).toBe(r.horsRegion);
+    expect(compte("lieu-inconnu")).toBe(r.lieuInconnu);
+    expect(compte("doublon")).toBe(r.doublons);
+    expect(r.refusees.length + r.retenues.length).toBe(4);
+  });
+});

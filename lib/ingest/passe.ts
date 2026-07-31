@@ -130,6 +130,7 @@ export async function executerPasse(
       doublons: tri.doublons,
       horsRegion: tri.horsRegion,
       lieuInconnu: tri.lieuInconnu,
+      refusees: tri.refusees,
     },
     nouvelles: tri.retenues.map((o) => o.id),
     perimees: balayage.perimees,

@@ -46,7 +46,19 @@ export interface Tri {
    *  explose, c'est qu'une source a cessé d'indiquer les villes, pas que le marché
    *  s'est éloigné. */
   lieuInconnu: number;
+  /**
+   * CE QUI A ÉTÉ ÉCARTÉ, NOMMÉMENT.
+   *
+   * Un compte seul ne se vérifie pas : « 5 écartées » ne dit pas si le filtre a bien
+   * travaillé ou s'il vient de jeter la meilleure offre du jour. Le déposant l'a signalé
+   * dès le premier vrai lot — il ne pouvait pas dire laquelle était dans quelle catégorie.
+   * Chaque refus porte donc son motif, et le compte reste pour la lecture rapide.
+   */
+  refusees: { entreprise: string; titre: string; motif: MotifRefus }[];
 }
+
+/** Pourquoi une offre n'est pas entrée. */
+export type MotifRefus = "hors-region" | "lieu-inconnu" | "sous-le-plancher" | "doublon";
 
 /**
  * Identifiant stable et lisible, dérivé de l'entreprise et du titre.
@@ -93,6 +105,7 @@ export function trier(
   let doublons = 0;
   let horsRegion = 0;
   let lieuInconnu = 0;
+  const refusees: Tri["refusees"] = [];
 
   for (const brute of recoltes) {
     const entreprise = brute.entreprise.trim() || "Employeur non nommé";
@@ -100,6 +113,7 @@ export function trier(
 
     if (vues.has(cle) || dejaSuivies.has(cle)) {
       doublons++;
+      refusees.push({ entreprise, titre: brute.titre, motif: "doublon" });
       continue;
     }
     vues.add(cle);
@@ -112,10 +126,12 @@ export function trier(
     const lieu = situer(brute.ville, brute.description);
     if (lieu === "hors-region") {
       horsRegion++;
+      refusees.push({ entreprise, titre: brute.titre, motif: "hors-region" });
       continue;
     }
     if (lieu === "lieu-inconnu") {
       lieuInconnu++;
+      refusees.push({ entreprise, titre: brute.titre, motif: "lieu-inconnu" });
       continue;
     }
 
@@ -124,6 +140,7 @@ export function trier(
     const note = computeScore({ titre: brute.titre, description: brute.description, km: null });
     if (note.parts.fitRole < FIT_ROLE_PLANCHER) {
       souslePlancher++;
+      refusees.push({ entreprise, titre: brute.titre, motif: "sous-le-plancher" });
       continue;
     }
 
@@ -149,7 +166,7 @@ export function trier(
     });
   }
 
-  return { retenues, souslePlancher, doublons, horsRegion, lieuInconnu };
+  return { retenues, souslePlancher, doublons, horsRegion, lieuInconnu, refusees };
 }
 
 /**
