@@ -8,6 +8,7 @@
 import { asc, desc, eq } from "drizzle-orm";
 import { db } from "./db";
 import { offerReasons, offers } from "./db/schema";
+import { assurerMigrations } from "./migrations";
 import { assurerSeedAJour } from "./synchro";
 import type { Offre, Raison } from "./types";
 
@@ -17,6 +18,10 @@ import type { Offre, Raison } from "./types";
  */
 export async function lireOffres(): Promise<Offre[] | null> {
   if (!process.env.DATABASE_URL) return null;
+
+  // Les migrations d'abord : une colonne ajoutée par un déploiement doit exister AVANT
+  // qu'on écrive dedans. Sans effet quand tout est à jour (Drizzle tient sa propre table).
+  await assurerMigrations();
 
   // Met la base au niveau du jeu de départ si un déploiement l'a fait changer. Presque
   // toujours une seule lecture puis retour immédiat ; l'écriture n'a lieu qu'au premier

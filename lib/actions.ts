@@ -14,7 +14,7 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { entreprisesLieux, offers, villes } from "./db/schema";
+import { entreprisesLieux, offers, syncState, villes } from "./db/schema";
 import { exigerSession } from "./session";
 import { MiseAJourOffreSchema } from "./types";
 import { NouvelleOffreSchema, aujourdhui, construireOffre, identifiantPour } from "./ajout";
@@ -196,11 +196,65 @@ export async function passeGeocodage(): Promise<ResultatPasse> {
  * `null` si les variables ne sont pas posées — auquel cas aucune distance n'est mesurée,
  * et `km` reste honnêtement inconnu plutôt que faux.
  */
-function domicile(): { lat: number; lon: number } | null {
+function domicileConfigure(): { lat: number; lon: number } | null {
   const lat = Number(process.env.DOMICILE_LAT);
   const lon = Number(process.env.DOMICILE_LON);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   return { lat, lon };
+}
+
+/** Clé sous laquelle les coordonnées du domicile sont conservées, une fois géocodées. */
+const CLE_DOMICILE = "domicile-coord";
+
+/**
+ * Le domicile de référence, par coordonnées OU par adresse.
+ *
+ * GARDE-FOU N°1 — c'est le SEUL endroit qui lit ces valeurs, et elles ne quittent pas cette
+ * fonction : seule la DISTANCE calculée est écrite et affichée. L'adresse vit dans une
+ * variable d'environnement, JAMAIS dans un fichier versionné : `tests/piiGuard.test.ts`
+ * ferait échouer tout commit qui en contiendrait une, et un dépôt garde son historique pour
+ * toujours — même privé, même corrigé après coup.
+ *
+ * DEUX FAÇONS DE LE POSER, ET C'EST VOULU
+ * `DOMICILE_LAT`/`DOMICILE_LON` si Marc a les coordonnées ; sinon `DOMICILE_ADRESSE`, que
+ * l'app géocode UNE fois et conserve en base. Demande du 2026-07-31 : ne plus avoir à
+ * chercher des coordonnées ni à lancer quoi que ce soit à la main.
+ *
+ * L'adresse ne part vers Nominatim qu'une seule fois — la position est ensuite relue en
+ * base. C'est le minimum : sans géocodage, aucune adresse ne devient une distance.
+ */
+async function domicile(): Promise<{ lat: number; lon: number } | null> {
+  const direct = domicileConfigure();
+  if (direct) return direct;
+
+  const adresse = process.env.DOMICILE_ADRESSE?.trim();
+  if (!adresse) return null;
+
+  // Déjà géocodée ? On ne redemande pas : la position d'un domicile ne change pas, et
+  // chaque appel évité est un appel de moins vers un service bénévole.
+  const [ligne] = await db.select().from(syncState).where(eq(syncState.cle, CLE_DOMICILE));
+  if (ligne) {
+    try {
+      const p = JSON.parse(ligne.valeur) as { lat: number; lon: number };
+      if (Number.isFinite(p.lat) && Number.isFinite(p.lon)) return p;
+    } catch {
+      // Valeur illisible : on regéocode plutôt que de rester bloqué.
+    }
+  }
+
+  const r = await geocoderPlusieurs([adresse], outilsNominatim());
+  const trouve = r.trouvees[0];
+  if (!trouve) {
+    console.error("[actions] domicile introuvable par géocodage :", r.panne ?? "aucun résultat");
+    return null;
+  }
+
+  const coord = { lat: trouve.lat, lon: trouve.lon };
+  await db
+    .insert(syncState)
+    .values({ cle: CLE_DOMICILE, valeur: JSON.stringify(coord) })
+    .onConflictDoNothing();
+  return coord;
 }
 
 /**
@@ -216,9 +270,9 @@ function domicile(): { lat: number; lon: number } | null {
 export async function mesurerDistances(): Promise<
   { ok: true; mesurees: number; situees: number } | { ok: false; erreur: string }
 > {
-  const chezMoi = domicile();
+  const chezMoi = await domicile();
   if (!chezMoi) {
-    return { ok: false, erreur: "DOMICILE_LAT / DOMICILE_LON non configurés." };
+    return { ok: false, erreur: "Domicile non configuré : pose DOMICILE_ADRESSE (ou DOMICILE_LAT/LON)." };
   }
 
   try {
