@@ -6,6 +6,49 @@
 
 ---
 
+## Session 2026-07-31 — la veille produit du réel, et la carte le montre
+
+> ⚠️ Les entrées des 29 et 30 juillet n'ont jamais été consignées : ce qui suit rattrape
+> l'état à partir du code réel, pas d'une mémoire de session. Ce qui n'a pas été vérifié
+> aujourd'hui est marqué « à confirmer ».
+
+### État en une page
+
+| | |
+|---|---|
+| **Gate** | `typecheck` + `test` (**473**) + `lint` (0 avertissement) + `build` verts. Jugé par **exit code**, jamais derrière un `\| grep` — un filtre masque le code de sortie. |
+| **Base** | Migrations **appliquées automatiquement au démarrage** (`lib/migrations.ts`, demande de Marc : « plus jamais à faire run db:migrate »). Mémorisée par processus, n'échoue jamais vers l'appelant. `0004` = colonne `offers.ville`. |
+| **Veille** | ✅ **Produit du réel.** Premier vrai lot le 2026-07-31 : 45 offres reçues, 40 ajoutées (38 → 78 actives), vérifié dans les journaux Vercel. Le chemin est `POST /api/ingest/depot` — une Routine claude.ai envoie, l'app trie (même filtre région, même plancher `fitRole`, même dédoublonnage que le cron). Les sources automatiques restent mortes : Guichet-Emplois 404 sur 5 URL, ATS américains sans employeur local, Jobillico/Québec emploi/Isarta sans flux. |
+| **Distance** | `DOMICILE_ADRESSE` géocodée une fois et conservée en base (`sync_state`), sinon `DOMICILE_LAT`/`LON`. Mesure automatique après réponse (`after()`), bornée à une passe / 5 min. |
+| **Carte** | Part des **offres** depuis `[CARTE-01]`, plus des seules 36 entreprises cibles. Deux manques distincts : `aSituer` (se règle à la prochaine passe) et `sansLieu` (la source n'annonce pas de ville — aucune passe n'y changera rien). |
+| **Interface** | Refonte « épurée » livrée (`[UX-11]`) : ombres douces à la place des bordures, pastilles, champ de recherche en pill. L'identité (ambre `#f2a31b`, logo monospace) est conservée. |
+| **Relances** | `lib/relances.ts` livré et testé (seuils 14 j / 45 j, `Relance` n'est PAS une réponse du recruteur). ⚠️ **Pas encore branché à l'interface** — la logique existe, rien ne l'affiche. |
+
+### Le défaut le plus coûteux de la session, et sa correction
+
+La colonne `ville` n'était écrite par **aucun** des quatre chemins d'insertion : chacun
+recopiait sa propre liste de colonnes, et l'ajout de `ville` a été oublié dans les quatre.
+Le type la porte, la lecture la lit, l'écriture la perd — sans erreur, sans log. Les 40
+offres du premier lot réel sont donc en base sans ville, donc sans position, donc sans
+distance et absentes de la carte : le critère numéro un de Marc, perdu en silence.
+
+Correction à la cause (`[CARTE-01]`) : `lib/persistance.ts` porte l'unique copie des
+colonnes, `tests/persistance.test.ts` la verrouille en DÉRIVANT la liste attendue de
+`OffreSchema`, et un second garde interdit à un cinquième chemin de réénumérer les colonnes.
+Le rattrapage des 40 passe par `/api/ingest/depot`, qui complète — sans jamais écraser — la
+ville d'une offre déjà suivie, et le compte remonte au rapport (`villesCompletees`).
+
+### Ce qui reste ouvert
+
+- **Rejouer un dépôt** pour rattraper les villes des 40 offres, puis vérifier qu'elles
+  apparaissent sur la carte. Le prompt de la Routine est INCHANGÉ.
+- **Brancher le suivi des relances à l'interface** (`lib/relances.ts` est prêt).
+- **Analyse LLM des offres** et **lecture Gmail via DriveAI** : acceptés par Marc, non
+  commencés. Passer par DriveAI évite un scope Google restreint sur JobAI.
+- La liste d'améliorations UX que Marc a proposé d'envoyer.
+
+---
+
 ## Session 2026-07-28 — cadrage, fondations, fork personnalisé
 
 ### État en une page

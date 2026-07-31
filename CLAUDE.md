@@ -365,6 +365,24 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   exactement comment la CI de ce dépôt a été ignorée quatre commits d'affilée. En job
   séparé (plus un passage hebdomadaire), « gate vert / audit rouge » se lit d'un coup
   d'œil et désigne la vraie cause.
+- **Une liste de colonnes recopiée à N endroits perd le champ suivant, et personne ne le
+  voit.** `offers.ville` a été ajoutée au schéma, au type et à la lecture — et oubliée dans
+  les QUATRE chemins d'insertion, qui recopiaient chacun leur liste. Aucune erreur, aucun
+  log : le type porte le champ, la lecture le lit, l'écriture le perd. Quarante offres
+  réelles sont entrées en production sans ville, donc sans position, donc sans distance —
+  le critère n°1 de Marc, effacé en silence pendant qu'il regardait une carte qui « manquait
+  d'offres ». Un `INSERT` recopié est une bombe à retardement dont la mèche est la prochaine
+  colonne : une seule copie (`lib/persistance.ts`), et un verrou qui **dérive** la liste
+  attendue du schéma plutôt que de la réécrire — sinon il vieillit comme les copies qu'il
+  remplace. Corollaire : unifier des colonnes CHANGE un comportement là où une copie
+  écrivait moins que les autres (ici `perimeeLe`, que la synchro du seed ne touchait pas et
+  qui aurait ressuscité les offres périmées). Lister ces écarts AVANT d'unifier, et les
+  nommer dans le code.
+- **Une plainte sur ce qu'on VOIT ne désigne presque jamais ce qu'il faut CHANGER.**
+  « Les offres ne sont pas sur la carte » : le réflexe est la carte, la cause était une
+  colonne jamais écrite deux couches plus bas. Déjà vécu avec « trop peu d'offres », qui
+  était un manque de STOCK et non d'affichage. Remonter la chaîne complète — écriture,
+  lecture, transformation, rendu — avant de toucher la couche qu'on accuse.
 - **Un export de données est une surface d'exécution, pas un dump.** Une cellule CSV qui
   commence par `=`, `+`, `-` ou `@` est évaluée à l'ouverture par Excel, LibreOffice et
   Google Sheets. Tout champ de texte libre qui sort de l'app vers un tableur se neutralise

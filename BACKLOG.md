@@ -570,6 +570,45 @@
         ATS, sites québécois) ne couvre le marché de Québec. Indeed via Routine est la
         seule voie qui produit — et elle produit.
 
+- [x] 🔧 **`[CARTE-01]`** **La colonne `ville` n'était écrite NULLE PART — et la carte
+      partait d'une liste tenue à la main.** Demande de Marc : « je veux que pour toutes
+      les offres elles soient visibles sur la carte, même celles déjà importées ».
+      · **La plainte ne désignait pas la cause.** Le réflexe était de retoucher la carte.
+        Le vrai défaut : les quatre chemins d'insertion (cron, dépôt, ajout manuel, synchro
+        du seed) recopiaient chacun leur liste de colonnes, et l'ajout de `ville` a été
+        oublié dans les quatre. Le type la porte, la lecture la lit, l'écriture la perd —
+        zéro erreur, zéro log. Les 40 offres du premier lot réel sont en base sans ville,
+        donc sans position, donc sans distance : le critère n°1, perdu en silence.
+      · **Corrigé à la cause** : `lib/persistance.ts` porte l'unique copie des colonnes.
+        `tests/persistance.test.ts` DÉRIVE la liste attendue de `OffreSchema` (écrite à la
+        main, elle vieillirait comme les quatre copies qu'elle remplace) et interdit à un
+        cinquième chemin de réénumérer les colonnes. Discrimination prouvée : retirer
+        `ville` fait tomber deux tests.
+      · **`colonnesSeed` exclut `perimeeLe`** : la synchro ne l'écrivait pas, et l'écrire
+        ressusciterait les offres que la veille a constatées fermées. Une unification de
+        colonnes peut changer un comportement par effet de bord — celui-là est nommé.
+      · **Rattrapage des 40** : `/api/ingest/depot` complète la ville d'une offre déjà
+        suivie au lieu de l'ignorer comme doublon. On complète, on n'écrase jamais, et le
+        compte remonte au rapport (`villesCompletees`). **Le prompt de la Routine est
+        inchangé** — c'était la question de Marc.
+      · **`construireVue` part des OFFRES.** `horsCibles` devient `sansLieu` : être hors de
+        la liste de chasse n'empêche plus d'apparaître, ne pas avoir de ville si. Les deux
+        manques ne se valent pas — l'un se règle à la prochaine passe, l'autre jamais sans
+        que la source annonce une ville.
+      · La page carte déclenche aussi `mesurerDistances` : `passeGeocodage` ne situe que
+        les cibles, les employeurs de l'ingestion seraient restés « à situer » à vie.
+
+- [x] 🎨 **`[UX-11]`** **Interface épurée** (demande Marc : « style google très épuré simple
+      beau »). La FORME change, pas l'identité : ambre `#f2a31b` publié au hub et logo
+      monospace conservés. Ombres douces à la place des bordures, onglets en pastilles,
+      recherche en pill qui se soulève au focus, filtres en chips, cartes qui s'élèvent au
+      survol. Variantes de thème sombre explicites — un noir translucide y disparaît.
+
+- [ ] 🔧 **`[UX-12]`** **Brancher le suivi des relances à l'interface.** `lib/relances.ts`
+      est livré et testé (seuils 14 j / 45 j, `Relance` n'est PAS une réponse du recruteur,
+      une date future est une saisie en cours et non un envoi) — mais **rien ne l'affiche**.
+      Une logique juste que personne ne voit ne suit rien.
+
 - [ ] 🧭 **`[UX-05]`** **Onglet agrégateur multi-sources** avec lien direct vers l'offre.
       ⚠️ **Se heurte au garde-fou n°4 (aucun scraping).** État réel des sources :
       · **Guichet-Emplois** — flux XML officiel d'EDSC, sur demande. C'est la source
