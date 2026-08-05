@@ -103,6 +103,27 @@ export function urlRechercheEntreprise(nom: string, ville: string): string {
   return `https://nominatim.openstreetmap.org/search?${p.toString()}`;
 }
 
+/**
+ * L'URL pour chercher une ADRESSE CIVIQUE.
+ *
+ * ⚠️ C'EST UNE QUESTION D'UNE AUTRE NATURE QUE LE NOM D'ENTREPRISE, et bien plus forte.
+ * « Laserax, Québec » demande à Nominatim de reconnaître une marque — la plupart des PME
+ * n'y sont pas, d'où les dizaines d'épingles au centre-ville. « 2707 Cazeneuve, Lévis »
+ * demande une adresse : c'est le cœur de métier d'un géocodeur, et le registre des
+ * entreprises nous en donne une, déclarée par l'entreprise elle-même.
+ *
+ * Le pays et la province cadrent comme ailleurs ; le reste de la chaîne vient du registre.
+ */
+export function urlRechercheAdresse(adresse: string): string {
+  const p = new URLSearchParams({
+    q: `${adresse}, Québec, Canada`,
+    format: "json",
+    limit: String(NB_CANDIDATS_ENTREPRISE),
+    countrycodes: "ca",
+  });
+  return `https://nominatim.openstreetmap.org/search?${p.toString()}`;
+}
+
 /** Un point, sans plus : c'est tout ce qu'il faut pour mesurer ou cadrer. */
 export interface Point {
   lat: number;
@@ -284,6 +305,12 @@ const MOTS_NON_DISCRIMINANTS = new Set([
   "les", "des", "societe", "entreprise", "entreprises", "industries", "industrie",
   "canada", "quebec", "service", "services", "produits", "solutions", "internationale",
   "international", "corporation", "corp", "limitee", "division", "atelier", "ateliers",
+  // Types de VOIE : la même règle sert à vérifier qu'un résultat porte bien la rue
+  // demandée, et « boul » apparierait n'importe quel boulevard de la ville. Ils ne
+  // désignent rien dans un nom d'entreprise non plus — un mot qui figure partout ne
+  // prouve jamais une correspondance, quel que soit le côté où on le lit.
+  "rue", "boul", "boulevard", "avenue", "chemin", "route", "montee", "cote", "place",
+  "rang", "impasse", "terrasse", "croissant", "autoroute", "parc",
 ]);
 
 /** Minuscules, sans accents, sans ponctuation — pour comparer des noms, pas des styles. */
@@ -362,6 +389,88 @@ export function choisirCandidatEntreprise(charge: unknown, nom: string): Coordon
  */
 export function lireReponseEntreprise(charge: unknown, nom: string): Coordonnees | null {
   return choisirCandidatEntreprise(charge, nom);
+}
+
+/**
+ * Sépare le NUMÉRO CIVIQUE de la VOIE dans une adresse du registre.
+ *
+ * Le registre écrit deux formes, vues toutes les deux dans le fichier réel : le numéro et
+ * la voie séparés par une virgule (`2707, CAZENEUVE`), ou d'un seul tenant — exemple
+ * factice : `123 RUE PRINCIPALE`. La chaîne stockée y ajoute la ville et le code postal
+ * (`adresseLisible`), qu'il faut EXCLURE de la voie — sinon la vérification ci-dessous
+ * serait satisfaite par le seul nom de la ville, qui figure dans tous les résultats de la
+ * ville. Une vérification qu'on peut satisfaire sans rien prouver ne vérifie rien.
+ *
+ * `null` quand il n'y a pas de numéro : sans numéro, on ne saurait pas distinguer
+ * « l'adresse trouvée » de « la rue trouvée », et une rue fait parfois deux kilomètres.
+ */
+export function decomposerAdresse(adresse: string): { numero: string; voie: string } | null {
+  const segments = adresse
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
+  const premier = segments[0] ?? "";
+
+  // Le numéro ouvre l'adresse. La lettre facultative couvre les « 123A ».
+  const m = premier.match(/^(\d+\s*[A-Za-z]?)\b\s*(.*)$/);
+  if (m === null) return null;
+
+  const numero = (m[1] ?? "").replace(/\s+/g, "");
+  // La voie suit le numéro dans le même segment, ou occupe le suivant (`2707, CAZENEUVE`).
+  const voie = (m[2] ?? "").trim() !== "" ? (m[2] ?? "").trim() : (segments[1] ?? "");
+  if (numero === "" || voie.trim() === "") return null;
+
+  return { numero, voie: voie.trim() };
+}
+
+/**
+ * Ce résultat porte-t-il bien LE numéro civique demandé ?
+ *
+ * ⚠️ C'EST LE DISCRIMINANT DU CHEMIN « ADRESSE », l'équivalent de `nomEchoDansResultat`
+ * pour le chemin « nom ». Sans lui, une adresse que Nominatim ne connaît pas ferait
+ * remonter la RUE, voire la MUNICIPALITÉ — laquelle est à 0 km du centre-ville et
+ * passerait donc la validation par la distance sans broncher, pour s'inscrire en base
+ * comme une position « exacte ». Ce serait le garde-fou n°3 violé de la pire façon : non
+ * pas une donnée manquante, mais une donnée fausse qui a l'air juste.
+ *
+ * Comparaison sur un MOT ENTIER : « 27 » ne doit pas être satisfait par « 2707 ».
+ */
+export function numeroEchoDansResultat(numero: string, resultat: string): boolean {
+  const n = normaliser(numero);
+  if (n === "") return false;
+  return new RegExp(`(^| )${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( |$)`).test(
+    normaliser(resultat),
+  );
+}
+
+/**
+ * Choisit le candidat qui est vraiment CETTE adresse : le numéro civique ET la voie
+ * doivent répondre. Les deux, parce que le numéro seul apparierait deux adresses portant
+ * le même numéro dans des rues différentes (exemple : la même façade numérotée sur une rue
+ * et sur un boulevard) — un numéro civique se retrouve dans toutes les rues d'une ville.
+ *
+ * `null` = on n'a pas trouvé l'adresse. L'appelant laisse alors l'épingle au centre-ville
+ * en le DISANT, ce qui reste honnête : l'adresse affichée, elle, vient du registre et
+ * demeure vraie — c'est la POSITION qu'on ne sait pas préciser.
+ */
+export function choisirCandidatAdresse(charge: unknown, adresse: string): Coordonnees | null {
+  const parts = decomposerAdresse(adresse);
+  if (parts === null) return null;
+  if (!Array.isArray(charge)) return null;
+
+  for (const element of charge.slice(0, NB_CANDIDATS_ENTREPRISE)) {
+    const c = lireElement(element);
+    if (c === null) continue;
+
+    // `display_name` et non `name` : ici on cherche une adresse, et c'est `display_name`
+    // qui porte le numéro et la rue. Le `name` d'un bâtiment ne les contient pas.
+    const libelle = c.adresse ?? "";
+    if (!numeroEchoDansResultat(parts.numero, libelle)) continue;
+    if (!nomEchoDansResultat(parts.voie, libelle)) continue;
+
+    return c;
+  }
+  return null;
 }
 
 /**
@@ -473,6 +582,53 @@ export async function geocoderEntreprises(
       // porte bien ce nom-là, et `geocoderSerie` n'a pas à connaître ce détail.
       lire: (charge: unknown) => lireReponseEntreprise(charge, e.nom),
     })),
+    outils,
+    budgetMs,
+  );
+}
+
+/**
+ * Géocode une série de lieux en posant à CHACUN la meilleure question dont on dispose :
+ * son ADRESSE quand on en a une, son NOM sinon.
+ *
+ * ⚠️ C'EST LE LEVIER SUR LE RATIO « à leur adresse / au centre-ville ». Interroger un nom
+ * de PME échoue le plus souvent — OpenStreetMap ne cartographie pas les raisons sociales,
+ * et c'est de là que viennent les dizaines d'épingles au centre-ville. Interroger une
+ * adresse civique réussit presque toujours, et le registre des entreprises nous en fournit
+ * une pour chaque établissement retrouvé. La position devient alors celle de l'adresse
+ * DÉCLARÉE par l'entreprise : ce n'est pas un objet cartographié à sa position, mais c'est
+ * très au-dessus du centre-ville — et la source reste dite à l'écran.
+ *
+ * ⚠️ UNE SEULE SÉRIE, ET C'EST LA RAISON D'ÊTRE DE CETTE FONCTION. Appeler deux séries à
+ * la suite — les adresses puis les noms — repartirait à zéro sur le garde-temps ET sur le
+ * plafond par passe : deux budgets au lieu d'un, donc le mur de la fonction Vercel, donc
+ * la page tuée avant d'enregistrer quoi que ce soit. C'est exactement ce qui est arrivé le
+ * 2026-08-05. La cadence, le plafond et le budget se partagent parce qu'ils protègent le
+ * MÊME service et la MÊME invocation.
+ *
+ * La clé du résultat reste le NOM : c'est lui qui désigne la ligne à mettre à jour.
+ */
+export async function geocoderLieux(
+  lieux: readonly { nom: string; ville: string; adresse: string | null }[],
+  outils: OutilsGeocodage,
+  budgetMs: number | null = null,
+): Promise<ResultatPasse> {
+  return geocoderSerie(
+    lieux.map((l) => {
+      const adresse = l.adresse;
+      if (adresse !== null) {
+        return {
+          nom: l.nom,
+          url: urlRechercheAdresse(adresse),
+          lire: (charge: unknown) => choisirCandidatAdresse(charge, adresse),
+        };
+      }
+      return {
+        nom: l.nom,
+        url: urlRechercheEntreprise(l.nom, l.ville),
+        lire: (charge: unknown) => lireReponseEntreprise(charge, l.nom),
+      };
+    }),
     outils,
     budgetMs,
   );

@@ -30,6 +30,7 @@ import {
   deciderPrecision,
   distanceKm,
   geocoderEntreprises,
+  geocoderLieux,
   geocoderPlusieurs,
   villeGeocodable,
 } from "./geocodage";
@@ -369,6 +370,16 @@ async function rattraperAdresses(
  */
 
 /** Ce qu'une passe de recherche dans le registre a donné. */
+/**
+ * L'horodatage qu'on pose pour dire « à retenter au prochain passage ».
+ *
+ * Une date volontairement ancienne plutôt qu'un champ « à refaire » : le raffinage trie
+ * déjà par `geocodeLe` croissant et écarte ce qui est trop récent. Une date de 1970
+ * satisfait les deux — retenter tout de suite, et en PREMIER, ce qui est exactement le
+ * bon ordre puisqu'on vient d'acquérir l'information qui rend la tentative prometteuse.
+ */
+const EPOQUE_A_RETENTER = new Date(0);
+
 interface PasseRegistre {
   candidates: number;
   trouvees: number;
@@ -547,9 +558,24 @@ async function adressesDepuisRegistre(
       continue;
     }
 
+    // ⚠️ `geocodeLe` REMIS À ZÉRO — SANS ÇA, CETTE ADRESSE NE SERT À RIEN AVANT SEPT JOURS.
+    //
+    // `positionARaffiner` attend `DELAI_RETENTE_POSITION_MS` depuis la dernière tentative,
+    // et ce délai est calibré sur une question dont la réponse ne change pas : « OSM
+    // connaît-il cette entreprise ? ». Or ici la question CHANGE — on vient d'acquérir une
+    // adresse civique, et le raffinage la posera à la place du nom. Laisser l'horodatage
+    // en l'état ferait attendre une semaine à une information déjà en main, pour rien.
+    //
+    // C'est la même erreur que `ville` puis `adresse`, une troisième fois sous un autre
+    // visage : ce n'est pas une colonne qui manque de rattrapage, c'est un DÉLAI dont la
+    // prémisse vient de tomber. Le remède se livre avec la cause, jamais « plus tard ».
     await db
       .update(entreprisesLieux)
-      .set({ adresse: adresseLisible(retenu), adresseSource: "registre" })
+      .set({
+        adresse: adresseLisible(retenu),
+        adresseSource: "registre",
+        geocodeLe: EPOQUE_A_RETENTER,
+      })
       .where(eq(entreprisesLieux.nom, lieu.nom));
     trouvees++;
   }
@@ -574,6 +600,14 @@ interface Raffinage {
   toujoursAuCentre: number;
   /** Trouvées trop loin du centre de leur ville : un homonyme, écarté. */
   horsRayon: number;
+  /**
+   * Précisées grâce à l'ADRESSE du registre plutôt qu'au nom.
+   *
+   * Compté à part parce que les deux chemins ne valent pas la même chose et ne se
+   * corrigent pas pareil : « 0 par adresse » sur des candidates qui en ont une dit que la
+   * forme d'adresse du registre ne parle pas à Nominatim, ce qu'aucun total ne révélerait.
+   */
+  parAdresse: number;
 }
 
 /**
@@ -607,18 +641,31 @@ async function raffinerPositions(
     .slice(0, max);
 
   const tentables = lignes
-    .map((l) => ({ nom: l.nom, ville: villeDe(l.nom) }))
-    .filter((e): e is { nom: string; ville: string } => e.ville !== null);
+    .map((l) => ({ nom: l.nom, ville: villeDe(l.nom), adresse: l.adresse }))
+    .filter((e): e is { nom: string; ville: string; adresse: string | null } => e.ville !== null);
 
   const vide: Raffinage = {
     candidates: tentables.length,
     precisees: 0,
     toujoursAuCentre: 0,
     horsRayon: 0,
+    parAdresse: 0,
   };
   if (tentables.length === 0) return vide;
 
-  const r = await geocoderEntreprises(tentables, outilsNominatim(), budgetMs);
+  // ⚠️ DEUX QUESTIONS, ET LA MEILLEURE EST POSÉE DÈS QU'ON PEUT LA POSER.
+  //
+  // Demander « Laserax, Québec » à Nominatim, c'est lui demander de reconnaître une marque :
+  // la plupart des PME ne sont pas dans OpenStreetMap, d'où les dizaines d'épingles au
+  // centre-ville que Marc voit à l'écran. Demander « 2707 Cazeneuve, Lévis », c'est lui
+  // demander une adresse — son cœur de métier. Le registre nous donne cette adresse pour
+  // chaque établissement retrouvé, et s'en servir pour POSITIONNER ne coûte pas une requête
+  // de plus : c'est la même requête, mieux posée.
+  //
+  // Le choix se fait entrée par entrée DANS une seule série (`geocoderLieux`) : deux séries
+  // enchaînées repartiraient à zéro sur le budget et sur le plafond.
+  const avecAdresse = new Set(tentables.filter((e) => e.adresse !== null).map((e) => e.nom));
+  const r = await geocoderLieux(tentables, outilsNominatim(), budgetMs);
 
   // Marquer la TENTATIVE avant d'écrire : c'est ce qui fait tourner la file, et ce qui
   // empêche une entreprise absente d'OpenStreetMap d'être redemandée à chaque passe.
@@ -632,6 +679,7 @@ async function raffinerPositions(
 
   let precisees = 0;
   let horsRayon = 0;
+  let parAdresse = 0;
   const villePar = new Map(tentables.map((t) => [t.nom, t.ville]));
 
   for (const t of r.trouvees) {
@@ -645,20 +693,31 @@ async function raffinerPositions(
       continue;
     }
 
-    await db
-      .update(entreprisesLieux)
-      .set({
-        lat: t.lat,
-        lon: t.lon,
-        precision: "exacte",
-        adresse: t.adresse,
-        // ⚠️ La source suit l'adresse, y compris quand celle-ci redevient NULLE : sans ce
-        // remise à zéro, une entreprise qui perd son adresse garderait sa source et la
-        // base refuserait l'écriture (contrainte « l'une sans l'autre, jamais »).
-        adresseSource: t.adresse === null ? null : "osm",
-      })
-      .where(eq(entreprisesLieux.nom, t.nom));
+    // ⚠️ NE PAS ÉCRASER L'ADRESSE QUI A SERVI À POSER LA QUESTION.
+    //
+    // Quand la position vient du chemin ADRESSE, c'est l'adresse du REGISTRE qu'on a
+    // géocodée : la garder est la seule écriture cohérente. Y substituer le
+    // `display_name` d'OpenStreetMap changerait à la fois le texte affiché et sa SOURCE
+    // — on afficherait « OpenStreetMap » sous une adresse que le registre a fournie et
+    // qu'OSM n'a fait que confirmer. Deux choses différentes ne portent pas la même
+    // étiquette (garde-fou n°3).
+    const venueDeLAdresse = avecAdresse.has(t.nom);
+    const champs = venueDeLAdresse
+      ? { lat: t.lat, lon: t.lon, precision: "exacte" as const }
+      : {
+          lat: t.lat,
+          lon: t.lon,
+          precision: "exacte" as const,
+          adresse: t.adresse,
+          // ⚠️ La source suit l'adresse, y compris quand celle-ci redevient NULLE : sans
+          // cette remise à zéro, une entreprise qui perd son adresse garderait sa source
+          // et la base refuserait l'écriture (contrainte « l'une sans l'autre, jamais »).
+          adresseSource: t.adresse === null ? null : ("osm" as const),
+        };
+
+    await db.update(entreprisesLieux).set(champs).where(eq(entreprisesLieux.nom, t.nom));
     precisees++;
+    if (venueDeLAdresse) parAdresse++;
   }
 
   return {
@@ -666,6 +725,7 @@ async function raffinerPositions(
     precisees,
     toujoursAuCentre: r.introuvables.length,
     horsRayon,
+    parAdresse,
   };
 }
 
@@ -974,6 +1034,7 @@ export async function mesurerDistances(
       precisees: 0,
       toujoursAuCentre: 0,
       horsRayon: 0,
+      parAdresse: 0,
     };
     try {
       const centres = new Map(
@@ -1035,6 +1096,7 @@ export async function mesurerDistances(
         `${registre.ambigues > 0 ? ` (${registre.ambigues} ambigues)` : ""}` +
         `${registre.absentes > 0 ? ` (${registre.absentes} absentes)` : ""} ` +
         `precisees=${raffinage.precisees}/${raffinage.candidates}` +
+        `${raffinage.parAdresse > 0 ? ` (${raffinage.parAdresse} par adresse)` : ""}` +
         `${raffinage.toujoursAuCentre > 0 ? ` (${raffinage.toujoursAuCentre} toujours au centre)` : ""}` +
         `${raffinage.horsRayon > 0 ? ` (${raffinage.horsRayon} hors rayon)` : ""} ` +
         `bornes=${bornes.mesurees}/${bornes.candidates}` +
