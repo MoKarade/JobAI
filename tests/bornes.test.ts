@@ -70,7 +70,10 @@ describe("la borne la plus proche", () => {
   });
 
   it("accepte une borne sans nom — OpenStreetMap n'en donne pas toujours", () => {
-    const r = proximiteBorne(LIEU, [borne(1, 46.8102, -71.2101, null)]);
+    // ⚠️ Position DÉRIVÉE du point de référence, jamais écrite en dur : le garde-fou n°1
+    // interdit toute paire de coordonnées à quatre décimales dans un fichier versionné,
+    // et il a raison — c'est la FORME qui reconstituerait un domicile, pas l'intention.
+    const r = proximiteBorne(LIEU, [borne(1, LIEU.lat + 0.0002, LIEU.lon + 0.0001, null)]);
     expect(r.nombre).toBe(1);
     expect(r.nom).toBeNull();
     expect(r.plusProcheM).not.toBeNull();
