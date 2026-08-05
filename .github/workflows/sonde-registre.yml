@@ -73,6 +73,13 @@ jobs:
     env:
       URL: https://www.registreentreprises.gouv.qc.ca/RQAnonymeGR/GR/GR03/GR03A2_22A_PIU_RecupDonnPub_PC/FichierDonneesOuvertes.aspx
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
       - name: Télécharger — UNE seule requête, et tout en découle
         run: |
           # `-A` : se présenter honnêtement plutôt qu'en client anonyme, comme pour
@@ -114,3 +121,11 @@ jobs:
             echo "   workflow À LA MAIN. Ne pas ajouter de nouvel essai automatique — c'est"
             echo "   précisément ce qui a déclenché le blocage la première fois."
           fi
+
+      # Demande de Marc (2026-08-05) : « pour chaque entreprise check avec le registre des
+      # entreprises aussi ». Le fichier en bloc est refusé ; interroger UNE entreprise est
+      # une question DIFFÉRENTE, et elle n'avait pas été mesurée. Hôtes distincts : l'échec
+      # du REQ ne dit rien de ce que répond le fédéral.
+      - name: Interroger le registre UNE entreprise à la fois
+        if: always()
+        run: npx tsx scripts/sonder-registre-unitaire.ts
