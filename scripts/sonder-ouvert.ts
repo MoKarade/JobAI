@@ -68,6 +68,20 @@ const SONDES: readonly Sonde[] = [
     attendu: "un point d'entrée exploitable, ou la preuve qu'il n'y en a pas",
   },
   {
+    // Demande de Marc (2026-08-05) : « je veux que pour tout tu check si y'a une borne de
+    // recharge à moins de 5 min à pied ». Les bornes sont dans OpenStreetMap
+    // (`amenity=charging_station`) et s'interrogent par l'API Overpass — gratuite, sans
+    // clé, même famille de données que le géocodage qu'on utilise déjà. On MESURE qu'elle
+    // répond avant d'en dépendre.
+    nom: "Overpass — bornes de recharge autour du centre de Québec",
+    url:
+      "https://overpass-api.de/api/interpreter?data=" +
+      encodeURIComponent(
+        '[out:json][timeout:20];node["amenity"="charging_station"](46.79,-71.25,46.83,-71.19);out body 20;',
+      ),
+    attendu: "des noeuds de bornes avec leurs coordonnées — sinon la fonctionnalité est morte-née",
+  },
+  {
     nom: "Données Québec — recherche « emploi »",
     url: "https://www.donneesquebec.ca/recherche/api/3/action/package_search?q=offres+emploi&rows=5",
     attendu: "un jeu de données provincial d'offres",
