@@ -82,6 +82,18 @@ async function principal(): Promise<void> {
     process.exit(1);
   }
 
+  // ⚠️ ANNONCER LES DEUX FICHIERS DÈS LE DÉPART.
+  //
+  // Marc a relancé l'import sans avoir fait `git pull` : l'ANCIEN script a tourné, n'a lu
+  // que les établissements, et sa sortie ressemblait à s'y méprendre à une réussite — même
+  // total, même message final. Rien ne disait qu'il manquait la moitié du travail. Une
+  // version qui annonce ce qu'elle va faire rend l'écart visible en une ligne : si
+  // « Nom.csv » n'apparaît pas ici, c'est que le code est périmé.
+  console.log("Deux fichiers seront lus :");
+  console.log(`  1. ${FICHIER_ETABLISSEMENTS} — les adresses`);
+  console.log(`  2. ${FICHIER_NOMS} — les dénominations (sans elles : 11 adresses sur 73)`);
+  console.log("Si le second n'apparaît pas plus bas, fais `git pull` : le script est périmé.\n");
+
   const chemin = join(resolve(dossier), FICHIER_ETABLISSEMENTS);
   console.log(`Lecture de ${chemin}`);
   console.log("Seuls les établissements de la région de Québec sont retenus.\n");
@@ -170,7 +182,14 @@ async function principal(): Promise<void> {
     process.exit(1);
   }
 
-  await importerNoms(resolve(dossier), neqRetenus);
+  const denominations = await importerNoms(resolve(dossier), neqRetenus);
+  if (denominations === 0) {
+    // Un import qui n'a chargé aucune dénomination laisserait la recherche au taux mesuré
+    // de 11 sur 73. Le dire plutôt que de finir sur un message de réussite.
+    console.error("\n⚠️ AUCUNE dénomination chargée — la recherche restera très partielle.");
+    console.error("Vérifie que Nom.csv est bien dans le dossier, puis relance.");
+    process.exit(1);
+  }
 
   console.log("\nC'est fini. L'app peut maintenant chercher une adresse dans le registre");
   console.log("sans aucun accès réseau — et elle indiquera « registre » comme source.");
@@ -183,7 +202,7 @@ async function principal(): Promise<void> {
  * région a déjà été retenu. C'est ce filtre qui rend une lecture de 274 Mo supportable —
  * et qui garde la table à une taille utile.
  */
-async function importerNoms(dossier: string, neqRetenus: Set<string>): Promise<void> {
+async function importerNoms(dossier: string, neqRetenus: Set<string>): Promise<number> {
   const chemin = join(dossier, FICHIER_NOMS);
   console.log(`\nLecture de ${chemin}`);
   console.log("Seules les dénominations des entreprises déjà retenues sont gardées.\n");
@@ -211,7 +230,7 @@ async function importerNoms(dossier: string, neqRetenus: Set<string>): Promise<v
       if (indices === null) {
         console.error("L'entête de Nom.csv ne porte pas les colonnes attendues — ignoré.");
         console.error(`Entête lue : ${ligne.slice(0, 300)}`);
-        return;
+        return 0;
       }
       await db.delete(registreNoms);
       continue;
@@ -242,6 +261,7 @@ async function importerNoms(dossier: string, neqRetenus: Set<string>): Promise<v
   await ecrireLot();
   console.log(`${lues.toLocaleString("fr-CA")} lignes lues.`);
   console.log(`${ecrites.toLocaleString("fr-CA")} dénominations gardées.`);
+  return ecrites;
 }
 
 void principal();
