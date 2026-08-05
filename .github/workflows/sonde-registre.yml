@@ -1,0 +1,99 @@
+# Sonde du Registre des entreprises du Québec — à la demande, lecture seule.
+#
+# POURQUOI UN WORKFLOW À PART
+# Les autres sondes interrogent des API et rendent quelques kilo-octets. Celle-ci télécharge
+# un ZIP dont on ignore la taille — c'est justement la première chose à mesurer. La mêler
+# aux autres rendrait la sonde rapide lente, et on cesserait de la lancer.
+#
+# CE QU'ON CHERCHE, DANS CET ORDRE — chaque réponse décide de la suivante :
+#   1. Cette URL sert-elle VRAIMENT un ZIP ? C'est une page `.aspx` : elle peut tout aussi
+#      bien rendre du HTML avec un formulaire, auquel cas la piste s'arrête là.
+#   2. Quelle TAILLE ? Le registre entier du Québec, c'est des millions d'entreprises. Si
+#      c'est plusieurs gigaoctets, l'import devra filtrer À LA LECTURE, sans jamais tout
+#      garder — et la base Neon ne pourra de toute façon pas l'héberger en entier.
+#   3. Quels FICHIERS, quelles COLONNES ? On ne veut que le nom, l'adresse, la ville et le
+#      code postal. Le reste (actionnaires, administrateurs, historiques) est du volume
+#      inutile, et ce sont des données PERSONNELLES de tiers qu'on n'a aucune raison de
+#      rapatrier — garde-fou n°1.
+#
+# ⚠️ AUCUN MOISSONNAGE. C'est un jeu de DONNÉES OUVERTES publié par le Registraire des
+# entreprises et référencé sur Données Québec : nommément l'exception du garde-fou n°4.
+#
+# Ce workflow n'a AUCUN secret et n'écrit nulle part — ni base, ni dépôt.
+
+name: Sonde du registre des entreprises
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sonder:
+    name: Mesurer le fichier de données ouvertes du REQ
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      URL: https://www.registreentreprises.gouv.qc.ca/RQAnonymeGR/GR/GR03/GR03A2_22A_PIU_RecupDonnPub_PC/FichierDonneesOuvertes.aspx
+    steps:
+      - name: 1. Ce que l'URL annonce (sans rien télécharger)
+        run: |
+          echo "== En-têtes =="
+          # -L : la page peut rediriger vers le fichier réel. -I seul suffit rarement sur
+          # un .aspx, on garde donc aussi une lecture partielle plus bas.
+          curl -sIL --max-time 60 "$URL" | grep -iE '^(HTTP/|content-type|content-length|content-disposition|location)' || true
+
+      - name: 2. Les premiers octets — un ZIP commence par « PK »
+        run: |
+          echo "== Signature =="
+          # Une page HTML commencerait par « <! » ou « <h ». Lire 64 octets suffit à
+          # trancher, et coûte quasiment rien si le fichier est énorme.
+          curl -sL --max-time 60 -r 0-63 "$URL" -o entete.bin || true
+          if [ -s entete.bin ]; then
+            file entete.bin
+            xxd entete.bin | head -2
+          else
+            echo "AUCUN octet rendu sur une requête partielle — le serveur refuse peut-être Range."
+          fi
+
+      - name: 3. Télécharger, et mesurer ce qui arrive vraiment
+        run: |
+          echo "== Téléchargement (borné à 15 min) =="
+          # `--max-filesize` protège le runner d'un fichier absurde : mieux vaut un échec
+          # net qu'un disque plein sans explication.
+          curl -sL --max-time 900 --max-filesize 4000000000 "$URL" -o req.bin -w 'code=%{http_code} taille=%{size_download} type=%{content_type}\n' || true
+          ls -lh req.bin || true
+          file req.bin || true
+
+      - name: 4. Ce qu'il y a DEDANS — sans tout extraire
+        run: |
+          if file req.bin | grep -qi zip; then
+            echo "== Contenu de l'archive =="
+            # `-l` liste sans extraire : c'est la mesure qui décide de la suite.
+            unzip -l req.bin | head -40
+            echo
+            echo "== Entêtes des fichiers texte (2 premières lignes de chacun) =="
+            mkdir -p extrait
+            # On n'extrait QUE les fichiers susceptibles de porter un nom ou une adresse.
+            # Les fichiers de personnes (administrateurs, actionnaires) ne nous regardent
+            # pas : garde-fou n°1, on ne rapatrie pas des données de tiers.
+            for f in $(unzip -l req.bin | awk '{print $4}' | grep -iE '(entreprise|adresse|nom|etablissement)' | grep -viE '(administrateur|actionnaire|personne|physique)' | head -6); do
+              echo "--- $f"
+              unzip -p req.bin "$f" 2>/dev/null | head -2 || echo "(illisible)"
+              echo
+            done
+          else
+            echo "PAS une archive ZIP — voici les 400 premiers caractères :"
+            head -c 400 req.bin || true
+          fi
+
+      - name: 5. Ce que la mesure doit trancher
+        if: always()
+        run: |
+          echo "À LIRE À L'ŒIL :"
+          echo " · si ce n'est pas un ZIP, la piste du registre s'arrête ici ;"
+          echo " · la TAILLE décide de l'import : au-delà de quelques centaines de Mo,"
+          echo "   il faudra filtrer en flux (région) sans jamais tout stocker ;"
+          echo " · les COLONNES décident du schéma : on ne veut que nom, adresse, ville,"
+          echo "   code postal — jamais les personnes."
