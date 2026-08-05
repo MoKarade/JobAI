@@ -86,6 +86,14 @@ const SONDES: readonly Sonde[] = [
     url: "https://www.donneesquebec.ca/recherche/api/3/action/package_search?q=offres+emploi&rows=5",
     attendu: "un jeu de données provincial d'offres",
   },
+  {
+    // La seule piste encore ouverte au 05/08. Deux jeux s'appellent « Offres d'emploi » —
+    // reste à savoir DE QUI : une seule ville publie souvent ses propres postes, ce qui
+    // serait sans intérêt ici. Il faut voir l'organisme, la fréquence et le format.
+    nom: "Données Québec — le jeu « Offres d'emploi » en détail",
+    url: "https://www.donneesquebec.ca/recherche/api/3/action/package_search?q=title:%22Offres%20d%27emploi%22&rows=3&fl=title,organization,notes",
+    attendu: "l'organisme qui publie, la fréquence de mise à jour et le format",
+  },
 ];
 
 /** Une réponse jugée sur son CONTENU, pas sur son code de statut. */
@@ -173,10 +181,27 @@ function resumerJson(j: Record<string, unknown>): void {
     return;
   }
 
-  const trouves = resultat.results as { title?: string; name?: string }[] | undefined;
+  const trouves = resultat.results as
+    | {
+        title?: string;
+        name?: string;
+        organization?: { title?: string };
+        metadata_modified?: string;
+        resources?: { format?: string }[];
+      }[]
+    | undefined;
   if (Array.isArray(trouves)) {
     console.log(`   → ${resultat.count ?? trouves.length} jeu(x) trouvé(s) ; premiers :`);
-    for (const t of trouves.slice(0, 5)) console.log(`      · ${t.title ?? t.name}`);
+    for (const t of trouves.slice(0, 5)) {
+      // L'ORGANISME et la FRAÎCHEUR décident de l'intérêt, pas le titre : « Offres
+      // d'emploi » publié par une seule municipalité pour ses propres postes n'aiderait
+      // en rien une recherche dans toute la région.
+      const formats = [...new Set((t.resources ?? []).map((r) => r.format).filter(Boolean))];
+      console.log(`      · ${t.title ?? t.name}`);
+      console.log(
+        `        organisme : ${t.organization?.title ?? "?"} · modifié : ${t.metadata_modified ?? "?"} · formats : ${formats.join(", ") || "aucun"}`,
+      );
+    }
     return;
   }
 
