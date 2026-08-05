@@ -376,6 +376,19 @@ interface PasseRegistre {
   ambigues: number;
   /** Nom absent du registre régional. */
   absentes: number;
+  /**
+   * Les noms écartés, NOMMÉS — parce que « 53 absentes » ne se vérifie pas.
+   *
+   * Ce compte seul ne dit pas si le rapprochement travaille bien ou s'il vient de rater
+   * les 53 employeurs qui comptent, et le seul moyen de trancher serait de tout rouvrir à
+   * la main. Trois causes appellent trois correctifs opposés — un organisme public absent
+   * du registre des entreprises, une marque qui n'est pas la raison sociale, une clé de
+   * rapprochement trop stricte — et seuls les NOMS permettent de les distinguer.
+   */
+  nomsAbsents: string[];
+  nomsAmbigus: string[];
+  /** Clés écartées par le garde anti-explosion, avec leur nombre de NEQ. */
+  clesTropCommunes: string[];
 }
 
 /**
@@ -413,6 +426,9 @@ async function adressesDepuisRegistre(
     trouvees: 0,
     ambigues: 0,
     absentes: 0,
+    nomsAbsents: [],
+    nomsAmbigus: [],
+    clesTropCommunes: [],
   };
   if (sansAdresse.length === 0) return vide;
 
@@ -440,16 +456,27 @@ async function adressesDepuisRegistre(
     s.add(n.neq);
     neqParCle.set(n.nomCle, s);
   }
-  // ⚠️ UNE CLÉ TROP COMMUNE N'EST PAS UNE PISTE, C'EST DU BRUIT.
+  // GARDE ANTI-EXPLOSION — ET IL SE MONTRE, PARCE QUE JE NE L'AI PAS MESURÉ.
   //
-  // 59 194 dénominations sont en base, et certaines formes se réduisent à une clé très
-  // répandue (« construction », « transport »). Une entreprise dont le nom normalise ainsi
-  // remonterait des centaines de NEQ — donc une requête énorme, puis des centaines
-  // d'établissements, pour un résultat qui serait de toute façon jugé AMBIGU et refusé.
-  // Autant le constater tout de suite : c'est le même refus, sans le coût.
-  const MAX_NEQ_PAR_CLE = 25;
+  // 59 194 dénominations sont en base ; une clé partagée par des centaines d'entreprises
+  // ferait une requête énorme. C'est le seul fait établi. Ce que j'avais écrit en plus —
+  // « de toute façon jugé ambigu, autant le refuser tout de suite » — était une DÉDUCTION,
+  // et fausse dans un cas réel : si une seule de ces entreprises est dans la ville
+  // attendue, `choisirEtablissement` tranche très bien. À 25, ce garde aurait donc jeté en
+  // SILENCE des adresses parfaitement résolvables, pour économiser un coût qui n'existe
+  // pas (la passe de 18h46 a rendu 27 s de budget sur 35).
+  //
+  // Il reste, mais à un seuil où il n'est plus une politique de rapprochement : 200
+  // entreprises sous une même dénomination normalisée, c'est une chaîne de franchises, et
+  // aucune ville ne les départage. Et surtout il DIT quand il mord — un filtre muet qui
+  // peut perdre des résultats est exactement la classe de défaut que ce dépôt a déjà payée
+  // trois fois.
+  const MAX_NEQ_PAR_CLE = 200;
+  const clesTropCommunes: string[] = [];
   for (const [cle, ensemble] of neqParCle) {
-    if (ensemble.size > MAX_NEQ_PAR_CLE) neqParCle.delete(cle);
+    if (ensemble.size <= MAX_NEQ_PAR_CLE) continue;
+    clesTropCommunes.push(`${cle} (${ensemble.size})`);
+    neqParCle.delete(cle);
   }
 
   const neqs = [...new Set([...neqParCle.values()].flatMap((e) => [...e]))];
@@ -500,13 +527,13 @@ async function adressesDepuisRegistre(
   }
 
   let trouvees = 0;
-  let ambigues = 0;
-  let absentes = 0;
+  const nomsAmbigus: string[] = [];
+  const nomsAbsents: string[] = [];
 
   for (const lieu of sansAdresse) {
     const candidats = parCle.get(cleNom(lieu.nom)) ?? [];
     if (candidats.length === 0) {
-      absentes++;
+      nomsAbsents.push(lieu.nom);
       continue;
     }
 
@@ -516,7 +543,7 @@ async function adressesDepuisRegistre(
     // inscrit en base.
     const retenu = choisirEtablissement(candidats, villeDe(lieu.nom));
     if (retenu === null) {
-      ambigues++;
+      nomsAmbigus.push(`${lieu.nom} (${candidats.length})`);
       continue;
     }
 
@@ -527,7 +554,15 @@ async function adressesDepuisRegistre(
     trouvees++;
   }
 
-  return { candidates: sansAdresse.length, trouvees, ambigues, absentes };
+  return {
+    candidates: sansAdresse.length,
+    trouvees,
+    ambigues: nomsAmbigus.length,
+    absentes: nomsAbsents.length,
+    nomsAmbigus,
+    nomsAbsents,
+    clesTropCommunes,
+  };
 }
 
 /** Ce qu'une passe de raffinement des positions a donné. */
@@ -916,7 +951,15 @@ export async function mesurerDistances(
     // Aucun accès réseau : les 28 821 établissements de la région sont en base. Cette passe
     // n'est donc bornée par rien et comble TOUTES les adresses manquantes d'un coup — ce
     // qu'aucune passe Nominatim ne pouvait faire, six par six.
-    let registre: PasseRegistre = { candidates: 0, trouvees: 0, ambigues: 0, absentes: 0 };
+    let registre: PasseRegistre = {
+      candidates: 0,
+      trouvees: 0,
+      ambigues: 0,
+      absentes: 0,
+      nomsAbsents: [],
+      nomsAmbigus: [],
+      clesTropCommunes: [],
+    };
     try {
       registre = await adressesDepuisRegistre(villeDe);
     } catch (err) {
@@ -998,6 +1041,32 @@ export async function mesurerDistances(
         `${bornes.echecs > 0 ? ` (${bornes.echecs} en échec)` : ""} ` +
         `budget restant=${restant === null ? "illimité" : `${restant} ms`}`,
     );
+
+    // ⚠️ NOMMER LES REFUS, PAS SEULEMENT LES COMPTER.
+    //
+    // « 53 absentes » est un chiffre qu'on ne peut pas vérifier : il ne dit pas si le
+    // rapprochement a bien travaillé ou s'il vient d'écarter les 53 employeurs qui
+    // comptent. Les noms, eux, se lisent en dix secondes et désignent la cause — un
+    // organisme public qui n'est pas au registre des entreprises n'appelle pas le même
+    // correctif qu'une marque commerciale absente de la raison sociale.
+    //
+    // Borné à quelques noms : c'est un échantillon pour diagnostiquer, pas un export.
+    const echantillon = (noms: readonly string[], max = 12): string =>
+      noms.length <= max
+        ? noms.join(" · ")
+        : `${noms.slice(0, max).join(" · ")} … +${noms.length - max}`;
+
+    if (registre.nomsAbsents.length > 0) {
+      console.log(`[registre] absentes — ${echantillon(registre.nomsAbsents)}`);
+    }
+    if (registre.nomsAmbigus.length > 0) {
+      console.log(`[registre] ambigues — ${echantillon(registre.nomsAmbigus)}`);
+    }
+    if (registre.clesTropCommunes.length > 0) {
+      // Ce garde n'a encore jamais mordu en production : s'il apparaît, c'est une mesure,
+      // pas une supposition — et le seuil se rediscute sur cette base.
+      console.log(`[registre] clés écartées — ${echantillon(registre.clesTropCommunes)}`);
+    }
 
     revalidatePath("/");
     revalidatePath("/carte");
