@@ -342,3 +342,47 @@ export type SyncStateRow = typeof syncState.$inferSelect;
 export type VilleRow = typeof villes.$inferSelect;
 export type EntrepriseLieuRow = typeof entreprisesLieux.$inferSelect;
 export type NewOfferReasonRow = typeof offerReasons.$inferInsert;
+
+/**
+ * Établissements du Registre des entreprises du Québec, filtrés sur la région.
+ *
+ * ⚠️ POURQUOI UNE TABLE, ET PAS UN APPEL AU MOMENT VOULU. Le registre n'est joignable
+ * NULLE PART automatiquement : le fichier complet est refusé par Cloudflare aux runners
+ * GitHub (mesuré 3×, Ray ID), et le datastore de Données Québec ne contient qu'une page
+ * d'erreur — leur propre moissonneur s'est heurté au même mur. Marc l'apporte donc depuis
+ * chez lui, une fois ; à partir de là tout est local et automatique.
+ *
+ * CE QU'ELLE CONTIENT, ET CE QU'ELLE NE CONTIENT PAS. Uniquement des ÉTABLISSEMENTS —
+ * les lieux où une entreprise opère réellement, pas le `ADR_DOMCL_*` du fichier
+ * `Entreprise.csv` qui est le domicile légal (souvent le bureau du comptable). Et jamais
+ * une ligne des fichiers d'administrateurs ou d'actionnaires : ce sont des données de
+ * personnes tierces, garde-fou n°1.
+ *
+ * C'est une table de RÉFÉRENCE : elle se remplace en bloc à chaque import, elle ne porte
+ * aucune donnée de Marc, et la perdre ne coûte qu'un ré-import.
+ */
+export const registreEtablissements = pgTable(
+  "registre_etablissements",
+  {
+    id: serial("id").primaryKey(),
+    /** Numéro d'entreprise du Québec — l'identifiant officiel, 10 chiffres. */
+    neq: text("neq").notNull(),
+    nom: text("nom").notNull(),
+    /**
+     * Le nom réduit à sa forme comparable (`cleNom`) — accents, casse, ponctuation et
+     * forme juridique retirés. C'est SUR CETTE COLONNE qu'on cherche : comparer « Laserax »
+     * à « LASERAX INC. » littéralement ne trouverait jamais rien.
+     */
+    nomCle: text("nom_cle").notNull(),
+    adresse: text("adresse").notNull(),
+    ville: text("ville").notNull(),
+    codePostal: text("code_postal"),
+    /** L'établissement PRINCIPAL, quand le registre le déclare. */
+    principal: boolean("principal").notNull().default(false),
+  },
+  (table) => [
+    // La recherche se fait toujours par clé de nom : sans index, chaque adresse manquante
+    // provoquerait un balayage complet de la table.
+    index("registre_nom_cle_idx").on(table.nomCle),
+  ],
+);

@@ -14,7 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrer.ts",
     "db:seed": "tsx scripts/charger-seed.ts",
-    "registre:inspecter": "tsx scripts/inspecter-registre.ts"
+    "registre:inspecter": "tsx scripts/inspecter-registre.ts",
+    "registre:importer": "tsx scripts/importer-registre.ts"
   },
   "dependencies": {
     "@mokarade/hub-contract": "github:MoKarade/hub-contract#2d37a61c337d485ab9ec716d9c7507972e807226",

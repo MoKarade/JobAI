@@ -67,7 +67,7 @@ function hash(s: string): number {
 }
 
 describe("migration", () => {
-  it("crée les cinq tables attendues", async () => {
+  it("crée les six tables attendues", async () => {
     const r = await pg.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' ORDER BY table_name`,
@@ -76,6 +76,9 @@ describe("migration", () => {
       "entreprises_lieux",
       "offer_reasons",
       "offers",
+      // Les établissements du Registre des entreprises, filtrés sur la région. Table de
+      // RÉFÉRENCE : aucune donnée de Marc, remplacée en bloc à chaque import.
+      "registre_etablissements",
       // Ce que la base sait avoir déjà appliqué : empreinte du jeu de départ, et
       // temporisation des passes de fond. C'est ce qui permet à l'app de se synchroniser
       // seule sans réécrire les offres à chaque affichage.
