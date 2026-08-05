@@ -30,6 +30,7 @@ import { SEUIL_PALIER_A, SEUIL_PALIER_B } from "@/lib/scoring";
 import { classerPanne, type Panne } from "@/lib/panne";
 import { Cadre } from "@/components/Cadre";
 import { CarteFiltrable } from "@/components/CarteFiltrable";
+import { resteDuTravail, type LieuTravail } from "@/lib/travaux";
 import { mesurerDistances, passeGeocodage } from "@/lib/actions";
 import {
   CLE_DISTANCES,
@@ -51,12 +52,16 @@ export default async function PageCarte() {
 
   let offres = null;
   let positions = new Map<string, PositionEntreprise>();
+  // Les lignes BRUTES servent au gate du travail de fond : il raisonne sur `geocodeLe` et
+  // `bornesLe`, que la forme d'affichage ne porte pas (et n'a pas à porter).
+  let lieux: LieuTravail[] = [];
   let panne: Panne | null = null;
 
   try {
     offres = await lireOffres();
     if (offres !== null) {
       const lignes = await db.select().from(entreprisesLieux);
+      lieux = lignes;
       positions = new Map(
         lignes.map((l) => [
           l.nom,
@@ -115,9 +120,16 @@ export default async function PageCarte() {
     // `km === null` s'éteint dès que la mesure a réussi, quel que soit le nom. C'est aussi
     // le critère de l'accueil : deux pages qui déclenchent le même travail doivent le
     // déclencher sur la même condition.
-    const employeursNonSitues = offres.some(
-      (o) => !o.histo && o.perimeeLe === null && o.km === null,
-    );
+    //
+    // ⚠️ MAIS LA DISTANCE N'EST PLUS LE SEUL TRAVAIL DE CETTE PASSE.
+    //
+    // Elle rattrape aussi les adresses et mesure les bornes. Gaté sur la seule distance, le
+    // déclencheur se refermait dès que les trajets marchaient — et affamait les deux autres,
+    // qui ne vivaient plus que du cron nocturne, six entreprises par nuit. C'est exactement
+    // ce que Marc a décrit : « j'ai toujours pas toutes les adresses, POURTANT les trajets
+    // Maps marchent ». Les deux moitiés de la phrase étaient la même cause.
+    // `resteDuTravail` (pur, partagé avec la passe elle-même) couvre les trois travaux.
+    const travauxRestants = resteDuTravail(offres, lieux, new Date());
 
     // ⚠️ UN SEUL `after()`, ET LES DEUX TRAVAUX EN SÉRIE.
     //
@@ -127,7 +139,7 @@ export default async function PageCarte() {
     // simultanés — ce que sa politique interdit, et le bannissement coûterait la carte
     // entière. Les deux réservations restent SÉPARÉES (chacune borne son propre travail,
     // et l'accueil déclenche la mesure de son côté) ; c'est l'EXÉCUTION qui est sérialisée.
-    if (ciblesManquantes > 0 || employeursNonSitues) {
+    if (ciblesManquantes > 0 || travauxRestants) {
       after(async () => {
         if (ciblesManquantes > 0) {
           try {
@@ -144,7 +156,7 @@ export default async function PageCarte() {
           }
         }
 
-        if (employeursNonSitues) {
+        if (travauxRestants) {
           try {
             if (await reserverPasse(db, CLE_DISTANCES, DELAI_MESURE_AUTO_MS, new Date())) {
               const r = await mesurerDistances();

@@ -12,7 +12,7 @@
 // pire que l'échec — d'où le journal côté serveur.
 
 import { revalidatePath } from "next/cache";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { entreprisesLieux, offers, syncState, villes } from "./db/schema";
 import { exigerSession } from "./session";
@@ -33,6 +33,7 @@ import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
 import { RAYON_5_MIN_M, proximiteBorne } from "./bornes";
 import { chercherBornes } from "./overpass";
+import { adresseARattraper, bornesAMesurer } from "./travaux";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -221,15 +222,41 @@ export async function passeGeocodage(): Promise<ResultatPasse> {
  * retenter à chaque passage serait un martèlement sans fin pour une réponse qui ne viendra
  * jamais.
  */
+/**
+ * Ce qu'une passe de rattrapage a réellement fait.
+ *
+ * ⚠️ « 0 » NE VEUT RIEN DIRE TOUT SEUL, et c'est ce qui a coûté une journée : « je n'ai
+ * toujours pas toutes les adresses » ne se diagnostique pas quand la fonction ne rend
+ * qu'un compte d'écritures. Zéro sur zéro candidat = il n'y avait rien à faire. Zéro sur
+ * six = les six ont été écartées, et c'est un défaut. Le détail sépare les deux.
+ */
+interface Rattrapage {
+  /** Combien de lignes remplissaient les conditions au début de la passe. */
+  candidates: number;
+  /** Combien ont réellement gagné leur adresse. */
+  ecrites: number;
+  /** Trouvées, mais trop loin du point déjà épinglé : un homonyme, écarté à raison. */
+  horsRayon: number;
+  /** Interrogées sans qu'OpenStreetMap ne rende d'adresse exploitable. */
+  sansReponse: number;
+}
+
 async function rattraperAdresses(
   villeDe: (nom: string) => string | null,
   max: number,
   budgetMs: number | null,
-): Promise<number> {
-  const lignes = await db
-    .select()
-    .from(entreprisesLieux)
-    .where(and(eq(entreprisesLieux.precision, "exacte"), isNull(entreprisesLieux.adresse)))
+): Promise<Rattrapage> {
+  // ⚠️ LE FILTRE VIT DANS `lib/travaux.ts`, PAS DANS LA CLAUSE `WHERE`.
+  //
+  // C'est la même règle qui décide ici QUI est retenté et, dans les pages, s'il faut
+  // déclencher une passe. Écrite deux fois — une en SQL, une en TypeScript — elle diverge :
+  // c'est précisément ce qui a affamé ce rattrapage pendant des jours. La table compte
+  // quelques dizaines de lignes ; les lire toutes pour appliquer un prédicat PARTAGÉ coûte
+  // moins qu'une seconde implémentation.
+  const toutes = await db.select().from(entreprisesLieux);
+  const maintenant = new Date();
+  const lignes = toutes
+    .filter((l) => adresseARattraper(l, maintenant))
     // LA MOINS RÉCEMMENT TENTÉE D'ABORD — et c'est ce qui fait CONVERGER le rattrapage.
     //
     // Sans `ORDER BY`, Postgres sert les lignes dans l'ordre du heap : le même lot
@@ -239,8 +266,8 @@ async function rattraperAdresses(
     // autres. En triant par `geocodeLe`, et en le marquant à CHAQUE tentative (réussie ou
     // non, voir plus bas), la file tourne : tout le monde passe, et un cas insoluble
     // retombe naturellement en queue au lieu de bloquer les suivants.
-    .orderBy(entreprisesLieux.geocodeLe)
-    .limit(max);
+    .sort((a, b) => a.geocodeLe.getTime() - b.geocodeLe.getTime())
+    .slice(0, max);
 
   // La position DÉJÀ VALIDÉE sert de référent : c'est elle qu'on cherche à confirmer.
   const referent = new Map(lignes.map((l) => [l.nom, { lat: l.lat, lon: l.lon }]));
@@ -249,10 +276,15 @@ async function rattraperAdresses(
     .map((l) => ({ nom: l.nom, ville: villeDe(l.nom) }))
     .filter((e): e is { nom: string; ville: string } => e.ville !== null);
 
-  if (tentables.length === 0) return 0;
+  const vide: Rattrapage = { candidates: tentables.length, ecrites: 0, horsRayon: 0, sansReponse: 0 };
+  // Aucune candidate GÉOCODABLE : ce n'est pas un échec, c'est qu'aucune des entreprises
+  // sans adresse n'a de ville connue. Le compte le dit — il vaut 0 sur 0, pas 0 sur six.
+  if (tentables.length === 0) return vide;
 
   const r = await geocoderEntreprises(tentables, outilsNominatim(), budgetMs);
   let ecrites = 0;
+  let horsRayon = 0;
+  let sansReponse = r.introuvables.length;
 
   // Marquer la TENTATIVE avant d'écrire quoi que ce soit : c'est ce qui fait tourner la
   // file. Seules les entreprises réellement interrogées sont marquées — celles que le
@@ -267,7 +299,12 @@ async function rattraperAdresses(
   }
 
   for (const t of r.trouvees) {
-    if (!t.adresse) continue;
+    // Trouvée, mais OpenStreetMap n'en donne pas l'adresse : compté à part de l'introuvable,
+    // sinon un jeu de données incomplet se lirait comme un géocodeur en panne.
+    if (!t.adresse) {
+      sansReponse++;
+      continue;
+    }
 
     // ⚠️ VALIDATION PAR LA DISTANCE — sans elle, cette fonction réintroduit l'incident que
     // le projet a déjà payé une fois (la brasserie Labatt de Montréal résolue pour celle de
@@ -280,7 +317,13 @@ async function rattraperAdresses(
     // correspond pas au point affiché serait une donnée plausible et fausse, exactement ce
     // qu'interdit le garde-fou n°3 — et pire que pas d'adresse du tout.
     const ancre = referent.get(t.nom);
-    if (!ancre || distanceKm({ lat: t.lat, lon: t.lon }, ancre) > RAYON_VALIDATION_KM) continue;
+    if (!ancre || distanceKm({ lat: t.lat, lon: t.lon }, ancre) > RAYON_VALIDATION_KM) {
+      // COMPTÉ, et compté À PART. Un rejet muet est indiscernable d'une source vide : si ce
+      // chiffre monte, c'est la résolution par nom qui ramène des homonymes, pas
+      // OpenStreetMap qui manque de données — et les deux se corrigent différemment.
+      horsRayon++;
+      continue;
+    }
 
     await db
       .update(entreprisesLieux)
@@ -289,7 +332,7 @@ async function rattraperAdresses(
     ecrites++;
   }
 
-  return ecrites;
+  return { candidates: tentables.length, ecrites, horsRayon, sansReponse };
 }
 
 /**
@@ -307,17 +350,27 @@ async function rattraperAdresses(
  * et un budget de temps. Un échec ici n'empêche RIEN d'autre — les bornes sont un confort,
  * la distance est le critère n°1.
  */
-async function mesurerBornes(max: number, budgetMs: number | null): Promise<number> {
+interface PasseBornes {
+  /** Entreprises jamais interrogées au début de la passe. */
+  candidates: number;
+  /** Interrogations abouties — que la réponse contienne des bornes ou non. */
+  mesurees: number;
+  /** Interrogations en échec (Overpass indisponible). La ligne repassera. */
+  echecs: number;
+}
+
+async function mesurerBornes(max: number, budgetMs: number | null): Promise<PasseBornes> {
   const debut = Date.now();
-  const lignes = await db
-    .select()
-    .from(entreprisesLieux)
-    .where(isNull(entreprisesLieux.bornesLe))
+  // Même raison qu'au-dessus : le prédicat est PARTAGÉ avec le gate des pages
+  // (`lib/travaux.ts`), il ne se réécrit pas en SQL.
+  const lignes = (await db.select().from(entreprisesLieux))
+    .filter(bornesAMesurer)
     // Ordre explicite : sans lui, Postgres sert le heap et les mêmes lignes reviendraient.
-    .orderBy(entreprisesLieux.nom)
-    .limit(max);
+    .sort((a, b) => a.nom.localeCompare(b.nom, "fr-CA"))
+    .slice(0, max);
 
   let mesurees = 0;
+  let echecs = 0;
 
   for (const l of lignes) {
     if (budgetMs !== null && Date.now() - debut >= budgetMs) break;
@@ -326,6 +379,7 @@ async function mesurerBornes(max: number, budgetMs: number | null): Promise<numb
     if (!r.ok) {
       // On NE marque PAS la ligne : elle repassera. Le journal garde la trace, parce qu'une
       // source qui tombe tout le temps doit finir par se voir.
+      echecs++;
       console.error(`[bornes] ${l.nom} — non mesurée : ${r.raison}`);
       continue;
     }
@@ -338,7 +392,7 @@ async function mesurerBornes(max: number, budgetMs: number | null): Promise<numb
     mesurees++;
   }
 
-  return mesurees;
+  return { candidates: lignes.length, mesurees, echecs };
 }
 
 /**
@@ -513,7 +567,7 @@ export async function mesurerDistances(
 
     // 1 bis. Récupérer les adresses manquantes des entreprises déjà situées — sans quoi
     //        la colonne resterait vide pour tout ce qui existait avant elle.
-    let adresses = 0;
+    let adresses: Rattrapage = { candidates: 0, ecrites: 0, horsRayon: 0, sansReponse: 0 };
     try {
       adresses = await rattraperAdresses(villeDe, maxSituations, budgetRestant());
     } catch (err) {
@@ -523,7 +577,7 @@ export async function mesurerDistances(
     }
 
     // 1 ter. Les bornes de recharge, pour les entreprises jamais regardées.
-    let bornes = 0;
+    let bornes: PasseBornes = { candidates: 0, mesurees: 0, echecs: 0 };
     try {
       bornes = await mesurerBornes(maxSituations, budgetRestant());
     } catch (err) {
@@ -539,6 +593,27 @@ export async function mesurerDistances(
       await db.update(offers).set(valeurs).where(eq(offers.id, m.id));
     }
 
+    // ⚠️ TRACER CE QUE LA PASSE A FAIT — MÊME QUAND ELLE N'A RIEN FAIT.
+    //
+    // Jusqu'ici ces travaux ne journalisaient QUE leurs échecs. Une passe qui tourne sans
+    // rien produire était donc indiscernable d'une passe qui n'a jamais tourné : les deux
+    // laissent des journaux vides. C'est exactement ce qui a rendu « je n'ai toujours pas
+    // toutes les adresses » indiagnosticable — il n'existait aucun moyen de savoir si le
+    // rattrapage avait démarré, ce qu'il avait trouvé, ou s'il s'était fait couper par le
+    // budget. Les comptes sont donnés en X/Y : « 0/0 » dit qu'il n'y avait rien à faire,
+    // « 0/6 » dit que six candidates ont été écartées, et ce sont deux situations opposées.
+    const restant = budgetRestant();
+    console.log(
+      `[distances] passe terminée — mesurées=${majs.length} situées=${situees}/${manquants.length} ` +
+        `villes=${aRattraper.length} ` +
+        `adresses=${adresses.ecrites}/${adresses.candidates}` +
+        `${adresses.horsRayon > 0 ? ` (${adresses.horsRayon} hors rayon)` : ""}` +
+        `${adresses.sansReponse > 0 ? ` (${adresses.sansReponse} sans réponse)` : ""} ` +
+        `bornes=${bornes.mesurees}/${bornes.candidates}` +
+        `${bornes.echecs > 0 ? ` (${bornes.echecs} en échec)` : ""} ` +
+        `budget restant=${restant === null ? "illimité" : `${restant} ms`}`,
+    );
+
     revalidatePath("/");
     revalidatePath("/carte");
     return {
@@ -546,8 +621,8 @@ export async function mesurerDistances(
       mesurees: majs.length,
       situees,
       villesRattrapees: aRattraper.length,
-      adressesRattrapees: adresses,
-      bornesMesurees: bornes,
+      adressesRattrapees: adresses.ecrites,
+      bornesMesurees: bornes.mesurees,
     };
   } catch (err) {
     console.error("[actions] mesure des distances impossible", err);

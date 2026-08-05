@@ -204,7 +204,7 @@ export async function GET(requete: Request) {
           budgetGeocodageMs: BUDGET_GEOCODAGE_CRON_MS,
         });
         localisation = m.ok
-          ? `${m.villesRattrapees} ville(s) rattrapée(s), ${m.situees} située(s), ${m.adressesRattrapees} adresse(s) récupérée(s), ${m.mesurees} mesurée(s)`
+          ? `${m.villesRattrapees} ville(s) rattrapée(s), ${m.situees} située(s), ${m.adressesRattrapees} adresse(s) récupérée(s), ${m.bornesMesurees} borne(s) mesurée(s), ${m.mesurees} mesurée(s)`
           : `refusée : ${m.erreur}`;
         if (!m.ok) console.error("[cron] localisation refusée :", m.erreur);
       } else {

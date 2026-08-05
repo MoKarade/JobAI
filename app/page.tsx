@@ -12,6 +12,8 @@ import { lireOffres } from "@/lib/donnees";
 import { mesurerDistances } from "@/lib/actions";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "@/lib/synchro";
 import { db } from "@/lib/db";
+import { entreprisesLieux } from "@/lib/db/schema";
+import { resteDuTravail } from "@/lib/travaux";
 import { resumer } from "@/lib/suivi";
 import { prochainesActions } from "@/lib/aFaire";
 import { aSurveiller, resumerRelances } from "@/lib/relances";
@@ -52,9 +54,25 @@ export default async function Accueil() {
   // toutes les offres ingérées (un déposant ne peut pas mesurer, et a raison de ne pas
   // inventer). APRÈS la réponse : la mesure peut déclencher un géocodage, qui appelle
   // Nominatim à 1,1 s par requête. Bornée à une passe / 5 min, comme la carte.
-  if (offres !== null && panne === null && offres.some((o) => !o.histo && o.km === null)) {
+  //
+  // ⚠️ LE GATE EST CELUI DE LA CARTE, MOT POUR MOT (`resteDuTravail`) — et il couvre les
+  // TROIS travaux de la passe, pas seulement la distance. Gaté sur la seule distance, il se
+  // refermait dès que les trajets marchaient et affamait le rattrapage des adresses et la
+  // mesure des bornes, qui vivent dans la même passe. La lecture des lieux se fait DANS le
+  // `after()` : elle sert à décider d'un travail de fond, elle n'a rien à faire dans le
+  // chemin critique de l'affichage.
+  if (offres !== null && panne === null) {
+    const aFaire = offres;
     after(async () => {
       try {
+        // ⚠️ VÉRIFIER QU'IL Y A DU TRAVAIL **AVANT** DE RÉSERVER LA PASSE.
+        //
+        // `reserverPasse` pose une temporisation de cinq minutes valable pour TOUS les
+        // déclencheurs. Réserver puis constater qu'il n'y a rien à faire brûlerait le
+        // créneau de la carte et du cron : chaque affichage de l'accueil bloquerait le
+        // travail des autres pendant cinq minutes, sans rien accomplir lui-même.
+        const lieux = await db.select().from(entreprisesLieux);
+        if (!resteDuTravail(aFaire, lieux, new Date())) return;
         if (!(await reserverPasse(db, CLE_DISTANCES, DELAI_MESURE_AUTO_MS, new Date()))) return;
         const r = await mesurerDistances();
         if (!r.ok) console.error("[accueil] mesure des distances refusée :", r.erreur);
