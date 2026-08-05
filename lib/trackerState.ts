@@ -19,12 +19,33 @@
 
 import { db } from "./db";
 import { offers } from "./db/schema";
+import { assurerMigrations } from "./migrations";
 import { resumer } from "./suivi";
 import type { ResumeSuivi } from "./types";
 
 export async function getTrackerState(): Promise<ResumeSuivi | null> {
   // Pas de base configurée : l'app tourne, l'intégration n'a rien à dire. Pas une erreur.
   if (!process.env.DATABASE_URL) return null;
+
+  // ⚠️ AVANT DE LIRE, GARANTIR LE SCHÉMA — comme `lireOffres`, et pour la même raison.
+  //
+  // C'était le seul chemin de lecture qui ne le faisait pas, et rien ne le signalait :
+  // les colonnes qu'il sélectionne datent toutes de la première migration, donc ça
+  // marchait par CHANCE. Deux conséquences, l'une déjà réelle, l'autre en embuscade.
+  //
+  // Réelle : sur une base neuve, une instance froide dont la PREMIÈRE requête est le
+  // sondage du hub lève « table offers absente » — le hub afficherait une PANNE là où la
+  // réponse honnête est « en construction » (§6 bis : `null` = pas branché, `throw` =
+  // panne ; les confondre est exactement ce que le garde-fou n°3 interdit).
+  //
+  // En embuscade : le jour où l'on publiera une métrique portée par une colonne récente,
+  // la lecture échouerait sur les instances créées par un sondage du hub et réussirait
+  // sur celles créées par une visite de Marc. Un défaut qui dépend de QUI a réveillé
+  // l'instance ne se reproduit pas, donc ne se corrige pas.
+  //
+  // Sûr : la fonction ne lève jamais, ne fait rien quand tout est à jour, et n'applique
+  // que les fichiers du dépôt déployé — l'appelant ne choisit rien.
+  await assurerMigrations();
 
   const lignes = await db
     .select({
