@@ -12,22 +12,25 @@
 
 | | |
 |---|---|
-| **Gate** | `typecheck` + `test` (**641**) + `lint` (0 avertissement) + `build` verts, jugés par exit code. CI consultée après chaque push. |
+| **Gate** | `typecheck` + `test` (**649**) + `lint` (0 avertissement) + `build` verts, jugés par exit code. CI consultée après chaque push. |
 | **Bornes de recharge** | ✅ **Mesuré en production, 76/76.** C'était `2/6 (3 en échec) · budget restant=0 ms` : une requête Overpass PAR entreprise, et un échec coûte le délai × trois instances de repli. Désormais **une seule requête pour tout le lot** (boîte englobante, proximité calculée en local), et le coût réseau ne dépend plus du nombre de lieux. La passe rend maintenant 27 s de budget sur 35. |
 | **Registre des entreprises** | Importé : **28 821 établissements** de la région + **59 194 dénominations** (`registre_etablissements`, `registre_noms`). Fichier officiel téléchargé par Marc — l'IP des runners GitHub est refusée par Cloudflare, et le datastore de Données Québec ne contient qu'une page d'erreur (leur propre moissonneur a heurté le même mur). Aucun fichier de personnes n'est lu (garde-fou n°1). |
 | **Adresses sans réseau** | `adressesDepuisRegistre` comble les adresses manquantes **sans aucun appel réseau**, donc sans budget de temps. Deux chemins de recherche : le nom d'établissement, puis les **dénominations** — le second manquait, et c'est lui qui a fait passer le rapprochement de `11/73` à un chiffre en progression. |
-| **Position par l'adresse** | `[REQ-17]` : quand on tient une adresse du registre, on la géocode **elle** au lieu du nom de l'entreprise. C'est le levier restant sur le ratio « à leur adresse / au centre-ville » — OpenStreetMap ne cartographie pas les raisons sociales, mais une adresse civique est son cœur de métier. ⚠️ **Pas encore mesuré en production.** |
+| **Position par l'adresse** | ✅ **Mesuré : `precisees=4/6 (4 par adresse)`.** Quand on tient une adresse du registre, on la géocode **elle** au lieu du nom de l'entreprise — OpenStreetMap ne cartographie pas les raisons sociales, mais une adresse civique est son cœur de métier. La première passe après le rattrapage a rendu 4 positions exactes sur 6 candidates (1 hors rayon écartée, 1 introuvable). |
 | **Source de l'adresse** | Colonne `adresse_source` (`osm` \| `registre`), contrainte en base « l'une sans l'autre, jamais ». Dite à l'écran : les deux ne valent pas la même chose. |
 | **Diagnostic** | Les refus du registre sont **nommés**, pas seulement comptés (`[registre] absentes — …`). « 53 absentes » ne se vérifie pas ; trois causes possibles appellent trois correctifs opposés. |
 
 ### Ce qui reste ouvert
 
-- **Lire la prochaine trace de production** : `registre=X/Y`, la liste des absentes, et
-  `precisees=… (N par adresse)`. La passe ne tourne **que** quand Marc ouvre l'app — la
-  session ne peut pas s'authentifier à sa place.
-- **Les 53 absentes** : ne rien coder avant d'avoir les noms. Un organisme public hors du
-  registre des entreprises, une marque absente de la raison sociale et une clé de
-  rapprochement trop stricte se corrigent de trois façons contraires.
+- **Les 53 absentes du registre** : les noms sont connus (`AMETEK`, `Evident Scientific`,
+  `Permafil Inc.`, `Groupe Mundial`, `Garoy Construction inc.`…). Ce qui manque encore,
+  c'est ce que le registre porte SOUS ces noms — la ligne `[registre] pistes` le dira à la
+  prochaine passe. Ne rien élargir avant : une clé de rapprochement trop stricte, un
+  organisme absent du registre régional et une marque ≠ raison sociale se corrigent de
+  trois façons contraires. `Groupe Laberge (118)` est un cas à part : 118 établissements
+  dans la région, le refus est défendable tant qu'on ne sait pas auquel le poste se rattache.
+- **Rappel de fonctionnement** : la passe ne tourne **que** quand Marc ouvre l'app — la
+  session ne peut pas s'authentifier à sa place pour la déclencher.
 - **Refonte visuelle totale** — demandée explicitement par Marc comme chantier suivant,
   séquencée après le ratio.
 - **Signature des commits** : toujours bloquée (clé de signature de 0 octet dans le

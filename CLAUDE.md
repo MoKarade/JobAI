@@ -524,6 +524,17 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   --exclude-standard`, soit exactement ce qu'un `git add -A` emporterait). Question à poser
   à tout test-garde : **existe-t-il un état du dépôt où la faute existe et où le garde ne la
   voit pas ?** Ici c'était l'état le plus courant de tous — juste avant le commit.
+- **Un OUTIL DE DIAGNOSTIC qui se tait quand il ne trouve rien ne diagnostique rien.**
+  J'ai livré une sonde qui journalisait ses trouvailles et rien d'autre. Résultat en
+  production : pas de ligne — donc impossible de distinguer « le registre est muet sur ces
+  noms » de « le code n'est pas déployé », qui sont les deux hypothèses opposées qu'elle
+  devait départager. C'est la règle des passes de fond (« 0/0 » et « 0/6 » disent des choses
+  contraires) appliquée à un outil de mesure : il parle DÈS QU'IL Y A QUELQUE CHOSE À
+  CHERCHER, et dit « aucune » quand c'est le cas. Sœur : le même jet annonçait en
+  commentaire une recherche « dans les deux sens » alors que le code n'en faisait qu'un —
+  une affirmation de commentaire se vérifie comme n'importe quel finding, et celle-ci
+  cachait que le lien recherché (« Groupe Mundial » ↔ « MUNDIAL ») n'était atteignable par
+  aucun préfixe.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

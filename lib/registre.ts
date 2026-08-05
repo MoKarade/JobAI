@@ -200,6 +200,37 @@ export function cleNom(nom: string): string {
     .trim();
 }
 
+/**
+ * Mots qui ne DÉSIGNENT pas une entreprise en particulier.
+ *
+ * Ils servent à choisir par quoi chercher : « garoy construction » se cherche par
+ * « garoy », pas par « construction » qui remonterait la moitié du registre.
+ */
+const MOTS_GENERIQUES = new Set([
+  "groupe", "les", "des", "entreprise", "entreprises", "industries", "industrie",
+  "construction", "constructions", "transport", "transports", "canada", "quebec",
+  "service", "services", "solutions", "produits", "compagnie", "technologies",
+]);
+
+/**
+ * Le mot par lequel CHERCHER une entreprise dans le registre, ou `null`.
+ *
+ * ⚠️ POUR DIAGNOSTIQUER, JAMAIS POUR DÉCIDER. Cette fonction sert à répondre à « que
+ * contient le registre sous ce nom ? » quand la comparaison de clés EXACTES n'a rien
+ * donné. Elle est volontairement grossière — une recherche par un seul mot ramène des
+ * homonymes, et c'est acceptable tant que rien n'en est écrit. La règle du dépôt reste
+ * entière : une heuristique peut grouper ce qu'on REGARDE, jamais décider ce qu'on ÉCRIT.
+ *
+ * On prend le PREMIER mot porteur : dans un nom d'entreprise québécois, le terme propre
+ * vient presque toujours avant le terme de métier (« Garoy Construction », « Groupe
+ * Mundial »). Le plus long serait un mauvais critère — « construction » bat « garoy » et
+ * ne désigne rien.
+ */
+export function motDeRecherche(cle: string): string | null {
+  const mots = cle.split(" ").filter((m) => m.length >= 4);
+  return mots.find((m) => !MOTS_GENERIQUES.has(m)) ?? mots[0] ?? null;
+}
+
 /** Deux noms désignent-ils la même entreprise ? Comparaison STRICTE sur la clé. */
 export function memeEntreprise(a: string, b: string): boolean {
   const ca = cleNom(a);

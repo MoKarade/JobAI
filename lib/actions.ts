@@ -46,6 +46,7 @@ import {
   adresseLisible,
   choisirEtablissement,
   cleNom,
+  motDeRecherche,
   type Etablissement,
 } from "./registre";
 import { BUDGET_PASSE_PAGE_MS } from "./synchro";
@@ -615,10 +616,20 @@ async function adressesDepuisRegistre(
  * piège déjà payé : une heuristique peut grouper ce qu'on REGARDE, jamais décider ce qu'on
  * ÉCRIT. On mesure d'abord ; la règle se discutera sur des noms réels.
  *
- * La recherche est un PRÉFIXE dans les deux sens — notre clé est le début d'une clé du
- * registre (« ametek » → « ametek canada »), ou l'inverse (« groupe mundial » → « mundial »
- * n'entre pas ici, mais « les aliments lucky 8 » → « les aliments lucky » oui). C'est
- * volontairement grossier : il ne s'agit pas de trancher, il s'agit de voir.
+ * ⚠️ LA RECHERCHE EST PAR MOT PORTEUR, ET LE PREMIER JET NE L'ÉTAIT PAS.
+ * Il cherchait `nomCle LIKE 'notre-clé %'` — donc uniquement les noms du registre qui
+ * COMMENCENT par le nôtre — alors que ce commentaire annonçait « les deux sens ». Mesuré
+ * en production le 2026-08-05 : zéro piste sur douze noms, et une affirmation de
+ * commentaire qui ne correspondait pas au code se vérifie comme n'importe quel finding.
+ * Un préfixe ne peut de toute façon pas relier « Groupe Mundial » à « MUNDIAL », qui est
+ * précisément le cas qu'on veut voir. On cherche donc par le mot PORTEUR du nom
+ * (`motDeRecherche`, pure et testée), n'importe où dans le nom du registre.
+ *
+ * ⚠️ ET ELLE PARLE MÊME QUAND ELLE NE TROUVE RIEN. Le premier jet ne journalisait que ses
+ * trouvailles : l'absence de ligne signifiait alors aussi bien « le registre ne contient
+ * rien » que « le code n'est pas déployé ». Deux situations opposées, un même silence —
+ * c'est le défaut que ce dépôt a déjà corrigé sur les passes de fond (« 0/0 » et « 0/6 »
+ * disent des choses contraires).
  */
 async function pistesPourAbsents(noms: readonly string[]): Promise<string[]> {
   // Borné : c'est un échantillon de diagnostic, et chaque nom coûte une requête.
@@ -626,18 +637,20 @@ async function pistesPourAbsents(noms: readonly string[]): Promise<string[]> {
   const pistes: string[] = [];
 
   for (const nom of echantillon) {
-    const cle = cleNom(nom);
-    if (cle === "") continue;
+    const mot = motDeRecherche(cleNom(nom));
+    if (mot === null) continue;
 
     const proches = await db
-      .select({ nom: registreNoms.nom, cle: registreNoms.nomCle })
+      .select({ nom: registreNoms.nom })
       .from(registreNoms)
-      .where(like(registreNoms.nomCle, `${cle} %`))
+      .where(like(registreNoms.nomCle, `%${mot}%`))
       .limit(3);
 
-    if (proches.length > 0) {
-      pistes.push(`${nom} → ${proches.map((p) => p.nom).join(" / ")}`);
-    }
+    pistes.push(
+      proches.length > 0
+        ? `${nom} → ${proches.map((p) => p.nom).join(" / ")}`
+        : `${nom} → rien sous « ${mot} »`,
+    );
   }
 
   return pistes;
@@ -1177,11 +1190,19 @@ export async function mesurerDistances(
     if (registre.nomsAmbigus.length > 0) {
       console.log(`[registre] ambigues — ${echantillon(registre.nomsAmbigus)}`);
     }
-    if (registre.pistes.length > 0) {
+    if (registre.absentes > 0) {
       // La MESURE qui manquait : ce que le registre porte sous ces noms-là. Rien n'en est
       // écrit — c'est ce qui permettra de décider si la règle de rapprochement doit bouger,
       // et dans quel sens, sur des noms réels plutôt que sur une intuition.
-      console.log(`[registre] pistes — ${echantillon(registre.pistes, 8)}`);
+      //
+      // La ligne sort DÈS QU'IL Y A DES ABSENTES, même si aucune piste n'est trouvée : son
+      // absence signifiait aussi bien « le registre est muet » que « le code n'est pas
+      // déployé », et ces deux-là ne se corrigent pas pareil.
+      console.log(
+        `[registre] pistes (${registre.pistes.length}) — ${
+          registre.pistes.length > 0 ? echantillon(registre.pistes, 8) : "aucune"
+        }`,
+      );
     }
     if (registre.clesTropCommunes.length > 0) {
       // Ce garde n'a encore jamais mordu en production : s'il apparaît, c'est une mesure,

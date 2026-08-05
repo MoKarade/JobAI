@@ -15,6 +15,7 @@ import {
   indicesColonnes,
   lireEtablissement,
   memeEntreprise,
+  motDeRecherche,
   retirerBom,
   villeDeLigneAdresse,
 } from "../lib/registre";
@@ -288,5 +289,42 @@ describe("adresse lisible", () => {
         principal: false,
       }),
     ).toBe(`${RUE_1}, Québec`);
+  });
+});
+
+describe("par quel mot chercher dans le registre", () => {
+  // ⚠️ POUR DIAGNOSTIQUER, JAMAIS POUR DÉCIDER. Rien de ce que ce choix ramène n'est écrit
+  // en base : il sert à répondre à « que contient le registre sous ce nom ? » quand la
+  // comparaison de clés exactes n'a rien donné. La règle du dépôt tient : une heuristique
+  // peut grouper ce qu'on REGARDE, jamais décider ce qu'on ÉCRIT.
+
+  it("prend le terme PROPRE, pas le terme de métier", () => {
+    // Le cas qui a motivé la fonction : chercher « construction » remonterait la moitié du
+    // registre et n'apprendrait rien. Prendre le plus LONG donnerait précisément ça.
+    expect(motDeRecherche(cleNom("Garoy Construction inc."))).toBe("garoy");
+    expect(motDeRecherche(cleNom("Dracon Automatisation"))).toBe("dracon");
+  });
+
+  it("saute les mots qui figurent dans un nom sur deux", () => {
+    // « Groupe Mundial » ne se relie à « MUNDIAL » ni par préfixe ni par suffixe : c'est
+    // exactement le lien qu'un préfixe ne pouvait pas voir, et le mot porteur, si.
+    expect(motDeRecherche(cleNom("Groupe Mundial"))).toBe("mundial");
+    expect(motDeRecherche(cleNom("Les Aliments Lucky 8"))).toBe("aliments");
+  });
+
+  it("ignore les mots trop courts pour discriminer", () => {
+    // Un mot de trois lettres apparié n'importe où dans 59 194 dénominations ne dit rien.
+    expect(motDeRecherche(cleNom("S Huot Inc"))).toBe("huot");
+  });
+
+  it("se rabat sur le premier mot quand TOUS sont génériques", () => {
+    // Mieux vaut une recherche bruyante qu'aucune recherche : c'est un diagnostic, et un
+    // diagnostic muet est ce qu'on vient de corriger.
+    expect(motDeRecherche(cleNom("Groupe Construction"))).toBe("groupe");
+  });
+
+  it("rend null quand il n'y a rien à chercher", () => {
+    expect(motDeRecherche("")).toBeNull();
+    expect(motDeRecherche("s a")).toBeNull();
   });
 });
