@@ -33,6 +33,37 @@
 //
 // Ce script ne fait que LIRE et rapporter. Il tourne sur un runner GitHub Actions, la
 // session de développement n'ayant aucun accès sortant.
+//
+// ══ VERDICT DU 2026-08-05, MESURÉ SUR SIX ENTREPRISES RÉELLES ══
+//
+// OVERPASS PAR NOM — NE RÉSOUT PAS LE PROBLÈME. Six interrogations :
+//     Laserax ......... aucun objet de ce nom dans toute la région
+//     Chantier Davie .. TROUVÉ (way/169057674) — mais PAS d'adresse taguée
+//     Canam Ponts ..... HTTP 429
+//     Robotiq ......... HTTP 504
+//     P.H. Tech ....... HTTP 429
+//     Poly-Robotics ... HTTP 429
+//
+//   Une seule réponse exploitable sur six, et elle ne portait PAS d'adresse. Deux
+//   enseignements, tous deux disqualifiants : (a) OpenStreetMap connaît parfois l'objet
+//   sans connaître son adresse — trouver l'entreprise ne donne alors qu'une position, pas
+//   une rue ; (b) une recherche par expression régulière sur `name` à travers toute la
+//   région est COÛTEUSE, et Overpass la limite durement (quatre refus sur six, à une
+//   requête toutes les 1,5 s). Ralentir la cadence rendrait la passe interminable pour un
+//   taux de réussite déjà très bas. Cette piste est CLOSE.
+//
+// REGISTRE DES ENTREPRISES DU QUÉBEC — la source existe, elle est officielle, elle est
+//   FRAÎCHE (publiée par le Registraire des entreprises, modifiée le 2026-08-02), mais sa
+//   ressource est un **ZIP derrière une page ASP.NET**
+//   (`FichierDonneesOuvertes.aspx`), sans taille annoncée — c'est le registre ENTIER du
+//   Québec, soit des millions d'entreprises. On ne télécharge pas ça dans une fonction
+//   serverless à chaque passe. L'exploiter demande un import PÉRIODIQUE (en CI) vers une
+//   table de la base, puis une recherche par nom en local. C'est un vrai chantier, pas un
+//   ajout d'appel — et il faut le décider comme tel.
+//
+// CE QUE ÇA VEUT DIRE POUR « 100 % D'ADRESSES EXACTES » : ce n'est pas atteignable avec
+//   les sources gratuites accessibles aujourd'hui. Laserax n'est dans OSM sous aucun nom ;
+//   Davie y est sans adresse. Le dire vaut mieux que de laisser croire le contraire.
 
 const DELAI_MS = 25_000;
 
