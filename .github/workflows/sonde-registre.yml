@@ -23,7 +23,28 @@
 # `Range`, pas de deuxième essai automatique. Si elle échoue, on attend et on relance à la
 # main — un service public n'est pas une ressource qu'on martèle jusqu'à ce qu'elle cède.
 #
-# CE QUE LA MESURE DOIT TRANCHER, dans cet ordre :
+# ══ CORRECTION DU DIAGNOSTIC — DEUXIÈME ESSAI, UNE SEULE REQUÊTE, MÊME REFUS ══
+#
+# J'avais attribué le blocage à ma propre insistance. C'était en partie faux, et la preuve
+# est dans la réponse : le refus porte un **Ray ID**, donc il vient de **Cloudflare**, et il
+# est arrivé sur une requête UNIQUE, dix minutes plus tard. Ce n'est donc pas la cadence
+# qui est en cause mais l'ADRESSE D'OÙ L'ON APPELLE : les IP des runners GitHub sont
+# partagées par des milliers de dépôts, et la protection anti-robot du site les refuse en
+# bloc. Corriger ma cadence était juste — ça ne suffit pas.
+#
+# CONSÉQUENCE, ET ELLE EST STRUCTURELLE : la CI ne peut pas télécharger ce fichier. Aucun
+# réglage de ce workflow n'y changera rien, et multiplier les essais ne ferait que
+# confirmer le blocage à un service public. Les seules issues réelles :
+#   · Marc télécharge le fichier depuis chez lui (son IP passe), une fois, et le dépose là
+#     où la CI peut le lire ;
+#   · ou l'on renonce au registre et l'on assume le ratio actuel.
+# Les deux se décident avec lui — ce n'est pas un choix technique.
+#
+# ⚠️ NE PAS ajouter de nouvel essai automatique ici. Le premier diagnostic était faux mais
+# la règle qu'il a produite reste bonne : on ne martèle pas un service public pour lui
+# arracher une réponse qu'il refuse.
+#
+# CE QUE LA MESURE DEVAIT TRANCHER, si l'accès s'ouvre un jour, dans cet ordre :
 #   1. Un ZIP, ou une page d'erreur ? Un ZIP commence par « PK », une page par « < ».
 #   2. Quelle TAILLE ? Au-delà de quelques centaines de Mo, l'import devra filtrer EN FLUX,
 #      la base Neon ne pouvant de toute façon pas héberger le registre entier.
