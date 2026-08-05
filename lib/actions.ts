@@ -18,6 +18,7 @@ import {
   entreprisesLieux,
   offers,
   registreEtablissements,
+  registreNoms,
   syncState,
   villes,
 } from "./db/schema";
@@ -37,8 +38,8 @@ import { employeursASituer, planifierDistances } from "./distances";
 import { villesARattraper } from "./ingest/pipeline";
 import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
-import { RAYON_5_MIN_M, proximiteBorne } from "./bornes";
-import { chercherBornes } from "./overpass";
+import { RAYON_5_MIN_M, boiteEnglobante, proximiteBorne } from "./bornes";
+import { DELAI_MAX_MS, ETENDUE_MAX_DEG, chercherBornesBoite } from "./overpass";
 import { adresseARattraper, bornesAMesurer, positionARaffiner } from "./travaux";
 import {
   adresseLisible,
@@ -420,15 +421,58 @@ async function adressesDepuisRegistre(
   const cles = [...new Set(sansAdresse.map((l) => cleNom(l.nom)))].filter((c) => c !== "");
   if (cles.length === 0) return vide;
 
-  const lignes = await db
-    .select()
-    .from(registreEtablissements)
-    .where(inArray(registreEtablissements.nomCle, cles));
+  // DEUX CHEMINS DE RECHERCHE, ET LE SECOND EST CELUI QUI MANQUAIT.
+  //
+  // Mesuré en production le 2026-08-05 avec le seul premier : « registre=11/73 · 61
+  // absentes ». Le nom d'un ÉTABLISSEMENT n'est souvent pas celui sous lequel on connaît
+  // l'entreprise — une usine déclarée sous sa raison sociale complète quand tout le monde
+  // l'appelle par sa marque. Les DÉNOMINATIONS (`Nom.csv`) portent les deux ; on y cherche
+  // aussi, puis on remonte au NEQ, puis aux établissements de ce NEQ.
+  const [parNomEtab, parDenomination] = await Promise.all([
+    db.select().from(registreEtablissements).where(inArray(registreEtablissements.nomCle, cles)),
+    db.select().from(registreNoms).where(inArray(registreNoms.nomCle, cles)),
+  ]);
+
+  // Les établissements des entreprises retrouvées par une de leurs dénominations.
+  const neqParCle = new Map<string, Set<string>>();
+  for (const n of parDenomination) {
+    const s = neqParCle.get(n.nomCle) ?? new Set<string>();
+    s.add(n.neq);
+    neqParCle.set(n.nomCle, s);
+  }
+  const neqs = [...new Set(parDenomination.map((n) => n.neq))];
+  const parNeq = new Map<string, Etablissement[]>();
+  if (neqs.length > 0) {
+    const etabs = await db
+      .select()
+      .from(registreEtablissements)
+      .where(inArray(registreEtablissements.neq, neqs));
+    for (const r of etabs) {
+      const liste = parNeq.get(r.neq) ?? [];
+      liste.push({
+        neq: r.neq,
+        nom: r.nom,
+        adresse: r.adresse,
+        ville: r.ville,
+        codePostal: r.codePostal ?? "",
+        principal: r.principal,
+      });
+      parNeq.set(r.neq, liste);
+    }
+  }
 
   const parCle = new Map<string, Etablissement[]>();
-  for (const r of lignes) {
-    const liste = parCle.get(r.nomCle) ?? [];
-    liste.push({
+  const ajouter = (cle: string, e: Etablissement): void => {
+    const liste = parCle.get(cle) ?? [];
+    // Le même établissement peut arriver par les DEUX chemins : par son propre nom et par
+    // une dénomination de son entreprise. Le compter deux fois le rendrait « ambigu » avec
+    // lui-même, et `choisirEtablissement` refuserait une adresse parfaitement claire.
+    if (!liste.some((x) => x.neq === e.neq && x.adresse === e.adresse)) liste.push(e);
+    parCle.set(cle, liste);
+  };
+
+  for (const r of parNomEtab) {
+    ajouter(r.nomCle, {
       neq: r.neq,
       nom: r.nom,
       adresse: r.adresse,
@@ -436,7 +480,11 @@ async function adressesDepuisRegistre(
       codePostal: r.codePostal ?? "",
       principal: r.principal,
     });
-    parCle.set(r.nomCle, liste);
+  }
+  for (const [cle, ensemble] of neqParCle) {
+    for (const neq of ensemble) {
+      for (const e of parNeq.get(neq) ?? []) ajouter(cle, e);
+    }
   }
 
   let trouvees = 0;
@@ -583,31 +631,62 @@ interface PasseBornes {
   echecs: number;
 }
 
-async function mesurerBornes(max: number, budgetMs: number | null): Promise<PasseBornes> {
-  const debut = Date.now();
-  // Même raison qu'au-dessus : le prédicat est PARTAGÉ avec le gate des pages
-  // (`lib/travaux.ts`), il ne se réécrit pas en SQL.
+async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
+  // ⚠️ PAS DE PLAFOND PAR PASSE, ET C'EST LA CONSÉQUENCE DIRECTE DE LA REQUÊTE UNIQUE.
+  //
+  // Le plafond de six existait parce que chaque entreprise coûtait un aller-retour réseau.
+  // Avec une seule interrogation pour tout le lot, le coût réseau ne dépend plus du nombre
+  // de lieux : ne garder que six reviendrait à s'imposer douze passes pour rien, alors que
+  // la même requête peut tout servir. Il ne reste qu'un `UPDATE` par entreprise, local.
   const lignes = (await db.select().from(entreprisesLieux))
     .filter(bornesAMesurer)
-    // Ordre explicite : sans lui, Postgres sert le heap et les mêmes lignes reviendraient.
-    .sort((a, b) => a.nom.localeCompare(b.nom, "fr-CA"))
-    .slice(0, max);
+    // Ordre explicite : sans lui, Postgres sert le heap et l'ordre varierait d'une passe à
+    // l'autre — sans conséquence ici, mais un ordre non déterministe se paie toujours.
+    .sort((a, b) => a.nom.localeCompare(b.nom, "fr-CA"));
+
+  if (lignes.length === 0) return { candidates: 0, mesurees: 0, echecs: 0 };
+
+  // ⚠️ UNE SEULE REQUÊTE POUR TOUT LE LOT, ET C'EST LA CORRECTION D'UNE VRAIE RÉGRESSION.
+  //
+  // Interroger Overpass autour de CHAQUE entreprise coûtait un aller-retour par lieu — et
+  // quand il échoue, il coûte le délai × les trois instances de repli. Mesuré en production
+  // le 2026-08-05 : « bornes=2/6 (3 en échec) · budget restant=0 ms », trois entreprises
+  // ayant chacune épuisé les trois instances. J'avais ramené le délai de 15 s à 5 s le matin
+  // même pour empêcher la passe de tuer la page — sans mesurer si 5 s suffisait. Ça ne
+  // suffisait pas, et le remède a créé la panne.
+  //
+  // Une boîte englobante couvre tous les employeurs du lot ; la proximité se calcule ensuite
+  // EN LOCAL. Le coût réseau devient indépendant du nombre d'entreprises, et le délai peut
+  // remonter à une valeur réaliste sans menacer le budget.
+  const boite = boiteEnglobante(lignes);
+  if (boite === null) return { candidates: lignes.length, mesurees: 0, echecs: 0 };
+
+  // Une boîte absurde (position aberrante en base) ramènerait des milliers de bornes ou
+  // expirerait : on refuse plutôt que d'envoyer une requête qu'on sait mauvaise.
+  if (
+    boite.latMax - boite.latMin > ETENDUE_MAX_DEG ||
+    boite.lonMax - boite.lonMin > ETENDUE_MAX_DEG
+  ) {
+    console.error("[bornes] boîte englobante anormalement large — interrogation annulée");
+    return { candidates: lignes.length, mesurees: 0, echecs: lignes.length };
+  }
+
+  // Pas assez de budget pour une requête réseau : on ne la commence pas. Une requête tuée
+  // en vol ne rapporte rien et consomme tout ce qui restait.
+  if (budgetMs !== null && budgetMs < DELAI_MAX_MS) {
+    return { candidates: lignes.length, mesurees: 0, echecs: 0 };
+  }
+
+  const r = await chercherBornesBoite(boite);
+  if (!r.ok) {
+    // On NE marque AUCUNE ligne : elles repasseront. Le journal garde la trace, parce
+    // qu'une source qui tombe tout le temps doit finir par se voir.
+    console.error(`[bornes] lot non mesuré : ${r.raison}`);
+    return { candidates: lignes.length, mesurees: 0, echecs: lignes.length };
+  }
 
   let mesurees = 0;
-  let echecs = 0;
-
   for (const l of lignes) {
-    if (budgetMs !== null && Date.now() - debut >= budgetMs) break;
-
-    const r = await chercherBornes({ lat: l.lat, lon: l.lon }, RAYON_5_MIN_M);
-    if (!r.ok) {
-      // On NE marque PAS la ligne : elle repassera. Le journal garde la trace, parce qu'une
-      // source qui tombe tout le temps doit finir par se voir.
-      echecs++;
-      console.error(`[bornes] ${l.nom} — non mesurée : ${r.raison}`);
-      continue;
-    }
-
     const p = proximiteBorne({ lat: l.lat, lon: l.lon }, r.bornes, RAYON_5_MIN_M);
     await db
       .update(entreprisesLieux)
@@ -616,7 +695,7 @@ async function mesurerBornes(max: number, budgetMs: number | null): Promise<Pass
     mesurees++;
   }
 
-  return { candidates: lignes.length, mesurees, echecs };
+  return { candidates: lignes.length, mesurees, echecs: 0 };
 }
 
 /**
@@ -867,7 +946,7 @@ export async function mesurerDistances(
     // 1 ter. Les bornes de recharge, pour les entreprises jamais regardées.
     let bornes: PasseBornes = { candidates: 0, mesurees: 0, echecs: 0 };
     try {
-      bornes = await mesurerBornes(maxSituations, budgetRestant());
+      bornes = await mesurerBornes(budgetRestant());
     } catch (err) {
       // Un confort ne fait pas tomber l'essentiel.
       console.error("[actions] mesure des bornes impossible", err);

@@ -386,3 +386,34 @@ export const registreEtablissements = pgTable(
     index("registre_nom_cle_idx").on(table.nomCle),
   ],
 );
+
+/**
+ * Les DÉNOMINATIONS déclarées de chaque entreprise du registre (fichier `Nom.csv`).
+ *
+ * ⚠️ POURQUOI CETTE SECONDE TABLE — MESURÉ EN PRODUCTION, PAS SUPPOSÉ.
+ * La première version ne cherchait que dans `NOM_ETAB`, le nom de l'ÉTABLISSEMENT. Résultat
+ * réel du 2026-08-05 : « registre=11/73 · 61 absentes ». Le nom d'un établissement n'est
+ * souvent pas celui sous lequel on connaît l'entreprise — une usine peut être déclarée sous
+ * la raison sociale complète quand tout le monde l'appelle par sa marque.
+ *
+ * `Nom.csv` porte TOUTES les dénominations d'une entreprise, y compris ses noms commerciaux.
+ * Chercher là, puis remonter au NEQ, puis aux établissements de ce NEQ, retrouve les
+ * entreprises que la comparaison sur le seul nom d'établissement manquait.
+ *
+ * Table de RÉFÉRENCE comme sa voisine : aucune donnée de Marc, remplacée en bloc à chaque
+ * import, et sa perte ne coûte qu'un ré-import.
+ */
+export const registreNoms = pgTable(
+  "registre_noms",
+  {
+    id: serial("id").primaryKey(),
+    neq: text("neq").notNull(),
+    nom: text("nom").notNull(),
+    /** Le nom réduit à sa forme comparable (`cleNom`) — c'est la colonne cherchée. */
+    nomCle: text("nom_cle").notNull(),
+  },
+  (table) => [
+    index("registre_noms_cle_idx").on(table.nomCle),
+    index("registre_noms_neq_idx").on(table.neq),
+  ],
+);

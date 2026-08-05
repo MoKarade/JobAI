@@ -9,6 +9,7 @@ import {
   RAYON_5_MIN_M,
   VITESSE_MARCHE_KMH,
   boiteAutour,
+  boiteEnglobante,
   distanceM,
   minutesAPied,
   proximiteBorne,
@@ -130,5 +131,43 @@ describe("boîte d'interrogation", () => {
     const bordEst = { lat: LIEU.lat, lon: b.lonMax };
     expect(distanceM(LIEU, bordNord)).toBeGreaterThanOrEqual(RAYON_5_MIN_M - 5);
     expect(distanceM(LIEU, bordEst)).toBeGreaterThanOrEqual(RAYON_5_MIN_M - 5);
+  });
+});
+
+describe("boîte englobante — une requête au lieu de six", () => {
+  it("englobe tous les lieux donnés", () => {
+    const b = boiteEnglobante([
+      { lat: 46.8, lon: -71.2 },
+      { lat: 46.9, lon: -71.0 },
+    ])!;
+    expect(b.latMin).toBeLessThan(46.8);
+    expect(b.latMax).toBeGreaterThan(46.9);
+    expect(b.lonMin).toBeLessThan(-71.2);
+    expect(b.lonMax).toBeGreaterThan(-71.0);
+  });
+
+  it("rend null sur une liste vide — il n'y a rien à interroger", () => {
+    expect(boiteEnglobante([])).toBeNull();
+  });
+
+  it("garde la MARGE du rayon cherché", () => {
+    // Sans marge, une borne située juste au-delà du dernier employeur du lot sortirait de
+    // la boîte, et « aucune borne » serait faux pour lui.
+    const seul = { lat: 46.8, lon: -71.2 };
+    const b = boiteEnglobante([seul])!;
+    const bordNord = { lat: b.latMax, lon: seul.lon };
+    expect(distanceM(seul, bordNord)).toBeGreaterThanOrEqual(RAYON_5_MIN_M - 5);
+  });
+
+  it("un seul lieu donne la même boîte que la recherche ponctuelle", () => {
+    // La cohérence qui compte : passer de « une requête par lieu » à « une requête pour
+    // tous » ne doit rien changer au périmètre couvert pour un lieu isolé.
+    const l = { lat: 46.81, lon: -71.21 };
+    const englobante = boiteEnglobante([l])!;
+    const ponctuelle = boiteAutour(l, RAYON_5_MIN_M);
+    expect(englobante.latMin).toBeCloseTo(ponctuelle.latMin, 6);
+    expect(englobante.latMax).toBeCloseTo(ponctuelle.latMax, 6);
+    expect(englobante.lonMin).toBeCloseTo(ponctuelle.lonMin, 6);
+    expect(englobante.lonMax).toBeCloseTo(ponctuelle.lonMax, 6);
   });
 });

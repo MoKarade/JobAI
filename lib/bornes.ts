@@ -130,3 +130,49 @@ export function boiteAutour(
     lonMax: lieu.lon + dLon,
   };
 }
+
+/**
+ * La boîte qui englobe TOUS les lieux donnés, avec une marge.
+ *
+ * ⚠️ ELLE REMPLACE SIX REQUÊTES PAR UNE. Interroger Overpass autour de chaque entreprise
+ * coûtait un aller-retour par lieu — et quand il échoue, il coûte le délai × le nombre
+ * d'instances de repli. Mesuré en production le 2026-08-05 : trois entreprises non mesurées,
+ * chacune ayant épuisé les trois instances, et le budget de la passe entièrement consommé.
+ *
+ * Les employeurs tiennent tous dans la région de Québec : une seule interrogation couvre
+ * l'ensemble, et la proximité se calcule ensuite EN LOCAL, pour tout le monde d'un coup.
+ * C'est aussi ce qui rend la mesure des bornes indépendante du nombre d'entreprises.
+ *
+ * La marge est le rayon cherché : sans elle, une borne située juste au-delà du dernier
+ * employeur du lot sortirait de la boîte et « aucune borne » serait faux pour lui.
+ */
+export function boiteEnglobante(
+  lieux: readonly { lat: number; lon: number }[],
+  margeM = RAYON_5_MIN_M,
+): { latMin: number; lonMin: number; latMax: number; lonMax: number } | null {
+  if (lieux.length === 0) return null;
+
+  let latMin = Infinity;
+  let latMax = -Infinity;
+  let lonMin = Infinity;
+  let lonMax = -Infinity;
+  for (const l of lieux) {
+    if (l.lat < latMin) latMin = l.lat;
+    if (l.lat > latMax) latMax = l.lat;
+    if (l.lon < lonMin) lonMin = l.lon;
+    if (l.lon > lonMax) lonMax = l.lon;
+  }
+
+  // Même conversion que `boiteAutour` : un degré de longitude rétrécit avec la latitude,
+  // et l'ignorer donnerait une marge trop étroite d'est en ouest.
+  const dLat = margeM / 111_320;
+  const latMoyenne = ((latMin + latMax) / 2) * (Math.PI / 180);
+  const dLon = margeM / (111_320 * Math.max(Math.cos(latMoyenne), 0.01));
+
+  return {
+    latMin: latMin - dLat,
+    lonMin: lonMin - dLon,
+    latMax: latMax + dLat,
+    lonMax: lonMax + dLon,
+  };
+}

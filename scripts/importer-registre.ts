@@ -29,16 +29,34 @@ import { createInterface } from "node:readline";
 import { resolve, join } from "node:path";
 import { chargerEnvLocal } from "../lib/chargerEnv";
 import { db } from "../lib/db";
-import { registreEtablissements } from "../lib/db/schema";
+import { registreEtablissements, registreNoms } from "../lib/db/schema";
 import {
   cleNom,
+  decouperCsv,
   indicesColonnes,
   lireEtablissement,
   type Etablissement,
 } from "../lib/registre";
 
-/** Le seul fichier lu. Nommé ici pour qu'on voie tout de suite ce qu'on ouvre. */
-const FICHIER = "Etablissements.csv";
+/** Les deux fichiers lus. Nommés ici pour qu'on voie tout de suite ce qu'on ouvre. */
+const FICHIER_ETABLISSEMENTS = "Etablissements.csv";
+
+/**
+ * Le fichier des DÉNOMINATIONS (274,8 Mo).
+ *
+ * ⚠️ IL EST NÉCESSAIRE, ET LA MESURE LE DIT. Sans lui, on ne cherchait que dans `NOM_ETAB`
+ * — le nom de l'ÉTABLISSEMENT — et le résultat réel du 2026-08-05 était « registre=11/73 ·
+ * 61 absentes ». Le nom d'un établissement n'est souvent pas celui sous lequel on connaît
+ * l'entreprise. `Nom.csv` porte toutes ses dénominations, noms commerciaux compris.
+ *
+ * On ne garde que les NEQ dont un établissement a DÉJÀ été retenu : le fichier couvre tout
+ * le Québec, la région n'en est qu'une fraction, et filtrer ainsi évite de charger des
+ * millions de lignes pour rien.
+ */
+const FICHIER_NOMS = "Nom.csv";
+
+/** Les colonnes lues dans `Nom.csv`, par leur nom exact. */
+const COLONNES_NOM = ["NEQ", "NOM_ASSUJ", "DAT_FIN_NOM_ASSUJ"] as const;
 
 /**
  * Taille des lots d'insertion.
@@ -64,7 +82,7 @@ async function principal(): Promise<void> {
     process.exit(1);
   }
 
-  const chemin = join(resolve(dossier), FICHIER);
+  const chemin = join(resolve(dossier), FICHIER_ETABLISSEMENTS);
   console.log(`Lecture de ${chemin}`);
   console.log("Seuls les établissements de la région de Québec sont retenus.\n");
 
@@ -78,6 +96,8 @@ async function principal(): Promise<void> {
   let retenues = 0;
   let lot: Etablissement[] = [];
   let ecrites = 0;
+  /** Les NEQ retenus — ils bornent la lecture du fichier des dénominations. */
+  const neqRetenus = new Set<string>();
 
   const ecrireLot = async (): Promise<void> => {
     if (lot.length === 0) return;
@@ -124,6 +144,7 @@ async function principal(): Promise<void> {
     const e = lireEtablissement(ligne, indices);
     if (e !== null) {
       retenues++;
+      neqRetenus.add(e.neq);
       lot.push(e);
       if (lot.length >= LOT) await ecrireLot();
     }
@@ -149,8 +170,78 @@ async function principal(): Promise<void> {
     process.exit(1);
   }
 
+  await importerNoms(resolve(dossier), neqRetenus);
+
   console.log("\nC'est fini. L'app peut maintenant chercher une adresse dans le registre");
   console.log("sans aucun accès réseau — et elle indiquera « registre » comme source.");
+}
+
+/**
+ * Charge les dénominations des entreprises RETENUES.
+ *
+ * Le fichier couvre tout le Québec ; on ne garde que les NEQ dont un établissement de la
+ * région a déjà été retenu. C'est ce filtre qui rend une lecture de 274 Mo supportable —
+ * et qui garde la table à une taille utile.
+ */
+async function importerNoms(dossier: string, neqRetenus: Set<string>): Promise<void> {
+  const chemin = join(dossier, FICHIER_NOMS);
+  console.log(`\nLecture de ${chemin}`);
+  console.log("Seules les dénominations des entreprises déjà retenues sont gardées.\n");
+
+  const flux = createInterface({
+    input: createReadStream(chemin, { encoding: "utf8" }),
+    crlfDelay: Infinity,
+  });
+
+  let indices: Record<string, number> | null = null;
+  let lues = 0;
+  let ecrites = 0;
+  let lot: { neq: string; nom: string; nomCle: string }[] = [];
+
+  const ecrireLot = async (): Promise<void> => {
+    if (lot.length === 0) return;
+    await db.insert(registreNoms).values(lot);
+    ecrites += lot.length;
+    lot = [];
+  };
+
+  for await (const ligne of flux) {
+    if (indices === null) {
+      indices = indicesColonnes(ligne, COLONNES_NOM);
+      if (indices === null) {
+        console.error("L'entête de Nom.csv ne porte pas les colonnes attendues — ignoré.");
+        console.error(`Entête lue : ${ligne.slice(0, 300)}`);
+        return;
+      }
+      await db.delete(registreNoms);
+      continue;
+    }
+
+    lues++;
+    const champs = decouperCsv(ligne);
+    const neq = (champs[indices.NEQ ?? -1] ?? "").trim();
+    if (!neqRetenus.has(neq)) continue;
+
+    // ⚠️ ON NE GARDE QUE LES NOMS ENCORE EN VIGUEUR. Une date de fin signifie que
+    // l'entreprise ne porte plus ce nom : le garder ferait retrouver une entreprise sous une
+    // dénomination abandonnée, et lui attribuer l'adresse d'aujourd'hui sous un nom d'hier.
+    if ((champs[indices.DAT_FIN_NOM_ASSUJ ?? -1] ?? "").trim() !== "") continue;
+
+    const nom = (champs[indices.NOM_ASSUJ ?? -1] ?? "").trim();
+    const cle = cleNom(nom);
+    if (nom === "" || cle === "") continue;
+
+    lot.push({ neq, nom, nomCle: cle });
+    if (lot.length >= LOT) await ecrireLot();
+
+    if (lues % 500_000 === 0) {
+      console.log(`   ${lues.toLocaleString("fr-CA")} lignes lues · ${ecrites} gardées`);
+    }
+  }
+
+  await ecrireLot();
+  console.log(`${lues.toLocaleString("fr-CA")} lignes lues.`);
+  console.log(`${ecrites.toLocaleString("fr-CA")} dénominations gardées.`);
 }
 
 void principal();

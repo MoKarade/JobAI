@@ -57,12 +57,29 @@ describe("durée de vie annoncée par les pages", () => {
 });
 
 describe("aucune étape ne peut à elle seule manger le budget", () => {
-  it("une interrogation Overpass, replis compris, reste une fraction du budget", () => {
-    // Le délai est payé PAR INSTANCE, et il y a trois instances en repli : c'est le produit
-    // qui compte, jamais le délai seul. À 15 s × 3, une seule entreprise injoignable
-    // consommait 45 s — plus que le budget entier, et la page mourait avec elle.
-    const pireCasUneEntreprise = DELAI_MAX_MS * INSTANCES_OVERPASS.length;
-    expect(pireCasUneEntreprise).toBeLessThan(BUDGET_PASSE_PAGE_MS / 2);
+  it("l'interrogation Overpass du LOT ENTIER tient dans le budget, avec marge", () => {
+    // ⚠️ LA PRÉMISSE DE CE TEST A CHANGÉ, ET C'EST VOULU — le reformuler n'est pas
+    // l'affaiblir. Écrit le matin, il protégeait contre « une seule entreprise injoignable
+    // consomme tout » : il y avait alors une requête PAR entreprise, et 15 s × 3 instances
+    // = 45 s pour un seul lieu. La mesure du soir a montré la suite (« bornes=2/6, 3 en
+    // échec, budget restant=0 ms ») : même à 5 s, trois échecs suffisaient à tout manger.
+    //
+    // Le modèle est désormais UNE requête pour tout le lot — boîte englobante, proximité
+    // calculée en local. Le pire cas ne dépend donc plus du nombre d'entreprises, et c'est
+    // LUI qu'il faut borner : trois instances, une seule fois, doivent tenir sous le budget
+    // en laissant de quoi finir le reste de la passe.
+    const pireCasDuLot = DELAI_MAX_MS * INSTANCES_OVERPASS.length;
+    expect(pireCasDuLot).toBeLessThan(BUDGET_PASSE_PAGE_MS);
+    // La marge : le reste de la passe (mesures, écritures, trace) doit encore tenir.
+    expect(BUDGET_PASSE_PAGE_MS - pireCasDuLot).toBeGreaterThanOrEqual(10_000);
+  });
+
+  it("la passe des bornes REFUSE de commencer sans de quoi finir une requête", () => {
+    // Une requête tuée en vol ne rapporte rien et consomme tout ce qui restait. Le code
+    // vérifie donc le budget restant AVANT de partir — sinon la dernière étape de la passe
+    // partirait systématiquement pour mourir.
+    const source = lire("lib/actions.ts");
+    expect(source).toContain("budgetMs < DELAI_MAX_MS");
   });
 
   it("la temporisation entre deux passes dépasse la durée d'une passe", () => {

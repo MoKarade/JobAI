@@ -45,7 +45,17 @@ export const INSTANCES_OVERPASS: readonly string[] = [
  * production. Overpass répond en général sous les 2 s sur une boîte de 350 m ; 5 s laisse
  * de la marge sans prendre le budget en otage.
  */
-export const DELAI_MAX_MS = 5_000;
+export const DELAI_MAX_MS = 8_000;
+
+/**
+ * Le rayon d'une requête RÉGIONALE, en degrés de latitude approximatifs.
+ *
+ * Garde-fou contre une boîte absurde : si un jour une position aberrante se glissait dans
+ * la table, la boîte englobante couvrirait un continent et la requête ramènerait des
+ * milliers de bornes — ou expirerait. Un degré de latitude fait ~111 km ; la grande région
+ * de Québec tient largement dans deux.
+ */
+export const ETENDUE_MAX_DEG = 2;
 
 /** Ce qu'une interrogation a donné — l'échec est DIT, jamais confondu avec un vide. */
 export type ResultatBornes =
@@ -118,9 +128,29 @@ export async function chercherBornes(
   rayonM: number,
   outils: OutilsOverpass = {},
 ): Promise<ResultatBornes> {
+  return chercherBornesBoite(boiteAutour(lieu, rayonM), outils);
+}
+
+/**
+ * Les bornes d'une BOÎTE — une seule requête, quel que soit le nombre de lieux.
+ *
+ * ⚠️ C'EST LA FORME QU'IL FAUT UTILISER POUR PLUSIEURS LIEUX. Une requête par entreprise
+ * coûte un aller-retour chacune, et quand elle échoue elle coûte le délai × les trois
+ * instances de repli : mesuré en production le 2026-08-05, trois entreprises non mesurées
+ * avaient à elles seules épuisé tout le budget de la passe. Une boîte qui les englobe
+ * toutes ramène les bornes en UNE fois, et la proximité se calcule ensuite en local.
+ *
+ * Essaie les instances l'une après l'autre et s'arrête à la première qui RÉPOND. Un échec
+ * de toutes rend `ok: false` avec sa raison — jamais une liste vide, qui se lirait comme
+ * « aucune borne ici » alors qu'on n'a rien pu mesurer.
+ */
+export async function chercherBornesBoite(
+  boite: { latMin: number; lonMin: number; latMax: number; lonMax: number },
+  outils: OutilsOverpass = {},
+): Promise<ResultatBornes> {
   const recuperer = outils.recuperer ?? fetch;
   const instances = outils.instances ?? INSTANCES_OVERPASS;
-  const corps = requeteBornes(boiteAutour(lieu, rayonM));
+  const corps = requeteBornes(boite);
   const echecs: string[] = [];
 
   for (const url of instances) {
