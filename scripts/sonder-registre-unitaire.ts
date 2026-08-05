@@ -27,6 +27,31 @@
 // écrite puis RETIRÉE : je l'avais inventée. Voir plus bas.)
 //
 // Ce script ne fait que LIRE et rapporter. Aucune base, aucun fichier, aucun secret.
+//
+// ══ VERDICT DU 2026-08-05 — LE DATASTORE CONTIENT UNE PAGE HTML, PAS LE REGISTRE ══
+//
+// La recherche par nom rend `total=0` sur les trois entreprises. La requête SANS `q`
+// explique pourquoi, et c'est édifiant :
+//
+//     total de lignes : 268
+//     champs (2) : _id:int, <!DOCTYPE html>:text
+//     · {"_id":1, "<!DOCTYPE html>": null}
+//     · {"_id":2, "<!DOCTYPE html>": "<html xmlns=...>"}
+//
+// Le nom de la COLONNE est `<!DOCTYPE html>`. Le moissonneur de Données Québec a tenté
+// d'ingérer la ressource du REQ — cette même page `.aspx` — a reçu du HTML au lieu du ZIP,
+// et l'a chargé tel quel dans le datastore comme un tableau de 268 lignes à deux colonnes.
+// Autrement dit : le portail s'est heurté EXACTEMENT au même refus que nous, et a stocké la
+// page d'erreur.
+//
+// CONSÉQUENCE : le registre n'est PAS interrogeable entreprise par entreprise. L'accès
+// existe, il répond `HTTP 200` et `success: true` — et ne contient rien d'utile. C'est le
+// cas d'école de la règle écrite au bas de ce fichier depuis le début, et j'ai failli y
+// tomber : quelques minutes plus tôt, j'avais lu ce 200 comme « le registre est accessible ».
+//
+// CE QUI RESTE, ET C'EST TOUT : Marc télécharge le fichier depuis chez lui (son IP n'est
+// pas bloquée), une fois, et le dépose là où la CI peut le lire. Aucun chemin automatique
+// n'existe — ni le fichier en bloc, ni la recherche unitaire, ni Overpass par nom.
 
 const DELAI_MS = 20_000;
 
