@@ -90,8 +90,16 @@ const SONDES: readonly Sonde[] = [
     // La seule piste encore ouverte au 05/08. Deux jeux s'appellent « Offres d'emploi » —
     // reste à savoir DE QUI : une seule ville publie souvent ses propres postes, ce qui
     // serait sans intérêt ici. Il faut voir l'organisme, la fréquence et le format.
+    //
+    // ⚠️ SURTOUT PAS DE `fl=` : le premier essai portait `fl=title,organization,notes`,
+    // croyant DEMANDER ces champs. CKAN le passe à Solr, qui restreint la projection — et
+    // `organization` n'y est pas un champ indexé sous ce nom. Résultat : le résumé a
+    // affiché « organisme : ? · modifié : ? · formats : aucun » sur les DEUX jeux, et j'ai
+    // failli en conclure que la source ne publiait rien. C'était ma requête qui avait
+    // effacé la réponse. Une API rend son objet complet par défaut ; on ne l'ampute que si
+    // le volume gêne, ce qui n'est pas le cas pour trois lignes.
     nom: "Données Québec — le jeu « Offres d'emploi » en détail",
-    url: "https://www.donneesquebec.ca/recherche/api/3/action/package_search?q=title:%22Offres%20d%27emploi%22&rows=3&fl=title,organization,notes",
+    url: "https://www.donneesquebec.ca/recherche/api/3/action/package_search?q=title:%22Offres%20d%27emploi%22&rows=3",
     attendu: "l'organisme qui publie, la fréquence de mise à jour et le format",
   },
 ];
@@ -185,9 +193,10 @@ function resumerJson(j: Record<string, unknown>): void {
     | {
         title?: string;
         name?: string;
+        notes?: string;
         organization?: { title?: string };
         metadata_modified?: string;
-        resources?: { format?: string }[];
+        resources?: { format?: string; url?: string }[];
       }[]
     | undefined;
   if (Array.isArray(trouves)) {
@@ -196,11 +205,20 @@ function resumerJson(j: Record<string, unknown>): void {
       // L'ORGANISME et la FRAÎCHEUR décident de l'intérêt, pas le titre : « Offres
       // d'emploi » publié par une seule municipalité pour ses propres postes n'aiderait
       // en rien une recherche dans toute la région.
-      const formats = [...new Set((t.resources ?? []).map((r) => r.format).filter(Boolean))];
-      console.log(`      · ${t.title ?? t.name}`);
+      const ressources = t.resources ?? [];
+      const formats = [...new Set(ressources.map((r) => r.format).filter(Boolean))];
+      console.log(`      · ${t.title ?? t.name}  [${t.name ?? "?"}]`);
       console.log(
         `        organisme : ${t.organization?.title ?? "?"} · modifié : ${t.metadata_modified ?? "?"} · formats : ${formats.join(", ") || "aucun"}`,
       );
+      // La description dit souvent ce que le titre cache : « postes offerts à la Ville
+      // de X » se lit là, et clôt la question sans télécharger le fichier.
+      if (t.notes) console.log(`        « ${t.notes.replace(/\s+/g, " ").slice(0, 220)} »`);
+      // L'URL de la ressource : c'est elle qu'il faudrait brancher, donc c'est elle qu'il
+      // faut VOIR avant de décider.
+      for (const r of ressources.slice(0, 3)) {
+        console.log(`        ↳ ${r.format ?? "?"} ${r.url ?? ""}`);
+      }
     }
     return;
   }
