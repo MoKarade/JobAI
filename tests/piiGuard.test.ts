@@ -20,18 +20,33 @@
 
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-/** Les fichiers suivis par git — la seule définition qui compte : ce qui part en ligne. */
+/**
+ * Les fichiers qui partent en ligne : ceux que git suit, ET ceux qui ne le sont pas encore.
+ *
+ * ⚠️ « SUIVI PAR GIT » ARRIVE UN COMMIT TROP TARD, et ça s'est payé le 2026-08-05.
+ * Le scan ne listait que `git ls-files`. Un fichier NEUF n'y figure pas : il devient
+ * visible du garde au moment précis où il entre dans l'historique — c'est-à-dire quand il
+ * est trop tard. Le gate local était sincèrement vert avant le commit, la CI rouge juste
+ * après, et le fichier fautif contenait douze adresses sous la forme surveillée. Un garde
+ * qui ne voit une faute qu'une fois commise ne protège pas : il constate.
+ *
+ * `--others --exclude-standard` ajoute exactement les fichiers non suivis que `.gitignore`
+ * ne couvre pas — donc ceux qu'un `git add -A` emporterait. Le garde regarde désormais ce
+ * qui EST en ligne et ce qui est sur le point d'y aller.
+ */
 function fichiersVersionnes(): string[] {
-  const sortie = execFileSync("git", ["ls-files"], {
-    cwd: process.cwd(),
-    encoding: "utf8",
-    maxBuffer: 10 * 1024 * 1024,
-  });
-  return sortie
-    .split("\n")
+  const lister = (args: string[]): string =>
+    execFileSync("git", args, {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+  const sortie = `${lister(["ls-files"])}\n${lister(["ls-files", "--others", "--exclude-standard"])}`;
+  return [...new Set(sortie.split("\n"))]
     .map((f) => f.trim())
     .filter(Boolean)
     .filter((f) => /\.(ts|tsx|js|mjs|json|md|css|yml|yaml|sql|example)$/.test(f))
@@ -95,6 +110,27 @@ describe("volume du scan", () => {
     expect(FICHIERS).toContain("lib/seed.ts");
     expect(FICHIERS).toContain("lib/reference.ts");
     expect(FICHIERS).toContain(".env.example");
+  });
+
+  it("voit un fichier NEUF avant son premier commit", () => {
+    // ⚠️ CE TEST EXISTE PARCE QUE LE GARDE A ÉCHOUÉ EXACTEMENT LÀ, le 2026-08-05.
+    //
+    // Le scan ne listait que `git ls-files` : un fichier neuf n'y figure pas, et devient
+    // visible du garde au moment précis où il entre dans l'historique — trop tard. Le gate
+    // local était sincèrement vert avant le commit, la CI rouge juste après, et le fichier
+    // fautif portait douze adresses sous la forme surveillée. Un garde qui ne voit une
+    // faute qu'une fois commise ne protège pas : il constate.
+    //
+    // La sonde ne contient AUCUNE donnée sensible — ce qu'on vérifie ici est la PORTÉE du
+    // scan, pas sa détection : la faire porter une vraie forme d'adresse ferait échouer les
+    // autres tests du fichier pour une raison sans rapport.
+    const sonde = resolve(process.cwd(), "lib/_sonde-portee-du-scan.ts");
+    try {
+      writeFileSync(sonde, "export const SONDE = 1;\n", "utf8");
+      expect(fichiersVersionnes()).toContain("lib/_sonde-portee-du-scan.ts");
+    } finally {
+      rmSync(sonde, { force: true });
+    }
   });
 
   it("scanne AUSSI les autres fichiers de test, et pas seulement lui-même", () => {

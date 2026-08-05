@@ -514,6 +514,16 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   exige donc son propre discriminant, au niveau de la chose cherchée : le nom pour une
   entreprise, le NUMÉRO CIVIQUE **et** la voie pour une adresse — le numéro seul apparie
   toutes les rues, la voie seule tous les numéros.
+- **Un garde dont la PORTÉE est « ce que git suit » arrive un commit trop tard.**
+  `piiGuard` listait `git ls-files` : un fichier NEUF n'y figure pas, et devient visible du
+  garde au moment précis où il entre dans l'historique. Résultat mesuré le 2026-08-05 : le
+  gate local sincèrement vert avant le commit, la CI ROUGE juste après, et le fichier fautif
+  portait douze adresses sous la forme surveillée — déjà en ligne. Un garde qui ne voit une
+  faute qu'une fois commise ne protège pas, il constate. La portée juste est « ce qui est en
+  ligne ET ce qui est sur le point d'y aller » (`git ls-files` + `--others
+  --exclude-standard`, soit exactement ce qu'un `git add -A` emporterait). Question à poser
+  à tout test-garde : **existe-t-il un état du dépôt où la faute existe et où le garde ne la
+  voit pas ?** Ici c'était l'état le plus courant de tous — juste avant le commit.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 
