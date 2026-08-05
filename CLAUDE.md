@@ -535,6 +535,20 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   une affirmation de commentaire se vérifie comme n'importe quel finding, et celle-ci
   cachait que le lien recherché (« Groupe Mundial » ↔ « MUNDIAL ») n'était atteignable par
   aucun préfixe.
+- **Un quota de déploiement est une ressource PARTAGÉE, et pousser à chaque correctif la
+  brûle.** Douze commits en deux heures ont produit douze déploiements de production et
+  épuisé le quota du compte — qui sert aussi aux cinq autres projets de Marc. Plusieurs de
+  ces commits ne touchaient QUE des `.md` et des tests : rien de ce que le site sert. Deux
+  changements, l'un de comportement et l'autre de mécanique. (a) Un correctif qui n'est pas
+  vérifiable tout de suite attend le suivant : on groupe, on ne pousse pas par réflexe.
+  (b) `vercel.json` porte un `ignoreCommand` (`scripts/build-necessaire.sh`) qui saute le
+  build quand le diff ne contient que documentation et tests. ⚠️ Sa convention est
+  contre-intuitive — **exit 0 IGNORE le build, exit 1 le LANCE** — et l'inverser ne
+  produirait pas « un déploiement de trop » : elle les supprimerait TOUS, en silence, la CI
+  restant verte pendant que la production se fige sur un commit ancien. D'où la règle du
+  script : toute incertitude (historique tronqué, diff illisible, extension inconnue) se
+  résout en CONSTRUISANT. La liste des exemptions est FERMÉE, celle de ce qui construit est
+  ouverte, et les deux sens de la panne sont prouvés par sonde.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 
