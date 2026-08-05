@@ -611,13 +611,41 @@
       que le clic ne pouvait pas honorer, un doublon d'épingle, et l'extraction du rattrapage
       de ville en fonction pure testée. Détail dans le message de commit.
 
-- [ ] 🔧 **`[MIGR-01]`** **Deux chemins de lecture, un seul applique les migrations.**
+- [x] 🔧 **`[MIGR-01]`** **Deux chemins de lecture, un seul applique les migrations.**
+      *Livré le 2026-08-05.* Une conséquence RÉELLE avait été sous-estimée à l'écriture du
+      ticket : sur une base neuve, une instance froide dont la première requête est le
+      sondage du hub lève « table offers absente » — le hub afficherait une PANNE là où la
+      réponse honnête est « en construction », ce que le §6 bis distingue explicitement.
+      Le test verrouille l'ORDRE (migrer après avoir lu ne répare rien), pas l'appel ;
+      discrimination prouvée en déplaçant l'appel après le `select`.
+      *Description d'origine :*
       `lireOffres` appelle `assurerMigrations` ; `getTrackerState` (le endpoint hub) fait un
       `db.select()` direct et ne l'appelle pas. Sans conséquence aujourd'hui — le hub ne lit
       aucune colonne récente — mais le jour où une migration ajoutera une colonne qu'il lit,
       un déploiement dont SEUL le hub est appelé échouerait jusqu'à la première visite de
       Marc. Constaté le 2026-07-31 en cherchant si la migration 0005 pouvait s'appliquer
       sans intervention : elle ne le peut pas par ce chemin.
+
+- [x] 🔧 **`[DIST-03]`** **La passe de fond était affamée par son propre déclencheur.**
+      *Livré le 2026-08-05*, en réponse à « j'ai toujours pas toutes les adresses pourtant
+      les trajets maps marchent ». Les pages déclenchaient sur « une offre n'a pas de
+      distance » — un gate qui se referme au moment exact où les trajets se mettent à
+      marcher, alors que le rattrapage des adresses et la mesure des bornes vivent dans la
+      MÊME passe. Il ne restait que le cron nocturne, six entreprises par nuit.
+      `lib/travaux.ts` (pur) porte désormais la décision, partagée par les trois
+      déclencheurs ET par la passe elle-même — les filtres SQL sont remplacés par le même
+      prédicat. Délai de retente de 24 h pour que le gate CONVERGE malgré les adresses
+      introuvables. Vérification avant réservation, sinon le créneau partagé se brûle à vide.
+      Et une trace par passe, même vide, comptée en X/Y : c'est l'absence de cette trace qui
+      rendait le défaut indiagnosticable.
+
+- [x] 🔎 **`[SRC-01..05]`** **Chercher une source d'offres qui existe vraiment.**
+      *Clos le 2026-08-05 — les sept sont MORTES, mesurées.* Verdict complet en tête de
+      `scripts/sonder-ouvert.ts`. Les deux jeux Données Québec nommés « Offres d'emploi »,
+      dernière piste ouverte, sont ceux des villes de **Laval** et de **Montréal** : leurs
+      propres postes, à 250 km. Il n'existe aucun jeu de données provincial d'offres. Le
+      seul canal qui produit est le dépôt, dont le prompt est désormais versionné
+      (`docs/ROUTINE-DEPOT.md`) au lieu de vivre uniquement dans la Routine de Marc.
 
 - [x] 🔧 **`[DIST-02]`** **`lib/distances.ts` ne connaît pas les alias d'entreprise.**
       *Livré le 2026-07-31* : la règle vit dans `lib/employeurs.ts` (`apparier`, `positionDe`)

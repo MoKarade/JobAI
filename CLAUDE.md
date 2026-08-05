@@ -441,6 +441,36 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   commence par `=`, `+`, `-` ou `@` est évaluée à l'ouverture par Excel, LibreOffice et
   Google Sheets. Tout champ de texte libre qui sort de l'app vers un tableur se neutralise
   au point de FORMATAGE (`lib/export.ts`), jamais dans le composant qui télécharge.
+- **Quand une passe fait PLUSIEURS travaux, son déclencheur doit couvrir CHACUN d'eux.**
+  Le gate des pages était « une offre n'a pas de distance ». Il se referme au moment précis
+  où toutes les distances sont mesurées — donc où les trajets se mettent à marcher — et il
+  affamait le rattrapage des adresses et la mesure des bornes, qui vivent dans la MÊME
+  passe : il ne restait que le cron nocturne, six entreprises par nuit. Marc l'a décrit
+  exactement : « j'ai toujours pas toutes les adresses, POURTANT les trajets Maps
+  marchent » — les deux moitiés de la phrase étaient la même cause, et c'est le « pourtant »
+  qui la désignait. Un gate calibré sur le premier travail fini affame tous les autres, et
+  le symptôme (« ça marche, mais il en manque toujours ») ne pointe jamais vers le gate.
+  Corollaire : un gate doit aussi CONVERGER — un travail dont la réponse ne viendra jamais
+  (une entreprise qu'OpenStreetMap ne connaît pas) porte un délai de retente, sinon on
+  remplace « s'éteint trop tôt » par « ne s'éteint jamais ». Et vérifier qu'il y a du
+  travail AVANT de réserver la passe : réserver puis ne rien faire brûle le créneau partagé
+  des autres déclencheurs.
+- **Un travail de fond qui ne journalise QUE ses échecs est indiagnosticable.** « Tourné
+  sans rien produire » et « jamais tourné » laissent tous deux des journaux vides : on ne
+  peut pas distinguer un travail qui n'a rien à faire d'un travail affamé, ni d'un travail
+  coupé par son budget. Tracer CHAQUE passe, même vide, et compter en X/Y — « 0/0 » dit
+  qu'il n'y avait rien à faire, « 0/6 » dit que six candidates ont été écartées, et ce sont
+  deux situations opposées. Même exigence que pour les refus d'ingestion : chaque rejet
+  porte son motif, parce que trois causes (homonyme écarté, source muette, service
+  indisponible) appellent trois corrections différentes.
+- **Une amputation de requête se fait passer pour une source vide.** La sonde CKAN portait
+  `fl=title,organization,notes`, croyant DEMANDER ces champs ; le paramètre restreint la
+  projection Solr et a supprimé de la réponse `organization`, `metadata_modified` et
+  `resources` — précisément ce qu'on cherchait. Le rapport affichait « organisme : ? ·
+  formats : aucun », et j'allais conclure que la source ne publiait rien. Une API rend son
+  objet complet par défaut : on ne l'ampute que si le volume gêne, jamais « pour cibler ».
+  Quand une réponse est vide là où on l'attendait pleine, suspecter SA PROPRE requête avant
+  la source.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

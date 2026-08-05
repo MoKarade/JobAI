@@ -175,3 +175,67 @@ d'affichage ne doit jamais passer devant la véracité du verdict — c'est la m
 s'applique à TOUT ce qui décide d'un go/no-go.
 
 **Verrou** : aucun (règle de méthode). Détection : un gate qui n'échoue jamais est suspect.
+
+---
+
+## 2026-08-05 — « Les trajets marchent, pourtant pas les adresses » : le « pourtant » était le diagnostic
+
+**Contexte** : Marc, plusieurs jours après la livraison du rattrapage d'adresses :
+« j'ai toujours pas toutes les adresses pourtant les trajets maps marchent, corrige ».
+
+**Ce qui s'est passé** : la fonction était livrée, testée, déployée, et validait bien ses
+résultats. Elle ne tournait presque jamais. Les deux pages déclenchaient la passe de fond
+sur `offres.some(o => o.km === null)` — « une offre n'a pas de distance ». Ce gate se
+referme au moment exact où toutes les distances sont mesurées, c'est-à-dire au moment où
+les trajets Maps se mettent à marcher. Or `rattraperAdresses` et `mesurerBornes` vivent
+DANS cette même passe : une fois les distances faites, plus rien ne les appelait. Il ne
+restait que le cron nocturne, six entreprises par nuit — sept nuits pour quarante.
+
+**Cause réelle** : une passe qui fait trois travaux, déclenchée par un gate qui n'en
+regarde qu'un. Le premier travail terminé referme la porte sur les deux autres.
+
+**Ce qui a rendu le défaut invisible** : ces travaux ne journalisaient QUE leurs échecs.
+Une passe qui tourne sans rien produire et une passe qui n'a jamais tourné laissent les
+mêmes journaux vides. Il n'existait aucun moyen de distinguer « rien à faire », « affamé »
+et « coupé par le budget » — donc aucun moyen de diagnostiquer autrement qu'en relisant le
+code ligne à ligne.
+
+**Règle durable** : quand une passe fait PLUSIEURS travaux, son déclencheur doit couvrir
+CHACUN d'eux, et la règle vit à UN seul endroit (`lib/travaux.ts`, pure) partagé par tous
+les déclencheurs et par la passe elle-même. Le gate doit CONVERGER : un travail dont la
+réponse ne viendra jamais porte un délai de retente, sinon on remplace « s'éteint trop
+tôt » par « ne s'éteint jamais ». Et tout travail de fond trace CHAQUE passe, même vide,
+en X/Y — « 0/0 » et « 0/6 » sont deux situations opposées.
+
+**Ce que Marc a dit et que je n'ai pas entendu tout de suite** : « pourtant ». Il ne
+décrivait pas deux problèmes, il donnait la corrélation. Une plainte utilisateur qui
+contient un « pourtant » ou un « alors que » désigne souvent le lien de cause, pas une
+circonstance atténuante.
+
+**Verrou** : `tests/travaux.test.ts` — le test discriminant assert les DEUX moitiés
+(`some(distanceAMesurer)` faux ET `resteDuTravail` vrai). L'ancien gate rend faux.
+
+---
+
+## 2026-08-05 — Ma propre requête avait effacé la réponse
+
+**Contexte** : dernière source d'offres encore plausible, deux jeux nommés « Offres
+d'emploi » sur Données Québec. Il fallait savoir QUI les publie — un titre ne dit rien.
+
+**Ce qui s'est passé** : la sonde a rapporté « organisme : ? · modifié : ? · formats :
+aucun » sur les deux. J'ai failli en conclure que la source ne publiait rien
+d'exploitable, et fermer la piste.
+
+**Cause réelle** : j'avais ajouté `fl=title,organization,notes` à la requête CKAN, croyant
+DEMANDER ces champs. CKAN passe `fl` à Solr, qui restreint la projection — et en a
+supprimé `organization`, `metadata_modified` et `resources`, c'est-à-dire exactement les
+trois choses que le résumé lisait. Sans le paramètre, la réponse est complète et tranche
+en une ligne : Ville de Laval et Ville de Montréal, leurs propres postes, à 250 km.
+
+**Règle durable** : une API rend son objet complet par défaut ; on ne l'ampute que si le
+volume gêne, jamais « pour cibler ». Quand une réponse est vide là où on l'attendait
+pleine, suspecter SA PROPRE requête avant la source. Même famille que « un HTTP 200 ne
+prouve rien » : le vide non plus.
+
+**Verrou** : aucun (règle de méthode). Le paramètre est retiré, avec la raison écrite à
+côté pour que personne ne le remette.
