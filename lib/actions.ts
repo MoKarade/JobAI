@@ -440,7 +440,19 @@ async function adressesDepuisRegistre(
     s.add(n.neq);
     neqParCle.set(n.nomCle, s);
   }
-  const neqs = [...new Set(parDenomination.map((n) => n.neq))];
+  // ⚠️ UNE CLÉ TROP COMMUNE N'EST PAS UNE PISTE, C'EST DU BRUIT.
+  //
+  // 59 194 dénominations sont en base, et certaines formes se réduisent à une clé très
+  // répandue (« construction », « transport »). Une entreprise dont le nom normalise ainsi
+  // remonterait des centaines de NEQ — donc une requête énorme, puis des centaines
+  // d'établissements, pour un résultat qui serait de toute façon jugé AMBIGU et refusé.
+  // Autant le constater tout de suite : c'est le même refus, sans le coût.
+  const MAX_NEQ_PAR_CLE = 25;
+  for (const [cle, ensemble] of neqParCle) {
+    if (ensemble.size > MAX_NEQ_PAR_CLE) neqParCle.delete(cle);
+  }
+
+  const neqs = [...new Set([...neqParCle.values()].flatMap((e) => [...e]))];
   const parNeq = new Map<string, Etablissement[]>();
   if (neqs.length > 0) {
     const etabs = await db
