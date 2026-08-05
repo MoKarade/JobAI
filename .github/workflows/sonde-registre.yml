@@ -2,19 +2,34 @@
 #
 # POURQUOI UN WORKFLOW À PART
 # Les autres sondes interrogent des API et rendent quelques kilo-octets. Celle-ci télécharge
-# un ZIP dont on ignore la taille — c'est justement la première chose à mesurer. La mêler
-# aux autres rendrait la sonde rapide lente, et on cesserait de la lancer.
+# un fichier dont on ignore la taille — c'est justement la première chose à mesurer. Les
+# mêler rendrait la sonde rapide lente, et on cesserait de la lancer.
 #
-# CE QU'ON CHERCHE, DANS CET ORDRE — chaque réponse décide de la suivante :
-#   1. Cette URL sert-elle VRAIMENT un ZIP ? C'est une page `.aspx` : elle peut tout aussi
-#      bien rendre du HTML avec un formulaire, auquel cas la piste s'arrête là.
-#   2. Quelle TAILLE ? Le registre entier du Québec, c'est des millions d'entreprises. Si
-#      c'est plusieurs gigaoctets, l'import devra filtrer À LA LECTURE, sans jamais tout
-#      garder — et la base Neon ne pourra de toute façon pas l'héberger en entier.
+# ⚠️ UNE SEULE REQUÊTE. C'EST LA LEÇON DU PREMIER ESSAI.
+#
+# La première version enchaînait trois requêtes — en-têtes, plage d'octets, téléchargement —
+# en moins d'une seconde. Le serveur du Registraire a répondu :
+#
+#     « L'accès à nos services vous est temporairement interdit en raison d'une
+#       utilisation excessive. »
+#
+# Ce n'était NI un 404, NI une mauvaise URL, NI une piste morte : c'était mon propre motif
+# d'appel qui fabriquait la réponse négative. Exactement la même faute que le paramètre
+# `fl=` ajouté à la requête CKAN quelques heures plus tôt — croire mesurer la source alors
+# qu'on mesure sa propre maladresse. Sur un service public, trois requêtes en une seconde
+# EST une utilisation excessive, et le serveur a raison.
+#
+# D'où : UNE requête, une seule, et tout se déduit de ce qu'elle rend. Pas de `-I`, pas de
+# `Range`, pas de deuxième essai automatique. Si elle échoue, on attend et on relance à la
+# main — un service public n'est pas une ressource qu'on martèle jusqu'à ce qu'elle cède.
+#
+# CE QUE LA MESURE DOIT TRANCHER, dans cet ordre :
+#   1. Un ZIP, ou une page d'erreur ? Un ZIP commence par « PK », une page par « < ».
+#   2. Quelle TAILLE ? Au-delà de quelques centaines de Mo, l'import devra filtrer EN FLUX,
+#      la base Neon ne pouvant de toute façon pas héberger le registre entier.
 #   3. Quels FICHIERS, quelles COLONNES ? On ne veut que le nom, l'adresse, la ville et le
-#      code postal. Le reste (actionnaires, administrateurs, historiques) est du volume
-#      inutile, et ce sont des données PERSONNELLES de tiers qu'on n'a aucune raison de
-#      rapatrier — garde-fou n°1.
+#      code postal. Les fichiers de PERSONNES (administrateurs, actionnaires) sont des
+#      données de tiers qu'on n'a aucune raison de rapatrier — garde-fou n°1.
 #
 # ⚠️ AUCUN MOISSONNAGE. C'est un jeu de DONNÉES OUVERTES publié par le Registraire des
 # entreprises et référencé sur Données Québec : nommément l'exception du garde-fou n°4.
@@ -37,63 +52,44 @@ jobs:
     env:
       URL: https://www.registreentreprises.gouv.qc.ca/RQAnonymeGR/GR/GR03/GR03A2_22A_PIU_RecupDonnPub_PC/FichierDonneesOuvertes.aspx
     steps:
-      - name: 1. Ce que l'URL annonce (sans rien télécharger)
+      - name: Télécharger — UNE seule requête, et tout en découle
         run: |
-          echo "== En-têtes =="
-          # -L : la page peut rediriger vers le fichier réel. -I seul suffit rarement sur
-          # un .aspx, on garde donc aussi une lecture partielle plus bas.
-          curl -sIL --max-time 60 "$URL" | grep -iE '^(HTTP/|content-type|content-length|content-disposition|location)' || true
-
-      - name: 2. Les premiers octets — un ZIP commence par « PK »
-        run: |
-          echo "== Signature =="
-          # Une page HTML commencerait par « <! » ou « <h ». Lire 64 octets suffit à
-          # trancher, et coûte quasiment rien si le fichier est énorme.
-          curl -sL --max-time 60 -r 0-63 "$URL" -o entete.bin || true
-          if [ -s entete.bin ]; then
-            file entete.bin
-            xxd entete.bin | head -2
-          else
-            echo "AUCUN octet rendu sur une requête partielle — le serveur refuse peut-être Range."
-          fi
-
-      - name: 3. Télécharger, et mesurer ce qui arrive vraiment
-        run: |
-          echo "== Téléchargement (borné à 15 min) =="
+          # `-A` : se présenter honnêtement plutôt qu'en client anonyme, comme pour
+          # Nominatim et Overpass. C'est la moindre des choses envers un service public.
           # `--max-filesize` protège le runner d'un fichier absurde : mieux vaut un échec
           # net qu'un disque plein sans explication.
-          curl -sL --max-time 900 --max-filesize 4000000000 "$URL" -o req.bin -w 'code=%{http_code} taille=%{size_download} type=%{content_type}\n' || true
+          curl -sL --max-time 900 --max-filesize 4000000000 \
+            -A "JobAI/1.0 (recherche d'emploi personnelle; contact via le depot GitHub)" \
+            "$URL" -o req.bin \
+            -w 'code=%{http_code} taille=%{size_download} type=%{content_type} redirections=%{num_redirects}\n' || true
+          echo "== Ce qui est arrivé =="
           ls -lh req.bin || true
           file req.bin || true
 
-      - name: 4. Ce qu'il y a DEDANS — sans tout extraire
+      - name: Lire le résultat — archive, ou refus
         run: |
-          if file req.bin | grep -qi zip; then
-            echo "== Contenu de l'archive =="
-            # `-l` liste sans extraire : c'est la mesure qui décide de la suite.
+          if file req.bin | grep -qi 'zip archive'; then
+            echo "== C'est bien une archive. Contenu, sans tout extraire =="
             unzip -l req.bin | head -40
             echo
-            echo "== Entêtes des fichiers texte (2 premières lignes de chacun) =="
-            mkdir -p extrait
-            # On n'extrait QUE les fichiers susceptibles de porter un nom ou une adresse.
-            # Les fichiers de personnes (administrateurs, actionnaires) ne nous regardent
-            # pas : garde-fou n°1, on ne rapatrie pas des données de tiers.
-            for f in $(unzip -l req.bin | awk '{print $4}' | grep -iE '(entreprise|adresse|nom|etablissement)' | grep -viE '(administrateur|actionnaire|personne|physique)' | head -6); do
+            echo "== Entêtes des fichiers susceptibles de porter un nom ou une adresse =="
+            # On n'ouvre QUE ceux-là. Les fichiers de personnes sont exclus explicitement :
+            # garde-fou n°1, on ne rapatrie pas des données de tiers.
+            for f in $(unzip -l req.bin | awk '{print $4}' \
+                        | grep -iE '(entreprise|adresse|nom|etablissement)' \
+                        | grep -viE '(administrateur|actionnaire|personne|physique)' \
+                        | head -6); do
               echo "--- $f"
               unzip -p req.bin "$f" 2>/dev/null | head -2 || echo "(illisible)"
               echo
             done
           else
-            echo "PAS une archive ZIP — voici les 400 premiers caractères :"
-            head -c 400 req.bin || true
+            echo "== PAS une archive. Les 600 premiers caractères disent pourquoi =="
+            head -c 600 req.bin || true
+            echo
+            echo
+            echo "⚠️ Si le message parle d'« utilisation excessive », ce n'est PAS un verdict"
+            echo "   sur la source : c'est un blocage temporaire. Attendre, puis relancer CE"
+            echo "   workflow À LA MAIN. Ne pas ajouter de nouvel essai automatique — c'est"
+            echo "   précisément ce qui a déclenché le blocage la première fois."
           fi
-
-      - name: 5. Ce que la mesure doit trancher
-        if: always()
-        run: |
-          echo "À LIRE À L'ŒIL :"
-          echo " · si ce n'est pas un ZIP, la piste du registre s'arrête ici ;"
-          echo " · la TAILLE décide de l'import : au-delà de quelques centaines de Mo,"
-          echo "   il faudra filtrer en flux (région) sans jamais tout stocker ;"
-          echo " · les COLONNES décident du schéma : on ne veut que nom, adresse, ville,"
-          echo "   code postal — jamais les personnes."
