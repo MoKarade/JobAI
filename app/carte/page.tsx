@@ -60,7 +60,22 @@ export default async function PageCarte() {
       positions = new Map(
         lignes.map((l) => [
           l.nom,
-          { lat: l.lat, lon: l.lon, precision: l.precision, adresse: l.adresse },
+          {
+            lat: l.lat,
+            lon: l.lon,
+            precision: l.precision,
+            adresse: l.adresse,
+            // `bornesLe` NULL = jamais interrogé. C'est ce qui distingue « on ne sait
+            // pas » de « il n'y en a aucune », et les deux se disent différemment.
+            bornes:
+              l.bornesLe === null
+                ? null
+                : {
+                    nombre: l.bornesM === null ? 0 : 1,
+                    plusProcheM: l.bornesM,
+                    nom: l.bornesNom,
+                  },
+          },
         ]),
       );
     }

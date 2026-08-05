@@ -1015,3 +1015,13 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .carte-offres--agrandie {
   height: 82vh;
 }
+
+/* Les bornes de recharge : une ligne de fait, au même niveau que la distance. Discrète —
+   c'est un critère de confort, pas le titre de la fiche. */
+.carte-liste__bornes,
+.popup-bornes {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}

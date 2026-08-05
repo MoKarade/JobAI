@@ -31,7 +31,7 @@ function positions(
   return new Map(
     entrees.map(([nom, precision, lat, lon, adresse]) => [
       nom,
-      { lat, lon, precision, adresse: adresse ?? null },
+      { lat, lon, precision, adresse: adresse ?? null, bornes: null },
     ]),
   );
 }

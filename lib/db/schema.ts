@@ -245,6 +245,27 @@ export const entreprisesLieux = pgTable(
      * et le code, pas les coordonnées publiques d'une entreprise.
      */
     adresse: text("adresse"),
+
+    /**
+     * BORNES DE RECHARGE — trois états, et il faut les trois.
+     *
+     * Demande de Marc (2026-08-05) : savoir, pour chaque employeur, s'il y a une borne à
+     * moins de cinq minutes à pied. Pour qui roule à l'électrique, ça pèse dans le choix
+     * d'un emploi autant qu'un détail du salaire, et aucune offre ne le mentionne.
+     *
+     *   · `bornesLe` NULL              → jamais interrogé. On ne sait pas.
+     *   · `bornesLe` posé, `bornesM` NULL → interrogé, AUCUNE borne dans le rayon.
+     *   · `bornesLe` posé, `bornesM` = N  → la plus proche est à N mètres.
+     *
+     * Les deux premiers états ne se disent PAS pareil à l'écran. Les confondre ferait
+     * passer un lieu non mesuré pour un lieu sans borne — un renseignement faux présenté
+     * avec l'aplomb d'un fait (garde-fou n°3). D'où la date SÉPARÉE de la distance :
+     * un seul champ ne peut pas porter la différence.
+     */
+    bornesM: integer("bornes_m"),
+    bornesNom: text("bornes_nom"),
+    bornesLe: timestamp("bornes_le", { withTimezone: true }),
+
     geocodeLe: timestamp("geocode_le", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

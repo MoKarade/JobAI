@@ -13,6 +13,10 @@ import Link from "next/link";
 import type { Epingle } from "@/lib/carte";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { palier } from "@/lib/scoring";
+import { RAYON_5_MIN_M, minutesAPied } from "@/lib/bornes";
+
+/** Le seuil, dit en toutes lettres — dérivé de la constante, jamais recopié. */
+const MINUTES_LIBELLE = `${minutesAPied(RAYON_5_MIN_M)} min`;
 
 export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
   return (
@@ -42,6 +46,17 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                 {x.km === null
                   ? "distance non mesurée"
                   : `${String(x.km).replace(".", ",")} km du domicile (mesuré)`}
+              </p>
+              {/* BORNES DE RECHARGE — trois états, trois phrases. « Pas encore regardé »
+                  n'est pas « aucune borne » : le second est une information, le premier
+                  une absence de mesure, et les confondre serait affirmer ce qu'on ignore. */}
+              <p className="carte-liste__bornes">
+                {x.bornes === null
+                  ? "Bornes de recharge : pas encore regardé."
+                  : x.bornes.plusProcheM === null
+                    ? `Aucune borne de recharge à moins de ${MINUTES_LIBELLE} à pied.`
+                    : `Borne de recharge à ~${minutesAPied(x.bornes.plusProcheM)} min à pied` +
+                      `${x.bornes.nom ? ` (${x.bornes.nom})` : ""} — ${x.bornes.plusProcheM} m à vol d’oiseau.`}
               </p>
               {x.lecture ? <p className="carte-liste__lecture">{x.lecture}</p> : null}
               {x.offres.length > 0 ? (

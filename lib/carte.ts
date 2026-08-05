@@ -72,6 +72,13 @@ export interface EntrepriseSurCarte {
    * (« adresse inconnue ») — c'est honnête, contrairement à une adresse plausible et fausse.
    */
   adresse: string | null;
+  /**
+   * Les bornes de recharge à cinq minutes à pied — TROIS états, jamais deux.
+   *
+   * `null` = jamais interrogé. `{ nombre: 0 }` = interrogé, aucune borne. Les confondre
+   * ferait passer un lieu non mesuré pour un lieu sans borne.
+   */
+  bornes: { nombre: number; plusProcheM: number | null; nom: string | null } | null;
   lecture: string;
   offres: OffreSurCarte[];
 }
@@ -110,6 +117,8 @@ export interface PositionEntreprise {
   lon: number;
   precision: PrecisionEpingle;
   adresse: string | null;
+  /** `null` tant que les bornes n'ont pas été interrogées pour ce lieu. */
+  bornes: { nombre: number; plusProcheM: number | null; nom: string | null } | null;
 }
 
 /** Les offres qu'une carte de recherche d'emploi doit montrer : celles qui sont vivantes. */
@@ -150,6 +159,7 @@ export function construireVue(
       ville: villeGeocodable(c.ville) ?? c.ville,
       km: c.km,
       adresse: null,
+      bornes: null,
       lecture: c.lecture,
       offres: [],
     });
@@ -183,6 +193,7 @@ export function construireVue(
         // des offres plus bas, MESURÉE, jamais déduite de l'épingle.
         km: null,
         adresse: null,
+        bornes: null,
         lecture: "",
         offres: [],
       };
@@ -226,6 +237,7 @@ export function construireVue(
     // L'adresse vient de la POSITION retenue : c'est elle qui a été géocodée, et elle n'en
     // porte une que si la résolution est exacte (`deciderPrecision`).
     entreprise.adresse = position.adresse;
+    entreprise.bornes = position.bornes;
 
     // La meilleure note en tête : c'est elle qui teinte l'épingle.
     entreprise.offres.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));

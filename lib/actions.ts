@@ -31,6 +31,8 @@ import { employeursASituer, planifierDistances } from "./distances";
 import { villesARattraper } from "./ingest/pipeline";
 import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
+import { RAYON_5_MIN_M, proximiteBorne } from "./bornes";
+import { chercherBornes } from "./overpass";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -291,6 +293,55 @@ async function rattraperAdresses(
 }
 
 /**
+ * Mesure les bornes de recharge autour des entreprises qui n'ont pas encore été regardées.
+ *
+ * Demande de Marc (2026-08-05). Une entreprise n'est interrogée qu'UNE FOIS : les bornes ne
+ * poussent pas du jour au lendemain, et Overpass est un service bénévole.
+ *
+ * ⚠️ « JAMAIS MESURÉ » N'EST PAS « AUCUNE BORNE ». Une interrogation qui échoue (l'instance
+ * publique a répondu 504 lors de la toute première sonde) ne pose PAS `bornesLe` : la ligne
+ * reste « à mesurer » et repassera. Écrire la date sur un échec figerait un « aucune borne »
+ * définitif pour un lieu qu'on n'a jamais pu regarder.
+ *
+ * Bornée comme le reste : quelques entreprises par passe, les moins récemment vues d'abord,
+ * et un budget de temps. Un échec ici n'empêche RIEN d'autre — les bornes sont un confort,
+ * la distance est le critère n°1.
+ */
+async function mesurerBornes(max: number, budgetMs: number | null): Promise<number> {
+  const debut = Date.now();
+  const lignes = await db
+    .select()
+    .from(entreprisesLieux)
+    .where(isNull(entreprisesLieux.bornesLe))
+    // Ordre explicite : sans lui, Postgres sert le heap et les mêmes lignes reviendraient.
+    .orderBy(entreprisesLieux.nom)
+    .limit(max);
+
+  let mesurees = 0;
+
+  for (const l of lignes) {
+    if (budgetMs !== null && Date.now() - debut >= budgetMs) break;
+
+    const r = await chercherBornes({ lat: l.lat, lon: l.lon }, RAYON_5_MIN_M);
+    if (!r.ok) {
+      // On NE marque PAS la ligne : elle repassera. Le journal garde la trace, parce qu'une
+      // source qui tombe tout le temps doit finir par se voir.
+      console.error(`[bornes] ${l.nom} — non mesurée : ${r.raison}`);
+      continue;
+    }
+
+    const p = proximiteBorne({ lat: l.lat, lon: l.lon }, r.bornes, RAYON_5_MIN_M);
+    await db
+      .update(entreprisesLieux)
+      .set({ bornesM: p.plusProcheM, bornesNom: p.nom, bornesLe: new Date() })
+      .where(eq(entreprisesLieux.nom, l.nom));
+    mesurees++;
+  }
+
+  return mesurees;
+}
+
+/**
  * Le domicile de référence, lu depuis l'environnement.
  *
  * GARDE-FOU N°1 — c'est le SEUL endroit de l'app qui lit ces coordonnées, et elles ne
@@ -378,6 +429,7 @@ export async function mesurerDistances(
       situees: number;
       villesRattrapees: number;
       adressesRattrapees: number;
+      bornesMesurees: number;
     }
   | { ok: false; erreur: string }
 > {
@@ -470,6 +522,15 @@ export async function mesurerDistances(
       console.error("[actions] rattrapage des adresses impossible", err);
     }
 
+    // 1 ter. Les bornes de recharge, pour les entreprises jamais regardées.
+    let bornes = 0;
+    try {
+      bornes = await mesurerBornes(maxSituations, budgetRestant());
+    } catch (err) {
+      // Un confort ne fait pas tomber l'essentiel.
+      console.error("[actions] mesure des bornes impossible", err);
+    }
+
     // 2. Mesurer. Le domicile ne sort pas de cette closure.
     const majs = planifierDistances(offres, positions, (p) => distanceKm(chezMoi, p));
     for (const m of majs) {
@@ -486,6 +547,7 @@ export async function mesurerDistances(
       situees,
       villesRattrapees: aRattraper.length,
       adressesRattrapees: adresses,
+      bornesMesurees: bornes,
     };
   } catch (err) {
     console.error("[actions] mesure des distances impossible", err);

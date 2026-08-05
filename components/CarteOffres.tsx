@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import { centreDuCadrage, type Epingle, type EntrepriseSurCarte } from "@/lib/carte";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { palier } from "@/lib/scoring";
+import { minutesAPied } from "@/lib/bornes";
 
 /** Couleurs des paliers, alignées sur celles des cartes d'offre. */
 const TEINTE: Record<ReturnType<typeof palier>, string> = {
@@ -65,6 +66,14 @@ function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string 
   if (e.adresse) {
     morceaux.push(`<span class="popup-adresse">${echapper(e.adresse)}</span>`);
   }
+  // Les bornes : trois états, trois phrases — « pas regardé » n'est pas « aucune ».
+  const bornes =
+    e.bornes === null
+      ? null
+      : e.bornes.plusProcheM === null
+        ? "Aucune borne de recharge à 5 min à pied"
+        : `Borne à ~${minutesAPied(e.bornes.plusProcheM)} min à pied${e.bornes.nom ? ` · ${e.bornes.nom}` : ""}`;
+  if (bornes) morceaux.push(`<span class="popup-bornes">${echapper(bornes)}</span>`);
   if (e.lecture) {
     const lecture = e.lecture.length > 160 ? `${e.lecture.slice(0, 157)}…` : e.lecture;
     morceaux.push(`<span class="popup-lecture">${echapper(lecture)}</span>`);
