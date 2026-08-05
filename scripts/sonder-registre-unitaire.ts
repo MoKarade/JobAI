@@ -114,6 +114,49 @@ async function parDatastore(nom: string): Promise<void> {
   }
 }
 
+/**
+ * QU'Y A-T-IL DANS CETTE RESSOURCE, AU JUSTE ?
+ *
+ * ⚠️ ZÉRO RÉSULTAT N'EST PAS UNE RÉPONSE À LA QUESTION POSÉE. Les trois recherches par nom
+ * rendent `total=0`. Trois explications tiennent debout, et elles n'appellent PAS les mêmes
+ * suites : (a) la ressource n'est pas la liste des entreprises mais un fichier annexe ;
+ * (b) l'index plein texte ne couvre pas la colonne des noms ; (c) le registre est bien là
+ * mais ces entreprises n'y figurent pas sous ce nom-là.
+ *
+ * Conclure « le registre n'est pas dans le datastore » sans regarder serait refaire, pour
+ * la cinquième fois de la journée, l'erreur de lire un manque comme un verdict. Une requête
+ * SANS `q` montre le total réel et les NOMS DE CHAMPS : c'est ce qui tranche entre les trois.
+ */
+async function contenuDeLaRessource(): Promise<void> {
+  console.log("── Que contient cette ressource ? (requête SANS recherche)");
+  const url =
+    `https://www.donneesquebec.ca/recherche/api/3/action/datastore_search?` +
+    `resource_id=${encodeURIComponent(RESSOURCE_REQ)}&limit=2`;
+  const { statut, corps } = await lire(url, "datastore (contenu)");
+  console.log(`   → HTTP ${statut}`);
+  if (statut !== 200) {
+    console.log(`      ${extrait(corps, 200)}`);
+    return;
+  }
+  try {
+    const j = JSON.parse(corps) as {
+      result?: {
+        total?: number;
+        fields?: { id?: string; type?: string }[];
+        records?: Record<string, unknown>[];
+      };
+    };
+    console.log(`      total de lignes : ${j.result?.total ?? "?"}`);
+    const champs = (j.result?.fields ?? []).map((f) => `${f.id}:${f.type}`);
+    console.log(`      champs (${champs.length}) : ${champs.join(", ").slice(0, 600)}`);
+    for (const r of (j.result?.records ?? []).slice(0, 2)) {
+      console.log(`      · ${JSON.stringify(r).slice(0, 600)}`);
+    }
+  } catch {
+    console.log("      ⚠️ corps illisible malgré un 200");
+  }
+}
+
 async function principal(): Promise<void> {
   console.log("SONDE — INTERROGER LE REGISTRE UNE ENTREPRISE À LA FOIS.");
   console.log("Le fichier en bloc est refusé par Cloudflare depuis la CI (mesuré 2×).");
@@ -126,7 +169,10 @@ async function principal(): Promise<void> {
     console.log();
   }
 
-  console.log("── Le REQ lui-même, UNE requête, pour voir si l'accès s'est rouvert");
+  await contenuDeLaRessource();
+  await new Promise((r) => setTimeout(r, 1200));
+
+  console.log("\n── Le REQ lui-même, UNE requête, pour voir si l'accès s'est rouvert");
   const { statut, corps } = await lire(
     "https://www.registreentreprises.gouv.qc.ca/RQAnonymeGR/GR/GR03/GR03A2_22A_PIU_RecupDonnPub_PC/FichierDonneesOuvertes.aspx",
     "REQ",
