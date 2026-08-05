@@ -67,17 +67,26 @@ export interface EntrepriseSurCarte {
   /**
    * L'adresse d'OpenStreetMap, ou `null`.
    *
-   * Présente UNIQUEMENT sur une position exacte : sur un repli au centre-ville, ce serait
-   * l'adresse de la mairie qu'on afficherait pour une usine. `null` se dit à l'écran
+   * ⚠️ SAVOIR OÙ ELLE EST ET POUVOIR L'ÉPINGLER SONT DEUX CHOSES DIFFÉRENTES, depuis que
+   * le registre des entreprises alimente ce champ. Une adresse issue d'OpenStreetMap
+   * accompagne toujours une position exacte ; une adresse du REGISTRE peut très bien
+   * coexister avec une épingle au centre-ville, parce qu'on connaît alors l'adresse sans
+   * qu'un géocodeur ait su la placer. Ce n'était pas vrai quand seul OSM écrivait ici, et
+   * ce commentaire l'affirmait encore : une doc périmée ment mieux qu'elle n'informe.
+   *
+   * Ce qui reste interdit : reprendre l'adresse rendue par un repli au centre-ville — ce
+   * serait l'adresse de la mairie affichée pour une usine. `null` se dit à l'écran
    * (« adresse inconnue ») — c'est honnête, contrairement à une adresse plausible et fausse.
    */
   adresse: string | null;
   /**
    * D'OÙ vient cette adresse, quand il y en a une. Demande de Marc : « et l'indiquer ».
    *
-   * `osm` = un objet cartographié À SON EMPLACEMENT. `registre` = le domicile légal tiré
-   * du registre des entreprises, qui peut être le bureau du comptable et non l'usine. Les
-   * afficher pareil serait présenter une adresse administrative comme un lieu de travail.
+   * `osm` = un objet cartographié À SON EMPLACEMENT. `registre` = l'adresse de
+   * l'ÉTABLISSEMENT déclarée au registre des entreprises — le lieu où l'entreprise opère,
+   * pas son domicile légal (on lit `Etablissements.csv`, jamais les domiciles). Vraie,
+   * mais sans garantie que l'épingle soit dessus. Les afficher pareil reviendrait à donner
+   * la même valeur à une position mesurée et à une adresse déclarée.
    */
   adresseSource: "osm" | "registre" | null;
   /**
@@ -245,8 +254,10 @@ export function construireVue(
       continue;
     }
 
-    // L'adresse vient de la POSITION retenue : c'est elle qui a été géocodée, et elle n'en
-    // porte une que si la résolution est exacte (`deciderPrecision`).
+    // L'adresse vient de la POSITION retenue, quelle que soit sa précision : le registre
+    // peut avoir renseigné l'adresse d'une entreprise que le géocodeur n'a pas su placer.
+    // La filtrer sur « exacte » ferait disparaître de l'écran tout ce que le registre
+    // apporte — l'information serait en base et invisible.
     entreprise.adresse = position.adresse;
     entreprise.adresseSource = position.adresseSource;
     entreprise.bornes = position.bornes;

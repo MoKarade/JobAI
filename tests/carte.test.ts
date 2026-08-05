@@ -26,10 +26,17 @@ function offre(champs: Partial<Offre> = {}): Offre {
 }
 
 function positions(
-  entrees: [string, "exacte" | "ville", number, number, (string | null)?][],
+  entrees: [
+    string,
+    "exacte" | "ville",
+    number,
+    number,
+    (string | null)?,
+    ("osm" | "registre")?,
+  ][],
 ): Map<string, PositionEntreprise> {
   return new Map(
-    entrees.map(([nom, precision, lat, lon, adresse]) => [
+    entrees.map(([nom, precision, lat, lon, adresse, source]) => [
       nom,
       {
         lat,
@@ -38,7 +45,7 @@ function positions(
         adresse: adresse ?? null,
         // La source suit l'adresse, ici comme en base : la contrainte l'exige, et une
         // fixture qui s'en affranchirait testerait un état que la base refuse.
-        adresseSource: adresse ? ("osm" as const) : null,
+        adresseSource: adresse ? (source ?? ("osm" as const)) : null,
         bornes: null,
       },
     ]),
@@ -391,6 +398,26 @@ describe("l'adresse, quand on la connaît", () => {
     const vue = construireVue([], ENTREPRISES_CIBLES, new Map());
     expect(vue.aSituer.length).toBeGreaterThan(0);
     expect(vue.epingles).toEqual([]);
+  });
+
+  it("GARDE l'adresse du REGISTRE même quand l'épingle reste au centre-ville", () => {
+    // ⚠️ SAVOIR OÙ ELLE EST ET POUVOIR L'ÉPINGLER SONT DEUX CHOSES DIFFÉRENTES.
+    //
+    // Tant qu'OpenStreetMap était la seule source, les deux allaient ensemble : une adresse
+    // n'existait que sur une position exacte, et le commentaire de `lib/carte.ts` en faisait
+    // une règle. Le registre des entreprises a rompu ce lien — il donne l'adresse déclarée
+    // d'un établissement que le géocodeur n'a pas su placer. Filtrer l'adresse sur la
+    // précision effacerait alors de l'écran tout ce que le registre apporte : l'information
+    // serait en base, exacte, et invisible. C'est le contraire du garde-fou n°3, qui
+    // interdit d'AFFICHER ce qu'on ne sait pas — pas de CACHER ce qu'on sait.
+    const vue = construireVue(
+      [offre({ id: "1", entreprise: "Laserax" })],
+      ENTREPRISES_CIBLES,
+      positions([["Laserax", "ville", 46.81, -71.22, ADRESSE_EXEMPLE, "registre"]]),
+    );
+    const x = vue.epingles.flatMap((e) => e.entreprises).find((e) => e.nom === "Laserax")!;
+    expect(x.adresse).toBe(ADRESSE_EXEMPLE);
+    expect(x.adresseSource).toBe("registre");
   });
 });
 

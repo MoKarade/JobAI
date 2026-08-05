@@ -76,6 +76,22 @@ export function CarteFiltrable({
     .filter((e) => e.precision === "exacte")
     .reduce((n, e) => n + e.entreprises.length, 0);
 
+  // ⚠️ SAVOIR OÙ ELLE EST ET POUVOIR L'ÉPINGLER SONT DEUX CHOSES DIFFÉRENTES.
+  //
+  // « 8 à leur adresse, 44 au centre-ville » décrivait l'ÉPINGLE, mais Marc y lit « est-ce
+  // que je sais où elles sont ? » — et depuis que le registre des entreprises alimente les
+  // adresses, les deux ont cessé de coïncider : on connaît l'adresse déclarée d'une
+  // entreprise qu'aucun géocodeur n'a su placer. Tout ranger sous « au centre-ville »
+  // effacerait ce gain de l'écran alors qu'il est en base et affiché juste en dessous,
+  // dans la liste. Trois états valent mieux qu'un ratio qui répond à côté.
+  const adresseSansEpingle = vue.epingles
+    .filter((e) => e.precision !== "exacte")
+    .reduce(
+      (n, e) => n + e.entreprises.filter((x) => x.adresseSource !== null).length,
+      0,
+    );
+  const sansAdresse = entreprises - exactes - adresseSansEpingle;
+
   return (
     <>
       {/* La MÊME barre que la liste : un seul composant, une seule règle. */}
@@ -95,7 +111,11 @@ export function CarteFiltrable({
       />
 
       <p className="carte__compte">
-        {exactes} à leur adresse, {entreprises - exactes} au centre-ville
+        {exactes} épinglées à leur adresse
+        {adresseSansEpingle > 0
+          ? ` · ${adresseSansEpingle} adresse connue, épingle au centre-ville`
+          : ""}
+        {sansAdresse > 0 ? ` · ${sansAdresse} sans adresse` : ""}
         {vue.aSituer.length > 0 ? ` · ${vue.aSituer.length} en attente de localisation` : ""}
         {filtreActif ? " · filtre actif : seules les entreprises qui ont une offre correspondante" : ""}
       </p>
