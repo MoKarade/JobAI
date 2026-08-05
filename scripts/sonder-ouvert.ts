@@ -151,8 +151,20 @@ function resumerJson(j: Record<string, unknown>): void {
     | undefined;
 
   if (Array.isArray(ressources)) {
-    console.log(`   → ${ressources.length} ressource(s) ; les 5 plus récentes :`);
-    for (const res of ressources.slice(-5)) {
+    // ⚠️ TRIER PAR NOM, pas prendre la fin du tableau : l'ordre des ressources CKAN n'a
+    // aucun rapport avec la chronologie. Une première lecture a montré « mars 2023 » et
+    // conclu trop vite que le jeu était figé — c'était l'ordre du tableau, pas la
+    // fraîcheur. La date du fichier (`last_modified`) est celle du DÉPÔT, pas celle des
+    // offres : c'est le NOM qui porte le mois couvert.
+    const parAnnee = [...ressources].sort((a, b) =>
+      (b.name ?? "").localeCompare(a.name ?? "", "fr-CA", { numeric: true }),
+    );
+    const annees = new Set(
+      ressources.map((r) => (r.name ?? "").match(/\b(20\d\d)\b/)?.[1] ?? "?"),
+    );
+    console.log(`   → ${ressources.length} ressource(s) ; années couvertes : ${[...annees].sort().join(", ")}`);
+    console.log("   → les 6 premières par ordre alphabétique inverse du nom :");
+    for (const res of parAnnee.slice(0, 6)) {
       console.log(
         `      · ${res.format ?? "?"} — ${res.name ?? "(sans nom)"} — ${res.last_modified ?? "date inconnue"}`,
       );
