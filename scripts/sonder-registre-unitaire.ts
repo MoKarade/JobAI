@@ -14,17 +14,17 @@
 // moissonnage : interdit par le garde-fou n°4, et de toute façon derrière le même
 // Cloudflare. On n'interroge donc QUE des points d'accès publiés comme des API.
 //
-// LES TROIS PISTES, ET CE QUI LES DISTINGUE
-//   1. REGISTRES D'ENTREPRISES DU CANADA (ISED). Le fédéral agrège les registres
-//      provinciaux — Québec compris — et publie une recherche. Hôte DIFFÉRENT de celui qui
-//      nous bloque, donc l'échec de l'un ne dit rien de l'autre. C'est la piste la plus
-//      prometteuse : une requête par entreprise, pas de téléchargement.
-//   2. LE DATASTORE DE DONNÉES QUÉBEC. CKAN sait exposer une ressource en SQL
-//      (`datastore_search`). Si le jeu du REQ y est chargé, on interroge par nom sans
-//      jamais toucher au ZIP. La sonde du 05/08 ne montrait qu'un ZIP et un PDF, mais elle
-//      ne posait pas la question au datastore — c'est différent.
-//   3. LE REQ LUI-MÊME, au cas où l'accès se serait rouvert depuis. Une seule requête, et
-//      on n'insiste pas : c'est déjà ce qui a produit deux refus.
+// LES DEUX PISTES QUI RESTENT
+//   1. LE DATASTORE DE DONNÉES QUÉBEC. CKAN sait exposer une ressource en SQL
+//      (`datastore_search`) : si la ressource du registre y est chargée, on interroge par
+//      NOM, une entreprise à la fois, sans jamais toucher au fichier. C'est exactement ce
+//      que Marc demande. Hôte différent de celui qui nous bloque, et il a déjà répondu
+//      aujourd'hui — l'échec du REQ ne dit rien de lui.
+//   2. LE REQ LUI-MÊME, au cas où l'accès se serait rouvert. Une seule requête, et on
+//      n'insiste pas : deux refus suffisent.
+//
+// (Une troisième piste — une API fédérale agrégeant les registres provinciaux — a été
+// écrite puis RETIRÉE : je l'avais inventée. Voir plus bas.)
 //
 // Ce script ne fait que LIRE et rapporter. Aucune base, aucun fichier, aucun secret.
 
@@ -33,8 +33,18 @@ const DELAI_MS = 20_000;
 /** Des entreprises RÉELLES du suivi — dont deux qu'OpenStreetMap ne sait pas situer. */
 const ENTREPRISES: readonly string[] = ["Laserax", "Robotiq", "Canam Ponts"];
 
-/** L'identifiant du jeu « Registre des entreprises » sur Données Québec. */
-const JEU_REQ = "registre-des-entreprises";
+/**
+ * L'UUID de la RESSOURCE du registre sur Données Québec.
+ *
+ * ⚠️ CE N'EST PAS LE SLUG DU JEU, ET C'EST LA CORRECTION D'UNE ERREUR DE MA PART.
+ * Le premier essai passait « registre-des-entreprises » — le nom du JEU de données — là où
+ * CKAN attend l'identifiant d'une RESSOURCE. Réponse : « Resource "registre-des-entreprises"
+ * was not found ». J'ai failli lire ça comme « le registre n'est pas dans le datastore »,
+ * alors que ça disait seulement « ce n'est pas un identifiant de ressource ». Troisième
+ * fois aujourd'hui qu'une requête malformée de ma part se fait passer pour un verdict sur
+ * la source ; l'UUID vient de la page publique de la ressource.
+ */
+const RESSOURCE_REQ = "eac1b5f1-d8c0-4690-9c51-316d44ed9d94";
 
 async function lire(url: string, quoi: string): Promise<{ statut: number; corps: string }> {
   try {
@@ -58,22 +68,20 @@ function extrait(corps: string, n = 300): string {
   return corps.replace(/\s+/g, " ").slice(0, n);
 }
 
-async function parIsed(nom: string): Promise<void> {
-  // L'API de recherche des Registres d'entreprises du Canada. Documentée et publique ;
-  // c'est le fédéral qui agrège les registres provinciaux.
-  const url = `https://searchregistries.ised-isde.canada.ca/api/v1/search?query=${encodeURIComponent(nom)}&jurisdiction=qc`;
-  const { statut, corps } = await lire(url, "ISED");
-  console.log(`   → ISED : HTTP ${statut}`);
-  if (statut === 200) console.log(`      ${extrait(corps)}`);
-  else if (corps) console.log(`      ${extrait(corps, 160)}`);
-}
+// ⚠️ LA SONDE ISED A ÉTÉ RETIRÉE, ET IL FAUT DIRE POURQUOI.
+//
+// J'avais écrit `searchregistries.ised-isde.canada.ca/api/v1/search?...` en la présentant
+// comme « documentée et publique ». Je l'avais INVENTÉE : elle a rendu `fetch failed`,
+// HTTP 0 — l'hôte ne répond pas à cette adresse. Une URL fabriquée qui échoue ne mesure
+// rien du tout, et la garder ici ferait croire que la piste fédérale a été testée. Si on
+// veut l'explorer un jour, il faudra d'abord TROUVER sa documentation, pas la deviner.
 
 async function parDatastore(nom: string): Promise<void> {
   // CKAN `datastore_search` : si la ressource est chargée dans le datastore, on interroge
   // par nom SANS jamais toucher au fichier. `q` fait une recherche plein texte.
   const url =
     `https://www.donneesquebec.ca/recherche/api/3/action/datastore_search?` +
-    `resource_id=${encodeURIComponent(JEU_REQ)}&q=${encodeURIComponent(nom)}&limit=3`;
+    `resource_id=${encodeURIComponent(RESSOURCE_REQ)}&q=${encodeURIComponent(nom)}&limit=3`;
   const { statut, corps } = await lire(url, "datastore");
   console.log(`   → Données Québec datastore : HTTP ${statut}`);
   console.log(`      ${extrait(corps, 220)}`);
@@ -86,9 +94,6 @@ async function principal(): Promise<void> {
 
   for (const nom of ENTREPRISES) {
     console.log(`── ${nom}`);
-    await parIsed(nom);
-    // Une seconde entre deux services publics : la leçon du jour, payée deux fois.
-    await new Promise((r) => setTimeout(r, 1200));
     await parDatastore(nom);
     await new Promise((r) => setTimeout(r, 1200));
     console.log();
