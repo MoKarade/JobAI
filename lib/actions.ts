@@ -12,7 +12,7 @@
 // pire que l'échec — d'où le journal côté serveur.
 
 import { revalidatePath } from "next/cache";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, like } from "drizzle-orm";
 import { db } from "./db";
 import {
   entreprisesLieux,
@@ -400,6 +400,14 @@ interface PasseRegistre {
   nomsAmbigus: string[];
   /** Clés écartées par le garde anti-explosion, avec leur nombre de NEQ. */
   clesTropCommunes: string[];
+  /**
+   * Ce que le registre contient sous un nom qu'on n'a PAS su retrouver.
+   *
+   * Purement diagnostique : « AMETEK » est-il absent du registre régional, ou y figure-t-il
+   * sous « AMETEK CANADA » ? Les deux réponses appellent des correctifs opposés, et la
+   * liste des absentes seule ne permet pas de les distinguer.
+   */
+  pistes: string[];
 }
 
 /**
@@ -440,6 +448,7 @@ async function adressesDepuisRegistre(
     nomsAbsents: [],
     nomsAmbigus: [],
     clesTropCommunes: [],
+    pistes: [],
   };
   if (sansAdresse.length === 0) return vide;
 
@@ -588,7 +597,50 @@ async function adressesDepuisRegistre(
     nomsAmbigus,
     nomsAbsents,
     clesTropCommunes,
+    pistes: await pistesPourAbsents(nomsAbsents),
   };
+}
+
+/**
+ * Ce que le registre contient VRAIMENT sous les noms qu'on n'a pas su retrouver.
+ *
+ * ⚠️ C'EST UNE MESURE, PAS UN RAPPROCHEMENT. Rien de ce qui sort d'ici n'est écrit nulle
+ * part : la fonction lit, journalise, et s'arrête. Elle existe parce que la liste des
+ * absentes pose une question à laquelle on ne peut pas répondre en la regardant —
+ * « AMETEK » est-il absent du registre régional, ou bien y figure-t-il sous « AMETEK
+ * CANADA » que notre comparaison de clés EXACTES ne reconnaît pas ? Les deux réponses
+ * appellent des correctifs opposés, et l'une des deux ne coûte rien à corriger.
+ *
+ * Élargir la règle de rapprochement AVANT d'avoir cette réponse, ce serait exactement le
+ * piège déjà payé : une heuristique peut grouper ce qu'on REGARDE, jamais décider ce qu'on
+ * ÉCRIT. On mesure d'abord ; la règle se discutera sur des noms réels.
+ *
+ * La recherche est un PRÉFIXE dans les deux sens — notre clé est le début d'une clé du
+ * registre (« ametek » → « ametek canada »), ou l'inverse (« groupe mundial » → « mundial »
+ * n'entre pas ici, mais « les aliments lucky 8 » → « les aliments lucky » oui). C'est
+ * volontairement grossier : il ne s'agit pas de trancher, il s'agit de voir.
+ */
+async function pistesPourAbsents(noms: readonly string[]): Promise<string[]> {
+  // Borné : c'est un échantillon de diagnostic, et chaque nom coûte une requête.
+  const echantillon = noms.slice(0, 12);
+  const pistes: string[] = [];
+
+  for (const nom of echantillon) {
+    const cle = cleNom(nom);
+    if (cle === "") continue;
+
+    const proches = await db
+      .select({ nom: registreNoms.nom, cle: registreNoms.nomCle })
+      .from(registreNoms)
+      .where(like(registreNoms.nomCle, `${cle} %`))
+      .limit(3);
+
+    if (proches.length > 0) {
+      pistes.push(`${nom} → ${proches.map((p) => p.nom).join(" / ")}`);
+    }
+  }
+
+  return pistes;
 }
 
 /** Ce qu'une passe de raffinement des positions a donné. */
@@ -1019,6 +1071,7 @@ export async function mesurerDistances(
       nomsAbsents: [],
       nomsAmbigus: [],
       clesTropCommunes: [],
+      pistes: [],
     };
     try {
       registre = await adressesDepuisRegistre(villeDe);
@@ -1123,6 +1176,12 @@ export async function mesurerDistances(
     }
     if (registre.nomsAmbigus.length > 0) {
       console.log(`[registre] ambigues — ${echantillon(registre.nomsAmbigus)}`);
+    }
+    if (registre.pistes.length > 0) {
+      // La MESURE qui manquait : ce que le registre porte sous ces noms-là. Rien n'en est
+      // écrit — c'est ce qui permettra de décider si la règle de rapprochement doit bouger,
+      // et dans quel sens, sur des noms réels plutôt que sur une intuition.
+      console.log(`[registre] pistes — ${echantillon(registre.pistes, 8)}`);
     }
     if (registre.clesTropCommunes.length > 0) {
       // Ce garde n'a encore jamais mordu en production : s'il apparaît, c'est une mesure,

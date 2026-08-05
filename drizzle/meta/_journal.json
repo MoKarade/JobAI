@@ -71,6 +71,13 @@
       "when": 1785953425533,
       "tag": "0009_dear_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785957900000,
+      "tag": "0010_rattrapage_adresses_registre",
+      "breakpoints": true
     }
   ]
 }

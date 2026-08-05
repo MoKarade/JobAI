@@ -29,6 +29,41 @@ function lireMigrations(): string[] {
     .filter((s) => s.length > 0);
 }
 
+describe("le journal des migrations", () => {
+  it("décrit EXACTEMENT les fichiers SQL committés", () => {
+    // ⚠️ CE TEST COMBLE UN ANGLE MORT DE CELUI QUI SUIT.
+    //
+    // `lireMigrations` lit le DOSSIER : un fichier SQL y est donc exécuté par les tests même
+    // s'il n'est déclaré nulle part. En production, c'est le JOURNAL qui commande — Drizzle
+    // n'applique que ce qu'il y trouve. Les deux peuvent donc diverger dans le pire sens
+    // possible : la suite verte, et la migration jamais jouée en ligne. Aucune erreur,
+    // aucune trace, une colonne ou un rattrapage qui n'existe simplement pas.
+    //
+    // Le risque n'est pas théorique : le journal se modifie à la main dès qu'on écrit une
+    // migration de DONNÉES, que `drizzle-kit generate` ne produit pas (il ne voit que les
+    // différences de schéma).
+    const dossier = resolve(process.cwd(), "drizzle");
+    const fichiers = readdirSync(dossier)
+      .filter((f) => f.endsWith(".sql"))
+      .map((f) => f.replace(/\.sql$/, ""))
+      .sort();
+
+    const journal = JSON.parse(
+      readFileSync(resolve(dossier, "meta/_journal.json"), "utf8"),
+    ) as { entries: { tag: string; idx: number }[] };
+    const declares = journal.entries.map((e) => e.tag).sort();
+
+    // Volume prouvé avant d'en dépendre : deux listes vides seraient « égales ».
+    expect(fichiers.length).toBeGreaterThan(5);
+    expect(declares).toEqual(fichiers);
+
+    // Les index doivent se suivre sans trou ni doublon : Drizzle applique dans cet ordre.
+    const idx = journal.entries.map((e) => e.idx);
+    expect(idx).toEqual([...idx].sort((a, b) => a - b));
+    expect(new Set(idx).size).toBe(idx.length);
+  });
+});
+
 beforeAll(async () => {
   pg = new PGlite();
   const instructions = lireMigrations();
