@@ -7,6 +7,9 @@
 import { describe, it, expect } from "vitest";
 import {
   COLONNES_ETABLISSEMENT,
+  adresseLisible,
+  choisirEtablissement,
+  type Etablissement,
   cleNom,
   decouperCsv,
   indicesColonnes,
@@ -24,6 +27,15 @@ const ENTETE =
 
 const IDX = indicesColonnes(ENTETE)!;
 
+// ⚠️ ADRESSES FACTICES, et le marqueur compte. Le garde-fou n°1 scanne les fichiers
+// versionnés à la recherche de la FORME d'une adresse municipale — il a d'ailleurs attrapé
+// la première version de ces fixtures, ce qui est exactement son travail. Chaque exemple
+// porte donc son marqueur sur SA ligne, et aucune de ces adresses n'existe.
+const RUE_1 = "2811 av. Exemple"; // adresse d'exemple, factice
+const RUE_2 = "44 boul. Factice"; // adresse d'exemple, factice
+const RUE_VIRGULE = "2707, Exemple"; // adresse d'exemple avec virgule, factice
+const RUE_HORS_REGION = "9101 boul. Exemple"; // adresse d'exemple hors region, factice
+
 describe("découpage CSV", () => {
   it("découpe une ligne simple", () => {
     expect(decouperCsv("a,b,c")).toEqual(["a", "b", "c"]);
@@ -35,10 +47,10 @@ describe("découpage CSV", () => {
     // le code postal atterrit dans la ville, la ville dans l'adresse. Aucune erreur ne se
     // déclenche : l'import écrirait des adresses fausses en silence, ce qui est pire que
     // pas d'adresse du tout.
-    expect(decouperCsv('1,"2707, CAZENEUVE",Montréal')).toEqual([
+    expect(decouperCsv(`1,"${RUE_VIRGULE}",Ville`)).toEqual([
       "1",
-      "2707, CAZENEUVE",
-      "Montréal",
+      RUE_VIRGULE,
+      "Ville",
     ]);
   });
 
@@ -114,7 +126,7 @@ describe("lecture d'un établissement", () => {
       ligne({
         NEQ: "1140030363",
         NOM_ETAB: "LASERAX INC.",
-        LIGN1_ADR: "2811 av. Watt",
+        LIGN1_ADR: RUE_1,
         LIGN2_ADR: "Québec (Québec)",
         LIGN4_ADR: "G1X 4S8",
         IND_ETAB_PRINC: "O",
@@ -124,7 +136,7 @@ describe("lecture d'un établissement", () => {
     expect(r).toEqual({
       neq: "1140030363",
       nom: "LASERAX INC.",
-      adresse: "2811 av. Watt",
+      adresse: RUE_1,
       ville: "Québec",
       codePostal: "G1X4S8",
       principal: true,
@@ -138,7 +150,7 @@ describe("lecture d'un établissement", () => {
       ligne({
         NEQ: "1",
         NOM_ETAB: "Quelque chose",
-        LIGN1_ADR: "9101 boul. Louis-H.-La Fontaine",
+        LIGN1_ADR: RUE_HORS_REGION,
         LIGN2_ADR: "Montréal (Québec)",
       }),
       IDX,
@@ -162,13 +174,13 @@ describe("lecture d'un établissement", () => {
       ligne({
         NEQ: "1",
         NOM_ETAB: "Test",
-        LIGN1_ADR: "2707, Cazeneuve",
+        LIGN1_ADR: RUE_VIRGULE,
         LIGN2_ADR: "Lévis (Québec)",
         LIGN4_ADR: "G6X3C7",
       }),
       IDX,
     );
-    expect(r?.adresse).toBe("2707, Cazeneuve");
+    expect(r?.adresse).toBe(RUE_VIRGULE);
     expect(r?.ville).toBe("Lévis");
   });
 });
@@ -189,5 +201,92 @@ describe("rapprochement des noms", () => {
     // autre nom qui se réduit à rien.
     expect(cleNom("Inc.")).toBe("");
     expect(memeEntreprise("Inc.", "Ltée")).toBe(false);
+  });
+});
+
+describe("choix de l'établissement parmi plusieurs", () => {
+  function etab(p: Partial<Etablissement> = {}): Etablissement {
+    return {
+      neq: "1",
+      nom: "Test",
+      adresse: RUE_1,
+      ville: "Québec",
+      codePostal: "G1A1A1",
+      principal: false,
+      ...p,
+    };
+  }
+
+  it("prend l'unique candidat sans se poser de question", () => {
+    const e = etab();
+    expect(choisirEtablissement([e], null)).toBe(e);
+  });
+
+  it("rend null quand il n'y a rien", () => {
+    expect(choisirEtablissement([], "Québec")).toBeNull();
+  });
+
+  it("la VILLE tranche entre deux établissements du même nom", () => {
+    // Le cas réel : une entreprise a un établissement à Québec et un à Lévis. L'offre dit
+    // laquelle, et c'est le discriminant le plus fort dont on dispose.
+    const aQuebec = etab({ ville: "Québec", adresse: RUE_1 });
+    const aLevis = etab({ ville: "Lévis", adresse: RUE_2 });
+    expect(choisirEtablissement([aQuebec, aLevis], "Lévis")).toBe(aLevis);
+    expect(choisirEtablissement([aQuebec, aLevis], "Québec")).toBe(aQuebec);
+  });
+
+  it("à défaut de ville, l'établissement PRINCIPAL que le registre désigne", () => {
+    const secondaire = etab({ adresse: RUE_1, principal: false });
+    const principal = etab({ adresse: RUE_2, principal: true });
+    expect(choisirEtablissement([secondaire, principal], null)).toBe(principal);
+  });
+
+  it("⚠️ REFUSE de choisir entre deux adresses également plausibles", () => {
+    // Le point qui compte. Deux établissements dans la même ville, aucun déclaré principal :
+    // prendre le premier serait un tirage au sort inscrit en base, et une adresse plausible
+    // mais fausse envoie Marc à la mauvaise porte. Le silence est la bonne réponse.
+    const a = etab({ adresse: RUE_1 });
+    const b = etab({ adresse: RUE_2 });
+    expect(choisirEtablissement([a, b], "Québec")).toBeNull();
+  });
+
+  it("refuse aussi quand DEUX établissements se disent principaux", () => {
+    const a = etab({ adresse: RUE_1, principal: true });
+    const b = etab({ adresse: RUE_2, principal: true });
+    expect(choisirEtablissement([a, b], null)).toBeNull();
+  });
+
+  it("la ville l'emporte même si l'autre est principal — l'offre sait où elle est", () => {
+    const bonneVille = etab({ ville: "Lévis", adresse: RUE_1, principal: false });
+    const principalAilleurs = etab({ ville: "Québec", adresse: RUE_2, principal: true });
+    expect(choisirEtablissement([bonneVille, principalAilleurs], "Lévis")).toBe(bonneVille);
+  });
+});
+
+describe("adresse lisible", () => {
+  it("assemble rue, ville et code postal", () => {
+    expect(
+      adresseLisible({
+        neq: "1",
+        nom: "X",
+        adresse: RUE_1,
+        ville: "Québec",
+        codePostal: "G1X4S8",
+        principal: true,
+      }),
+    ).toBe(`${RUE_1}, Québec, G1X4S8`);
+  });
+
+  it("n'écrit pas de virgule pour un code postal absent", () => {
+    expect(
+      adresseLisible({
+        neq: "1",
+        nom: "X",
+        adresse: RUE_1,
+        ville: "Québec",
+        codePostal: "",
+        principal: false,
+      }),
+    ).toBe(`${RUE_1}, Québec`);
   });
 });

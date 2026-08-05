@@ -12,9 +12,15 @@
 // pire que l'échec — d'où le journal côté serveur.
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "./db";
-import { entreprisesLieux, offers, syncState, villes } from "./db/schema";
+import {
+  entreprisesLieux,
+  offers,
+  registreEtablissements,
+  syncState,
+  villes,
+} from "./db/schema";
 import { exigerSession } from "./session";
 import { MiseAJourOffreSchema } from "./types";
 import { NouvelleOffreSchema, aujourdhui, construireOffre, identifiantPour } from "./ajout";
@@ -34,6 +40,12 @@ import { colonnesOffre } from "./persistance";
 import { RAYON_5_MIN_M, proximiteBorne } from "./bornes";
 import { chercherBornes } from "./overpass";
 import { adresseARattraper, bornesAMesurer, positionARaffiner } from "./travaux";
+import {
+  adresseLisible,
+  choisirEtablissement,
+  cleNom,
+  type Etablissement,
+} from "./registre";
 import { BUDGET_PASSE_PAGE_MS } from "./synchro";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
@@ -354,6 +366,110 @@ async function rattraperAdresses(
  * et un budget de temps. Un échec ici n'empêche RIEN d'autre — les bornes sont un confort,
  * la distance est le critère n°1.
  */
+
+/** Ce qu'une passe de recherche dans le registre a donné. */
+interface PasseRegistre {
+  candidates: number;
+  trouvees: number;
+  /** Nom présent plusieurs fois sans qu'on puisse trancher : écarté, pas deviné. */
+  ambigues: number;
+  /** Nom absent du registre régional. */
+  absentes: number;
+}
+
+/**
+ * Complète les adresses manquantes DEPUIS LE REGISTRE DES ENTREPRISES.
+ *
+ * ⚠️ AUCUN ACCÈS RÉSEAU. C'est ce qui change tout : les 28 821 établissements de la région
+ * sont en base (`registre_etablissements`, importés une fois depuis le fichier officiel que
+ * Marc a téléchargé). Cette passe n'est donc bornée ni par Nominatim, ni par le budget de
+ * temps qui a déjà tué la page une fois — elle peut combler TOUTES les adresses en une
+ * seule fois, ce qu'aucune passe réseau ne pouvait faire.
+ *
+ * ⚠️ ELLE N'OUVRE PAS LE GATE, ET C'EST VOULU. On pourrait ajouter « il reste une adresse
+ * nulle » à `resteDuTravail` — mais ce terme ne CONVERGERAIT PAS : une entreprise absente
+ * du registre régional le restera, et le gate resterait ouvert à vie, relançant une passe à
+ * chaque affichage sans que rien ne progresse. C'est exactement le défaut corrigé ce matin.
+ *
+ * Ce n'est pas un manque : toute entreprise NOUVELLE arrive sans distance et sans bornes
+ * mesurées, donc le gate s'ouvre déjà pour elle, et cette passe s'exécute dans la foulée.
+ * Elle est un COMPLÉMENT de la passe, pas son déclencheur.
+ *
+ * ELLE NE REMPLACE JAMAIS UNE ADRESSE D'OPENSTREETMAP. L'ordre de préférence est écrit
+ * ici : OSM d'abord, parce que c'est l'objet cartographié à SA position ; le registre
+ * ensuite, parce qu'il donne l'adresse déclarée de l'établissement — vraie, mais sans
+ * garantie que l'épingle soit dessus. La source est inscrite avec l'adresse et DITE à
+ * l'écran : les deux ne valent pas la même chose.
+ */
+async function adressesDepuisRegistre(
+  villeDe: (nom: string) => string | null,
+): Promise<PasseRegistre> {
+  const sansAdresse = (await db.select().from(entreprisesLieux)).filter(
+    (l) => l.adresse === null,
+  );
+  const vide: PasseRegistre = {
+    candidates: sansAdresse.length,
+    trouvees: 0,
+    ambigues: 0,
+    absentes: 0,
+  };
+  if (sansAdresse.length === 0) return vide;
+
+  // Une seule lecture pour tout le lot : les clés recherchées sont peu nombreuses, et
+  // interroger la base une fois par entreprise ferait des dizaines d'allers-retours.
+  const cles = [...new Set(sansAdresse.map((l) => cleNom(l.nom)))].filter((c) => c !== "");
+  if (cles.length === 0) return vide;
+
+  const lignes = await db
+    .select()
+    .from(registreEtablissements)
+    .where(inArray(registreEtablissements.nomCle, cles));
+
+  const parCle = new Map<string, Etablissement[]>();
+  for (const r of lignes) {
+    const liste = parCle.get(r.nomCle) ?? [];
+    liste.push({
+      neq: r.neq,
+      nom: r.nom,
+      adresse: r.adresse,
+      ville: r.ville,
+      codePostal: r.codePostal ?? "",
+      principal: r.principal,
+    });
+    parCle.set(r.nomCle, liste);
+  }
+
+  let trouvees = 0;
+  let ambigues = 0;
+  let absentes = 0;
+
+  for (const lieu of sansAdresse) {
+    const candidats = parCle.get(cleNom(lieu.nom)) ?? [];
+    if (candidats.length === 0) {
+      absentes++;
+      continue;
+    }
+
+    // Le choix vit dans `choisirEtablissement` (pure, testée) : ville attendue d'abord,
+    // établissement principal ensuite, refus sinon. Une entreprise peut avoir plusieurs
+    // établissements dans la région, et prendre le premier venu serait un tirage au sort
+    // inscrit en base.
+    const retenu = choisirEtablissement(candidats, villeDe(lieu.nom));
+    if (retenu === null) {
+      ambigues++;
+      continue;
+    }
+
+    await db
+      .update(entreprisesLieux)
+      .set({ adresse: adresseLisible(retenu), adresseSource: "registre" })
+      .where(eq(entreprisesLieux.nom, lieu.nom));
+    trouvees++;
+  }
+
+  return { candidates: sansAdresse.length, trouvees, ambigues, absentes };
+}
+
 /** Ce qu'une passe de raffinement des positions a donné. */
 interface Raffinage {
   candidates: number;
@@ -699,6 +815,23 @@ export async function mesurerDistances(
       console.error("[actions] rattrapage des adresses impossible", err);
     }
 
+    // 1 bis-2. LE REGISTRE, pour tout ce qu'OpenStreetMap n'a pas donné.
+    //
+    // Placée APRÈS le rattrapage OSM, et c'est l'ordre de préférence : une adresse
+    // d'OpenStreetMap est celle d'un objet cartographié À SA POSITION ; l'adresse du
+    // registre est celle que l'entreprise a DÉCLARÉE pour son établissement — vraie, mais
+    // sans garantie que l'épingle soit dessus. La source est écrite avec l'adresse.
+    //
+    // Aucun accès réseau : les 28 821 établissements de la région sont en base. Cette passe
+    // n'est donc bornée par rien et comble TOUTES les adresses manquantes d'un coup — ce
+    // qu'aucune passe Nominatim ne pouvait faire, six par six.
+    let registre: PasseRegistre = { candidates: 0, trouvees: 0, ambigues: 0, absentes: 0 };
+    try {
+      registre = await adressesDepuisRegistre(villeDe);
+    } catch (err) {
+      console.error("[actions] recherche dans le registre impossible", err);
+    }
+
     // 1 quater. Retenter de situer VRAIMENT celles qui sont au centre-ville. Sans ça,
     //           l'élargissement de la règle de résolution ne servirait qu'aux entreprises
     //           à venir, et les dizaines déjà posées au centre y resteraient à vie.
@@ -764,6 +897,9 @@ export async function mesurerDistances(
         `adresses=${adresses.ecrites}/${adresses.candidates}` +
         `${adresses.horsRayon > 0 ? ` (${adresses.horsRayon} hors rayon)` : ""}` +
         `${adresses.sansReponse > 0 ? ` (${adresses.sansReponse} sans réponse)` : ""} ` +
+        `registre=${registre.trouvees}/${registre.candidates}` +
+        `${registre.ambigues > 0 ? ` (${registre.ambigues} ambigues)` : ""}` +
+        `${registre.absentes > 0 ? ` (${registre.absentes} absentes)` : ""} ` +
         `precisees=${raffinage.precisees}/${raffinage.candidates}` +
         `${raffinage.toujoursAuCentre > 0 ? ` (${raffinage.toujoursAuCentre} toujours au centre)` : ""}` +
         `${raffinage.horsRayon > 0 ? ` (${raffinage.horsRayon} hors rayon)` : ""} ` +

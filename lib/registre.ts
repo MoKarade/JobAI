@@ -209,3 +209,48 @@ export function memeEntreprise(a: string, b: string): boolean {
 
 /** Réexporté pour que l'import n'ait pas à connaître deux modules de normalisation. */
 export { normaliserLieu };
+
+/**
+ * Choisit L'ÉTABLISSEMENT qui correspond, parmi ceux qui portent le même nom.
+ *
+ * ⚠️ UNE ENTREPRISE PEUT AVOIR PLUSIEURS ÉTABLISSEMENTS DANS LA RÉGION, et ils n'ont pas
+ * la même adresse. Prendre le premier venu serait un tirage au sort inscrit en base — le
+ * même défaut que le « premier candidat qui apparie » d'un `SELECT` sans `ORDER BY`, déjà
+ * payé par ce dépôt. L'ordre de préférence est donc explicite :
+ *
+ *   1. la VILLE attendue, quand on la connaît — c'est le discriminant le plus fort ;
+ *   2. l'établissement PRINCIPAL, que le registre désigne lui-même ;
+ *   3. rien. On REFUSE plutôt que de choisir au hasard entre deux adresses réelles.
+ *
+ * Ce refus n'est pas un échec : une adresse plausible mais fausse enverrait Marc à la
+ * mauvaise porte, ce que le garde-fou n°3 interdit. Mieux vaut le silence.
+ */
+export function choisirEtablissement(
+  candidats: readonly Etablissement[],
+  villeAttendue: string | null,
+): Etablissement | null {
+  if (candidats.length === 0) return null;
+  if (candidats.length === 1) return candidats[0] ?? null;
+
+  // 1. La ville tranche presque toujours.
+  if (villeAttendue !== null && villeAttendue !== "") {
+    const cible = normaliserLieu(villeAttendue);
+    const memeVille = candidats.filter((c) => normaliserLieu(c.ville) === cible);
+    if (memeVille.length === 1) return memeVille[0] ?? null;
+    if (memeVille.length > 1) return principalUnique(memeVille);
+  }
+
+  // 2. À défaut, l'établissement que le registre déclare PRINCIPAL.
+  return principalUnique(candidats);
+}
+
+/** L'unique établissement principal, ou `null` s'il n'y en a pas exactement un. */
+function principalUnique(candidats: readonly Etablissement[]): Etablissement | null {
+  const principaux = candidats.filter((c) => c.principal);
+  return principaux.length === 1 ? (principaux[0] ?? null) : null;
+}
+
+/** L'adresse telle qu'on l'affiche : rue, ville, code postal — rien d'autre. */
+export function adresseLisible(e: Etablissement): string {
+  return [e.adresse, e.ville, e.codePostal].filter((p) => p !== "").join(", ");
+}
