@@ -33,7 +33,7 @@ import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
 import { RAYON_5_MIN_M, proximiteBorne } from "./bornes";
 import { chercherBornes } from "./overpass";
-import { adresseARattraper, bornesAMesurer } from "./travaux";
+import { adresseARattraper, bornesAMesurer, positionARaffiner } from "./travaux";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -350,6 +350,101 @@ async function rattraperAdresses(
  * et un budget de temps. Un échec ici n'empêche RIEN d'autre — les bornes sont un confort,
  * la distance est le critère n°1.
  */
+/** Ce qu'une passe de raffinement des positions a donné. */
+interface Raffinage {
+  candidates: number;
+  /** Repassées de « centre-ville » à leur vraie position. */
+  precisees: number;
+  /** Toujours introuvables sous ce nom : elles retomberont en queue de file. */
+  toujoursAuCentre: number;
+  /** Trouvées trop loin du centre de leur ville : un homonyme, écarté. */
+  horsRayon: number;
+}
+
+/**
+ * Retente de situer VRAIMENT les entreprises posées au centre de leur ville.
+ *
+ * ⚠️ POURQUOI CETTE FONCTION EXISTE — LA MÊME ERREUR, UNE QUATRIÈME FOIS
+ * La règle de résolution a été élargie (plusieurs candidats au lieu d'un seul, cf.
+ * `NB_CANDIDATS_ENTREPRISE`) parce que 44 entreprises sur 52 tombaient au centre-ville.
+ * Mais les deux passes de géocodage écartent explicitement ce qui est DÉJÀ situé — et un
+ * repli au centre-ville EST situé. Sans ce rattrapage, la nouvelle règle ne profiterait
+ * qu'aux entreprises À VENIR, et les 44 resteraient au centre-ville pour toujours : le
+ * ratio que Marc a signalé n'aurait pas bougé d'un point. Une règle qui arrive après coup
+ * se livre AVEC ce qui la rattrape.
+ *
+ * Ce qu'elle ne fait JAMAIS : dégrader. Une entreprise déjà « exacte » n'est pas touchée,
+ * et un candidat trop loin du centre de sa ville est écarté (même garde que pour les
+ * adresses — c'est l'incident Labatt). Au pire, la ligne reste ce qu'elle était.
+ */
+async function raffinerPositions(
+  villeDe: (nom: string) => string | null,
+  centreDe: (ville: string) => { lat: number; lon: number } | null,
+  max: number,
+  budgetMs: number | null,
+): Promise<Raffinage> {
+  const maintenant = new Date();
+  const lignes = (await db.select().from(entreprisesLieux))
+    .filter((l) => positionARaffiner(l, maintenant))
+    // La moins récemment tentée d'abord : la file tourne, et un cas insoluble retombe en
+    // queue au lieu de consommer le quota des autres à chaque passage.
+    .sort((a, b) => a.geocodeLe.getTime() - b.geocodeLe.getTime())
+    .slice(0, max);
+
+  const tentables = lignes
+    .map((l) => ({ nom: l.nom, ville: villeDe(l.nom) }))
+    .filter((e): e is { nom: string; ville: string } => e.ville !== null);
+
+  const vide: Raffinage = {
+    candidates: tentables.length,
+    precisees: 0,
+    toujoursAuCentre: 0,
+    horsRayon: 0,
+  };
+  if (tentables.length === 0) return vide;
+
+  const r = await geocoderEntreprises(tentables, outilsNominatim(), budgetMs);
+
+  // Marquer la TENTATIVE avant d'écrire : c'est ce qui fait tourner la file, et ce qui
+  // empêche une entreprise absente d'OpenStreetMap d'être redemandée à chaque passe.
+  const interrogees = new Set([...r.trouvees.map((t) => t.nom), ...r.introuvables]);
+  for (const nom of interrogees) {
+    await db
+      .update(entreprisesLieux)
+      .set({ geocodeLe: maintenant })
+      .where(eq(entreprisesLieux.nom, nom));
+  }
+
+  let precisees = 0;
+  let horsRayon = 0;
+  const villePar = new Map(tentables.map((t) => [t.nom, t.ville]));
+
+  for (const t of r.trouvees) {
+    // Le référent est le CENTRE DE LA VILLE, pas la position en base — laquelle EST ce
+    // centre. C'est exactement la question de `deciderPrecision` : ce candidat est-il à une
+    // distance plausible de la ville annoncée ? Au-delà, c'est un homonyme d'ailleurs.
+    const ville = villePar.get(t.nom);
+    const centre = ville ? centreDe(ville) : null;
+    if (!centre || distanceKm({ lat: t.lat, lon: t.lon }, centre) > RAYON_VALIDATION_KM) {
+      horsRayon++;
+      continue;
+    }
+
+    await db
+      .update(entreprisesLieux)
+      .set({ lat: t.lat, lon: t.lon, precision: "exacte", adresse: t.adresse })
+      .where(eq(entreprisesLieux.nom, t.nom));
+    precisees++;
+  }
+
+  return {
+    candidates: tentables.length,
+    precisees,
+    toujoursAuCentre: r.introuvables.length,
+    horsRayon,
+  };
+}
+
 interface PasseBornes {
   /** Entreprises jamais interrogées au début de la passe. */
   candidates: number;
@@ -576,6 +671,38 @@ export async function mesurerDistances(
       console.error("[actions] rattrapage des adresses impossible", err);
     }
 
+    // 1 quater. Retenter de situer VRAIMENT celles qui sont au centre-ville. Sans ça,
+    //           l'élargissement de la règle de résolution ne servirait qu'aux entreprises
+    //           à venir, et les dizaines déjà posées au centre y resteraient à vie.
+    let raffinage: Raffinage = {
+      candidates: 0,
+      precisees: 0,
+      toujoursAuCentre: 0,
+      horsRayon: 0,
+    };
+    try {
+      const centres = new Map(
+        (await db.select().from(villes)).map((v) => [v.nom, { lat: v.lat, lon: v.lon }]),
+      );
+      raffinage = await raffinerPositions(
+        villeDe,
+        (v) => centres.get(v) ?? null,
+        maxSituations,
+        budgetRestant(),
+      );
+      if (raffinage.precisees > 0) {
+        // Les positions ont changé : les relire AVANT de mesurer, sinon cette passe
+        // mesurerait encore depuis le centre-ville qu'elle vient de corriger.
+        const relues = await db.select().from(entreprisesLieux);
+        positions.clear();
+        for (const l of relues) {
+          positions.set(l.nom, { lat: l.lat, lon: l.lon, precision: l.precision });
+        }
+      }
+    } catch (err) {
+      console.error("[actions] raffinage des positions impossible", err);
+    }
+
     // 1 ter. Les bornes de recharge, pour les entreprises jamais regardées.
     let bornes: PasseBornes = { candidates: 0, mesurees: 0, echecs: 0 };
     try {
@@ -609,6 +736,9 @@ export async function mesurerDistances(
         `adresses=${adresses.ecrites}/${adresses.candidates}` +
         `${adresses.horsRayon > 0 ? ` (${adresses.horsRayon} hors rayon)` : ""}` +
         `${adresses.sansReponse > 0 ? ` (${adresses.sansReponse} sans réponse)` : ""} ` +
+        `precisees=${raffinage.precisees}/${raffinage.candidates}` +
+        `${raffinage.toujoursAuCentre > 0 ? ` (${raffinage.toujoursAuCentre} toujours au centre)` : ""}` +
+        `${raffinage.horsRayon > 0 ? ` (${raffinage.horsRayon} hors rayon)` : ""} ` +
         `bornes=${bornes.mesurees}/${bornes.candidates}` +
         `${bornes.echecs > 0 ? ` (${bornes.echecs} en échec)` : ""} ` +
         `budget restant=${restant === null ? "illimité" : `${restant} ms`}`,

@@ -65,6 +65,33 @@ export function adresseARattraper(l: LieuTravail, maintenant: Date): boolean {
 }
 
 /**
+ * Délai avant de retenter la POSITION d'une entreprise posée au centre de sa ville.
+ *
+ * Plus long que pour l'adresse, et pour deux raisons : une entreprise absente
+ * d'OpenStreetMap aujourd'hui n'y sera pas demain, et il y en a plusieurs dizaines — les
+ * retenter chaque jour serait un filet d'appels permanent vers un service bénévole pour
+ * une réponse qui ne change presque jamais. Une semaine laisse le temps qu'une fiche soit
+ * créée, sans marteler.
+ */
+export const DELAI_RETENTE_POSITION_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Cette entreprise est-elle posée au centre-ville faute de mieux, et assez ancienne pour
+ * qu'on retente de la situer vraiment ?
+ *
+ * ⚠️ C'EST LE CHEMIN DE RATTRAPAGE DE LA RÈGLE DE RÉSOLUTION, et il est indispensable.
+ * Les deux passes de géocodage écartent ce qui est DÉJÀ situé — or un repli au centre-ville
+ * EST situé. Améliorer la façon de résoudre une entreprise ne profiterait donc qu'aux
+ * nouvelles, et les dizaines déjà posées au centre-ville y resteraient à vie. C'est mot
+ * pour mot ce qui est arrivé à `ville`, puis à `adresse` : une règle (ou une colonne) qui
+ * arrive après coup se livre AVEC ce qui la rattrape, jamais « plus tard ».
+ */
+export function positionARaffiner(l: LieuTravail, maintenant: Date): boolean {
+  if (l.precision !== "ville") return false;
+  return maintenant.getTime() - l.geocodeLe.getTime() >= DELAI_RETENTE_POSITION_MS;
+}
+
+/**
  * Faut-il regarder les bornes de recharge autour de cette entreprise ?
  *
  * Une seule fois par lieu, quel que soit le résultat : les bornes ne poussent pas du jour au
@@ -94,5 +121,6 @@ export function resteDuTravail(
 ): boolean {
   if (offres.some(distanceAMesurer)) return true;
   if (lieux.some((l) => adresseARattraper(l, maintenant))) return true;
+  if (lieux.some((l) => positionARaffiner(l, maintenant))) return true;
   return lieux.some(bornesAMesurer);
 }

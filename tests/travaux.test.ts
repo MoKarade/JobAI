@@ -11,9 +11,11 @@
 import { describe, it, expect } from "vitest";
 import {
   DELAI_RETENTE_ADRESSE_MS,
+  DELAI_RETENTE_POSITION_MS,
   adresseARattraper,
   bornesAMesurer,
   distanceAMesurer,
+  positionARaffiner,
   resteDuTravail,
   type LieuTravail,
   type OffreTravail,
@@ -92,6 +94,54 @@ describe("adresse à rattraper", () => {
     // Un test qui coderait « 24 h » en dur mentirait au premier ajustement du délai.
     const pile = lieu({ adresse: null, geocodeLe: ilYA(DELAI_RETENTE_ADRESSE_MS) });
     expect(adresseARattraper(pile, MAINTENANT)).toBe(true);
+  });
+});
+
+describe("position à raffiner — le rattrapage de la règle de résolution", () => {
+  it("oui : posée au centre-ville, et pas retentée depuis longtemps", () => {
+    const vieille = lieu({
+      precision: "ville",
+      adresse: null,
+      geocodeLe: ilYA(DELAI_RETENTE_POSITION_MS + 1000),
+    });
+    expect(positionARaffiner(vieille, MAINTENANT)).toBe(true);
+  });
+
+  it("JAMAIS sur une position déjà exacte — on ne dégrade pas ce qui est juste", () => {
+    const exacte = lieu({
+      precision: "exacte",
+      geocodeLe: ilYA(DELAI_RETENTE_POSITION_MS * 2),
+    });
+    expect(positionARaffiner(exacte, MAINTENANT)).toBe(false);
+  });
+
+  it("attend le délai — une entreprise absente d'OSM n'y sera pas demain", () => {
+    const recente = lieu({
+      precision: "ville",
+      adresse: null,
+      geocodeLe: ilYA(DELAI_RETENTE_POSITION_MS - 1000),
+    });
+    expect(positionARaffiner(recente, MAINTENANT)).toBe(false);
+  });
+
+  it("le délai des positions est plus long que celui des adresses", () => {
+    // Dérivé des constantes, jamais de leurs valeurs du jour : les retenter aussi souvent
+    // que les adresses ferait un filet d'appels permanent pour une réponse qui ne change
+    // presque jamais.
+    expect(DELAI_RETENTE_POSITION_MS).toBeGreaterThan(DELAI_RETENTE_ADRESSE_MS);
+  });
+
+  it("reste du travail tant qu'une entreprise est au centre-ville", () => {
+    // ⚠️ LE POINT QUI COMPTE. Sans ce terme, la règle de résolution élargie ne profiterait
+    // qu'aux entreprises À VENIR : les deux passes de géocodage écartent ce qui est déjà
+    // situé, et un repli au centre-ville EST situé. Les dizaines déjà posées au centre y
+    // resteraient à vie, et le ratio signalé par Marc ne bougerait pas d'un point.
+    const auCentre = lieu({
+      precision: "ville",
+      adresse: null,
+      geocodeLe: ilYA(DELAI_RETENTE_POSITION_MS + 1000),
+    });
+    expect(resteDuTravail([offre()], [auCentre], MAINTENANT)).toBe(true);
   });
 });
 

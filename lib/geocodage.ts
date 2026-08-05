@@ -78,11 +78,26 @@ export function urlRecherche(ville: string): string {
  * partout) : la ville et la province cadrent la recherche, les mêmes bornes régionales
  * rejettent le reste.
  */
+/**
+ * Combien de candidats demander pour une ENTREPRISE.
+ *
+ * ⚠️ C'EST LA CAUSE DU MAUVAIS RATIO, MESURÉE À L'ÉCRAN : « 8 à leur adresse, 44 au
+ * centre-ville ». Avec `limit=1`, on ne voit que le MEILLEUR résultat selon Nominatim —
+ * et pour une requête en texte libre dont le nom d'entreprise n'est pas un lieu connu,
+ * c'est très souvent la MUNICIPALITÉ elle-même. Elle est rejetée à raison (classe
+ * `place`), et faute d'autre candidat on se replie au centre-ville. L'entreprise réelle
+ * était peut-être en deuxième position : on ne l'a jamais regardée.
+ *
+ * Cinq : au-delà, Nominatim rend des correspondances de plus en plus lâches, et chaque
+ * candidat supplémentaire est une occasion d'accepter le mauvais.
+ */
+export const NB_CANDIDATS_ENTREPRISE = 5;
+
 export function urlRechercheEntreprise(nom: string, ville: string): string {
   const p = new URLSearchParams({
     q: `${nom}, ${ville}, Québec, Canada`,
     format: "json",
-    limit: "1",
+    limit: String(NB_CANDIDATS_ENTREPRISE),
     countrycodes: "ca",
   });
   return `https://nominatim.openstreetmap.org/search?${p.toString()}`;
@@ -119,10 +134,14 @@ export interface Coordonnees extends Point {
  */
 export function lireReponse(charge: unknown): Coordonnees | null {
   if (!Array.isArray(charge) || charge.length === 0) return null;
+  return lireElement(charge[0]);
+}
 
-  const premier = charge[0] as { lat?: unknown; lon?: unknown; display_name?: unknown };
-  const lat = Number(premier?.lat);
-  const lon = Number(premier?.lon);
+/** Lit UN résultat Nominatim. Extrait de `lireReponse` pour servir aussi aux candidats. */
+function lireElement(element: unknown): Coordonnees | null {
+  const e = element as { lat?: unknown; lon?: unknown; display_name?: unknown };
+  const lat = Number(e?.lat);
+  const lon = Number(e?.lon);
 
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   if (lat < BORNES.latMin || lat > BORNES.latMax) return null;
@@ -131,7 +150,7 @@ export function lireReponse(charge: unknown): Coordonnees | null {
   // L'adresse est BORNÉE : `display_name` peut être très long (Nominatim empile le pays,
   // la région, le code postal…), et rien ne garantit sa forme. Une chaîne vide vaut
   // absence — on ne stocke pas du vide qui aurait l'air d'une adresse.
-  const brute = typeof premier?.display_name === "string" ? premier.display_name.trim() : "";
+  const brute = typeof e?.display_name === "string" ? e.display_name.trim() : "";
   return { lat, lon, adresse: brute === "" ? null : brute.slice(0, 300) };
 }
 
@@ -257,19 +276,92 @@ async function geocoderSerie(
 const CLASSES_NON_ENTREPRISE = new Set(["place", "boundary", "highway"]);
 
 /**
- * Lit une réponse Nominatim pour une ENTREPRISE : mêmes bornes que `lireReponse`, plus le
- * rejet des classes non ponctuelles. Un rejet rend `null` (introuvable → repli ville DIT),
- * jamais une fausse position étiquetée exacte.
+ * Mots qui ne DÉSIGNENT rien : présents dans un nom sur deux, ils ne prouvent aucune
+ * correspondance. « Groupe » apparie « Groupe Robert » à « Groupe Sani-Tech ».
  */
-export function lireReponseEntreprise(charge: unknown): Coordonnees | null {
-  const c = lireReponse(charge);
-  if (c === null) return null;
+const MOTS_NON_DISCRIMINANTS = new Set([
+  "groupe", "inc", "ltee", "ltd", "enr", "senc", "sencrl", "cie", "compagnie",
+  "les", "des", "societe", "entreprise", "entreprises", "industries", "industrie",
+  "canada", "quebec", "service", "services", "produits", "solutions", "internationale",
+  "international", "corporation", "corp", "limitee", "division", "atelier", "ateliers",
+]);
 
-  const premier = (charge as unknown[])[0] as { class?: unknown };
-  if (typeof premier?.class === "string" && CLASSES_NON_ENTREPRISE.has(premier.class)) {
-    return null;
+/** Minuscules, sans accents, sans ponctuation — pour comparer des noms, pas des styles. */
+function normaliser(texte: string): string {
+  return texte
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Le résultat porte-t-il vraiment le nom cherché ?
+ *
+ * ⚠️ SANS CE CONTRÔLE, REGARDER PLUS DE CANDIDATS ROUVRIRAIT LE TROU DES HOMONYMES — cette
+ * fois DANS la ville, là où la validation par la distance (30 km) ne voit rien. Nominatim
+ * répond en texte libre : demander « Laserax, Québec » et prendre le 3ᵉ résultat peut très
+ * bien rendre un commerce sans rapport du même quartier. Le nom est le seul discriminant
+ * qui reste à cette échelle.
+ *
+ * Un mot d'au moins quatre lettres et qui DÉSIGNE quelque chose suffit ; un nom qui n'en
+ * contient aucun (sigle court, « ACE ») doit apparaître en ENTIER. Exporté pour être
+ * testé : c'est la pièce qui décide qu'une position est celle de l'employeur.
+ */
+export function nomEchoDansResultat(nom: string, resultat: string): boolean {
+  const cible = normaliser(resultat);
+  if (cible === "") return false;
+
+  const n = normaliser(nom);
+  if (n === "") return false;
+
+  const significatifs = n
+    .split(" ")
+    .filter((m) => m.length >= 4 && !MOTS_NON_DISCRIMINANTS.has(m));
+
+  // Aucun mot porteur : on exige le nom complet. Un sigle de trois lettres apparié par
+  // sous-chaîne attraperait n'importe quoi (« ace » dans « place », « surface »…).
+  if (significatifs.length === 0) {
+    return new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(cible);
   }
-  return c;
+
+  return significatifs.some((m) => cible.includes(m));
+}
+
+/**
+ * Choisit, parmi les candidats rendus par Nominatim, le premier qui peut être CETTE
+ * entreprise : dans les bornes régionales, d'une classe possible pour un commerce, et
+ * portant le nom cherché. `null` = aucun — l'appelant se replie au centre-ville en le
+ * DISANT, jamais une fausse position étiquetée exacte.
+ */
+export function choisirCandidatEntreprise(charge: unknown, nom: string): Coordonnees | null {
+  if (!Array.isArray(charge)) return null;
+
+  for (const element of charge.slice(0, NB_CANDIDATS_ENTREPRISE)) {
+    const c = lireElement(element);
+    if (c === null) continue;
+
+    const e = element as { class?: unknown; display_name?: unknown; name?: unknown };
+    if (typeof e?.class === "string" && CLASSES_NON_ENTREPRISE.has(e.class)) continue;
+
+    // `name` quand Nominatim le donne (le nom PROPRE du lieu), sinon `display_name` — qui
+    // le contient, noyé dans l'adresse complète.
+    const libelle = typeof e?.name === "string" && e.name !== "" ? e.name : (c.adresse ?? "");
+    if (!nomEchoDansResultat(nom, libelle)) continue;
+
+    return c;
+  }
+  return null;
+}
+
+/**
+ * Lit une réponse Nominatim pour une ENTREPRISE : mêmes bornes que `lireReponse`, plus le
+ * rejet des classes non ponctuelles ET l'exigence que le nom réponde. Un rejet rend `null`
+ * (introuvable → repli ville DIT), jamais une fausse position étiquetée exacte.
+ */
+export function lireReponseEntreprise(charge: unknown, nom: string): Coordonnees | null {
+  return choisirCandidatEntreprise(charge, nom);
 }
 
 /**
@@ -353,7 +445,9 @@ export async function geocoderEntreprises(
     entreprises.map((e) => ({
       nom: e.nom,
       url: urlRechercheEntreprise(e.nom, e.ville),
-      lire: lireReponseEntreprise,
+      // Le nom est CAPTURÉ ici : le lecteur en a besoin pour vérifier que le candidat
+      // porte bien ce nom-là, et `geocoderSerie` n'a pas à connaître ce détail.
+      lire: (charge: unknown) => lireReponseEntreprise(charge, e.nom),
     })),
     outils,
     budgetMs,

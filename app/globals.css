@@ -1042,6 +1042,20 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   height: 82vh;
 }
 
+/* ⚠️ LA SORTIE DOIT RESTER À L'ÉCRAN — sinon l'agrandissement est un cul-de-sac.
+   Le bouton « Réduire » est AU-DESSUS de la carte. Une fois la carte à 82vh, elle occupe
+   presque toute la fenêtre ET capte la molette (`scrollWheelZoom`) : remonter vers le
+   bouton zoome la carte au lieu de faire défiler la page. Collante, la barre suit le
+   défilement et reste atteignable. Le z-index passe devant les contrôles Leaflet (qui
+   montent à 1000) ; sans fond opaque, les tuiles transparaîtraient dessous. */
+.carte-outils--collante {
+  position: sticky;
+  top: 0;
+  z-index: 1100;
+  padding: var(--pas) 0;
+  background: var(--bg);
+}
+
 /* Les bornes de recharge : une ligne de fait, au même niveau que la distance. Discrète —
    c'est un critère de confort, pas le titre de la fiche. */
 .carte-liste__bornes,

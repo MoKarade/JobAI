@@ -223,6 +223,26 @@ export function CarteOffres({
     };
   }, [epingles, cadre]);
 
+  // ⚠️ UNE SORTIE QUI NE DÉPEND PAS DU DÉFILEMENT.
+  //
+  // Agrandie, la carte fait 82 % de la hauteur de la fenêtre et la molette lui appartient
+  // (`scrollWheelZoom`) : remonter vers le bouton « Réduire » ZOOME la carte au lieu de
+  // faire défiler la page. Le seul chemin de retour passait donc par ce qu'on cherchait à
+  // réduire — Marc : « quand j'agrandis la carte je peux plus la réduire ». La barre
+  // d'outils devient collante (elle reste à l'écran, voir le CSS), et Échap ramène à la
+  // taille normale sans viser quoi que ce soit. Deux sorties INDÉPENDANTES : l'une se
+  // voit, l'autre marche même si on ne la voit pas.
+  useEffect(() => {
+    if (!agrandie) return;
+    const surTouche = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setAgrandie(false);
+      requestAnimationFrame(() => instanceRef.current?.invalidateSize());
+    };
+    window.addEventListener("keydown", surTouche);
+    return () => window.removeEventListener("keydown", surTouche);
+  }, [agrandie]);
+
   if (epingles.length === 0 || !cadre) return null;
 
   // Le centre du cadrage — il sert au lien trafic. Il se déduit des seules ENTREPRISES,
@@ -249,14 +269,14 @@ export function CarteOffres({
 
       {/* Ces contrôles sont HORS du conteneur `aria-hidden` : ce sont de vrais boutons,
           utilisables au clavier et annoncés. */}
-      <div className="carte-outils">
+      <div className={`carte-outils${agrandie ? " carte-outils--collante" : ""}`}>
         <button
           type="button"
           className="filtre"
           onClick={basculerTaille}
           aria-pressed={agrandie}
         >
-          {agrandie ? "Réduire la carte" : "Agrandir la carte"}
+          {agrandie ? "Réduire la carte (Échap)" : "Agrandir la carte"}
         </button>
 
         {/* LE TRAFIC N'EXISTE PAS SUR CETTE CARTE, et c'est une limite, pas un oubli.

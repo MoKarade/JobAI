@@ -18,6 +18,8 @@ import {
   geocoderVille,
   lireReponse,
   lireReponseEntreprise,
+  nomEchoDansResultat,
+  NB_CANDIDATS_ENTREPRISE,
   urlRecherche,
   urlRechercheEntreprise,
   geocoderEntreprises,
@@ -40,6 +42,24 @@ function faussetFetch(reponses: (unknown | Error)[]) {
 }
 
 const ok = (lat: number, lon: number) => [{ lat: String(lat), lon: String(lon) }];
+
+/**
+ * Un résultat NOMMÉ, comme Nominatim en rend toujours un.
+ *
+ * Les fixtures d'origine n'avaient ni `name` ni `display_name` — Nominatim, lui, en rend
+ * systématiquement. Depuis que le lecteur exige que le candidat PORTE le nom cherché
+ * (sans quoi élargir la recherche rouvrirait le trou des homonymes), une fixture anonyme
+ * ne représente plus rien de réel : elle testerait un cas que le service ne produit pas.
+ */
+const okNomme = (lat: number, lon: number, nom: string) => [
+  {
+    lat: String(lat),
+    lon: String(lon),
+    class: "building",
+    name: nom,
+    display_name: `${nom}, Québec, Canada`,
+  },
+];
 
 describe("nom géocodable", () => {
   it("retire la précision entre parenthèses", () => {
@@ -121,7 +141,7 @@ describe("recherche d'entreprise", () => {
   });
 
   it("trie trouvées et INTROUVABLES — une PME absente d'OpenStreetMap n'est pas une panne", () => {
-    const { recuperer } = faussetFetch([ok(46.75, -71.29), []]);
+    const { recuperer } = faussetFetch([okNomme(46.75, -71.29, "Laserax"), []]);
     return geocoderEntreprises(
       [
         { nom: "Laserax", ville: "Québec" },
@@ -138,7 +158,7 @@ describe("recherche d'entreprise", () => {
   it("partage la MÊME mécanique que les villes : cadence, bornes, panne conservée", async () => {
     // Une entreprise résolue hors de la région (homonyme d'ailleurs) est REFUSÉE comme
     // pour une ville — même lecteur de réponse, mêmes bornes.
-    const { recuperer } = faussetFetch([ok(49.26, -123.11)]); // Vancouver
+    const { recuperer } = faussetFetch([okNomme(49.26, -123.11, "Labatt")]); // Vancouver
     const r = await geocoderEntreprises([{ nom: "Labatt", ville: "Québec" }], {
       recuperer,
       attendre: async () => {},
@@ -146,7 +166,7 @@ describe("recherche d'entreprise", () => {
     expect(r.trouvees).toEqual([]);
     expect(r.introuvables).toEqual(["Labatt"]);
 
-    const casse = faussetFetch([ok(46.75, -71.29), "HTTP_500"]);
+    const casse = faussetFetch([okNomme(46.75, -71.29, "A-Entreprise"), "HTTP_500"]);
     const r2 = await geocoderEntreprises(
       [
         { nom: "A-Entreprise", ville: "Québec" },
@@ -160,13 +180,21 @@ describe("recherche d'entreprise", () => {
 });
 
 describe("lecture d'une réponse d'ENTREPRISE", () => {
-  const avecClasse = (classe: string) => [{ lat: "46.75", lon: "-71.29", class: classe }];
+  /** Un candidat Nominatim tel qu'il arrive vraiment : avec sa classe ET son nom. */
+  const cand = (classe: string, nom: string, lat = 46.75, lon = -71.29) => ({
+    lat: String(lat),
+    lon: String(lon),
+    class: classe,
+    name: nom,
+    display_name: `${nom}, Québec, Capitale-Nationale, Québec, Canada`,
+  });
 
-  it("accepte un lieu ponctuel plausible, classe connue ou absente", () => {
-    expect(lireReponseEntreprise(avecClasse("building"))).toEqual({ lat: 46.75, lon: -71.29, adresse: null });
-    expect(lireReponseEntreprise(avecClasse("amenity"))).not.toBeNull();
-    // Nominatim rend toujours une classe ; son absence ne doit pas rejeter à tort.
-    expect(lireReponseEntreprise(ok(46.75, -71.29))).not.toBeNull();
+  it("accepte un lieu ponctuel plausible qui porte le nom cherché", () => {
+    expect(lireReponseEntreprise([cand("building", "Laserax")], "Laserax")).toMatchObject({
+      lat: 46.75,
+      lon: -71.29,
+    });
+    expect(lireReponseEntreprise([cand("amenity", "Laserax")], "Laserax")).not.toBeNull();
   });
 
   it("REFUSE une municipalité, une frontière administrative ou une rue", () => {
@@ -174,14 +202,72 @@ describe("lecture d'une réponse d'ENTREPRISE", () => {
     // elle-même — DANS les bornes régionales, donc inscrite « exacte » à vie sans ce rejet.
     // Une ville se résout légitimement en `place`/`boundary` ; une entreprise, jamais.
     for (const classe of ["place", "boundary", "highway"]) {
-      expect(lireReponseEntreprise(avecClasse(classe)), classe).toBeNull();
+      expect(lireReponseEntreprise([cand(classe, "Labatt")], "Labatt"), classe).toBeNull();
     }
   });
 
   it("garde les bornes régionales du lecteur de base", () => {
     expect(
-      lireReponseEntreprise([{ lat: "49.26", lon: "-123.11", class: "office" }]),
+      lireReponseEntreprise([cand("office", "Laserax", 49.26, -123.11)], "Laserax"),
     ).toBeNull();
+  });
+
+  // ⚠️ LE DÉFAUT QUE CE LOT CORRIGE — mesuré à l'écran : « 8 à leur adresse, 44 au
+  // centre-ville ». Avec un seul candidat, la municipalité arrivée en tête faisait perdre
+  // l'entreprise qui suivait, et 85 % des épingles tombaient au centre-ville.
+  it("passe la MUNICIPALITÉ en tête et prend l'entreprise qui suit", () => {
+    const charge = [
+      cand("place", "Québec", 46.81, -71.21),
+      cand("building", "Laserax", 46.75, -71.29),
+    ];
+    expect(lireReponseEntreprise(charge, "Laserax")).toMatchObject({ lat: 46.75 });
+  });
+
+  it("REFUSE un candidat qui ne porte pas le nom cherché, même bien classé et proche", () => {
+    // Sans ce contrôle, regarder plus de candidats rouvrirait le trou des homonymes DANS
+    // la ville — là où la validation par la distance ne voit rien.
+    const charge = [
+      cand("place", "Québec", 46.81, -71.21),
+      cand("shop", "Boulangerie Dupont", 46.8, -71.22),
+    ];
+    expect(lireReponseEntreprise(charge, "Laserax")).toBeNull();
+  });
+
+  it("ne regarde jamais plus de candidats que la limite demandée", () => {
+    // Le bon candidat au-delà de la limite ne doit pas être trouvé : sinon le test ne
+    // prouverait pas que la borne est appliquée.
+    const bourrage = Array.from({ length: NB_CANDIDATS_ENTREPRISE }, (_, i) =>
+      cand("place", `Bourrage ${i}`, 46.81, -71.21),
+    );
+    const charge = [...bourrage, cand("building", "Laserax")];
+    expect(lireReponseEntreprise(charge, "Laserax")).toBeNull();
+  });
+});
+
+describe("le nom du résultat répond-il au nom cherché", () => {
+  it("reconnaît le nom, quels que soient accents, casse et ponctuation", () => {
+    expect(nomEchoDansResultat("Laserax", "LASERAX inc.")).toBe(true);
+    expect(nomEchoDansResultat("Créaform", "Creaform, Lévis")).toBe(true);
+    expect(nomEchoDansResultat("Sani-Tech", "Groupe Sani Tech")).toBe(true);
+  });
+
+  it("N'apparie PAS sur un mot qui ne désigne rien", () => {
+    // « Groupe » est dans un nom sur deux : apparier dessus reviendrait à accepter
+    // n'importe quelle entreprise de la ville.
+    expect(nomEchoDansResultat("Groupe Robert", "Groupe Sani-Tech")).toBe(false);
+    expect(nomEchoDansResultat("Les Industries Québec", "Industries Bombardier")).toBe(false);
+  });
+
+  it("exige le nom ENTIER quand aucun mot n'est assez long pour discriminer", () => {
+    // « ACE » en sous-chaîne attraperait « place », « surface », « Boniface »…
+    expect(nomEchoDansResultat("ACE", "Place Sainte-Foy")).toBe(false);
+    expect(nomEchoDansResultat("ACE", "Surface Concept")).toBe(false);
+    expect(nomEchoDansResultat("ACE", "ACE Aviation, Québec")).toBe(true);
+  });
+
+  it("refuse un résultat sans libellé — on ne valide pas contre du vide", () => {
+    expect(nomEchoDansResultat("Laserax", "")).toBe(false);
+    expect(nomEchoDansResultat("", "Laserax")).toBe(false);
   });
 });
 
