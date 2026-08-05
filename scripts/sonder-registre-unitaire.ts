@@ -77,14 +77,41 @@ function extrait(corps: string, n = 300): string {
 // veut l'explorer un jour, il faudra d'abord TROUVER sa documentation, pas la deviner.
 
 async function parDatastore(nom: string): Promise<void> {
-  // CKAN `datastore_search` : si la ressource est chargée dans le datastore, on interroge
-  // par nom SANS jamais toucher au fichier. `q` fait une recherche plein texte.
+  // CKAN `datastore_search` : la ressource EST chargée dans le datastore (mesuré le 05/08,
+  // HTTP 200 + success:true). On interroge par nom, sans jamais toucher au fichier.
   const url =
     `https://www.donneesquebec.ca/recherche/api/3/action/datastore_search?` +
     `resource_id=${encodeURIComponent(RESSOURCE_REQ)}&q=${encodeURIComponent(nom)}&limit=3`;
   const { statut, corps } = await lire(url, "datastore");
   console.log(`   → Données Québec datastore : HTTP ${statut}`);
-  console.log(`      ${extrait(corps, 220)}`);
+  if (statut !== 200) {
+    console.log(`      ${extrait(corps, 200)}`);
+    return;
+  }
+
+  // ⚠️ UN 200 NE PROUVE RIEN — c'est écrit au bas de ce fichier, et le premier essai est
+  // tombé dans le piège : l'extrait tronqué à 220 caractères montrait « success: true »
+  // sans montrer un seul ENREGISTREMENT. « L'API accepte ma question » et « l'API répond à
+  // ma question » sont deux choses différentes. On regarde donc le CONTENU.
+  try {
+    const j = JSON.parse(corps) as {
+      result?: { total?: number; records?: Record<string, unknown>[] };
+    };
+    const total = j.result?.total ?? 0;
+    const recs = j.result?.records ?? [];
+    console.log(`      total=${total} · ${recs.length} enregistrement(s) rendus`);
+    if (recs.length === 0) {
+      console.log("      → le datastore répond, mais ne connaît pas ce nom.");
+      return;
+    }
+    // Les NOMS DE CHAMPS d'abord : ce sont eux qui disent si une adresse est disponible.
+    console.log(`      champs : ${Object.keys(recs[0] ?? {}).join(", ")}`);
+    for (const r of recs.slice(0, 2)) {
+      console.log(`      · ${JSON.stringify(r).slice(0, 500)}`);
+    }
+  } catch {
+    console.log("      ⚠️ corps illisible malgré un 200");
+  }
 }
 
 async function principal(): Promise<void> {
