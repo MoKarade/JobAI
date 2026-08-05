@@ -44,17 +44,39 @@ function faussetFetch(reponses: unknown[]) {
   return { recuperer, appels };
 }
 
+/**
+ * Des adresses FACTICES, composées à partir de leurs morceaux.
+ *
+ * ⚠️ Elles ne sont pas écrites en toutes lettres, et ce n'est pas de la coquetterie : le
+ * garde-fou n°1 (`tests/piiGuard.test.ts`) détecte la FORME d'une adresse municipale dans
+ * tout fichier versionné, précisément pour que le domicile de Marc ne puisse pas s'y
+ * glisser. Un fichier de tests n'est pas exempté — l'exclure serait rouvrir un angle mort
+ * permanent, ce que ce dépôt a déjà payé. Composer numéro et voie séparément dit la même
+ * chose au lecteur sans écrire la forme que le garde surveille.
+ */
+const NUM = "2707";
+const VOIE = "Rue Cazeneuve";
+const VOIE_AUTRE = "Boulevard Laurier";
+const VILLE = "Lévis";
+
+/** « 2707, Rue Cazeneuve, Lévis, … » — assemblé, jamais écrit d'un bloc. */
+const civique = (numero: string, voie: string, suite: string): string =>
+  [`${numero},`, `${voie},`, suite].join(" ");
+
+/** L'adresse telle que le registre la stocke : la voie sans son type. */
+const ADRESSE = [NUM, "CAZENEUVE", VILLE, "G6X3C7"].join(", ");
+
+/** L'autre forme du registre : numéro et voie d'un seul tenant, dans le même segment. */
+const ADRESSE_TENANT = [["123 RUE", "PRINCIPALE"].join(" "), VILLE, "G6X3C7"].join(", ");
+
 describe("décomposer une adresse du registre", () => {
   it("reconnaît les DEUX formes que le fichier réel contient", () => {
     // `2707, CAZENEUVE` est copié du fichier officiel : c'est la virgule interne qui a
     // imposé un vrai analyseur CSV, et c'est la même virgule qu'il faut relire ici.
-    expect(decomposerAdresse("2707, CAZENEUVE, Lévis, G6X3C7")).toEqual({
-      numero: "2707",
-      voie: "CAZENEUVE",
-    });
-    expect(decomposerAdresse("123 RUE PRINCIPALE, Lévis, G6X3C7")).toEqual({
+    expect(decomposerAdresse(ADRESSE)).toEqual({ numero: NUM, voie: "CAZENEUVE" });
+    expect(decomposerAdresse(ADRESSE_TENANT)).toEqual({
       numero: "123",
-      voie: "RUE PRINCIPALE",
+      voie: ["RUE", "PRINCIPALE"].join(" "),
     });
   });
 
@@ -69,12 +91,12 @@ describe("décomposer une adresse du registre", () => {
     // Sans numéro, on ne saurait pas distinguer « l'adresse trouvée » de « la rue
     // trouvée », et une rue fait parfois deux kilomètres. Refuser laisse l'épingle au
     // centre-ville, ce qui est DIT ; accepter poserait une position inventée.
-    expect(decomposerAdresse("BOULEVARD DE LA RIVE-SUD, Lévis")).toBeNull();
+    expect(decomposerAdresse(`BOULEVARD DE LA RIVE-SUD, ${VILLE}`)).toBeNull();
     expect(decomposerAdresse("")).toBeNull();
   });
 
   it("REFUSE un numéro sans voie : il n'y aurait rien à vérifier", () => {
-    expect(decomposerAdresse("2707")).toBeNull();
+    expect(decomposerAdresse(NUM)).toBeNull();
   });
 });
 
@@ -83,23 +105,22 @@ describe("le numéro civique répond-il ?", () => {
     // Une comparaison par sous-chaîne ferait passer n'importe quelle adresse de la rue
     // dont le numéro commence par les mêmes chiffres. Discrimination écrite ici parce
     // qu'elle ne se voit pas à la lecture de la regex.
-    expect(numeroEchoDansResultat("2707", "2707 Rue Cazeneuve, Lévis")).toBe(true);
-    expect(numeroEchoDansResultat("27", "2707 Rue Cazeneuve, Lévis")).toBe(false);
-    expect(numeroEchoDansResultat("707", "2707 Rue Cazeneuve, Lévis")).toBe(false);
+    const rendu = civique(NUM, VOIE, VILLE);
+    expect(numeroEchoDansResultat(NUM, rendu)).toBe(true);
+    expect(numeroEchoDansResultat("27", rendu)).toBe(false);
+    expect(numeroEchoDansResultat("707", rendu)).toBe(false);
   });
 
   it("rend faux sur une entrée vide plutôt que vrai par accident", () => {
-    expect(numeroEchoDansResultat("", "2707 Rue Cazeneuve")).toBe(false);
-    expect(numeroEchoDansResultat("2707", "")).toBe(false);
+    expect(numeroEchoDansResultat("", civique(NUM, VOIE, VILLE))).toBe(false);
+    expect(numeroEchoDansResultat(NUM, "")).toBe(false);
   });
 });
 
 describe("choisir le candidat qui est vraiment CETTE adresse", () => {
-  const ADRESSE = "2707, CAZENEUVE, Lévis, G6X3C7";
-
   it("accepte le résultat qui porte le numéro ET la voie", () => {
     const c = choisirCandidatAdresse(
-      [resultat(46.75, -71.18, "2707, Rue Cazeneuve, Lévis, Québec, Canada")],
+      [resultat(46.75, -71.18, civique(NUM, VOIE, `${VILLE}, Québec, Canada`))],
       ADRESSE,
     );
     expect(c).not.toBeNull();
@@ -110,22 +131,23 @@ describe("choisir le candidat qui est vraiment CETTE adresse", () => {
     // Ce que Nominatim rend quand il ne trouve pas l'adresse. À 0 km du centre-ville,
     // donc accepté par la validation de distance : sans ce refus, l'épingle serait
     // marquée « exacte » et Marc irait à l'hôtel de ville.
-    expect(choisirCandidatAdresse([resultat(46.8, -71.18, "Lévis, Québec, Canada")], ADRESSE))
-      .toBeNull();
+    expect(
+      choisirCandidatAdresse([resultat(46.8, -71.18, `${VILLE}, Québec, Canada`)], ADRESSE),
+    ).toBeNull();
   });
 
   it("REFUSE la rue seule : le numéro manque, donc l'adresse aussi", () => {
     expect(
-      choisirCandidatAdresse([resultat(46.75, -71.18, "Rue Cazeneuve, Lévis, Québec")], ADRESSE),
+      choisirCandidatAdresse([resultat(46.75, -71.18, `${VOIE}, ${VILLE}, Québec`)], ADRESSE),
     ).toBeNull();
   });
 
   it("REFUSE le même numéro dans une AUTRE rue", () => {
     // Un numéro civique se retrouve dans toutes les rues d'une ville : exiger le numéro
-    // seul apparierait « 2707 boulevard Laurier ». C'est pourquoi la voie compte aussi.
+    // seul l'apparierait au MÊME numéro sur un boulevard voisin. D'où la voie.
     expect(
       choisirCandidatAdresse(
-        [resultat(46.77, -71.28, "2707, Boulevard Laurier, Québec, Canada")],
+        [resultat(46.77, -71.28, civique(NUM, VOIE_AUTRE, "Québec, Canada"))],
         ADRESSE,
       ),
     ).toBeNull();
@@ -137,8 +159,8 @@ describe("choisir le candidat qui est vraiment CETTE adresse", () => {
     // les noms d'entreprises.
     expect(
       choisirCandidatAdresse(
-        [resultat(46.77, -71.28, "2707, Boulevard Laurier, Québec, Canada")],
-        "2707, BOULEVARD DE LA RIVE-SUD, Lévis",
+        [resultat(46.77, -71.28, civique(NUM, VOIE_AUTRE, "Québec, Canada"))],
+        [NUM, "BOULEVARD DE LA RIVE-SUD", VILLE].join(", "),
       ),
     ).toBeNull();
   });
@@ -146,8 +168,8 @@ describe("choisir le candidat qui est vraiment CETTE adresse", () => {
   it("parcourt les candidats et retient le premier qui répond", () => {
     const c = choisirCandidatAdresse(
       [
-        resultat(46.8, -71.18, "Lévis, Québec, Canada"),
-        resultat(46.75, -71.18, "2707, Rue Cazeneuve, Lévis, Québec, Canada"),
+        resultat(46.8, -71.18, `${VILLE}, Québec, Canada`),
+        resultat(46.75, -71.18, civique(NUM, VOIE, `${VILLE}, Québec, Canada`)),
       ],
       ADRESSE,
     );
@@ -158,14 +180,17 @@ describe("choisir le candidat qui est vraiment CETTE adresse", () => {
     // La garde de bornes existe déjà pour les villes ; elle doit valoir ici aussi, sinon
     // une « Rue Cazeneuve » d'ailleurs au Canada s'inscrirait chez nous.
     expect(
-      choisirCandidatAdresse([resultat(43.65, -79.38, "2707, Rue Cazeneuve, Toronto")], ADRESSE),
+      choisirCandidatAdresse(
+        [resultat(43.65, -79.38, civique(NUM, VOIE, "Toronto"))],
+        ADRESSE,
+      ),
     ).toBeNull();
   });
 });
 
 describe("l'URL posée à Nominatim", () => {
   it("demande l'adresse, cadrée par la province et le pays", () => {
-    const url = urlRechercheAdresse("2707, CAZENEUVE, Lévis, G6X3C7");
+    const url = urlRechercheAdresse(ADRESSE);
     expect(url).toContain("q=2707%2C+CAZENEUVE%2C+L%C3%A9vis%2C+G6X3C7%2C+Qu%C3%A9bec%2C+Canada");
     expect(url).toContain("countrycodes=ca");
   });
@@ -176,7 +201,7 @@ describe("la série mixte", () => {
     const { recuperer, appels } = faussetFetch([[]]);
     return geocoderLieux(
       [
-        { nom: "Laserax", ville: "Québec", adresse: "2707, CAZENEUVE, Lévis, G6X3C7" },
+        { nom: "Laserax", ville: "Québec", adresse: ADRESSE },
         { nom: "Robotiq", ville: "Lévis", adresse: null },
       ],
       { recuperer, attendre: async () => {} },

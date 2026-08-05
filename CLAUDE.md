@@ -471,6 +471,49 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   objet complet par défaut : on ne l'ampute que si le volume gêne, jamais « pour cibler ».
   Quand une réponse est vide là où on l'attendait pleine, suspecter SA PROPRE requête avant
   la source.
+- **Un travail de fond hérite de la durée de vie de sa page — il ne s'y ajoute pas.**
+  Le travail lancé par `after()` (Next 15) vit DANS l'invocation de la fonction : croire
+  l'inverse est l'erreur de fond qui a tué trois `GET /carte` d'affilée en « Task timed out
+  after 30 seconds », sans qu'une seule ligne de trace ne sorte — le processus est tué avant
+  d'avoir pu écrire. Deux causes cumulées, dont une bien plus générale : **un budget laissé
+  à `null` n'est pas un grand budget, c'est AUCUNE borne**, et ce défaut dort tant que le
+  chemin est rare. Corollaire opératoire : deux séries d'appels enchaînées repartent chacune
+  à zéro sur le garde-temps ET sur le plafond par passe — une frontière réseau se traverse
+  en UNE série, sinon les bornes qu'on croit poser sont doublées en silence.
+- **Le coût d'une frontière réseau se dimensionne sur le PIRE CAS, pas sur le cas nominal.**
+  Une requête Overpass par entreprise coûte un aller-retour chacune — et quand elle échoue,
+  elle coûte le délai × les trois instances de repli. Mesuré : `bornes=2/6 (3 en échec),
+  budget restant=0 ms`. Baisser le délai ne réglait rien, c'était traiter le symptôme : la
+  bonne question était « pourquoi le coût dépend-il du nombre de lieux ? ». Une requête sur
+  la BOÎTE ENGLOBANTE de tout le lot, puis la proximité calculée en local, a rendu `76/76`
+  et 27 s de budget. Quand un budget est mangé par des échecs, chercher la requête qui rend
+  le coût indépendant du volume avant de rogner les délais.
+- **Une déduction écrite au présent dans un commentaire devient un fait pour la prochaine
+  session — donc elle se mesure ou elle se dit comme déduction.** J'ai posé un garde
+  (« au-delà de 25 correspondances, le résultat serait de toute façon jugé ambigu ») en
+  justifiant sa valeur par un raisonnement que je n'avais pas vérifié : il est faux dès
+  qu'une seule des candidates est dans la ville attendue, cas que le code sait très bien
+  trancher. Le garde jetait donc en SILENCE des résultats résolvables, pour économiser un
+  coût que la mesure du jour montrait inexistant (27 s de budget restant). Deux règles :
+  un filtre qui peut perdre des résultats DIT quand il mord, et un seuil qu'on n'a pas
+  mesuré se place là où il n'est qu'un filet anti-explosion, jamais là où il devient une
+  politique.
+- **Un délai de retente encode une PRÉMISSE : quand elle tombe, le délai doit tomber avec.**
+  « Retenter dans sept jours » était calibré sur une question dont la réponse ne change pas
+  (« OpenStreetMap connaît-il cette entreprise ? »). Le jour où l'on acquiert une adresse
+  civique, la question CHANGE — et laisser l'horodatage en place ferait attendre une semaine
+  à une information déjà en main. C'est la même erreur que `ville` puis `adresse`, une
+  troisième fois sous un autre visage : ce n'est pas une colonne qui manque de rattrapage,
+  c'est un délai dont la justification vient de disparaître. Se demander, en acquérant une
+  donnée : « quel mécanisme, calibré sans elle, devrait être ré-armé maintenant ? »
+- **Un service qui ne trouve pas ne dit pas toujours non — il répond à côté, et à côté peut
+  passer les contrôles.** Nominatim, faute de trouver une adresse, remonte la rue ou la
+  MUNICIPALITÉ. Or la municipalité est à 0 km du centre-ville : elle franchit la validation
+  par la distance sans broncher et s'inscrit « exacte » à vie. Ce n'est pas une donnée
+  manquante, c'est une donnée fausse qui a l'air juste. Tout élargissement d'une recherche
+  exige donc son propre discriminant, au niveau de la chose cherchée : le nom pour une
+  entreprise, le NUMÉRO CIVIQUE **et** la voie pour une adresse — le numéro seul apparie
+  toutes les rues, la voie seule tous les numéros.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

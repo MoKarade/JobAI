@@ -6,18 +6,55 @@
 
 ---
 
+## Session 2026-08-05 (soir) — le registre des entreprises, et les adresses qui viennent avec
+
+### État en une page
+
+| | |
+|---|---|
+| **Gate** | `typecheck` + `test` (**641**) + `lint` (0 avertissement) + `build` verts, jugés par exit code. CI consultée après chaque push. |
+| **Bornes de recharge** | ✅ **Mesuré en production, 76/76.** C'était `2/6 (3 en échec) · budget restant=0 ms` : une requête Overpass PAR entreprise, et un échec coûte le délai × trois instances de repli. Désormais **une seule requête pour tout le lot** (boîte englobante, proximité calculée en local), et le coût réseau ne dépend plus du nombre de lieux. La passe rend maintenant 27 s de budget sur 35. |
+| **Registre des entreprises** | Importé : **28 821 établissements** de la région + **59 194 dénominations** (`registre_etablissements`, `registre_noms`). Fichier officiel téléchargé par Marc — l'IP des runners GitHub est refusée par Cloudflare, et le datastore de Données Québec ne contient qu'une page d'erreur (leur propre moissonneur a heurté le même mur). Aucun fichier de personnes n'est lu (garde-fou n°1). |
+| **Adresses sans réseau** | `adressesDepuisRegistre` comble les adresses manquantes **sans aucun appel réseau**, donc sans budget de temps. Deux chemins de recherche : le nom d'établissement, puis les **dénominations** — le second manquait, et c'est lui qui a fait passer le rapprochement de `11/73` à un chiffre en progression. |
+| **Position par l'adresse** | `[REQ-17]` : quand on tient une adresse du registre, on la géocode **elle** au lieu du nom de l'entreprise. C'est le levier restant sur le ratio « à leur adresse / au centre-ville » — OpenStreetMap ne cartographie pas les raisons sociales, mais une adresse civique est son cœur de métier. ⚠️ **Pas encore mesuré en production.** |
+| **Source de l'adresse** | Colonne `adresse_source` (`osm` \| `registre`), contrainte en base « l'une sans l'autre, jamais ». Dite à l'écran : les deux ne valent pas la même chose. |
+| **Diagnostic** | Les refus du registre sont **nommés**, pas seulement comptés (`[registre] absentes — …`). « 53 absentes » ne se vérifie pas ; trois causes possibles appellent trois correctifs opposés. |
+
+### Ce qui reste ouvert
+
+- **Lire la prochaine trace de production** : `registre=X/Y`, la liste des absentes, et
+  `precisees=… (N par adresse)`. La passe ne tourne **que** quand Marc ouvre l'app — la
+  session ne peut pas s'authentifier à sa place.
+- **Les 53 absentes** : ne rien coder avant d'avoir les noms. Un organisme public hors du
+  registre des entreprises, une marque absente de la raison sociale et une clé de
+  rapprochement trop stricte se corrigent de trois façons contraires.
+- **Refonte visuelle totale** — demandée explicitement par Marc comme chantier suivant,
+  séquencée après le ratio.
+- **Signature des commits** : toujours bloquée (clé de signature de 0 octet dans le
+  conteneur).
+
+### Le piège du jour, en une phrase
+
+Une passe de fond lancée par `after()` **vit dans l'invocation de la page** : elle hérite
+de son `maxDuration`, elle ne s'y ajoute pas. Trois `GET /carte` d'affilée sont morts en
+« Task timed out after 30 seconds » sans qu'une ligne de trace ne sorte, parce qu'un budget
+laissé à `null` n'est pas un grand budget — c'est aucune borne. Verrouillé par
+`tests/budgetPasse.test.ts`, qui relit les trois exemplaires du fait sur le disque.
+
+---
+
 ## Session 2026-08-05 — filtres partout, bornes de recharge, et la chasse aux sources close
 
 ### État en une page
 
 | | |
 |---|---|
-| **Gate** | `typecheck` + `test` (**562**) + `lint` (0 avertissement) + `build` verts. Jugé par **exit code**, jamais derrière un `\| grep`. |
+| **Gate** | `typecheck` + `test` (562 à ce moment-là, **641** au soir) + `lint` + `build` verts. Jugé par **exit code**, jamais derrière un `\| grep`. |
 | **Sources d'offres** | ❌ **Les sept sont mortes, mesurées.** Le verdict complet est en tête de `scripts/sonder-ouvert.ts` et dans `docs/ROUTINE-DEPOT.md`. Les deux jeux Données Québec nommés « Offres d'emploi » — la dernière piste — sont ceux des **villes de Laval et de Montréal**, leurs propres postes, à 250 km. Il n'existe aucun jeu provincial d'offres. |
 | **Le seul canal qui produit** | `POST /api/ingest/depot`, alimenté par une Routine claude.ai. Son prompt vivait **uniquement dans la Routine** — invisible, non versionné, incorrigible ; il est désormais dans `docs/ROUTINE-DEPOT.md`, avec les recherches à lancer et la lecture du rapport de refus. |
 | **Filtres** | Identiques sur la liste et la carte (`lib/filtres.ts`, `components/Filtres.tsx`). `proches: boolean` est devenu `distanceMaxKm` à paliers (10 / 25 / 50) ; `sansDistanceMesuree` distingue « loin » de « pas mesuré ». |
 | **Carte** | Part des offres, se complète **sans clic** (`after()` + `reserverPasse`). Le gate est `km === null` (le résultat visé), jamais `!positions.has(nom)` — ce dernier ne converge pas quand la position est inscrite sous un autre nom. Un seul `after()`, travaux en série : deux `after()` s'exécutent en parallèle (mesuré). |
-| **Bornes de recharge** | `[BORNE-01..03]` livré : `lib/bornes.ts` (pur) + `lib/overpass.ts` + migration `0006`. **Trois états, pas deux** : `bornesLe` NULL = jamais interrogé, posé sans distance = aucune à moins de 350 m, posé avec = la distance. Un échec de sonde n'écrit **pas** la date, donc la ligne est retentée. ⚠️ **N'a encore jamais tourné en vrai** — Overpass avait rendu 504 à la seule tentative ; la sonde CI du 05/08 la voit répondre (HTTP 200, JSON). À vérifier dans les journaux Vercel. |
+| **Bornes de recharge** | `[BORNE-01..03]` livré : `lib/bornes.ts` (pur) + `lib/overpass.ts` + migration `0006`. **Trois états, pas deux** : `bornesLe` NULL = jamais interrogé, posé sans distance = aucune à moins de 350 m, posé avec = la distance. Un échec de sonde n'écrit **pas** la date, donc la ligne est retentée. ✅ **A tourné, et le premier résultat était mauvais** : `2/6 (3 en échec)`, budget épuisé. Corrigé le soir même par la requête unique — voir la section du soir. |
 | **Adresses** | `rattraperAdresses` valide la position obtenue par la **distance à l'ancre** (`> RAYON_VALIDATION_KM` ⇒ écartée) : sans ça, un homonyme d'ailleurs s'inscrivait « exacte » à vie — mesuré à 233 km. Budget partagé avec `situerLot` par un chrono unique, sinon chacun repartait à zéro et le total doublait. ⚠️ **À confirmer en production.** |
 | **Interface** | `[UX-13]` : les 22 tailles de police sont devenues une **échelle de six pas** (zéro `font-size` littéral restant), fond neutre (il tirait sur le crème), espacements +25 %, interlignage 1,65, mesure de lecture à 68 caractères. |
 | **Schéma** | Tout chemin de lecture garantit désormais son schéma : `getTrackerState` (sondage du hub) était le seul à ne pas appeler `assurerMigrations` — ça marchait par chance, ses colonnes datant de la première migration. |
