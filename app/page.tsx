@@ -29,6 +29,10 @@ import { Cadre } from "@/components/Cadre";
 
 // Le suivi change à chaque geste de Marc : jamais de page mise en cache.
 export const dynamic = "force-dynamic";
+// L'accueil déclenche la MÊME passe de fond que la carte : il lui faut la même durée de
+// vie, sinon `after()` s'y fait tuer au bout de la valeur par défaut. Un déclencheur qui
+// hérite d'un travail hérite aussi de ce que ce travail coûte.
+export const maxDuration = 60;
 
 export default async function Accueil() {
   const session = await auth();

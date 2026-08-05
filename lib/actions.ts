@@ -34,6 +34,7 @@ import { colonnesOffre } from "./persistance";
 import { RAYON_5_MIN_M, proximiteBorne } from "./bornes";
 import { chercherBornes } from "./overpass";
 import { adresseARattraper, bornesAMesurer, positionARaffiner } from "./travaux";
+import { BUDGET_PASSE_PAGE_MS } from "./synchro";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -640,7 +641,22 @@ export async function mesurerDistances(
     // ingestion comprise, et se faire tuer sans exécuter le moindre `catch`. Le budget se
     // DÉCOMPTE désormais du temps déjà consommé.
     const departGeocodage = Date.now();
-    const budgetTotal = options.budgetGeocodageMs ?? null;
+    // ⚠️ JAMAIS `null` PAR DÉFAUT — un budget absent n'est pas un grand budget, c'est
+    // AUCUNE borne, et c'est ce qui a tué la page.
+    //
+    // Mesuré en production le 2026-08-05 : trois `GET /carte` de suite en « Vercel Runtime
+    // Timeout Error: Task timed out after 30 seconds », et pas une seule ligne de trace —
+    // la passe était tuée avant d'avoir pu écrire quoi que ce soit. Le compte est simple :
+    // quatre étapes réseau (situer, adresses, raffinage, bornes), chacune jusqu'à six
+    // appels, et une interrogation Overpass qui pouvait à elle seule durer 15 s par
+    // instance. Le travail de fond d'`after()` vit DANS l'invocation de la fonction : il
+    // hérite de son `maxDuration`, il ne s'y ajoute pas.
+    //
+    // Le défaut vient de moi : tant que le gate ne s'ouvrait presque jamais, ce chemin sans
+    // budget passait inaperçu. L'avoir ouvert ce matin l'a rendu quotidien. Une valeur par
+    // défaut permissive est une bombe à retardement dont la mèche est le jour où le chemin
+    // devient fréquent.
+    const budgetTotal = options.budgetGeocodageMs ?? BUDGET_PASSE_PAGE_MS;
     const budgetRestant = (): number | null =>
       budgetTotal === null ? null : Math.max(0, budgetTotal - (Date.now() - departGeocodage));
     const manquants = employeursASituer(offres, positions, villeDe);

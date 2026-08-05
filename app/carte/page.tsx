@@ -41,9 +41,13 @@ import {
 } from "@/lib/synchro";
 
 export const dynamic = "force-dynamic";
-// La passe de localisation enchaîne des requêtes Nominatim à ~1,1 s d'intervalle : la
-// Server Action a besoin de plus que la durée par défaut.
-export const maxDuration = 30;
+// ⚠️ 60 s, ET UN BUDGET DE 35 s POUR LE TRAVAIL DE FOND (`BUDGET_PASSE_PAGE_MS`).
+// Le travail lancé par `after()` vit DANS cette invocation : il hérite de ce plafond, il
+// ne s'y ajoute pas. À 30 s sans budget, la passe était tuée en plein vol — mesuré en
+// production, trois fois de suite, sans qu'une ligne de trace ne sorte. La valeur est
+// dupliquée dans `lib/synchro.ts` (`MAX_DURATION_CARTE_S`) parce que Next exige ici un
+// littéral ; un test vérifie que les deux ne divergent pas.
+export const maxDuration = 60;
 export const metadata = { title: "Carte — JobAI" };
 
 export default async function PageCarte() {

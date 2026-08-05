@@ -35,8 +35,17 @@ export const INSTANCES_OVERPASS: readonly string[] = [
   "https://overpass.osm.jp/api/interpreter",
 ];
 
-/** Au-delà, on abandonne : une requête qui pend bloquerait toute la passe. */
-export const DELAI_MAX_MS = 15_000;
+/**
+ * Au-delà, on abandonne : une requête qui pend bloquerait toute la passe.
+ *
+ * ⚠️ 5 s, pas 15 : ce délai est payé PAR INSTANCE, et il y en a trois en repli — une seule
+ * entreprise pouvait donc consommer 45 s. Le travail de fond d'une page dispose de 35 s en
+ * tout (`BUDGET_PASSE_PAGE_MS`) : à 15 s, une entreprise injoignable mangeait le budget de
+ * toutes les autres, et la page se faisait tuer avant d'écrire la moindre trace — mesuré en
+ * production. Overpass répond en général sous les 2 s sur une boîte de 350 m ; 5 s laisse
+ * de la marge sans prendre le budget en otage.
+ */
+export const DELAI_MAX_MS = 5_000;
 
 /** Ce qu'une interrogation a donné — l'échec est DIT, jamais confondu avec un vide. */
 export type ResultatBornes =

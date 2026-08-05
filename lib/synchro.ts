@@ -261,3 +261,29 @@ export const CLE_DISTANCES = "distances-auto";
  * déclenche en amont, lequel appelle Nominatim. D'où un délai du même ordre.
  */
 export const DELAI_MESURE_AUTO_MS = 5 * 60 * 1000;
+
+/**
+ * Durée maximale de la fonction qui rend la carte, en SECONDES.
+ *
+ * Next exige un littéral pour `export const maxDuration` : la page ne peut pas importer
+ * cette constante. Elle est donc ici pour être LUE par le test qui vérifie que la page
+ * l'annonce bien, et que le budget du travail de fond reste dessous.
+ */
+export const MAX_DURATION_CARTE_S = 60;
+
+/**
+ * Temps total accordé au travail de fond déclenché par une PAGE.
+ *
+ * ⚠️ CE N'EST PAS UN RÉGLAGE DE CONFORT, C'EST LA BORNE QUI MANQUAIT.
+ *
+ * Le travail lancé par `after()` s'exécute DANS l'invocation de la fonction : il hérite de
+ * son `maxDuration`, il ne s'y ajoute pas. Sans budget explicite, la passe enchaînait
+ * quatre étapes réseau jusqu'à dépasser la durée de vie de la page — mesuré en production :
+ * trois `GET /carte` de suite tués à 30 s, sans qu'une seule ligne de trace ne sorte.
+ *
+ * La marge (60 s de fonction, 35 s de travail) couvre le rendu, les écritures en base et
+ * le dépassement d'une requête déjà partie quand le budget s'épuise. Un budget qui touche
+ * le plafond ne protège de rien : c'est justement au moment où il déborde qu'il faut qu'il
+ * reste de quoi finir proprement.
+ */
+export const BUDGET_PASSE_PAGE_MS = 35_000;
