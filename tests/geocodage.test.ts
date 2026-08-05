@@ -292,6 +292,20 @@ describe("validation d'une résolution par la DISTANCE au centre-ville", () => {
       ...proche,
       precision: "exacte",
       adresse: null,
+      adresseSource: null,
+    });
+  });
+
+  it("une adresse gardée porte TOUJOURS sa source", () => {
+    // ⚠️ C'est ici que se joue « et l'indiquer » : la base refuse une adresse sans source,
+    // et cette fonction est la SEULE qui décide qu'une adresse est gardée. Si elle oubliait
+    // la source, tous les chemins d'écriture échoueraient — ou pire, l'écran afficherait
+    // une rue sans pouvoir dire si c'est le lieu ou un domicile légal.
+    const proche = { ...decalageLat(RAYON_VALIDATION_KM - 5), adresse: "1 rue Exemple" };
+    expect(deciderPrecision(proche, quebec)).toMatchObject({
+      precision: "exacte",
+      adresse: "1 rue Exemple",
+      adresseSource: "osm",
     });
   });
 
@@ -303,16 +317,23 @@ describe("validation d'une résolution par la DISTANCE au centre-ville", () => {
       ...quebec,
       precision: "ville",
       adresse: null,
+      adresseSource: null,
     });
     expect(deciderPrecision(decalageLat(RAYON_VALIDATION_KM + 5), quebec)).toEqual({
       ...quebec,
       precision: "ville",
       adresse: null,
+      adresseSource: null,
     });
   });
 
   it("sans résolution : repli au centre-ville", () => {
-    expect(deciderPrecision(null, quebec)).toEqual({ ...quebec, precision: "ville", adresse: null });
+    expect(deciderPrecision(null, quebec)).toEqual({
+      ...quebec,
+      precision: "ville",
+      adresse: null,
+      adresseSource: null,
+    });
   });
 });
 

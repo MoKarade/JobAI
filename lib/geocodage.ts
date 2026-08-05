@@ -396,24 +396,48 @@ export const RAYON_VALIDATION_KM = 30;
  * PURE — c'est la pièce qu'il ne faut pas se tromper, donc celle qu'on teste : exacte
  * seulement si Nominatim a rendu un lieu ponctuel plausible À DISTANCE PLAUSIBLE de la
  * ville attendue ; sinon le centre-ville, en le disant. Jamais de troisième état.
+ *
+ * ⚠️ ELLE REND AUSSI LA SOURCE DE L'ADRESSE, et c'est délibéré : c'est la SEULE fonction
+ * qui décide qu'une adresse est gardée. La faire porter la source rend impossible qu'un
+ * chemin d'écriture l'oublie — or ce dépôt a déjà perdu une colonne quatre fois parce que
+ * chaque chemin d'insertion la renseignait dans son coin. Ici, `osm` est la vérité par
+ * construction : cette fonction ne voit que des résolutions Nominatim/OpenStreetMap.
  */
 export function deciderPrecision(
   resolution: (Point & { adresse?: string | null }) | null,
   centreVille: Point,
-): { lat: number; lon: number; precision: "exacte" | "ville"; adresse: string | null } {
+): {
+  lat: number;
+  lon: number;
+  precision: "exacte" | "ville";
+  adresse: string | null;
+  adresseSource: "osm" | null;
+} {
   if (resolution !== null && distanceKm(resolution, centreVille) <= RAYON_VALIDATION_KM) {
     return {
       lat: resolution.lat,
       lon: resolution.lon,
       precision: "exacte",
       adresse: resolution.adresse ?? null,
+      // La source suit l'adresse — présente avec elle, absente sans elle. La base refuse
+      // toute autre combinaison, et c'est ce qui donne son sens à la colonne.
+      adresseSource: resolution.adresse ? "osm" : null,
     };
   }
   // ⚠️ `adresse: null` sur un REPLI, et c'est le point important : l'adresse rendue par
   // Nominatim serait alors celle du CENTRE-VILLE. La garder reviendrait à publier
   // « 2 rue de l'Hôtel-de-Ville » comme adresse d'une usine — précisément le genre de
   // chiffre plausible et faux qu'interdit le garde-fou n°3.
-  return { lat: centreVille.lat, lon: centreVille.lon, precision: "ville", adresse: null };
+  return {
+    lat: centreVille.lat,
+    lon: centreVille.lon,
+    precision: "ville",
+    adresse: null,
+    // Pas d'adresse, donc pas de source. Le typage a refusé de laisser passer ce chemin
+    // sans le dire — c'est exactement ce qu'on lui demande sur une donnée qui doit rester
+    // cohérente à deux champs.
+    adresseSource: null,
+  };
 }
 
 /** Géocode une série de VILLES. */

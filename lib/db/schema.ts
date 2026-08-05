@@ -247,6 +247,24 @@ export const entreprisesLieux = pgTable(
     adresse: text("adresse"),
 
     /**
+     * D'OÙ VIENT CETTE ADRESSE. Demande de Marc (2026-08-05) : « et l'indiquer ».
+     *
+     * ⚠️ CE N'EST PAS UNE MÉTADONNÉE DE CONFORT — deux sources ne disent pas la même chose,
+     * et l'écran doit pouvoir les distinguer :
+     *
+     *   · `osm`      → un objet cartographié dans OpenStreetMap, à l'endroit où il est.
+     *                  C'est le LIEU. Quand elle existe, c'est la meilleure réponse.
+     *   · `registre` → le Registre des entreprises du Québec. C'est le DOMICILE LÉGAL, qui
+     *                  peut parfaitement être le bureau du comptable et non l'usine. Une
+     *                  adresse de registre affichée sans le dire serait une donnée
+     *                  plausible et fausse — exactement ce qu'interdit le garde-fou n°3.
+     *
+     * `null` quand `adresse` est nulle. Une adresse sans source déclarée ne devrait pas
+     * exister : c'est ce que vérifie la contrainte plus bas.
+     */
+    adresseSource: text("adresse_source", { enum: ["osm", "registre"] }),
+
+    /**
      * BORNES DE RECHARGE — trois états, et il faut les trois.
      *
      * Demande de Marc (2026-08-05) : savoir, pour chaque employeur, s'il y a une borne à
@@ -276,6 +294,21 @@ export const entreprisesLieux = pgTable(
     check(
       "entreprises_lieux_precision_ck",
       sql`${table.precision} IN ('exacte', 'ville')`,
+    ),
+    check(
+      "entreprises_lieux_adresse_source_ck",
+      sql`${table.adresseSource} IN ('osm', 'registre')`,
+    ),
+    // ⚠️ UNE ADRESSE SANS SOURCE N'A PAS LE DROIT D'EXISTER, et réciproquement.
+    //
+    // C'est la contrainte qui donne son sens à la colonne : sans elle, un chemin d'écriture
+    // pourrait inscrire une adresse en oubliant sa provenance, et l'écran afficherait une
+    // rue sans pouvoir dire si c'est le lieu ou un domicile légal. La base refuse — le
+    // typage ne survivrait pas à une écriture faite hors de l'app, et c'est déjà arrivé
+    // qu'un chemin d'insertion oublie une colonne (`ville`, quatre fois).
+    check(
+      "entreprises_lieux_adresse_avec_source_ck",
+      sql`(${table.adresse} IS NULL) = (${table.adresseSource} IS NULL)`,
     ),
   ],
 );

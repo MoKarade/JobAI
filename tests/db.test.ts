@@ -84,7 +84,7 @@ describe("migration", () => {
     ]);
   });
 
-  it("pose bien les 12 contraintes CHECK du schéma", async () => {
+  it("pose bien les 14 contraintes CHECK du schéma", async () => {
     const r = await pg.query<{ constraint_name: string }>(
       `SELECT con.conname AS constraint_name
        FROM pg_constraint con
@@ -93,6 +93,11 @@ describe("migration", () => {
        ORDER BY con.conname`,
     );
     expect(r.rows.map((x) => x.constraint_name)).toEqual([
+      // Une adresse et sa SOURCE vont ensemble ou pas du tout : sans cette paire de
+      // contraintes, un chemin d'écriture pourrait inscrire une rue sans dire si c'est le
+      // lieu de l'entreprise ou son domicile légal — et l'écran l'afficherait pareil.
+      "entreprises_lieux_adresse_avec_source_ck",
+      "entreprises_lieux_adresse_source_ck",
       "entreprises_lieux_lat_ck",
       "entreprises_lieux_lon_ck",
       "entreprises_lieux_precision_ck",

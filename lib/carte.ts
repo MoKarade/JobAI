@@ -73,6 +73,14 @@ export interface EntrepriseSurCarte {
    */
   adresse: string | null;
   /**
+   * D'OÙ vient cette adresse, quand il y en a une. Demande de Marc : « et l'indiquer ».
+   *
+   * `osm` = un objet cartographié À SON EMPLACEMENT. `registre` = le domicile légal tiré
+   * du registre des entreprises, qui peut être le bureau du comptable et non l'usine. Les
+   * afficher pareil serait présenter une adresse administrative comme un lieu de travail.
+   */
+  adresseSource: "osm" | "registre" | null;
+  /**
    * Les bornes de recharge à cinq minutes à pied — TROIS états, jamais deux.
    *
    * `null` = jamais interrogé. `{ nombre: 0 }` = interrogé, aucune borne. Les confondre
@@ -117,6 +125,7 @@ export interface PositionEntreprise {
   lon: number;
   precision: PrecisionEpingle;
   adresse: string | null;
+  adresseSource: "osm" | "registre" | null;
   /** `null` tant que les bornes n'ont pas été interrogées pour ce lieu. */
   bornes: { nombre: number; plusProcheM: number | null; nom: string | null } | null;
 }
@@ -159,6 +168,7 @@ export function construireVue(
       ville: villeGeocodable(c.ville) ?? c.ville,
       km: c.km,
       adresse: null,
+      adresseSource: null,
       bornes: null,
       lecture: c.lecture,
       offres: [],
@@ -193,6 +203,7 @@ export function construireVue(
         // des offres plus bas, MESURÉE, jamais déduite de l'épingle.
         km: null,
         adresse: null,
+        adresseSource: null,
         bornes: null,
         lecture: "",
         offres: [],
@@ -237,6 +248,7 @@ export function construireVue(
     // L'adresse vient de la POSITION retenue : c'est elle qui a été géocodée, et elle n'en
     // porte une que si la résolution est exacte (`deciderPrecision`).
     entreprise.adresse = position.adresse;
+    entreprise.adresseSource = position.adresseSource;
     entreprise.bornes = position.bornes;
 
     // La meilleure note en tête : c'est elle qui teinte l'épingle.

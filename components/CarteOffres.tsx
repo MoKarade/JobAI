@@ -25,6 +25,7 @@ import { centreDuCadrage, type Epingle, type EntrepriseSurCarte } from "@/lib/ca
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { palier } from "@/lib/scoring";
 import { minutesAPied } from "@/lib/bornes";
+import { mentionSource } from "@/lib/adresse";
 
 /** Couleurs des paliers, alignées sur celles des cartes d'offre. */
 const TEINTE: Record<ReturnType<typeof palier>, string> = {
@@ -64,7 +65,13 @@ function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string 
   // L'ADRESSE quand OpenStreetMap la connaît. Sur un repli au centre-ville il n'y en a pas,
   // et on ne dit rien plutôt que d'afficher celle de la mairie pour une usine.
   if (e.adresse) {
-    morceaux.push(`<span class="popup-adresse">${echapper(e.adresse)}</span>`);
+    // La SOURCE avec l'adresse, ici comme dans la liste : un domicile légal tiré du
+    // registre n'est pas un lieu de travail. Le texte vient de `lib/adresse.ts` — écrit
+    // deux fois, il aurait divergé, et c'est la version la plus vague qui aurait survécu.
+    const mention = mentionSource(e.adresseSource);
+    morceaux.push(
+      `<span class="popup-adresse">${echapper(e.adresse)}${mention ? ` <small>(${echapper(mention)})</small>` : ""}</span>`,
+    );
   }
   // Les bornes : trois états, trois phrases — « pas regardé » n'est pas « aucune ».
   const bornes =

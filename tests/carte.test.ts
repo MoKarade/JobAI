@@ -31,7 +31,16 @@ function positions(
   return new Map(
     entrees.map(([nom, precision, lat, lon, adresse]) => [
       nom,
-      { lat, lon, precision, adresse: adresse ?? null, bornes: null },
+      {
+        lat,
+        lon,
+        precision,
+        adresse: adresse ?? null,
+        // La source suit l'adresse, ici comme en base : la contrainte l'exige, et une
+        // fixture qui s'en affranchirait testerait un état que la base refuse.
+        adresseSource: adresse ? ("osm" as const) : null,
+        bornes: null,
+      },
     ]),
   );
 }

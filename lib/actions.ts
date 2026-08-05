@@ -328,7 +328,10 @@ async function rattraperAdresses(
 
     await db
       .update(entreprisesLieux)
-      .set({ adresse: t.adresse })
+      // La SOURCE part avec l'adresse, jamais après : la base refuse l'une sans l'autre,
+      // et c'est voulu — une rue affichée sans qu'on puisse dire si c'est le lieu ou un
+      // domicile légal serait une donnée plausible et fausse.
+      .set({ adresse: t.adresse, adresseSource: "osm" })
       .where(eq(entreprisesLieux.nom, t.nom));
     ecrites++;
   }
@@ -433,7 +436,16 @@ async function raffinerPositions(
 
     await db
       .update(entreprisesLieux)
-      .set({ lat: t.lat, lon: t.lon, precision: "exacte", adresse: t.adresse })
+      .set({
+        lat: t.lat,
+        lon: t.lon,
+        precision: "exacte",
+        adresse: t.adresse,
+        // ⚠️ La source suit l'adresse, y compris quand celle-ci redevient NULLE : sans ce
+        // remise à zéro, une entreprise qui perd son adresse garderait sa source et la
+        // base refuserait l'écriture (contrainte « l'une sans l'autre, jamais »).
+        adresseSource: t.adresse === null ? null : "osm",
+      })
       .where(eq(entreprisesLieux.nom, t.nom));
     precisees++;
   }

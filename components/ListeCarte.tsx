@@ -14,6 +14,7 @@ import type { Epingle } from "@/lib/carte";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { palier } from "@/lib/scoring";
 import { RAYON_5_MIN_M, minutesAPied } from "@/lib/bornes";
+import { ADRESSE_ABSENTE, mentionSource } from "@/lib/adresse";
 
 /** Le seuil, dit en toutes lettres — dérivé de la constante, jamais recopié. */
 const MINUTES_LIBELLE = `${minutesAPied(RAYON_5_MIN_M)} min`;
@@ -39,8 +40,16 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                   au centre de sa ville n'a pas d'adresse connue, et en afficher une
                   plausible serait pire que le silence. */}
               <p className="carte-liste__adresse">
-                {x.adresse ??
-                  "Adresse non publiée dans OpenStreetMap — le lien Maps ci-dessous la retrouve par le nom."}
+                {x.adresse ?? ADRESSE_ABSENTE}
+                {/* LA SOURCE, quand il y a une adresse. Un domicile légal tiré du registre
+                    n'est pas un lieu de travail : les afficher pareil enverrait Marc à la
+                    mauvaise porte. Le texte vit dans `lib/adresse.ts`, une seule fois. */}
+                {x.adresse && x.adresseSource ? (
+                  <span className="carte-liste__source">
+                    {" "}
+                    ({mentionSource(x.adresseSource)})
+                  </span>
+                ) : null}
               </p>
               <p className="carte-liste__faits">
                 {x.km === null

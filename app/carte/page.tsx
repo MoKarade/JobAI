@@ -74,6 +74,7 @@ export default async function PageCarte() {
             lon: l.lon,
             precision: l.precision,
             adresse: l.adresse,
+            adresseSource: l.adresseSource,
             // `bornesLe` NULL = jamais interrogé. C'est ce qui distingue « on ne sait
             // pas » de « il n'y en a aucune », et les deux se disent différemment.
             bornes:

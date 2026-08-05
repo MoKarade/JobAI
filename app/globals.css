@@ -1056,6 +1056,16 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   background: var(--bg);
 }
 
+/* LA SOURCE D'UNE ADRESSE — discrète, mais jamais absente. Elle ne doit pas concurrencer
+   l'adresse elle-même à la lecture ; elle doit juste être là quand on se demande d'où
+   sort cette rue, parce qu'un domicile légal et un lieu de travail ne s'utilisent pas
+   pareil. */
+.carte-liste__source,
+.popup-adresse small {
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+}
+
 /* Les bornes de recharge : une ligne de fait, au même niveau que la distance. Discrète —
    c'est un critère de confort, pas le titre de la fiche. */
 .carte-liste__bornes,
