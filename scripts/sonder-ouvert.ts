@@ -25,6 +25,31 @@
 // ⚠️ AUCUN MOISSONNAGE (garde-fou n°4). On n'interroge que des points d'accès publiés comme
 // tels : données ouvertes, API documentées, flux déclarés. Une page HTML qu'on lirait au
 // chausse-pied n'est pas une source, c'est du scraping, et ce n'est pas négociable.
+//
+// ══ VERDICT DU 2026-08-05 — les sept sont MORTES, et voici de quoi ne pas y revenir ══
+//
+//   Guichet-Emplois RSS ............. 404 sur six formes d'URL
+//   Guichet-Emplois API jobsearch ... 404
+//   Données ouvertes — Guichet ....... CSV mensuels, contenu 2023
+//   Données ouvertes — job postings .. Statistique Canada : des STATISTIQUES de postes
+//                                      vacants (taux, nombres par région), aucune offre
+//   Données Québec — « Offres d'emploi » ......... Ville de LAVAL, ses propres postes
+//   Données Québec — « … et postulation » ....... Ville de MONTRÉAL, idem
+//   Québec emploi / Placement en ligne .......... page HTML (200 + <html>), aucun flux
+//
+// Il n'existe AUCUN jeu de données provincial d'offres. Les deux jeux nommés « Offres
+// d'emploi » étaient la dernière piste ouverte : leur titre promettait exactement ce qu'on
+// cherchait, leur ORGANISME a clos la question en une ligne — c'est bien pour ça que le
+// résumé rapporte l'organisme et pas seulement le titre.
+//
+// Ce script reste ici, mais il ne tourne QUE sur demande, jamais dans le cron. La leçon
+// dit pourquoi : huit requêtes vouées à l'échec chaque matin, c'est du bruit dans le
+// rapport, et surtout l'habitude de voir des sources en erreur — après quoi une vraie
+// panne ne se remarque plus. On le relance le jour où l'on a une raison de croire qu'une
+// source a bougé, avec la preuve ci-dessus à contredire.
+//
+// Le seul canal qui produit est le dépôt (`docs/ROUTINE-DEPOT.md`). Ce n'est pas un pis-
+// aller faute d'avoir cherché : c'est ce qui reste après avoir mesuré tout le reste.
 
 const DELAI_MS = 20_000;
 

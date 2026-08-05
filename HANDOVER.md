@@ -6,6 +6,35 @@
 
 ---
 
+## Session 2026-08-05 — filtres partout, bornes de recharge, et la chasse aux sources close
+
+### État en une page
+
+| | |
+|---|---|
+| **Gate** | `typecheck` + `test` (**562**) + `lint` (0 avertissement) + `build` verts. Jugé par **exit code**, jamais derrière un `\| grep`. |
+| **Sources d'offres** | ❌ **Les sept sont mortes, mesurées.** Le verdict complet est en tête de `scripts/sonder-ouvert.ts` et dans `docs/ROUTINE-DEPOT.md`. Les deux jeux Données Québec nommés « Offres d'emploi » — la dernière piste — sont ceux des **villes de Laval et de Montréal**, leurs propres postes, à 250 km. Il n'existe aucun jeu provincial d'offres. |
+| **Le seul canal qui produit** | `POST /api/ingest/depot`, alimenté par une Routine claude.ai. Son prompt vivait **uniquement dans la Routine** — invisible, non versionné, incorrigible ; il est désormais dans `docs/ROUTINE-DEPOT.md`, avec les recherches à lancer et la lecture du rapport de refus. |
+| **Filtres** | Identiques sur la liste et la carte (`lib/filtres.ts`, `components/Filtres.tsx`). `proches: boolean` est devenu `distanceMaxKm` à paliers (10 / 25 / 50) ; `sansDistanceMesuree` distingue « loin » de « pas mesuré ». |
+| **Carte** | Part des offres, se complète **sans clic** (`after()` + `reserverPasse`). Le gate est `km === null` (le résultat visé), jamais `!positions.has(nom)` — ce dernier ne converge pas quand la position est inscrite sous un autre nom. Un seul `after()`, travaux en série : deux `after()` s'exécutent en parallèle (mesuré). |
+| **Bornes de recharge** | `[BORNE-01..03]` livré : `lib/bornes.ts` (pur) + `lib/overpass.ts` + migration `0006`. **Trois états, pas deux** : `bornesLe` NULL = jamais interrogé, posé sans distance = aucune à moins de 350 m, posé avec = la distance. Un échec de sonde n'écrit **pas** la date, donc la ligne est retentée. ⚠️ **N'a encore jamais tourné en vrai** — Overpass avait rendu 504 à la seule tentative ; la sonde CI du 05/08 la voit répondre (HTTP 200, JSON). À vérifier dans les journaux Vercel. |
+| **Adresses** | `rattraperAdresses` valide la position obtenue par la **distance à l'ancre** (`> RAYON_VALIDATION_KM` ⇒ écartée) : sans ça, un homonyme d'ailleurs s'inscrivait « exacte » à vie — mesuré à 233 km. Budget partagé avec `situerLot` par un chrono unique, sinon chacun repartait à zéro et le total doublait. ⚠️ **À confirmer en production.** |
+| **Interface** | `[UX-13]` : les 22 tailles de police sont devenues une **échelle de six pas** (zéro `font-size` littéral restant), fond neutre (il tirait sur le crème), espacements +25 %, interlignage 1,65, mesure de lecture à 68 caractères. |
+| **Schéma** | Tout chemin de lecture garantit désormais son schéma : `getTrackerState` (sondage du hub) était le seul à ne pas appeler `assurerMigrations` — ça marchait par chance, ses colonnes datant de la première migration. |
+
+### Ce qui reste ouvert
+
+- **Vérifier en production** que `rattraperAdresses` et `mesurerBornes` ont réellement
+  tourné — journaux Vercel, pas déduction. Les deux sont livrés et testés sur du simulé.
+- **Faire tourner la Routine tous les jours** avec le prompt de `docs/ROUTINE-DEPOT.md`.
+  C'est la réponse à « pas assez d'offres » : un dépôt en 72 h ne remplit pas une liste.
+- **Analyse LLM des offres** et **lecture Gmail via DriveAI** : acceptés, non commencés.
+- **Signature des commits** : bloquée — la clé de signature de l'environnement est un
+  fichier vide (0 octet). Il faut une vraie clé SSH dans le conteneur, déclarée comme
+  *Signing key* sur le compte GitHub de Marc.
+
+---
+
 ## Session 2026-07-31 — la veille produit du réel, et la carte le montre
 
 > ⚠️ Les entrées des 29 et 30 juillet n'ont jamais été consignées : ce qui suit rattrape
