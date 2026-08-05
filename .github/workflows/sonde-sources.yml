@@ -42,3 +42,10 @@ jobs:
       # par le garde-fou n°4.
       - name: Sonder les sources ouvertes (données ouvertes, API publiques)
         run: npx tsx scripts/sonder-ouvert.ts
+
+      # Ajoutée le 2026-08-05 : « quand tu ne trouves pas l'adresse exacte je veux une
+      # recherche web ou maps pour trouver ». Web et Maps sont hors d'atteinte (clé
+      # payante ou moissonnage interdit) ; cette sonde mesure les deux sources GRATUITES
+      # et OFFICIELLES qui restent — Overpass par nom, et le registre des entreprises.
+      - name: Sonder les sources d'ADRESSE (Overpass par nom, registre du Québec)
+        run: npx tsx scripts/sonder-adresses.ts
