@@ -158,3 +158,11 @@ async function principal(): Promise<void> {
 }
 
 void principal();
+
+// ⚠️ `export {}` FAIT DE CE FICHIER UN MODULE, ET C'EST NÉCESSAIRE.
+// Sans lui, TypeScript le traite comme un script à portée GLOBALE : ses noms de premier
+// niveau (`DELAI_MS`, `principal`) entrent alors en collision avec ceux des autres sondes,
+// et le typecheck tombe sur « Cannot redeclare block-scoped variable » — dans deux fichiers
+// à la fois, dont un qui n'a pas bougé. Un fichier de script sans le moindre import n'est
+// pas isolé par défaut.
+export {};
