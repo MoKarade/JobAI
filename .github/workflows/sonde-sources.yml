@@ -35,3 +35,10 @@ jobs:
 
       - name: Sonder les sources québécoises
         run: npx tsx scripts/sonder-quebec.ts
+
+      # Ajoutée le 2026-08-05 : « ça fait plusieurs jours y'a pas assez d'offres ». Les
+      # sources actives ne produisent rien ; celle-ci cherche celles qui répondent
+      # VRAIMENT, à commencer par les données ouvertes du Canada — nommément autorisées
+      # par le garde-fou n°4.
+      - name: Sonder les sources ouvertes (données ouvertes, API publiques)
+        run: npx tsx scripts/sonder-ouvert.ts

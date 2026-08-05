@@ -1,0 +1,172 @@
+// scripts/sonder-ouvert.ts — chercher une source d'offres qui EXISTE VRAIMENT.
+//
+//   npx tsx scripts/sonder-ouvert.ts
+//
+// POURQUOI CE SCRIPT EXISTE
+// Marc, le 2026-08-05 : « ça fait plusieurs jours y'a pas assez d'offres ». Le constat est
+// juste, et la cause est connue : les sources automatiques ne produisent RIEN. Le flux RSS
+// du Guichet-Emplois répond 404 sur cinq adresses (mesuré le 31/07, `sonder-sources.ts`),
+// les ATS interrogés ne couvrent aucun employeur de la région, et tout le stock réel vient
+// d'un dépôt manuel via une Routine — un seul en 72 h.
+//
+// Avant de coder quoi que ce soit, on MESURE ce qui répond. Ce script ne fait que lire et
+// rapporter : ni base, ni fichier, ni secret. Il tourne sur un runner GitHub Actions, parce
+// que la session de développement n'a aucun accès sortant (403 sur jobbank.gc.ca comme sur
+// ouvert.canada.ca — vérifié le 05/08 avant d'écrire ces lignes).
+//
+// CE QU'ON CHERCHE, ET DANS QUEL ORDRE
+//   1. Le portail de DONNÉES OUVERTES du Canada — nommément autorisé par le garde-fou n°4.
+//      Une recherche du 05/08 indique qu'il publie les offres du Guichet-Emplois en CSV,
+//      par mois. À vérifier : fraîcheur réelle, colonnes, volume, et s'il est filtrable sur
+//      la région de Québec.
+//   2. L'API du Guichet-Emplois si elle existe sans clé.
+//   3. Les ATS que les employeurs d'ICI utilisent vraiment.
+//
+// ⚠️ AUCUN MOISSONNAGE (garde-fou n°4). On n'interroge que des points d'accès publiés comme
+// tels : données ouvertes, API documentées, flux déclarés. Une page HTML qu'on lirait au
+// chausse-pied n'est pas une source, c'est du scraping, et ce n'est pas négociable.
+
+const DELAI_MS = 20_000;
+
+interface Sonde {
+  nom: string;
+  url: string;
+  /** Ce qu'on espère y trouver — sert à juger la réponse, pas seulement son code. */
+  attendu: string;
+}
+
+/**
+ * Le portail de données ouvertes expose une API CKAN, documentée et publique.
+ * `package_show` décrit un jeu de données et ses ressources téléchargeables.
+ */
+const ID_JEU_GUICHET = "ea639e28-c0fc-48bf-b5dd-b8899bd43072";
+
+const SONDES: readonly Sonde[] = [
+  {
+    nom: "Données ouvertes — description du jeu Guichet-Emplois",
+    url: `https://open.canada.ca/data/api/action/package_show?id=${ID_JEU_GUICHET}`,
+    attendu: "la liste des ressources, leur format et leur date",
+  },
+  {
+    nom: "Données ouvertes — recherche « job postings »",
+    url: "https://open.canada.ca/data/api/action/package_search?q=job+postings+job+bank&rows=5",
+    attendu: "d'autres jeux de données d'offres, au cas où celui-ci serait figé",
+  },
+  {
+    nom: "Guichet-Emplois — API de recherche (sans clé ?)",
+    url: "https://www.jobbank.gc.ca/api/jobsearch?searchstring=coordonnateur&locationstring=Quebec",
+    attendu: "du JSON d'offres ; un 404 clôt la question",
+  },
+  {
+    nom: "Guichet-Emplois — flux RSS, 6e forme",
+    url: "https://www.jobbank.gc.ca/jobsearch/rss/jobsearch?searchstring=coordonnateur&locationstring=Quebec%2C+QC",
+    attendu: "du XML ; les 5 formes précédentes ont rendu 404",
+  },
+  {
+    nom: "Emploi-Québec / Placement en ligne",
+    url: "https://placement.emploiquebec.gouv.qc.ca/mbe/ut/suivroffrs/apercuoffr.asp",
+    attendu: "un point d'entrée exploitable, ou la preuve qu'il n'y en a pas",
+  },
+  {
+    nom: "Données Québec — recherche « emploi »",
+    url: "https://www.donneesquebec.ca/recherche/api/3/action/package_search?q=offres+emploi&rows=5",
+    attendu: "un jeu de données provincial d'offres",
+  },
+];
+
+/** Une réponse jugée sur son CONTENU, pas sur son code de statut. */
+async function sonder(s: Sonde): Promise<void> {
+  console.log(`\n── ${s.nom}`);
+  console.log(`   attendu : ${s.attendu}`);
+  console.log(`   ${s.url}`);
+
+  try {
+    const r = await fetch(s.url, {
+      headers: {
+        // Se présenter honnêtement : c'est la moindre des choses envers un service public,
+        // et beaucoup refusent un appelant anonyme.
+        "User-Agent": "JobAI/1.0 (recherche d'emploi personnelle; contact via le dépôt)",
+        Accept: "application/json, application/xml, text/xml, */*",
+      },
+      signal: AbortSignal.timeout(DELAI_MS),
+    });
+
+    const type = r.headers.get("content-type") ?? "(non déclaré)";
+    console.log(`   → HTTP ${r.status} · ${type}`);
+    if (!r.ok) return;
+
+    const texte = await r.text();
+    console.log(`   → ${texte.length} caractères`);
+
+    // ⚠️ UN 200 NE PROUVE RIEN — leçon payée par ce projet : « 36 entreprises trouvées »
+    // était faux parce que le code prenait un 200 pour une preuve. On regarde donc CE QUE
+    // la réponse contient, et on en montre un échantillon à l'œil humain.
+    if (type.includes("json")) {
+      try {
+        const j = JSON.parse(texte) as Record<string, unknown>;
+        resumerJson(j);
+      } catch {
+        console.log("   ⚠️ content-type JSON mais corps illisible");
+      }
+    } else if (texte.trimStart().startsWith("<")) {
+      const titres = [...texte.matchAll(/<title>([^<]{3,120})<\/title>/gi)]
+        .slice(0, 4)
+        .map((m) => m[1]);
+      console.log(`   → balises <title> : ${titres.length === 0 ? "aucune" : ""}`);
+      for (const t of titres) console.log(`      · ${t}`);
+      if (texte.includes("<html")) console.log("   ⚠️ c'est une PAGE HTML, pas un flux");
+    } else {
+      console.log(`   → extrait : ${texte.slice(0, 200).replace(/\s+/g, " ")}`);
+    }
+  } catch (err) {
+    const m = err instanceof Error ? err.message : String(err);
+    console.log(`   → ÉCHEC : ${m}`);
+  }
+}
+
+/** Ce qu'on veut savoir d'une réponse CKAN : y a-t-il des fichiers, et de quand ? */
+function resumerJson(j: Record<string, unknown>): void {
+  const resultat = j.result as Record<string, unknown> | undefined;
+  if (!resultat) {
+    console.log(`   → clés : ${Object.keys(j).slice(0, 8).join(", ")}`);
+    return;
+  }
+
+  const ressources = resultat.resources as
+    | { name?: string; format?: string; url?: string; last_modified?: string }[]
+    | undefined;
+
+  if (Array.isArray(ressources)) {
+    console.log(`   → ${ressources.length} ressource(s) ; les 5 plus récentes :`);
+    for (const res of ressources.slice(-5)) {
+      console.log(
+        `      · ${res.format ?? "?"} — ${res.name ?? "(sans nom)"} — ${res.last_modified ?? "date inconnue"}`,
+      );
+      console.log(`        ${res.url ?? ""}`);
+    }
+    return;
+  }
+
+  const trouves = resultat.results as { title?: string; name?: string }[] | undefined;
+  if (Array.isArray(trouves)) {
+    console.log(`   → ${resultat.count ?? trouves.length} jeu(x) trouvé(s) ; premiers :`);
+    for (const t of trouves.slice(0, 5)) console.log(`      · ${t.title ?? t.name}`);
+    return;
+  }
+
+  console.log(`   → clés du résultat : ${Object.keys(resultat).slice(0, 10).join(", ")}`);
+}
+
+async function principal(): Promise<void> {
+  console.log("SONDE DES SOURCES OUVERTES — lecture seule, aucune écriture.");
+  console.log("Objectif : trouver une source d'offres qui réponde VRAIMENT.\n");
+
+  for (const s of SONDES) await sonder(s);
+
+  console.log("\n──────────────────────────────────────────────");
+  console.log("À LIRE À L'ŒIL : un flux VALIDE n'est pas un flux UTILE.");
+  console.log("Le RSS d'Espresso-Jobs répondait 200, en XML bien formé, avec 20 entrées —");
+  console.log("c'était leur blogue. Vérifier que les titres ressemblent à des OFFRES.");
+}
+
+void principal();
