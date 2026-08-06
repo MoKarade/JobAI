@@ -25,6 +25,14 @@ export interface OffreBrute {
   entreprise: string;
   /** Ville telle qu'annoncée. Peut être vide : on ne devine pas. */
   ville: string;
+  /**
+   * Adresse civique du poste, VERBATIM de l'annonce. Vide si l'annonce n'en donne pas.
+   *
+   * ⚠️ JAMAIS RECONSTITUÉE. Une adresse tirée de la mémoire d'un modèle ou d'une fiche
+   * entreprise est plausible et fausse — mesuré : la fiche Indeed d'AMETEK rend son siège
+   * social de Pennsylvanie pour son usine de Lévis. Vide vaut mieux.
+   */
+  adresse?: string;
   /** URL publique de l'offre. Une offre sans lien n'est pas retenue. */
   lien: string;
   /** Texte de l'annonce, quand la source le donne. Sert à la note, jamais affiché brut. */

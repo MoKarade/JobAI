@@ -42,6 +42,14 @@ export const OffreDeposeeSchema = z.object({
   titre: z.string().min(1).max(200),
   entreprise: z.string().max(120).default(""),
   ville: z.string().max(120).default(""),
+  /**
+   * L'adresse civique du poste, VERBATIM de l'annonce. Vide si l'annonce n'en donne pas.
+   *
+   * Pas de validation forte ici — c'est `adresseUtilisable` qui juge la FORME, et le
+   * géocodeur qui tranche pour de bon (il exige déjà un numéro civique ET une voie, sans
+   * quoi Nominatim remonte la municipalité, laquelle passerait pour une adresse exacte).
+   */
+  adresse: z.string().max(200).default(""),
   lien: LienOffre,
   description: z.string().max(20_000).default(""),
   publieeLe: z
@@ -64,3 +72,25 @@ export const LotDeposeSchema = z.object({
 });
 
 export type LotDepose = z.infer<typeof LotDeposeSchema>;
+
+/**
+ * Cette adresse d'annonce vaut-elle la peine d'être retenue ?
+ *
+ * PURE, et volontairement GROSSIÈRE : le vrai juge est le géocodeur, qui exige déjà un
+ * numéro civique ET une voie avant d'accepter de déplacer une épingle. Ce filtre-ci écarte
+ * seulement ce qui n'a aucune chance — « En présentiel », « Télétravail », « Québec » seul —
+ * pour ne pas envoyer à Nominatim des requêtes dont on sait qu'elles rendront la
+ * municipalité, laquelle passerait ensuite pour une adresse exacte.
+ *
+ * Trois conditions, et elles se justifient chacune :
+ *   · un CHIFFRE, parce qu'une adresse civique en porte toujours un ;
+ *   · des LETTRES, parce qu'un code postal ou un numéro seul ne situe rien ;
+ *   · une longueur plancher, parce que « 8 » n'est pas une adresse.
+ */
+export function adresseUtilisable(brut: string): boolean {
+  const t = brut.trim();
+  if (t.length < 8 || t.length > 200) return false;
+  if (!/\d/.test(t)) return false;
+  // Au moins trois lettres consécutives : un nom de voie, pas « 12 A ».
+  return /\p{L}{3}/u.test(t);
+}

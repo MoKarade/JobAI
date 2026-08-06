@@ -82,10 +82,28 @@ interface Trouvaille {
   extrait: string;
 }
 
+/**
+ * Neutralise la VALEUR du champ `adresse` d'un fichier de dépôt — et elle seule.
+ *
+ * Appliquée UNIQUEMENT aux `data/depot/*.json`, qui portent des adresses d'entreprise
+ * recopiées d'annonces publiques. Le reste de la ligne, et tout le reste du fichier,
+ * continuent d'être scannés normalement.
+ *
+ * La clé est ancrée (`"adresse"` suivi de deux-points) : `adresseSource` ou `adresse_x` ne
+ * matchent pas. Une exemption qui déborde sur des clés voisines cesserait d'être une
+ * exception pour devenir un trou.
+ */
+export function retirerAdressesDeDepot(contenu: string): string {
+  return contenu.replace(/"adresse"\s*:\s*"(?:[^"\\]|\\.)*"/g, '"adresse": ""');
+}
+
 function chercher(motif: RegExp, fichiers: readonly string[]): Trouvaille[] {
   const trouvailles: Trouvaille[] = [];
   for (const f of fichiers) {
-    const contenu = readFileSync(resolve(process.cwd(), f), "utf8");
+    const brut = readFileSync(resolve(process.cwd(), f), "utf8");
+    // Seuls les DÉPÔTS voient leur champ `adresse` neutralisé — voir
+    // `retirerAdressesDeDepot`. Partout ailleurs, le contenu est scanné tel quel.
+    const contenu = f.startsWith("data/depot/") ? retirerAdressesDeDepot(brut) : brut;
     contenu.split("\n").forEach((ligne, i) => {
       if (motif.test(ligne) && !estExemple(ligne)) {
         trouvailles.push({ fichier: f, ligne: i + 1, extrait: ligne.trim().slice(0, 100) });
@@ -149,6 +167,33 @@ describe("garde-fou n°1 — aucune donnée personnelle en clair", () => {
     // committées, calculées depuis DOMICILE_LAT / DOMICILE_LON.
     const motif = /\b\d{3,5},?\s+(av\.|avenue|rue|boul\.|boulevard|ch\.|chemin)\s+\S/i;
     expect(chercher(motif, FICHIERS)).toEqual([]);
+  });
+
+  it("l'exemption des dépôts ne couvre QUE le champ `adresse`, pas leur reste", () => {
+    // ⚠️ POURQUOI UNE EXEMPTION EXISTE, ET POURQUOI ELLE EST SI ÉTROITE.
+    //
+    // Depuis le 2026-08-06, les fichiers `data/depot/*.json` portent l'adresse civique
+    // ANNONCÉE d'un employeur — recopiée d'une offre d'emploi publique. C'est une adresse
+    // d'entreprise, versionnée exprès, et elle a exactement la forme que ce garde
+    // surveille. Sans exemption, la fonctionnalité serait impossible ; avec une exemption
+    // par FICHIER, on ouvrirait un dossier entier où n'importe quelle adresse pourrait se
+    // glisser. On exempte donc la VALEUR d'une seule clé, et rien d'autre.
+    //
+    // Ce que ça ne met PAS en danger : le domicile de Marc ne vit que dans
+    // `DOMICILE_ADRESSE`, une variable d'environnement, et aucun chemin d'ingestion ne le
+    // touche. Un dépôt est écrit à partir d'annonces publiques, jamais de son profil.
+    //
+    // Ce test PROUVE l'étroitesse : une adresse posée AILLEURS que dans `adresse` est
+    // toujours vue. Sans lui, élargir l'exemption à tout le fichier passerait inaperçu.
+    const motif = /\b\d{3,5},?\s+(av\.|avenue|rue|boul\.|boulevard|ch\.|chemin)\s+\S/i;
+    const numero = "1548";
+    const voie = "avenue de la Test";
+    expect(retirerAdressesDeDepot(`  "ville": "${numero} ${voie}"`)).toMatch(motif);
+    expect(retirerAdressesDeDepot(`  "adresse": "${numero} ${voie}, Québec, QC"`)).not.toMatch(
+      motif,
+    );
+    // Et la clé doit être celle du dépôt, pas n'importe quelle clé qui lui ressemble.
+    expect(retirerAdressesDeDepot(`  "adresseSource": "${numero} ${voie}"`)).toMatch(motif);
   });
 
   it("aucune coordonnée géographique en dur", () => {

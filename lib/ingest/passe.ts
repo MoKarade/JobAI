@@ -19,12 +19,19 @@ import type { Offre } from "../types";
 import { idOffre, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
 import { RECHERCHES_GUICHET, sourceAts, sourceGuichet } from "./sources";
 import { sourceDepotFichier } from "./depotFichier";
+import { adresseUtilisable } from "./depotSchema";
 import type { AtsEntreprise, OffreBrute, Recuperateur, ResultatSource, Source } from "./types";
 
 /** Sources interrogées par exécution. Au-delà, on dépasse la durée d'une fonction. */
 export const MAX_SOURCES_PAR_PASSE = 14;
 
 /** Le compte rendu d'une passe. Tout y est dit, y compris ce qui a échoué. */
+/** Une adresse d'annonce, rattachée à son employeur. */
+export interface AdresseAnnoncee {
+  entreprise: string;
+  adresse: string;
+}
+
 export interface RapportPasse {
   /** Ce que chaque source a rendu, succès comme échec. */
   sources: { id: string; ok: boolean; offres: number; erreur?: string }[];
@@ -49,6 +56,19 @@ export interface RapportPasse {
   offres: Offre[];
   journal: JournalVeille;
   resume: string;
+  /**
+   * Les adresses que les ANNONCES elles-mêmes ont données, par employeur.
+   *
+   * ⚠️ ELLES NE VIVENT PAS SUR L'OFFRE, ET C'EST DÉLIBÉRÉ. Une adresse répond à « où est
+   * cet employeur ? », question à laquelle `entreprises_lieux` répond déjà — la porter sur
+   * `offers` aurait dupliqué la même information sur chaque poste du même site, avec le
+   * risque que les copies divergent. La passe la RAPPORTE, `lib/actions.ts` l'écrit là où
+   * elle sert, et seulement quand la ligne n'en a pas.
+   *
+   * Déjà filtrées par `adresseUtilisable` : ce qui arrive ici a la forme d'une adresse
+   * civique, pas « En présentiel ».
+   */
+  adresses: AdresseAnnoncee[];
 }
 
 /**
@@ -160,5 +180,25 @@ export async function executerPasse(
     offres: balayage.offres,
     journal: balayage.journal,
     resume: `${tri.retenues.length} nouvelle${tri.retenues.length > 1 ? "s" : ""}, ${resumerBalayage(balayage)}`,
+    adresses: adressesAnnoncees(brutes),
   };
+}
+
+/**
+ * Les adresses exploitables d'un lot, une par employeur.
+ *
+ * PURE. Une seule adresse par employeur : la PREMIÈRE rencontrée. Prendre la dernière, ou
+ * les accumuler, reviendrait à faire dépendre l'adresse écrite de l'ordre des sources —
+ * c'est-à-dire du hasard. Un employeur qui a réellement deux sites reste un cas que la
+ * table des lieux ne modélise pas ; le dire ici vaut mieux que de le résoudre au tirage.
+ */
+export function adressesAnnoncees(brutes: readonly OffreBrute[]): AdresseAnnoncee[] {
+  const par = new Map<string, string>();
+  for (const b of brutes) {
+    const entreprise = b.entreprise.trim();
+    const adresse = (b.adresse ?? "").trim();
+    if (entreprise === "" || !adresseUtilisable(adresse)) continue;
+    if (!par.has(entreprise)) par.set(entreprise, adresse);
+  }
+  return [...par].map(([entreprise, adresse]) => ({ entreprise, adresse }));
 }

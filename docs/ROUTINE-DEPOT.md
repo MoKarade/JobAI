@@ -38,6 +38,22 @@ un fichier et le pousser** : Vercel déploie, et l'app lit ce qu'elle porte elle
     data/depot/2026-08-06.json
     { "source": "session-indeed", "jour": "2026-08-06", "offres": [ … ] }
 
+Chaque offre peut porter une **`adresse`** — l'adresse civique du poste, **recopiée
+verbatim de l'annonce**, jamais reconstituée. `get_job_details` d'Indeed la donne
+parfois : mesuré le 2026-08-06 sur deux annonces, l'une porte un numéro civique, une voie
+et un code postal complets (répétés deux fois), l'autre n'écrit que « Lieu du poste : En
+présentiel ». Le champ reste **vide** dans ce second cas.
+
+⚠️ **Jamais l'adresse d'une fiche entreprise, jamais celle de la mémoire du modèle.** La
+fiche Indeed d'AMETEK rend son siège social de Pennsylvanie pour son usine de Lévis — une
+adresse plausible et fausse envoie Marc à la mauvaise porte, ce qu'interdit le garde-fou
+n°3. `adresseUtilisable` (pur, testé) écarte déjà « En présentiel », « Télétravail » et
+« Québec » seul ; le géocodeur tranche ensuite, il exige un numéro civique ET une voie.
+
+L'adresse est écrite dans `entreprises_lieux` avec `adresse_source = "offre"`, **seulement
+si la ligne n'en a pas** : elle n'écrase jamais une adresse d'OpenStreetMap, qui est un
+objet cartographié à sa position.
+
 Même schéma que le corps HTTP — littéralement le même, `lib/ingest/depotSchema.ts` : deux
 définitions auraient dérivé, et c'est le canal le moins relu qui aurait gardé la version la
 plus permissive. La ville s'écrit **seule**, sans province (« Québec », pas « Quebec City,

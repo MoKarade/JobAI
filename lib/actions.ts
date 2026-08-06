@@ -41,7 +41,12 @@ import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
 import { ETENDUE_VIDE_SUSPECTE_KM, boiteEnglobante, proximiteBorne } from "./bornes";
 import { DELAI_MAX_MS, ETENDUE_MAX_DEG, chercherBornesBoite } from "./overpass";
-import { adresseARattraper, bornesAMesurer, positionARaffiner } from "./travaux";
+import {
+  EPOQUE_A_RETENTER,
+  adresseARattraper,
+  bornesAMesurer,
+  positionARaffiner,
+} from "./travaux";
 import {
   adresseLisible,
   choisirEtablissement,
@@ -380,7 +385,7 @@ async function rattraperAdresses(
  * satisfait les deux — retenter tout de suite, et en PREMIER, ce qui est exactement le
  * bon ordre puisqu'on vient d'acquérir l'information qui rend la tentative prometteuse.
  */
-const EPOQUE_A_RETENTER = new Date(0);
+
 
 interface PasseRegistre {
   candidates: number;

@@ -15,12 +15,13 @@
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { offerReasons, offers, syncState } from "@/lib/db/schema";
+import { entreprisesLieux, offerReasons, offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { colonnesOffre } from "@/lib/persistance";
 import { mesurerDistances } from "@/lib/actions";
+import { EPOQUE_A_RETENTER } from "@/lib/travaux";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "@/lib/synchro";
 import { executerPasse } from "@/lib/ingest/passe";
 import { recuperer } from "@/lib/ingest/sources";
@@ -160,6 +161,31 @@ export async function GET(requete: Request) {
     // apporte parfois la ville qu'elle n'avait pas. Sans elle, son employeur n'est pas
     // géocodable — donc sans distance et hors de la carte. La décision est prise par
     // `villesACompleter` (pure, testée), qui n'écrase jamais une ville connue.
+    // ⚠️ L'ADRESSE ANNONCÉE, ÉCRITE LÀ OÙ ELLE SERT, ET JAMAIS PAR-DESSUS UNE AUTRE.
+    //
+    // Mesuré le 2026-08-06 sur deux annonces Indeed réelles : l'une porte un numéro
+    // civique, une voie et un code postal complets (elle les répète même deux fois),
+    // l'autre n'écrit que « Lieu du poste : En présentiel ». Le canal existe sans être
+    // garanti — d'où un rattrapage strictement additif, sur les seules lignes dont
+    // `adresse` est NULLE. Écraser une adresse d'OpenStreetMap (un objet cartographié à sa
+    // position) par un texte d'annonce serait un recul de qualité déguisé en mise à jour.
+    //
+    // `geocodeLe` remis à l'époque de retente pour la même raison que le registre : la
+    // question « OSM connaît-il cette entreprise ? » vient de changer — on tient désormais
+    // une adresse civique, et le raffinage la posera à la place du nom. Sans ça,
+    // l'information resterait inutilisée sept jours.
+    let adressesAnnoncees = 0;
+    for (const { entreprise, adresse } of rapport.adresses) {
+      const maj = await db
+        .update(entreprisesLieux)
+        .set({ adresse, adresseSource: "offre", geocodeLe: EPOQUE_A_RETENTER })
+        .where(
+          and(eq(entreprisesLieux.nom, entreprise), isNull(entreprisesLieux.adresse)),
+        )
+        .returning({ nom: entreprisesLieux.nom });
+      adressesAnnoncees += maj.length;
+    }
+
     for (const { id, ville } of rapport.villesACompleter) {
       await db.update(offers).set({ ville, majLe: new Date() }).where(eq(offers.id, id));
     }
@@ -222,6 +248,7 @@ export async function GET(requete: Request) {
         jour,
         resume: rapport.resume,
         trouvees: rapport.trouvees,
+        adressesAnnoncees,
         nouvelles: rapport.nouvelles.length,
         perimees: rapport.perimees.length,
         revenues: rapport.revenues.length,

@@ -124,3 +124,20 @@ export function resteDuTravail(
   if (lieux.some((l) => positionARaffiner(l, maintenant))) return true;
   return lieux.some(bornesAMesurer);
 }
+
+/**
+ * L'horodatage qui veut dire « à réessayer tout de suite ».
+ *
+ * ⚠️ ELLE NE PEUT PAS VIVRE DANS `lib/actions.ts`, et le build l'a prouvé : ce module est
+ * `"use server"`, donc il ne peut EXPORTER que des fonctions asynchrones. Y ajouter une
+ * constante casse la collecte des pages avec un message qui ne nomme ni le fichier ni la
+ * cause (« Failed to collect page data »). Elle vit donc ici, avec les autres décisions
+ * pures que les deux côtés partagent.
+ *
+ * POURQUOI ON REMET UNE DATE À ZÉRO. `positionARaffiner` attend un délai depuis la dernière
+ * tentative, calibré sur une question dont la réponse ne change pas (« OSM connaît-il cette
+ * entreprise ? »). Quand on vient d'acquérir une ADRESSE, la question change : le raffinage
+ * la posera à la place du nom. Laisser l'horodatage en l'état ferait attendre une semaine à
+ * une information déjà en main.
+ */
+export const EPOQUE_A_RETENTER = new Date(0);

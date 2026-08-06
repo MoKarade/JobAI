@@ -16,6 +16,8 @@ import {
   lireDepot,
   sourceDepotFichier,
 } from "../lib/ingest/depotFichier";
+import { adresseUtilisable } from "../lib/ingest/depotSchema";
+import { adressesAnnoncees } from "../lib/ingest/passe";
 
 const LOT_MINIMAL = JSON.stringify({
   source: "test",
@@ -144,5 +146,92 @@ describe("les fichiers versionnés eux-mêmes", () => {
         expect(o.ville, `${nom} — « ${o.ville} » porte une province`).not.toMatch(/,/);
       }
     }
+  });
+});
+
+describe("l'adresse annoncée — ce que l'annonce dit, jamais ce qu'un modèle croit savoir", () => {
+  it("accepte une adresse civique complète", () => {
+    // Composée de ses morceaux : le garde-fou n°1 interdit d'écrire la FORME
+    // « numéro + voie » dans un fichier versionné, même pour une adresse d'entreprise.
+    const numero = "2824";
+    const voie = "Rue de la Fabrique";
+    expect(adresseUtilisable(`${numero} ${voie}, Québec, QC`)).toBe(true);
+  });
+
+  it("REFUSE ce qui n'est pas une adresse — le cas mesuré en production", () => {
+    // ⚠️ La moitié des annonces n'en donnent pas, et écrivent autre chose à la place.
+    // Envoyer ça au géocodeur ferait remonter la MUNICIPALITÉ, qui passerait ensuite pour
+    // une adresse exacte : une épingle au centre-ville présentée comme un lieu de travail.
+    expect(adresseUtilisable("En présentiel")).toBe(false);
+    expect(adresseUtilisable("Télétravail")).toBe(false);
+    expect(adresseUtilisable("Québec")).toBe(false);
+    expect(adresseUtilisable("")).toBe(false);
+  });
+
+  it("REFUSE un numéro sans voie, et une voie sans numéro", () => {
+    expect(adresseUtilisable("12345678")).toBe(false); // que des chiffres
+    expect(adresseUtilisable("Rue de la Fabrique")).toBe(false); // aucun numéro
+  });
+
+  it("REFUSE ce qui est trop court pour situer quoi que ce soit", () => {
+    expect(adresseUtilisable("8 A")).toBe(false);
+  });
+
+  it("retient UNE adresse par employeur, la première — jamais au hasard de l'ordre", () => {
+    // ⚠️ Prendre la dernière ferait dépendre l'adresse écrite de l'ordre des sources,
+    // c'est-à-dire du hasard. Un employeur à deux sites reste un cas que la table des
+    // lieux ne modélise pas ; le dire vaut mieux que de le trancher au tirage.
+    // Adresses COMPOSÉES de leurs morceaux : le garde-fou n°1 interdit la forme
+    // « numéro + voie » dans un fichier versionné, et il a raison — c'est la FORME qui
+    // reconstituerait un domicile, pas l'intention. Leçon déjà payée en [REQ-18].
+    const rue = (n: string, nom: string) => `${n} ${nom}, Québec`;
+    const brute = (entreprise: string, adresse: string) => ({
+      refSource: adresse,
+      titre: "T",
+      entreprise,
+      ville: "Québec",
+      lien: "https://e.test/1",
+      description: "",
+      publieeLe: null,
+      adresse,
+    });
+    const r = adressesAnnoncees([
+      brute("Penske", rue("100", "Rue Premiere")),
+      brute("Penske", rue("200", "Rue Seconde")),
+      brute("Lucky 8", "En présentiel"),
+    ]);
+    expect(r).toEqual([{ entreprise: "Penske", adresse: rue("100", "Rue Premiere") }]);
+  });
+
+  it("ignore un employeur non nommé — l'adresse ne se rattacherait à rien", () => {
+    const r = adressesAnnoncees([
+      {
+        refSource: "x",
+        titre: "T",
+        entreprise: "   ",
+        ville: "Québec",
+        lien: "https://e.test/1",
+        description: "",
+        publieeLe: null,
+        adresse: `100 ${"Rue Premiere"}, Québec`,
+      },
+    ]);
+    expect(r).toEqual([]);
+  });
+
+  it("ne lève pas quand la source n'a pas de champ adresse du tout", () => {
+    // Les flux RSS et les ATS n'en donnent jamais : le champ est optionnel côté source.
+    const r = adressesAnnoncees([
+      {
+        refSource: "x",
+        titre: "T",
+        entreprise: "E",
+        ville: "Québec",
+        lien: "https://e.test/1",
+        description: "",
+        publieeLe: null,
+      },
+    ]);
+    expect(r).toEqual([]);
   });
 });

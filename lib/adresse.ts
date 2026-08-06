@@ -12,17 +12,22 @@
 //     son usine, mais tout aussi bien le bureau de son comptable, un siège social à
 //     Montréal, ou une case postale. Afficher ça comme « l'adresse » enverrait Marc à la
 //     mauvaise porte — une donnée plausible et fausse, ce qu'interdit le garde-fou n°3.
+//   · L'ANNONCE elle-même donne l'adresse du POSTE, écrite par l'employeur. C'est la plus
+//     pertinente des trois pour Marc — c'est là qu'il irait travailler, et un même
+//     employeur affiche des postes sur plusieurs sites. Elle n'est pas vérifiée
+//     cartographiquement, d'où la mention : elle vient d'un texte, pas d'une carte.
 //
 // D'où une mention COURTE mais présente à chaque fois. Le texte n'est écrit qu'ICI :
 // répété dans la liste et dans la fenêtre de la carte, il finirait par diverger, et c'est
 // la version la plus vague qui survivrait.
 
-export type SourceAdresse = "osm" | "registre";
+export type SourceAdresse = "osm" | "registre" | "offre";
 
 /** Ce que l'écran ajoute après une adresse, pour dire ce qu'elle vaut. */
 export function mentionSource(source: SourceAdresse | null): string {
   if (source === "osm") return "OpenStreetMap";
   if (source === "registre") return "registre des entreprises — domicile légal";
+  if (source === "offre") return "annoncée dans l'offre";
   return "";
 }
 
