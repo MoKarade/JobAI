@@ -69,6 +69,17 @@ export type ResultatBornes =
  * surface d'une station. N'interroger que les points en manquerait une partie — et « aucune
  * borne » serait alors faux.
  */
+/**
+ * Délai accordé au SERVEUR, en secondes. Il DOIT rester sous le nôtre.
+ *
+ * ⚠️ IL ÉTAIT À 12 ALORS QU'ON RACCROCHE À 8, et c'est un défaut à part entière : toute
+ * requête mettant entre 8 et 12 secondes était abandonnée par nous pendant que le serveur
+ * la traitait encore. Elle comptait comme un échec d'instance, on passait à la suivante, et
+ * le travail déjà fait par la première était jeté. Donner à un service plus de temps qu'on
+ * n'est prêt à en attendre, c'est se garantir des échecs qui n'en sont pas.
+ */
+export const DELAI_SERVEUR_S = 7;
+
 export function requeteBornes(boite: {
   latMin: number;
   lonMin: number;
@@ -76,8 +87,27 @@ export function requeteBornes(boite: {
   lonMax: number;
 }): string {
   const b = `${boite.latMin},${boite.lonMin},${boite.latMax},${boite.lonMax}`;
-  return `[out:json][timeout:12];(node["amenity"="charging_station"](${b});way["amenity"="amenity_placeholder"](${b}););out center;`
-    .replace("amenity_placeholder", "charging_station");
+  const cible = `["amenity"="charging_station"](${b})`;
+  return `[out:json][timeout:${DELAI_SERVEUR_S}];(node${cible};way${cible};);out center;`;
+}
+
+/**
+ * Overpass a-t-il signalé qu'il n'a PAS pu répondre ?
+ *
+ * ⚠️ C'EST LE DÉFAUT QUI A GELÉ TOUTE LA FONCTIONNALITÉ, et c'est la leçon maison appliquée
+ * à un service de plus : un HTTP 200 ne prouve rien tant qu'on n'a pas lu ce qu'il contient.
+ *
+ * Quand sa requête dépasse le temps imparti, Overpass ne répond pas par une erreur HTTP :
+ * il rend **200**, un corps JSON parfaitement valide, `elements: []` — et un champ `remark`
+ * qui dit que la requête a expiré. Sans le lire, « le service n'a pas pu chercher » devient
+ * « il n'y a aucune borne » : l'app inscrit alors « aucune borne » pour TOUTES les
+ * entreprises, et comme la date de mesure est posée du même coup, elles ne sont plus jamais
+ * réinterrogées. Un échec transitoire se fige en fait permanent.
+ */
+export function remarqueOverpass(charge: unknown): string | null {
+  if (typeof charge !== "object" || charge === null) return null;
+  const r = (charge as { remark?: unknown }).remark;
+  return typeof r === "string" && r.trim() !== "" ? r.trim() : null;
 }
 
 /** Lit une réponse Overpass. PURE : c'est ce qui la rend testable sans réseau. */
@@ -174,7 +204,17 @@ export async function chercherBornesBoite(
         continue;
       }
 
-      return { ok: true, bornes: lireBornes(await r.json()) };
+      const charge = await r.json();
+
+      // Le corps DIT quand le service a renoncé, même sous un 200. Le confondre avec
+      // « aucune borne » gèlerait la mesure de tout le lot (voir `remarqueOverpass`).
+      const remarque = remarqueOverpass(charge);
+      if (remarque !== null) {
+        echecs.push(`${hote(url)} → ${remarque}`);
+        continue;
+      }
+
+      return { ok: true, bornes: lireBornes(charge) };
     } catch (err) {
       echecs.push(`${hote(url)} → ${err instanceof Error ? err.message : String(err)}`);
     }

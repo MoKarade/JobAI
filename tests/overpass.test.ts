@@ -6,8 +6,19 @@
 // un lieu qu'on n'a jamais pu interroger.
 
 import { describe, it, expect } from "vitest";
-import { chercherBornes, lireBornes, requeteBornes } from "../lib/overpass";
+import {
+  DELAI_MAX_MS,
+  DELAI_SERVEUR_S,
+  chercherBornes,
+  chercherBornesBoite,
+  lireBornes,
+  remarqueOverpass,
+  requeteBornes,
+} from "../lib/overpass";
 import { RAYON_5_MIN_M } from "../lib/bornes";
+
+/** Une boîte régionale plausible, pour les tests qui n'en font pas leur sujet. */
+const BOITE = { latMin: 46.7, lonMin: -71.4, latMax: 46.9, lonMax: -71.1 };
 
 const LIEU = { lat: 46.81, lon: -71.21 };
 
@@ -117,5 +128,79 @@ describe("un ÉCHEC n'est jamais « aucune borne »", () => {
       expect(r.ok).toBe(true);
       if (r.ok) expect(r.bornes).toEqual([]);
     });
+  });
+});
+
+describe("un HTTP 200 ne prouve rien : lire le CORPS", () => {
+  // ⚠️ CE BLOC PROTÈGE LA PANNE QUI A GELÉ TOUTE LA FONCTIONNALITÉ.
+  //
+  // Quand sa requête dépasse le temps imparti, Overpass ne répond pas par une erreur HTTP :
+  // il rend 200, un JSON valide, `elements: []`, et un champ `remark`. Lu naïvement, ça dit
+  // « aucune borne de recharge » — et comme l'app inscrit alors la date de mesure, les
+  // entreprises ne sont PLUS JAMAIS réinterrogées. Un incident transitoire devient un fait
+  // permanent, sans qu'aucune erreur ne soit levée nulle part.
+
+  it("reconnaît le signal d'abandon dans un corps par ailleurs valide", () => {
+    expect(
+      remarqueOverpass({
+        version: 0.6,
+        remark: "runtime error: Query timed out in 'query' at line 1 after 7 seconds.",
+        elements: [],
+      }),
+    ).toContain("timed out");
+    // Une réponse normale n'en porte pas : le garde ne doit pas crier sur du succès.
+    expect(remarqueOverpass({ version: 0.6, elements: [] })).toBeNull();
+    expect(remarqueOverpass({ remark: "   " })).toBeNull();
+    expect(remarqueOverpass(null)).toBeNull();
+  });
+
+  it("un 200 PORTEUR d'un remark est un ÉCHEC, pas un lot vide", async () => {
+    // Le test qui compte : `ok: false` fait repasser les lignes, `ok: true` les fige.
+    const recuperer = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ remark: "runtime error: Query timed out", elements: [] }),
+    })) as unknown as typeof fetch;
+
+    const r = await chercherBornesBoite(BOITE, { recuperer, instances: ["https://un.test/"] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.raison).toContain("timed out");
+  });
+
+  it("un vrai lot vide reste un lot vide", async () => {
+    // L'inverse doit rester vrai : sans remark, zéro borne est une RÉPONSE — et c'est ce
+    // qui distingue « on a cherché, il n'y a rien » de « on n'a pas pu chercher ».
+    const recuperer = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ version: 0.6, elements: [] }),
+    })) as unknown as typeof fetch;
+
+    const r = await chercherBornesBoite(BOITE, { recuperer, instances: ["https://un.test/"] });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.bornes).toEqual([]);
+  });
+});
+
+describe("le délai accordé au serveur", () => {
+  it("reste SOUS celui au bout duquel on raccroche", () => {
+    // ⚠️ Il était à 12 s alors qu'on abandonne à 8 : toute requête prenant entre les deux
+    // était jetée par nous pendant que le serveur la traitait encore, et comptée comme un
+    // échec d'instance. Donner à un service plus de temps qu'on n'est prêt à en attendre,
+    // c'est fabriquer des échecs qui n'en sont pas. La borne est DÉRIVÉE des deux
+    // constantes, jamais recopiée.
+    expect(DELAI_SERVEUR_S * 1000).toBeLessThan(DELAI_MAX_MS);
+  });
+
+  it("la requête annonce bien ce délai-là", () => {
+    expect(requeteBornes(BOITE)).toContain(`[timeout:${DELAI_SERVEUR_S}]`);
+  });
+
+  it("interroge les points ET les surfaces", () => {
+    // Une borne est parfois cartographiée comme un point, parfois comme la surface d'une
+    // station. N'interroger que les points ferait dire « aucune borne » à tort.
+    const q = requeteBornes(BOITE);
+    expect(q).toContain('node["amenity"="charging_station"]');
+    expect(q).toContain('way["amenity"="charging_station"]');
   });
 });

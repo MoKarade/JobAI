@@ -45,6 +45,16 @@ export const VITESSE_MARCHE_KMH = 4.8;
  */
 export const RAYON_5_MIN_M = 350;
 
+/**
+ * Au-delà de cette étendue, un lot revenu VIDE est un échec, pas une réponse.
+ *
+ * Dix kilomètres : plus grand qu'un quartier. Sur une telle boîte, « aucune borne de
+ * recharge » n'est pas une information plausible dans la région de Québec — c'est la
+ * signature d'un service qui n'a pas pu chercher. En dessous, un vide est crédible et
+ * s'inscrit normalement.
+ */
+export const ETENDUE_VIDE_SUSPECTE_KM = 10;
+
 /** Distance à vol d'oiseau entre deux points, en MÈTRES (haversine). */
 export function distanceM(
   a: { lat: number; lon: number },

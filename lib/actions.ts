@@ -39,7 +39,12 @@ import { employeursASituer, planifierDistances } from "./distances";
 import { villesARattraper } from "./ingest/pipeline";
 import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
-import { RAYON_5_MIN_M, boiteEnglobante, proximiteBorne } from "./bornes";
+import {
+  ETENDUE_VIDE_SUSPECTE_KM,
+  RAYON_5_MIN_M,
+  boiteEnglobante,
+  proximiteBorne,
+} from "./bornes";
 import { DELAI_MAX_MS, ETENDUE_MAX_DEG, chercherBornesBoite } from "./overpass";
 import { adresseARattraper, bornesAMesurer, positionARaffiner } from "./travaux";
 import {
@@ -854,6 +859,26 @@ async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
     // On NE marque AUCUNE ligne : elles repasseront. Le journal garde la trace, parce
     // qu'une source qui tombe tout le temps doit finir par se voir.
     console.error(`[bornes] lot non mesuré : ${r.raison}`);
+    return { candidates: lignes.length, mesurees: 0, echecs: lignes.length };
+  }
+
+  // ⚠️ ZÉRO BORNE SUR TOUTE UNE RÉGION N'EST PAS UNE MESURE, C'EST UNE NON-RÉPONSE.
+  //
+  // La boîte couvre ici des dizaines de kilomètres autour de Québec — il y a des bornes de
+  // recharge, c'est un fait vérifiable. Un lot revenu VIDE sur une telle étendue signale
+  // donc un service qui n'a pas cherché, pas une région sans bornes. Et la distinction est
+  // vitale : écrire le résultat pose `bornesLe`, or `bornesAMesurer` ne retient que les
+  // lignes dont cette date est nulle — un vide accepté une fois fige « aucune borne » sur
+  // TOUTES les entreprises, définitivement, sans qu'aucune erreur ne soit jamais levée.
+  //
+  // On ne marque donc rien : le lot repassera. Le seuil est celui d'une boîte plus grande
+  // qu'un quartier — en dessous, un vide est parfaitement crédible et s'inscrit.
+  const etendueKm = (boite.latMax - boite.latMin) * 111;
+  if (r.bornes.length === 0 && etendueKm > ETENDUE_VIDE_SUSPECTE_KM) {
+    console.error(
+      `[bornes] réponse VIDE sur ${etendueKm.toFixed(0)} km — traitée comme un échec, ` +
+        `pas comme « aucune borne » : le lot repassera`,
+    );
     return { candidates: lignes.length, mesurees: 0, echecs: lignes.length };
   }
 

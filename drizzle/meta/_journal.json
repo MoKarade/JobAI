@@ -78,6 +78,13 @@
       "when": 1785957900000,
       "tag": "0010_rattrapage_adresses_registre",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786000000000,
+      "tag": "0011_remesurer_les_bornes",
+      "breakpoints": true
     }
   ]
 }

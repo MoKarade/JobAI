@@ -1,0 +1,629 @@
+{
+  "id": "0b11d0de-1111-4b11-b111-0b11d0de1111",
+  "prevId": "0a10d0de-1010-4a10-b010-0a10d0de1010",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.entreprises_lieux": {
+      "name": "entreprises_lieux",
+      "schema": "",
+      "columns": {
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "lat": {
+          "name": "lat",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lon": {
+          "name": "lon",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "precision": {
+          "name": "precision",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "adresse": {
+          "name": "adresse",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "adresse_source": {
+          "name": "adresse_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bornes_m": {
+          "name": "bornes_m",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bornes_nom": {
+          "name": "bornes_nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bornes_le": {
+          "name": "bornes_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geocode_le": {
+          "name": "geocode_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "entreprises_lieux_lat_ck": {
+          "name": "entreprises_lieux_lat_ck",
+          "value": "\"entreprises_lieux\".\"lat\" >= 45 AND \"entreprises_lieux\".\"lat\" <= 49"
+        },
+        "entreprises_lieux_lon_ck": {
+          "name": "entreprises_lieux_lon_ck",
+          "value": "\"entreprises_lieux\".\"lon\" >= -75 AND \"entreprises_lieux\".\"lon\" <= -68"
+        },
+        "entreprises_lieux_precision_ck": {
+          "name": "entreprises_lieux_precision_ck",
+          "value": "\"entreprises_lieux\".\"precision\" IN ('exacte', 'ville')"
+        },
+        "entreprises_lieux_adresse_source_ck": {
+          "name": "entreprises_lieux_adresse_source_ck",
+          "value": "\"entreprises_lieux\".\"adresse_source\" IN ('osm', 'registre')"
+        },
+        "entreprises_lieux_adresse_avec_source_ck": {
+          "name": "entreprises_lieux_adresse_avec_source_ck",
+          "value": "(\"entreprises_lieux\".\"adresse\" IS NULL) = (\"entreprises_lieux\".\"adresse_source\" IS NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.offer_reasons": {
+      "name": "offer_reasons",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "offer_id": {
+          "name": "offer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ton": {
+          "name": "ton",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "texte": {
+          "name": "texte",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ordre": {
+          "name": "ordre",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "offer_reasons_offer_idx": {
+          "name": "offer_reasons_offer_idx",
+          "columns": [
+            {
+              "expression": "offer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ordre",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "offer_reasons_offer_id_offers_id_fk": {
+          "name": "offer_reasons_offer_id_offers_id_fk",
+          "tableFrom": "offer_reasons",
+          "tableTo": "offers",
+          "columnsFrom": [
+            "offer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "offer_reasons_ton_ck": {
+          "name": "offer_reasons_ton_ck",
+          "value": "\"offer_reasons\".\"ton\" IN ('atout', 'reserve')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.offers": {
+      "name": "offers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'seed'"
+        },
+        "date_reperage": {
+          "name": "date_reperage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entreprise": {
+          "name": "entreprise",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "poste": {
+          "name": "poste",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lien": {
+          "name": "lien",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "km": {
+          "name": "km",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ville": {
+          "name": "ville",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salaire_affiche": {
+          "name": "salaire_affiche",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "priorite": {
+          "name": "priorite",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Moyenne'"
+        },
+        "statut": {
+          "name": "statut",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Identifiee'"
+        },
+        "date_envoi": {
+          "name": "date_envoi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "score": {
+          "name": "score",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "score_source": {
+          "name": "score_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "user_note": {
+          "name": "user_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "histo": {
+          "name": "histo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "perimee_le": {
+          "name": "perimee_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "maj_le": {
+          "name": "maj_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "offers_score_idx": {
+          "name": "offers_score_idx",
+          "columns": [
+            {
+              "expression": "histo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "score",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "offers_entreprise_idx": {
+          "name": "offers_entreprise_idx",
+          "columns": [
+            {
+              "expression": "entreprise",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "offers_source_ck": {
+          "name": "offers_source_ck",
+          "value": "\"offers\".\"source\" IN ('seed', 'jobbank', 'user')"
+        },
+        "offers_priorite_ck": {
+          "name": "offers_priorite_ck",
+          "value": "\"offers\".\"priorite\" IN ('Haute', 'Moyenne', 'Basse')"
+        },
+        "offers_statut_ck": {
+          "name": "offers_statut_ck",
+          "value": "\"offers\".\"statut\" IN ('Identifiee', 'CVenvoye', 'Relance', 'Entrevue', 'Refusee', 'Offre')"
+        },
+        "offers_score_source_ck": {
+          "name": "offers_score_source_ck",
+          "value": "\"offers\".\"score_source\" IS NULL OR \"offers\".\"score_source\" IN ('manuel', 'calcule')"
+        },
+        "offers_score_bornes_ck": {
+          "name": "offers_score_bornes_ck",
+          "value": "\"offers\".\"score\" IS NULL OR (\"offers\".\"score\" >= 0 AND \"offers\".\"score\" <= 100)"
+        },
+        "offers_km_ck": {
+          "name": "offers_km_ck",
+          "value": "\"offers\".\"km\" IS NULL OR \"offers\".\"km\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.registre_etablissements": {
+      "name": "registre_etablissements",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "neq": {
+          "name": "neq",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nom_cle": {
+          "name": "nom_cle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "adresse": {
+          "name": "adresse",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ville": {
+          "name": "ville",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code_postal": {
+          "name": "code_postal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "principal": {
+          "name": "principal",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "registre_nom_cle_idx": {
+          "name": "registre_nom_cle_idx",
+          "columns": [
+            {
+              "expression": "nom_cle",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.registre_noms": {
+      "name": "registre_noms",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "neq": {
+          "name": "neq",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nom_cle": {
+          "name": "nom_cle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "registre_noms_cle_idx": {
+          "name": "registre_noms_cle_idx",
+          "columns": [
+            {
+              "expression": "nom_cle",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "registre_noms_neq_idx": {
+          "name": "registre_noms_neq_idx",
+          "columns": [
+            {
+              "expression": "neq",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sync_state": {
+      "name": "sync_state",
+      "schema": "",
+      "columns": {
+        "cle": {
+          "name": "cle",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "valeur": {
+          "name": "valeur",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "maj_le": {
+          "name": "maj_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.villes": {
+      "name": "villes",
+      "schema": "",
+      "columns": {
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "lat": {
+          "name": "lat",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lon": {
+          "name": "lon",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "geocode_le": {
+          "name": "geocode_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "villes_lat_ck": {
+          "name": "villes_lat_ck",
+          "value": "\"villes\".\"lat\" >= 45 AND \"villes\".\"lat\" <= 49"
+        },
+        "villes_lon_ck": {
+          "name": "villes_lon_ck",
+          "value": "\"villes\".\"lon\" >= -75 AND \"villes\".\"lon\" <= -68"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
