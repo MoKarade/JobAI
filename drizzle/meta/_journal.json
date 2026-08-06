@@ -99,6 +99,13 @@
       "when": 1786070000000,
       "tag": "0013_adresse_annoncee",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786080000000,
+      "tag": "0014_adresse_recherchee",
+      "breakpoints": true
     }
   ]
 }

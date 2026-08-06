@@ -200,7 +200,7 @@ describe("l'adresse annoncée — ce que l'annonce dit, jamais ce qu'un modèle 
       brute("Penske", rue("200", "Rue Seconde")),
       brute("Lucky 8", "En présentiel"),
     ]);
-    expect(r).toEqual([{ entreprise: "Penske", adresse: rue("100", "Rue Premiere") }]);
+    expect(r).toEqual([{ entreprise: "Penske", adresse: rue("100", "Rue Premiere"), source: "offre" }]);
   });
 
   it("ignore un employeur non nommé — l'adresse ne se rattacherait à rien", () => {
@@ -231,6 +231,120 @@ describe("l'adresse annoncée — ce que l'annonce dit, jamais ce qu'un modèle 
         description: "",
         publieeLe: null,
       },
+    ]);
+    expect(r).toEqual([]);
+  });
+});
+
+describe("la recherche web — la source la plus risquée, et ce qui la rend acceptable", () => {
+  const rue = (n: string, nom: string, ville = "Québec") => `${n} ${nom}, ${ville}, QC`;
+
+  function brute(o: {
+    ville: string;
+    adresse: string;
+    adresseSource?: "annonce" | "recherche";
+    adresseUrl?: string | null;
+  }) {
+    return {
+      refSource: o.adresse,
+      titre: "T",
+      entreprise: "Cible",
+      lien: "https://e.test/1",
+      description: "",
+      publieeLe: null,
+      adresseUrl: null,
+      ...o,
+    };
+  }
+
+  it("REFUSE une adresse dont la ville contredit celle de l'offre", () => {
+    // ⚠️ LE TEST QUI JUSTIFIE TOUTE LA FONCTIONNALITÉ. Sans cette garde, « trouve l'adresse
+    // d'AMETEK » écrit un siège social de Pennsylvanie sur une usine de Lévis — plausible,
+    // faux, et indiscernable d'une bonne réponse une fois en base.
+    const r = adressesAnnoncees([
+      brute({
+        ville: "Lévis",
+        adresse: rue("1100", "Cassatt Road", "Berwyn"),
+        adresseSource: "recherche",
+        adresseUrl: "https://exemple.test/fiche",
+      }),
+    ]);
+    expect(r).toEqual([]);
+  });
+
+  it("ACCEPTE quand la ville concorde — deux faits indépendants qui se confirment", () => {
+    const r = adressesAnnoncees([
+      brute({
+        ville: "Québec",
+        adresse: rue("100", "Rue Premiere"),
+        adresseSource: "recherche",
+        adresseUrl: "https://exemple.test/fiche",
+      }),
+    ]);
+    expect(r).toEqual([
+      { entreprise: "Cible", adresse: rue("100", "Rue Premiere"), source: "recherche" },
+    ]);
+  });
+
+  it("REFUSE une adresse de recherche SANS sa page — une trouvaille sans provenance est une invention", () => {
+    const r = adressesAnnoncees([
+      brute({
+        ville: "Québec",
+        adresse: rue("100", "Rue Premiere"),
+        adresseSource: "recherche",
+      }),
+    ]);
+    expect(r).toEqual([]);
+  });
+
+  it("n'exige PAS de page pour une adresse d'annonce — l'employeur EST la source", () => {
+    const r = adressesAnnoncees([
+      brute({ ville: "Québec", adresse: rue("100", "Rue Premiere"), adresseSource: "annonce" }),
+    ]);
+    expect(r[0]?.source).toBe("offre");
+  });
+
+  it("L'ANNONCE L'EMPORTE sur la recherche, quel que soit l'ordre d'arrivée", () => {
+    // ⚠️ Discrimination : sans la règle de préséance, le résultat dépendrait de l'ordre des
+    // offres — c'est-à-dire du hasard. Les deux sens sont vérifiés.
+    const cherchee = brute({
+      ville: "Québec",
+      adresse: rue("900", "Rue Web"),
+      adresseSource: "recherche",
+      adresseUrl: "https://exemple.test/fiche",
+    });
+    const annoncee = brute({
+      ville: "Québec",
+      adresse: rue("100", "Rue Premiere"),
+      adresseSource: "annonce",
+    });
+    expect(adressesAnnoncees([cherchee, annoncee])[0]?.adresse).toBe(rue("100", "Rue Premiere"));
+    expect(adressesAnnoncees([annoncee, cherchee])[0]?.adresse).toBe(rue("100", "Rue Premiere"));
+  });
+
+  it("REFUSE quand l'offre n'annonce aucune ville — il n'y a alors RIEN à vérifier", () => {
+    // Une adresse invérifiable n'est pas une adresse prudente : c'est une adresse dont on
+    // ignore si elle est bonne.
+    const r = adressesAnnoncees([
+      brute({
+        ville: "",
+        adresse: rue("100", "Rue Premiere"),
+        adresseSource: "recherche",
+        adresseUrl: "https://exemple.test/fiche",
+      }),
+    ]);
+    expect(r).toEqual([]);
+  });
+
+  it("la garde s'applique AUSSI aux adresses d'annonce", () => {
+    // Une annonce dont l'adresse contredit sa propre ville se trompe quelque part, et on ne
+    // sait pas où. Une seule règle partout vaut mieux qu'une exception à retenir.
+    const r = adressesAnnoncees([
+      brute({
+        ville: "Lévis",
+        adresse: rue("100", "Rue Premiere", "Montréal"),
+        adresseSource: "annonce",
+      }),
     ]);
     expect(r).toEqual([]);
   });

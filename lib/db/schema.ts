@@ -262,7 +262,7 @@ export const entreprisesLieux = pgTable(
      * `null` quand `adresse` est nulle. Une adresse sans source déclarée ne devrait pas
      * exister : c'est ce que vérifie la contrainte plus bas.
      */
-    adresseSource: text("adresse_source", { enum: ["osm", "registre", "offre"] }),
+    adresseSource: text("adresse_source", { enum: ["osm", "registre", "offre", "recherche"] }),
 
     /**
      * BORNES DE RECHARGE — trois états, et il faut les trois.
@@ -310,7 +310,7 @@ export const entreprisesLieux = pgTable(
     ),
     check(
       "entreprises_lieux_adresse_source_ck",
-      sql`${table.adresseSource} IN ('osm', 'registre', 'offre')`,
+      sql`${table.adresseSource} IN ('osm', 'registre', 'offre', 'recherche')`,
     ),
     // ⚠️ UNE ADRESSE SANS SOURCE N'A PAS LE DROIT D'EXISTER, et réciproquement.
     //

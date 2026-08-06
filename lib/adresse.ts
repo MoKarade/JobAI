@@ -13,21 +13,31 @@
 //     Montréal, ou une case postale. Afficher ça comme « l'adresse » enverrait Marc à la
 //     mauvaise porte — une donnée plausible et fausse, ce qu'interdit le garde-fou n°3.
 //   · L'ANNONCE elle-même donne l'adresse du POSTE, écrite par l'employeur. C'est la plus
-//     pertinente des trois pour Marc — c'est là qu'il irait travailler, et un même
+//     pertinente des quatre pour Marc — c'est là qu'il irait travailler, et un même
 //     employeur affiche des postes sur plusieurs sites. Elle n'est pas vérifiée
 //     cartographiquement, d'où la mention : elle vient d'un texte, pas d'une carte.
+//   · UNE RECHERCHE WEB, en dernier recours, quand l'annonce n'en donne aucune. C'est la
+//     source la plus RISQUÉE du projet : « adresse AMETEK » rend un siège social de
+//     Pennsylvanie pour une usine de Lévis. Elle n'entre qu'accompagnée de sa page source
+//     et si sa ville concorde avec celle de l'offre — deux faits indépendants qui se
+//     confirment. Et l'écran le DIT : « à confirmer », parce que personne ne l'a vue.
 //
 // D'où une mention COURTE mais présente à chaque fois. Le texte n'est écrit qu'ICI :
 // répété dans la liste et dans la fenêtre de la carte, il finirait par diverger, et c'est
 // la version la plus vague qui survivrait.
 
-export type SourceAdresse = "osm" | "registre" | "offre";
+export type SourceAdresse = "osm" | "registre" | "offre" | "recherche";
 
 /** Ce que l'écran ajoute après une adresse, pour dire ce qu'elle vaut. */
 export function mentionSource(source: SourceAdresse | null): string {
   if (source === "osm") return "OpenStreetMap";
   if (source === "registre") return "registre des entreprises — domicile légal";
   if (source === "offre") return "annoncée dans l'offre";
+  // ⚠️ LA MENTION LA PLUS IMPORTANTE DES QUATRE. Une adresse trouvée sur le web a passé la
+  // garde de cohérence (sa ville concorde avec celle de l'offre) et le géocodeur, mais
+  // personne ne l'a vue de ses yeux. Le dire n'est pas une précaution de forme : c'est la
+  // différence entre « voici l'adresse » et « voici ce qu'on a trouvé ».
+  if (source === "recherche") return "trouvée sur le web — à confirmer";
   return "";
 }
 

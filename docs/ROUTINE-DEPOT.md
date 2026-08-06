@@ -50,9 +50,38 @@ adresse plausible et fausse envoie Marc à la mauvaise porte, ce qu'interdit le 
 n°3. `adresseUtilisable` (pur, testé) écarte déjà « En présentiel », « Télétravail » et
 « Québec » seul ; le géocodeur tranche ensuite, il exige un numéro civique ET une voie.
 
-L'adresse est écrite dans `entreprises_lieux` avec `adresse_source = "offre"`, **seulement
-si la ligne n'en a pas** : elle n'écrase jamais une adresse d'OpenStreetMap, qui est un
-objet cartographié à sa position.
+### Et quand l'annonce n'en donne pas : la recherche web
+
+Demande de Marc, 2026-08-06. Le chercheur peut aller lire le **site officiel** de
+l'entreprise (page « Contact »), et déclare alors `adresseSource: "recherche"` **plus
+`adresseUrl`**, la page où il l'a lue.
+
+⚠️ **C'est la source la plus risquée du projet**, et deux gardes la rendent acceptable :
+
+1. **La page source est EXIGÉE.** Sans provenance, une adresse est invérifiable — ni Marc
+   ni une session future ne peuvent la contrôler — et elle prend pourtant l'autorité d'un
+   fait mesuré. L'URL est ce qui distingue une trouvaille d'une invention.
+2. **La ville doit CONCORDER** avec celle qu'annonce l'offre (`villeCoherente`, pur, testé).
+   Deux faits venus de sources indépendantes qui se confirment valent infiniment mieux
+   qu'un seul qui affirme. Mesuré : une recherche « Permafil » rend Sainte-Marguerite alors
+   que l'offre annonce Lévis — on ne sait pas laquelle est bonne, donc on ne prend ni l'une
+   ni l'autre.
+
+Cette garde refuse aussi des cas justes : une adresse dans un arrondissement
+(« Sainte-Foy » pour une offre annoncée à « Québec ») est rejetée. Le coût est **assumé** :
+ne pas prendre une bonne adresse fait perdre une épingle, en prendre une mauvaise envoie
+Marc à la mauvaise porte. Les deux erreurs ne se valent pas.
+
+La même garde s'applique aux adresses d'ANNONCE : une annonce dont l'adresse contredit sa
+propre ville se trompe quelque part, et on ne sait pas où. Une seule règle partout vaut
+mieux qu'une exception à retenir. Quand les deux existent, l'**annonce l'emporte** sur la
+recherche, quel que soit l'ordre d'arrivée.
+
+L'adresse est écrite dans `entreprises_lieux` avec `adresse_source = "offre"` ou
+`"recherche"`, **seulement si la ligne n'en a pas** : elle n'écrase jamais une adresse
+d'OpenStreetMap, qui est un objet cartographié à sa position. L'écran distingue les quatre
+origines — une adresse de recherche s'affiche « trouvée sur le web — à confirmer », parce
+que personne ne l'a vue.
 
 Même schéma que le corps HTTP — littéralement le même, `lib/ingest/depotSchema.ts` : deux
 définitions auraient dérivé, et c'est le canal le moins relu qui aurait gardé la version la

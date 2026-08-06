@@ -33,6 +33,10 @@ export interface OffreBrute {
    * social de Pennsylvanie pour son usine de Lévis. Vide vaut mieux.
    */
   adresse?: string;
+  /** `annonce` (recopiée du texte) ou `recherche` (trouvée sur le web). */
+  adresseSource?: "annonce" | "recherche" | null;
+  /** La page où l'adresse a été trouvée. Exigée quand elle vient d'une recherche. */
+  adresseUrl?: string | null;
   /** URL publique de l'offre. Une offre sans lien n'est pas retenue. */
   lien: string;
   /** Texte de l'annonce, quand la source le donne. Sert à la note, jamais affiché brut. */

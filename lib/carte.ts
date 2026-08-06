@@ -89,7 +89,7 @@ export interface EntrepriseSurCarte {
    * mais sans garantie que l'épingle soit dessus. Les afficher pareil reviendrait à donner
    * la même valeur à une position mesurée et à une adresse déclarée.
    */
-  adresseSource: "osm" | "registre" | "offre" | null;
+  adresseSource: "osm" | "registre" | "offre" | "recherche" | null;
   /**
    * La borne de recharge la plus proche — TROIS états, jamais deux.
    *
@@ -135,7 +135,7 @@ export interface PositionEntreprise {
   lon: number;
   precision: PrecisionEpingle;
   adresse: string | null;
-  adresseSource: "osm" | "registre" | "offre" | null;
+  adresseSource: "osm" | "registre" | "offre" | "recherche" | null;
   /** `null` tant que les bornes n'ont pas été interrogées pour ce lieu. */
   bornes: ProximiteBorne | null;
 }

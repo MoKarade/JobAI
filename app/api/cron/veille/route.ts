@@ -175,10 +175,10 @@ export async function GET(requete: Request) {
     // une adresse civique, et le raffinage la posera à la place du nom. Sans ça,
     // l'information resterait inutilisée sept jours.
     let adressesAnnoncees = 0;
-    for (const { entreprise, adresse } of rapport.adresses) {
+    for (const { entreprise, adresse, source } of rapport.adresses) {
       const maj = await db
         .update(entreprisesLieux)
-        .set({ adresse, adresseSource: "offre", geocodeLe: EPOQUE_A_RETENTER })
+        .set({ adresse, adresseSource: source, geocodeLe: EPOQUE_A_RETENTER })
         .where(
           and(eq(entreprisesLieux.nom, entreprise), isNull(entreprisesLieux.adresse)),
         )

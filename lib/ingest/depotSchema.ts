@@ -11,6 +11,7 @@
 // ne peut donc pas se fabriquer une place en tête de liste, même en l'écrivant dans le lot.
 
 import { z } from "zod";
+import { normaliserLieu } from "./region";
 
 /**
  * Un lien d'offre — et il doit être en http(s).
@@ -50,6 +51,28 @@ export const OffreDeposeeSchema = z.object({
    * quoi Nominatim remonte la municipalité, laquelle passerait pour une adresse exacte).
    */
   adresse: z.string().max(200).default(""),
+  /**
+   * D'OÙ vient cette adresse. C'est la question la plus importante du champ précédent.
+   *
+   * `annonce` = recopiée du texte de l'offre. L'employeur écrit lui-même où est le poste :
+   * c'est la source la plus fiable qui existe pour cette question.
+   *
+   * `recherche` = trouvée par une recherche web, parce que l'annonce n'en donnait pas.
+   * ⚠️ C'est la source la plus RISQUÉE du projet, et elle doit être traitée comme telle :
+   * une recherche « adresse AMETEK » rend le siège social de Pennsylvanie pour une usine de
+   * Lévis. Elle n'est acceptée qu'accompagnée de son `adresseUrl`, et seulement si sa ville
+   * concorde avec celle que l'offre annonce (`villeCoherente`).
+   */
+  adresseSource: z.enum(["annonce", "recherche"]).nullable().default(null),
+  /**
+   * La page où l'adresse a été trouvée, quand elle vient d'une recherche.
+   *
+   * ⚠️ EXIGÉE, ET PAS POUR LA FORME. Une adresse sans provenance est invérifiable : ni Marc
+   * ni une session future ne peuvent la contrôler, et elle prend pourtant l'autorité d'un
+   * fait mesuré. L'URL rend la trouvaille RELISABLE — c'est la seule chose qui distingue
+   * une recherche d'une invention.
+   */
+  adresseUrl: LienOffre.nullable().default(null),
   lien: LienOffre,
   description: z.string().max(20_000).default(""),
   publieeLe: z
@@ -93,4 +116,28 @@ export function adresseUtilisable(brut: string): boolean {
   if (!/\d/.test(t)) return false;
   // Au moins trois lettres consécutives : un nom de voie, pas « 12 A ».
   return /\p{L}{3}/u.test(t);
+}
+
+/**
+ * L'adresse et la ville annoncée parlent-elles du même endroit ?
+ *
+ * ⚠️ C'EST LA GARDE QUI REND LA RECHERCHE WEB ACCEPTABLE. Sans elle, « trouve l'adresse de
+ * X » rend le siège social, le bureau de Montréal, ou l'établissement d'une homonyme —
+ * toutes plausibles, toutes fausses, et toutes indiscernables d'une bonne réponse une fois
+ * écrites en base. L'offre, elle, DIT dans quelle ville est le poste : c'est un fait
+ * indépendant, venu d'une autre source, et deux faits indépendants qui concordent valent
+ * infiniment mieux qu'un seul qui affirme.
+ *
+ * ⚠️ ELLE REFUSE PLUTÔT QU'ELLE NE DEVINE, et ça lui coûte des cas justes. Une adresse dans
+ * un arrondissement (« Sainte-Foy » pour une offre annoncée à « Québec ») sera rejetée. Le
+ * coût est assumé : ne pas prendre une bonne adresse fait perdre une épingle, en prendre une
+ * mauvaise envoie Marc à la mauvaise porte. Les deux erreurs ne se valent pas.
+ *
+ * Sans ville annoncée, il n'y a RIEN à vérifier — donc on refuse. Une adresse invérifiable
+ * n'est pas une adresse prudente, c'est une adresse dont on ignore si elle est bonne.
+ */
+export function villeCoherente(adresse: string, villeAnnoncee: string): boolean {
+  const ville = normaliserLieu(villeAnnoncee);
+  if (ville === "" || !adresseUtilisable(adresse)) return false;
+  return normaliserLieu(adresse).includes(ville);
 }

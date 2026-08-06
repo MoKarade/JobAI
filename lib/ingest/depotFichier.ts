@@ -108,6 +108,8 @@ export function brutesDuDepot(lot: Depot): OffreBrute[] {
     entreprise: o.entreprise,
     ville: o.ville,
     adresse: o.adresse,
+    adresseSource: o.adresseSource,
+    adresseUrl: o.adresseUrl,
     lien: o.lien,
     description: o.description,
     publieeLe: o.publieeLe,

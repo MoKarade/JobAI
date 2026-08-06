@@ -19,17 +19,19 @@ import type { Offre } from "../types";
 import { idOffre, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
 import { RECHERCHES_GUICHET, sourceAts, sourceGuichet } from "./sources";
 import { sourceDepotFichier } from "./depotFichier";
-import { adresseUtilisable } from "./depotSchema";
+import { villeCoherente } from "./depotSchema";
 import type { AtsEntreprise, OffreBrute, Recuperateur, ResultatSource, Source } from "./types";
 
 /** Sources interrogées par exécution. Au-delà, on dépasse la durée d'une fonction. */
 export const MAX_SOURCES_PAR_PASSE = 14;
 
 /** Le compte rendu d'une passe. Tout y est dit, y compris ce qui a échoué. */
-/** Une adresse d'annonce, rattachée à son employeur. */
+/** Une adresse trouvée pour un employeur, avec ce qui permet de la juger. */
 export interface AdresseAnnoncee {
   entreprise: string;
   adresse: string;
+  /** `offre` = écrite dans l'annonce ; `recherche` = trouvée sur le web, donc à vérifier. */
+  source: "offre" | "recherche";
 }
 
 export interface RapportPasse {
@@ -193,12 +195,40 @@ export async function executerPasse(
  * table des lieux ne modélise pas ; le dire ici vaut mieux que de le résoudre au tirage.
  */
 export function adressesAnnoncees(brutes: readonly OffreBrute[]): AdresseAnnoncee[] {
-  const par = new Map<string, string>();
+  const par = new Map<string, AdresseAnnoncee>();
+
   for (const b of brutes) {
     const entreprise = b.entreprise.trim();
     const adresse = (b.adresse ?? "").trim();
-    if (entreprise === "" || !adresseUtilisable(adresse)) continue;
-    if (!par.has(entreprise)) par.set(entreprise, adresse);
+    if (entreprise === "") continue;
+
+    // ⚠️ LA GARDE DE COHÉRENCE S'APPLIQUE AUX DEUX ORIGINES, pas seulement à la recherche
+    // web. Une annonce dont l'adresse contredit sa propre ville se trompe quelque part, et
+    // on ne sait pas où : la refuser coûte une épingle, la prendre envoie à la mauvaise
+    // porte. Une seule règle, appliquée partout, plutôt qu'une exception à retenir.
+    if (!villeCoherente(adresse, b.ville)) continue;
+
+    // ⚠️ UNE ADRESSE DE RECHERCHE SANS SA PAGE EST REFUSÉE. Sans provenance, elle est
+    // invérifiable — ni Marc ni une session future ne peuvent la contrôler — et elle prend
+    // pourtant l'autorité d'un fait mesuré. L'URL est ce qui distingue une trouvaille d'une
+    // invention ; l'exiger est le prix d'admission de cette source.
+    const cherchee = b.adresseSource === "recherche";
+    if (cherchee && !(b.adresseUrl ?? "").trim()) continue;
+
+    const trouvee: AdresseAnnoncee = {
+      entreprise,
+      adresse,
+      source: cherchee ? "recherche" : "offre",
+    };
+
+    // L'ANNONCE L'EMPORTE SUR LA RECHERCHE, quel que soit l'ordre d'arrivée. L'employeur
+    // qui écrit où est son poste bat une page trouvée sur le web — et faire dépendre ce
+    // choix de l'ordre des offres reviendrait à le tirer au sort.
+    const dejaLa = par.get(entreprise);
+    if (dejaLa === undefined || (dejaLa.source === "recherche" && trouvee.source === "offre")) {
+      par.set(entreprise, trouvee);
+    }
   }
-  return [...par].map(([entreprise, adresse]) => ({ entreprise, adresse }));
+
+  return [...par.values()];
 }
