@@ -6,13 +6,13 @@
 
 ---
 
-## Session 2026-08-06 — la borne la plus proche (et non plus « aucune » partout)
+## Session 2026-08-06 — la borne la plus proche, le registre épuisé, la veille débloquée
 
 ### État en une page
 
 | | |
 |---|---|
-| **Gate** | `typecheck` + `test` (**694**) + `lint` (0 avertissement) + `build` verts, jugés par exit code. |
+| **Gate** | `typecheck` + `test` (**715**) + `lint` (0 avertissement) + `build` verts, jugés par exit code. |
 | **Le vrai défaut des bornes** | La mesure fonctionnait (`bornes=81/81`, aucune ligne d'erreur, migration `0011` appliquée) — c'est le **plafond de 350 m** qui rendait la réponse inutile : presque aucun employeur industriel n'a de borne à trois coins de rue, donc l'écran affichait « aucune » partout. Exact, et sans valeur. |
 | **[BORNE-05]** | Le plafond est retiré : `proximiteBorne` rend **la plus proche, quelle que soit sa distance**. La portée de la requête passe de 350 m à 15 km (`PORTEE_RECHERCHE_M`), et `ETENDUE_MAX_DEG` de 2 à 3 — la marge coûte ~0,4° en longitude, et un lot Portneuf↔Charlevoix arrivait à 1,99°, au bord du refus. |
 | **Ce qu'on rapporte en plus** | La **marque** (`network` → `brand` → `operator` → `name` : le réseau AVANT le nom, qui porte souvent le stationnement d'accueil), la **vitesse** (`fast_charge`, prises à courant continu, puissance ≥ 25 kW) et le **tarif publié**. Nouvelles colonnes `bornes_rapide`, `bornes_tarif` ; migration `0012` efface les dates pour tout remesurer au nouveau sens. |
@@ -31,14 +31,45 @@
   fonction même qui filtre ensuite : 17 m de manque sur 15 km — invisible à 350 m. Un seul
   `RAYON_TERRE_M`, partagé.
 
+### `[LIEU-01]` — le registre est épuisé comme levier, et c'est mesuré
+
+`registre=0/58 (5 ambigues) (53 absentes)`. La ligne `[registre] pistes` nomme enfin les
+cas, et elle tranche dans les deux sens :
+
+- **Ce qui se corrigeait** : le complément entre parenthèses. `Adecco (Papiers White Birch -
+  Stadacona)` ne trouvait rien pendant que le registre contient « ADECCO » ; idem `JDHM
+  (Après sinistre)`. `clesDeRecherche` cherche donc AUSSI sans la parenthèse — du côté de la
+  question, jamais dans `cleNom` (dont dérive le `nomCle` déjà stocké à l'import : y toucher
+  désaccorderait les deux en silence).
+- **Ce qu'il ne faut PAS corriger** : `S Huot Inc` → « RÉAL HUOT INC. » (autre entreprise),
+  `Groupe Mundial` (division Metal Bernard) → « Casino Mundial », `Evident Scientific` →
+  « RADIO EVIDENTIA ». Trois adresses fausses, trois mauvaises portes. Un test verrouille ces
+  trois cas : il tombe si quelqu'un ajoute un retrait de mot générique ou un préfixe.
+- **Ce qui n'est nulle part** : `Permafil`, `Agilean`, `AMETEK` — « rien sous X ».
+
+Reste donc ouvert : la plupart des employeurs sont épinglés au **centre de leur ville**, et
+ni OpenStreetMap (qui ne cartographie pas les PME) ni le registre ne les placeront. Le
+prochain levier honnête est une **adresse saisie par Marc** (`adresseSource: "manuelle"`),
+pas un rapprochement plus souple.
+
+### `[VEILLE-05]` — un second canal, sans jeton
+
+Livré : `data/depot/AAAA-MM-JJ.json`, lu par `lib/ingest/depotFichier.ts`, déclaré source
+**hors rotation** dans `passe.ts`. Une session de développement a le connecteur Indeed **et**
+le dépôt git, mais aucun accès réseau vers l'app — elle écrit un fichier et le pousse.
+**Premier lot réel : 26 offres, 25 retenues par `trier()`, 1 sous le plancher.**
+
+⚠️ **La Routine quotidienne est créée mais SANS le connecteur Indeed.** `create_trigger` a
+refusé de le transmettre (« the connectors parameter is not available for this
+organization »), et les sessions qu'elle allume n'auront donc pas `mcp__Indeed__*`. Le prompt
+s'arrête proprement dans ce cas plutôt que d'écrire un lot vide — un lot vide se lirait
+« la veille a tourné et n'a rien vu », et ferait périmer des offres encore ouvertes. **Geste
+de Marc, un seul** : ajouter le connecteur Indeed à la Routine
+« JobAI — veille Indeed quotidienne » (`trig_01PBbNZQEnNu4tXuQ6He9yFs`, 11:00 UTC) depuis
+l'écran Routines de claude.ai.
+
 ### Ce qui reste ouvert
 
-- **`[LIEU-01]`** — « toutes les offres et entreprises aient un emplacement ». Les pistes
-  mesurées en production montrent que **Adecco** (« ADECCO QUÉBEC ») et **S Huot**
-  (« RÉAL HUOT INC. ») existent bien au registre : c'est le nettoyage de nom qui échoue,
-  pas le registre. `Permafil`, `Agilean`, `AMETEK` en sont réellement absents.
-- **`[VEILLE-05]`** — « qu'il m'en trouve des nouvelles chaque jour ». Les sept sources
-  automatiques sont closes ; le seul canal vivant reste `POST /api/ingest/depot`.
 - **Signature des commits** : toujours bloquée (clé de signature de 0 octet dans le conteneur).
 
 ---
