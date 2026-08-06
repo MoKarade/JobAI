@@ -549,6 +549,25 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   script : toute incertitude (historique tronqué, diff illisible, extension inconnue) se
   résout en CONSTRUISANT. La liste des exemptions est FERMÉE, celle de ce qui construit est
   ouverte, et les deux sens de la panne sont prouvés par sonde.
+- **Un revert de conteneur n'emporte pas que le travail : il emporte la PLOMBERIE GIT, et
+  tous les outils qui s'y fient se mettent à mentir.** Vécu deux fois le 2026-08-05. Le
+  premier symptôme est le bon : `git status` annonce « 124 commits non poussés, aucune
+  branche distante » alors que le serveur porte exactement le HEAD local. La cause n'est pas
+  l'état du dépôt mais celui de `.git/config` : le `refspec` de `origin` avait été réduit à
+  une vieille branche de travail, sans `main`, et `refs/remotes/origin/main` avait disparu.
+  Sans ce mapping, `git fetch` réussit, la ref est écrite, et git refuse quand même de la
+  reconnaître comme branche de suivi — donc `@{u}` n'existe pas et tout compte de « non
+  poussés » se fait contre le vide.
+  Réflexe en trois temps, dans cet ordre : (1) **le serveur d'abord** — `git ls-remote origin
+  <branche>` comparé à `git rev-parse HEAD` tranche en une commande, et c'est la seule
+  vérité ; (2) si l'écart est réel, `git merge-base --is-ancestor HEAD FETCH_HEAD` AVANT tout
+  `checkout -B`, sinon on détruit du travail local unique ; (3) réparer la plomberie
+  (`git config --add remote.origin.fetch '+refs/heads/main:refs/remotes/origin/main'` puis
+  `--set-upstream-to`), sans quoi le prochain outil racontera la même histoire.
+  Corollaire de comportement : sous un conteneur qui reverte, **committer ne protège plus** —
+  seul un push protège. Un lot vert se pousse tout de suite ; c'est aussi ce qui rend
+  l'`ignoreCommand` de `vercel.json` payant, puisqu'un lot de docs ou de tests ne coûte alors
+  aucun déploiement.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 
