@@ -26,9 +26,9 @@ import { entreprisesLieux } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import type { PositionEntreprise } from "@/lib/carte";
 import { ENTREPRISES_CIBLES } from "@/lib/reference";
-import { SEUIL_PALIER_A, SEUIL_PALIER_B } from "@/lib/scoring";
 import { classerPanne, type Panne } from "@/lib/panne";
 import { Cadre } from "@/components/Cadre";
+import { couleurNote } from "@/lib/couleurNote";
 import { CarteFiltrable } from "@/components/CarteFiltrable";
 import { resteDuTravail, type LieuTravail } from "@/lib/travaux";
 import { mesurerDistances, passeGeocodage } from "@/lib/actions";
@@ -211,33 +211,24 @@ export default async function PageCarte() {
 
   return (
     <Cadre actif="/carte" titre="Carte des offres">
-      <p className="intro-section">
-        Chaque cercle plein est une <strong>entreprise</strong> à son emplacement ; un cercle
-        en <strong>pointillé</strong> regroupe celles qu’OpenStreetMap ne connaît pas, posées
-        au centre de leur ville — la position est alors approximative, et la fiche le dit.
-        Clique une épingle pour l’entreprise, ses offres et le trajet.
-      </p>
-
-      {/* Les couleurs des cercles portent le palier : la légende le DIT, avec les seuils
-          LUS depuis le barème — recopiés, ils mentiraient au premier ajustement. */}
+      {/* ⚠️ UNE LÉGENDE, PAS UN MODE D'EMPLOI (demande de Marc, 2026-08-06 : « des
+          légendes simples au lieu de texte inutile »). Le paragraphe d'avant expliquait en
+          quatre lignes ce que l'épingle montre maintenant elle-même : depuis qu'elle PORTE
+          son score, il n'y a plus de code couleur à décoder. Reste ce qui ne se devine
+          pas — que le pointillé veut dire « au centre de la ville, faute d'adresse ». */}
       <p className="carte-legende">
         <span>
-          <span className="carte-legende__pastille" style={{ background: "#7c5cff" }} />
-          {SEUIL_PALIER_A}+ (fonce)
+          <span className="carte-legende__pastille" style={{ background: couleurNote(90) }} />
+          proche de 100
         </span>
         <span>
-          <span className="carte-legende__pastille" style={{ background: "#2f9e6d" }} />
-          {SEUIL_PALIER_B}–{SEUIL_PALIER_A - 1} (solide)
+          <span className="carte-legende__pastille" style={{ background: couleurNote(50) }} />
+          plus bas
         </span>
         <span>
-          <span className="carte-legende__pastille" style={{ background: "#c98a1b" }} />
-          sous {SEUIL_PALIER_B}
+          <span className="carte-legende__pastille carte-legende__pastille--approx" />
+          position approximative
         </span>
-        <span>
-          <span className="carte-legende__pastille" style={{ background: "#7a8194" }} />
-          sans offre active
-        </span>
-        <span>pointillé = position approximative</span>
       </p>
 
       {/* Le filtrage et l'assemblage des épingles vivent côté client : c'est ce qui rend

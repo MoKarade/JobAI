@@ -2,9 +2,13 @@
 
 // components/CarteOffres.tsx — la carte, côté navigateur.
 //
-// Depuis [UX-09], une épingle est une ENTREPRISE (cercle plein, teinté par le palier de sa
-// meilleure offre) ou un GROUPE d'entreprises posées au centre de leur ville faute de mieux
-// (cercle en pointillé, neutre — la précision se voit avant même d'ouvrir la fenêtre).
+// Depuis [UX-09], une épingle est une ENTREPRISE, ou un GROUPE d'entreprises posées au
+// centre de leur ville faute de mieux — ce dernier se voit au trait POINTILLÉ, avant même
+// d'ouvrir la fenêtre.
+//
+// Chaque pastille PORTE le meilleur score de ses offres, et sa couleur vient de la même
+// échelle continue que les cercles de la liste (`lib/couleurNote.ts`). Un cercle de
+// couleur seul obligeait à cliquer pour savoir ce qu'il valait — donc à cliquer partout.
 //
 // Leaflet touche `window` dès son import : il est donc chargé DYNAMIQUEMENT dans un effet.
 // Un import statique casserait le rendu serveur de la page entière.
@@ -23,16 +27,10 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import { centreDuCadrage, type Epingle, type EntrepriseSurCarte } from "@/lib/carte";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
-import { palier } from "@/lib/scoring";
+import { couleurNote } from "@/lib/couleurNote";
 import { minutesAPied } from "@/lib/bornes";
 import { mentionSource } from "@/lib/adresse";
 
-/** Couleurs des paliers, alignées sur celles des cartes d'offre. */
-const TEINTE: Record<ReturnType<typeof palier>, string> = {
-  A: "#7c5cff",
-  B: "#2f9e6d",
-  C: "#c98a1b",
-};
 /** Une cible sans offre active n'a pas de palier : teinte neutre, pas un faux « C ». */
 const TEINTE_SANS_OFFRE = "#7a8194";
 
@@ -185,16 +183,30 @@ export function CarteOffres({
               return max === null ? o.score : Math.max(max, o.score);
             }, null);
           const aDesOffres = e.entreprises.some((x) => x.offres.length > 0);
-          const teinte = aDesOffres ? TEINTE[palier(meilleure)] : TEINTE_SANS_OFFRE;
 
-          const cercle = L.circleMarker([e.lat, e.lon], {
-            radius: approximative ? 12 : 9,
-            color: teinte,
-            fillColor: teinte,
-            // Le pointillé EST le signal « approximatif » : il se voit avant tout clic.
-            dashArray: approximative ? "4 4" : undefined,
-            fillOpacity: approximative ? 0.25 : 0.6,
-            weight: 2,
+          // ⚠️ L'ÉPINGLE PORTE LE SCORE (demande de Marc, 2026-08-06 : « je veux pouvoir
+          // voir le score de l'offre dans la carte »). Un cercle de couleur seul obligeait
+          // à cliquer pour savoir ce qu'il valait — donc à cliquer partout. Le nombre écrit
+          // dedans supprime ce détour, et il porte l'information même pour qui ne
+          // distingue pas les teintes (WCAG 1.4.1).
+          //
+          // La couleur vient de la MÊME fonction que les cercles de la liste
+          // (`lib/couleurNote.ts`) : le plan et la liste doivent parler de la même échelle,
+          // sinon un même score se dit de deux façons selon l'écran qu'on regarde.
+          const fond = aDesOffres ? couleurNote(meilleure) : TEINTE_SANS_OFFRE;
+          const libelle = meilleure === null ? (aDesOffres ? "–" : "") : String(meilleure);
+          const taille = approximative ? 38 : 34;
+
+          const cercle = L.marker([e.lat, e.lon], {
+            icon: L.divIcon({
+              className: "",
+              html:
+                `<span class="epingle${approximative ? " epingle--approx" : ""}" ` +
+                `style="background:${fond};width:${taille}px;height:${taille}px">` +
+                `${echapper(libelle)}</span>`,
+              iconSize: [taille, taille],
+              iconAnchor: [taille / 2, taille / 2],
+            }),
           }).addTo(instance);
 
           const contenu =

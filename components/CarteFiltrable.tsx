@@ -154,8 +154,10 @@ export function CarteFiltrable({
 
       {vue.aSituer.length > 0 ? (
         <p className="carte__manquants">
-          Pas encore situé{vue.aSituer.length > 1 ? "es" : "e"} — la localisation se complète
-          toute seule, à chaque passage et chaque nuit : {vue.aSituer.join(", ")}.
+          {/* La phrase disait en trois lignes ce que la liste dit déjà : ces entreprises
+              n'ont pas de position. Le fait utile — ça se règle tout seul — tient en trois
+              mots, et les noms suffisent au reste. */}
+          Sans position (se complète seule) : {vue.aSituer.join(", ")}.
         </p>
       ) : null}
 

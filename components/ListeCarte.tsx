@@ -13,6 +13,7 @@ import Link from "next/link";
 import type { Epingle } from "@/lib/carte";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { palier } from "@/lib/scoring";
+import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { Fait } from "./Icone";
 import { RAYON_5_MIN_M, minutesAPied } from "@/lib/bornes";
 import { ADRESSE_ABSENTE, mentionSource } from "@/lib/adresse";
@@ -78,10 +79,21 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                       key={o.id}
                       className={`carte-liste__offre carte-liste__offre--${palier(o.score)}`}
                     >
+                      {/* ⚠️ LE SCORE SE VOIT ICI AUSSI (demande de Marc, 2026-08-06 :
+                          « je veux voir le score dans la carte ET sur le côté »). Même
+                          pastille, même échelle de couleur que le plan et que la liste
+                          d'offres : un score doit se dire d'une seule façon, sinon on
+                          apprend trois codes pour une seule information. */}
+                      <span
+                        className="carte-liste__note"
+                        style={{ background: couleurNote(o.score), color: encreSurNote() }}
+                        title={o.score === null ? "Jamais notée" : `${o.score} sur 100`}
+                      >
+                        {o.score ?? "–"}
+                      </span>
                       <Link href={`/offre/${o.id}`}>{o.poste}</Link>
                       <span className="carte-liste__faits">
-                        {o.score === null ? "–" : o.score}
-                        {o.km === null ? "" : ` · ${String(o.km).replace(".", ",")} km`}
+                        {o.km === null ? "" : `${String(o.km).replace(".", ",")} km`}
                       </span>
                     </li>
                   ))}
