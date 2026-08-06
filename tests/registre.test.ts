@@ -11,6 +11,7 @@ import {
   choisirEtablissement,
   type Etablissement,
   cleNom,
+  clesDeRecherche,
   decouperCsv,
   indicesColonnes,
   lireEtablissement,
@@ -326,5 +327,57 @@ describe("par quel mot chercher dans le registre", () => {
   it("rend null quand il n'y a rien à chercher", () => {
     expect(motDeRecherche("")).toBeNull();
     expect(motDeRecherche("s a")).toBeNull();
+  });
+});
+
+describe("les clés de recherche — une variante mesurée, et pas une de plus", () => {
+  it("commence TOUJOURS par la clé exacte", () => {
+    // L'ordre est la politique : une entreprise qui figure telle quelle au registre ne doit
+    // jamais être résolue par une forme raccourcie qui pourrait désigner autre chose.
+    expect(clesDeRecherche("Laserax")[0]).toBe(cleNom("Laserax"));
+  });
+
+  it("retire le complément entre parenthèses — le cas mesuré en production", () => {
+    // `Adecco (Papiers White Birch - Stadacona)` ne trouvait rien pendant que le registre
+    // contient « ADECCO ». La parenthèse dit OÙ ou POUR QUI, jamais QUI.
+    const cles = clesDeRecherche("Adecco (Papiers White Birch - Stadacona)");
+    expect(cles).toContain("adecco");
+    expect(cles[0]).toBe("adecco papiers white birch stadacona");
+  });
+
+  it("gère le second cas réel : JDHM (Après sinistre)", () => {
+    expect(clesDeRecherche("JDHM (Après sinistre)")).toContain("jdhm");
+  });
+
+  it("ne rend qu'UNE clé quand il n'y a pas de parenthèse — pas de bruit", () => {
+    expect(clesDeRecherche("Robotiq")).toEqual(["robotiq"]);
+  });
+
+  it("dédoublonne quand la parenthèse ne change rien", () => {
+    expect(clesDeRecherche("Robotiq ()")).toEqual(["robotiq"]);
+  });
+
+  it("N'INVENTE AUCUNE AUTRE VARIANTE — les trois faux rapprochements de la production", () => {
+    // ⚠️ LE VERROU QUI COMPTE, et il est dérivé de cas RÉELS, pas imaginés. La ligne
+    // `[registre] pistes` du 2026-08-06 montre ce qu'un rapprochement plus souple
+    // écrirait : « S Huot Inc » → RÉAL HUOT INC. (une autre entreprise), « Groupe
+    // Mundial » (division Metal Bernard) → Casino Mundial, « Evident Scientific » →
+    // RADIO EVIDENTIA. Trois adresses fausses, trois mauvaises portes.
+    //
+    // Ce test tombe si quelqu'un ajoute un jour un retrait de mot générique ou une
+    // correspondance par préfixe : les clés cessent alors d'être des identités.
+    expect(clesDeRecherche("S Huot Inc")).toEqual(["s huot"]);
+    expect(clesDeRecherche("Groupe Mundial")).toEqual(["groupe mundial"]);
+    expect(clesDeRecherche("Evident Scientific")).toEqual(["evident scientific"]);
+  });
+
+  it("ne rend JAMAIS de clé vide — une clé vide interrogerait tout le registre", () => {
+    // Un nom entièrement entre parenthèses garde quand même sa clé exacte : `cleNom` traite
+    // déjà la ponctuation comme du séparateur. C'est la VARIANTE qui devient vide, et c'est
+    // elle qu'on écarte — sans quoi `inArray` recevrait une chaîne vide, qui n'apparie rien
+    // mais s'ajouterait à chaque requête.
+    expect(clesDeRecherche("(tout entre parenthèses)")).toEqual(["tout entre parentheses"]);
+    expect(clesDeRecherche("   ")).toEqual([]);
+    expect(clesDeRecherche("Adecco (…)").every((c) => c !== "")).toBe(true);
   });
 });

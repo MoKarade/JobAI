@@ -231,6 +231,42 @@ export function motDeRecherche(cle: string): string | null {
   return mots.find((m) => !MOTS_GENERIQUES.has(m)) ?? mots[0] ?? null;
 }
 
+/**
+ * Les clés sous lesquelles CHERCHER une entreprise, de la plus sûre à la moins sûre.
+ *
+ * ⚠️ POURQUOI CE N'EST PAS UN ASSOUPLISSEMENT DE `cleNom`. Le registre est importé une
+ * fois, et `nomCle` y est calculé PAR `cleNom` au moment de l'import. Toucher à `cleNom`
+ * désaccorderait en silence les clés stockées et les clés cherchées — la comparaison
+ * continuerait de « marcher », sur deux normalisations différentes. Les variantes vivent
+ * donc du côté de la QUESTION, jamais du côté des données déjà écrites.
+ *
+ * UNE SEULE VARIANTE, ET ELLE EST MESURÉE. Le nom d'employeur d'une offre porte parfois un
+ * complément entre parenthèses : le site du poste, la division, le donneur d'ordre. La
+ * production du 2026-08-06 en donne deux, `Adecco (Papiers White Birch - Stadacona)` et
+ * `JDHM (Après sinistre)` — et le registre contient bien « ADECCO ». La parenthèse dit OÙ
+ * ou POUR QUI, jamais QUI : la retirer pose la même question, mieux.
+ *
+ * ⚠️ ET RIEN D'AUTRE — LA PRODUCTION A MONTRÉ POURQUOI. La ligne `[registre] pistes` du
+ * même jour prouve qu'un rapprochement plus souple écrirait des adresses FAUSSES :
+ * `S Huot Inc` → « RÉAL HUOT INC. » (une autre entreprise), `Groupe Mundial` (division
+ * Metal Bernard) → « Casino Mundial », `Evident Scientific` → « RADIO EVIDENTIA ». Trois
+ * cas réels, trois mauvaises portes. Un mot commun n'est pas une identité, et une adresse
+ * plausible et fausse est pire que pas d'adresse (garde-fou n°3).
+ */
+export function clesDeRecherche(nom: string): string[] {
+  const cles: string[] = [];
+  const ajouter = (c: string) => {
+    if (c !== "" && !cles.includes(c)) cles.push(c);
+  };
+
+  ajouter(cleNom(nom));
+  // La parenthèse et son contenu, où qu'ils soient — une non capturante suffit, on ne
+  // garde rien de ce qu'elle contient.
+  ajouter(cleNom(nom.replace(/\([^)]*\)/g, " ")));
+
+  return cles;
+}
+
 /** Deux noms désignent-ils la même entreprise ? Comparaison STRICTE sur la clé. */
 export function memeEntreprise(a: string, b: string): boolean {
   const ca = cleNom(a);

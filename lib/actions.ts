@@ -46,6 +46,7 @@ import {
   adresseLisible,
   choisirEtablissement,
   cleNom,
+  clesDeRecherche,
   motDeRecherche,
   type Etablissement,
 } from "./registre";
@@ -455,7 +456,14 @@ async function adressesDepuisRegistre(
 
   // Une seule lecture pour tout le lot : les clés recherchées sont peu nombreuses, et
   // interroger la base une fois par entreprise ferait des dizaines d'allers-retours.
-  const cles = [...new Set(sansAdresse.map((l) => cleNom(l.nom)))].filter((c) => c !== "");
+  // ⚠️ TOUTES LES VARIANTES D'UN NOM, PAS SEULEMENT SA CLÉ EXACTE (`clesDeRecherche`).
+  // Un employeur d'offre s'écrit parfois avec un complément entre parenthèses — le site du
+  // poste, la division. `Adecco (Papiers White Birch - Stadacona)` ne trouvait donc rien
+  // pendant que le registre contient « ADECCO ». La variante est cherchée EN PLUS, jamais À
+  // LA PLACE : l'ordre de préférence reste l'exact d'abord.
+  const cles = [
+    ...new Set(sansAdresse.flatMap((l) => clesDeRecherche(l.nom))),
+  ].filter((c) => c !== "");
   if (cles.length === 0) return vide;
 
   // DEUX CHEMINS DE RECHERCHE, ET LE SECOND EST CELUI QUI MANQUAIT.
@@ -552,7 +560,13 @@ async function adressesDepuisRegistre(
   const nomsAbsents: string[] = [];
 
   for (const lieu of sansAdresse) {
-    const candidats = parCle.get(cleNom(lieu.nom)) ?? [];
+    // La PREMIÈRE variante qui donne quelque chose gagne — `clesDeRecherche` les rend par
+    // confiance décroissante. S'arrêter là garde la clé exacte prioritaire : une entreprise
+    // qui existe telle quelle au registre n'est jamais résolue par une forme raccourcie.
+    const candidats =
+      clesDeRecherche(lieu.nom)
+        .map((c) => parCle.get(c))
+        .find((liste) => liste !== undefined && liste.length > 0) ?? [];
     if (candidats.length === 0) {
       nomsAbsents.push(lieu.nom);
       continue;
