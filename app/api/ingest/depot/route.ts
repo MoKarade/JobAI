@@ -31,6 +31,7 @@ import { offerReasons, offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { colonnesOffre } from "@/lib/persistance";
 import { trier, villesACompleter } from "@/lib/ingest/pipeline";
+import { LotDeposeSchema } from "@/lib/ingest/depotSchema";
 import { appliquerBalayage, type JournalVeille } from "@/lib/veille";
 
 export const dynamic = "force-dynamic";
@@ -39,34 +40,16 @@ export const maxDuration = 60;
 const CLE_JOURNAL = "veille-journal";
 
 /**
- * Ce qu'un déposant a le droit d'envoyer.
+ * Ce qu'un déposant a le droit d'envoyer — le MÊME schéma que le dépôt par fichier.
  *
- * Volontairement PAUVRE : ni note, ni priorité, ni statut. Ce sont des jugements, et ils se
- * calculent ici à partir de ce que le barème sait faire — pas à partir de ce qu'un appelant
- * affirme. Les bornes de taille évitent qu'un lot malformé fasse tomber la route.
+ * ⚠️ IL VIVAIT ICI EN DOUBLE. Les deux canaux portent exactement le même contenu ; deux
+ * définitions auraient dérivé, et c'est le canal le moins relu qui aurait gardé la version
+ * la plus permissive. Le détail qui le prouve : `z.string().url()` acceptait
+ * `javascript:…` des DEUX côtés — corrigé une fois, dans `lib/ingest/depotSchema.ts`.
  */
-const OffreDeposeeSchema = z.object({
-  titre: z.string().min(1).max(200),
-  entreprise: z.string().max(120).default(""),
-  ville: z.string().max(120).default(""),
-  lien: z.string().url().max(500),
-  description: z.string().max(20_000).default(""),
-  publieeLe: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullable()
-    .default(null),
-  refSource: z.string().max(200).default(""),
-});
+const LotSchema = LotDeposeSchema;
 
-const LotSchema = z.object({
-  /** D'où vient ce lot. Apparaît dans le rapport : un dépôt anonyme ne se débogue pas. */
-  source: z.string().min(1).max(60),
-  /** Date du balayage (AAAA-MM-JJ), dans le fuseau de Marc. */
-  jour: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  offres: z.array(OffreDeposeeSchema).max(300),
-});
-
+/** Comparaison à temps constant : un `===` sur un secret fuit sa longueur commune. */
 function memeSecret(a: string, b: string): boolean {
   const ha = createHash("sha256").update(a).digest();
   const hb = createHash("sha256").update(b).digest();

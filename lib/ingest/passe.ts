@@ -18,7 +18,8 @@ import { appliquerBalayage, resumerBalayage, type JournalVeille } from "../veill
 import type { Offre } from "../types";
 import { idOffre, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
 import { RECHERCHES_GUICHET, sourceAts, sourceGuichet } from "./sources";
-import type { AtsEntreprise, OffreBrute, Recuperateur, ResultatSource } from "./types";
+import { sourceDepotFichier } from "./depotFichier";
+import type { AtsEntreprise, OffreBrute, Recuperateur, ResultatSource, Source } from "./types";
 
 /** Sources interrogées par exécution. Au-delà, on dépasse la durée d'une fonction. */
 export const MAX_SOURCES_PAR_PASSE = 14;
@@ -59,19 +60,27 @@ export interface RapportPasse {
 export function selectionnerSources(
   ats: readonly AtsEntreprise[],
   depart: number,
-): ReturnType<typeof sourceGuichet>[] {
-  const toutes = [
+  aujourdhui: string,
+): Source[] {
+  // ⚠️ LE DÉPÔT DE FICHIERS EST HORS ROTATION, ET C'EST TOUT L'INTÉRÊT. La rotation existe
+  // pour ne pas dépasser la durée d'une fonction en interrogeant douze sources RÉSEAU. Le
+  // dépôt ne fait aucune requête : il lit un fichier du projet. Le mettre dans la rotation
+  // le ferait sauter certains jours — donc les offres qu'il porte ne seraient pas « revues »
+  // ce jour-là, et la péremption les ferait disparaître alors qu'elles sont bien là.
+  const depot = sourceDepotFichier(aujourdhui);
+
+  const reseau = [
     ...RECHERCHES_GUICHET.map((r) => sourceGuichet(r)),
     ...ats.map((a) => sourceAts(a)),
   ];
-  if (toutes.length <= MAX_SOURCES_PAR_PASSE) return toutes;
+  if (reseau.length <= MAX_SOURCES_PAR_PASSE) return [depot, ...reseau];
 
-  const debut = ((depart % toutes.length) + toutes.length) % toutes.length;
-  const choisies: typeof toutes = [];
+  const debut = ((depart % reseau.length) + reseau.length) % reseau.length;
+  const choisies: typeof reseau = [];
   for (let i = 0; i < MAX_SOURCES_PAR_PASSE; i++) {
-    choisies.push(toutes[(debut + i) % toutes.length]!);
+    choisies.push(reseau[(debut + i) % reseau.length]!);
   }
-  return choisies;
+  return [depot, ...choisies];
 }
 
 /**
@@ -92,7 +101,7 @@ export async function executerPasse(
   aujourdhui: string,
   rec: Recuperateur,
 ): Promise<RapportPasse> {
-  const sources = selectionnerSources(ats, depart);
+  const sources = selectionnerSources(ats, depart, aujourdhui);
 
   // En parallèle : les sources sont indépendantes, et les enchaîner ferait dépasser la
   // durée de la fonction bien avant d'avoir tout interrogé.

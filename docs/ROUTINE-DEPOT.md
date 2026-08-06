@@ -26,6 +26,38 @@ la région — et deux « trouvailles » étaient des homonymes à Amsterdam.
 Reste `POST /api/ingest/depot` : la Routine a le connecteur Indeed, l'app a la base. **Ce n'est pas une entorse au garde-fou n°4** : l'app ne va rien chercher, elle
 reçoit — et elle applique au lot reçu exactement le tri du cron.
 
+## Deuxième canal, sans jeton : `data/depot/AAAA-MM-JJ.json`
+
+Depuis le 2026-08-06, un second chemin existe, et il ne demande **aucun geste de Marc**.
+
+Une session de développement a le connecteur Indeed **et** le dépôt git, mais **aucun accès
+réseau vers l'app** — mesuré : le proxy refuse `emploi.hubperso.com` comme il refuse
+Overpass. Elle ne peut donc pas appeler le point de dépôt. Elle peut, en revanche, **écrire
+un fichier et le pousser** : Vercel déploie, et l'app lit ce qu'elle porte elle-même.
+
+    data/depot/2026-08-06.json
+    { "source": "session-indeed", "jour": "2026-08-06", "offres": [ … ] }
+
+Même schéma que le corps HTTP — littéralement le même, `lib/ingest/depotSchema.ts` : deux
+définitions auraient dérivé, et c'est le canal le moins relu qui aurait gardé la version la
+plus permissive. La ville s'écrit **seule**, sans province (« Québec », pas « Quebec City,
+QC »).
+
+Le fichier est lu par `lib/ingest/depotFichier.ts`, déclaré comme une source **hors
+rotation** dans `lib/ingest/passe.ts` : il ne fait aucune requête, donc rien ne justifie de
+le sauter certains jours — et le sauter ferait périmer à tort les offres qu'il porte.
+
+⚠️ **Seuls les sept derniers jours sont relus** (`FENETRE_DEPOT_JOURS`). Sans cette fenêtre,
+plus aucune offre ne périmerait jamais : un lot de janvier serait « revu » chaque matin, et
+une annonce fermée resterait ouverte à l'écran pour toujours.
+
+**Premier lot réel** : 26 offres Indeed le 2026-08-06 (recherches « coordonnateur de
+projet », « superviseur de production », « chargé de projet » sur Québec et Lévis) — 25
+retenues par `trier()`, 1 sous le plancher d'adéquation. Mesuré, pas supposé.
+
+Les deux canaux coexistent sans se gêner : le dédoublonnage se fait sur `refSource`, donc
+une offre déposée par les deux n'entre qu'une fois.
+
 ## Le prompt à coller dans la Routine
 
 > Fréquence : **une fois par jour**, le matin. Le stock ne monte pas parce qu'un dépôt a
