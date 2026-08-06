@@ -81,9 +81,10 @@ export default async function PageCarte() {
               l.bornesLe === null
                 ? null
                 : {
-                    nombre: l.bornesM === null ? 0 : 1,
                     plusProcheM: l.bornesM,
                     nom: l.bornesNom,
+                    rapide: l.bornesRapide,
+                    tarif: l.bornesTarif,
                   },
           },
         ]),

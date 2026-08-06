@@ -31,6 +31,7 @@
 import type { EntrepriseCible } from "./reference";
 import type { Offre } from "./types";
 import { villeGeocodable } from "./geocodage";
+import type { ProximiteBorne } from "./bornes";
 import { apparier as apparierNoms, positionDe } from "./employeurs";
 
 // L'appariement des noms d'employeur vit dans `lib/employeurs.ts` : la carte n'est pas
@@ -90,12 +91,12 @@ export interface EntrepriseSurCarte {
    */
   adresseSource: "osm" | "registre" | null;
   /**
-   * Les bornes de recharge à cinq minutes à pied — TROIS états, jamais deux.
+   * La borne de recharge la plus proche — TROIS états, jamais deux.
    *
-   * `null` = jamais interrogé. `{ nombre: 0 }` = interrogé, aucune borne. Les confondre
-   * ferait passer un lieu non mesuré pour un lieu sans borne.
+   * `null` = jamais interrogé. `{ plusProcheM: null }` = interrogé, rien trouvé dans la
+   * portée. Les confondre ferait passer un lieu non mesuré pour un lieu sans borne.
    */
-  bornes: { nombre: number; plusProcheM: number | null; nom: string | null } | null;
+  bornes: ProximiteBorne | null;
   lecture: string;
   offres: OffreSurCarte[];
 }
@@ -136,7 +137,7 @@ export interface PositionEntreprise {
   adresse: string | null;
   adresseSource: "osm" | "registre" | null;
   /** `null` tant que les bornes n'ont pas été interrogées pour ce lieu. */
-  bornes: { nombre: number; plusProcheM: number | null; nom: string | null } | null;
+  bornes: ProximiteBorne | null;
 }
 
 /** Les offres qu'une carte de recherche d'emploi doit montrer : celles qui sont vivantes. */

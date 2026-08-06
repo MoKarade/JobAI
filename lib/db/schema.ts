@@ -267,21 +267,34 @@ export const entreprisesLieux = pgTable(
     /**
      * BORNES DE RECHARGE — trois états, et il faut les trois.
      *
-     * Demande de Marc (2026-08-05) : savoir, pour chaque employeur, s'il y a une borne à
-     * moins de cinq minutes à pied. Pour qui roule à l'électrique, ça pèse dans le choix
-     * d'un emploi autant qu'un détail du salaire, et aucune offre ne le mentionne.
+     * Demande de Marc (2026-08-05) : savoir, pour chaque employeur, où est la borne de
+     * recharge. Pour qui roule à l'électrique, ça pèse dans le choix d'un emploi autant
+     * qu'un détail du salaire, et aucune offre ne le mentionne.
      *
-     *   · `bornesLe` NULL              → jamais interrogé. On ne sait pas.
-     *   · `bornesLe` posé, `bornesM` NULL → interrogé, AUCUNE borne dans le rayon.
+     *   · `bornesLe` NULL                 → jamais interrogé. On ne sait pas.
+     *   · `bornesLe` posé, `bornesM` NULL → interrogé, rien trouvé dans la portée.
      *   · `bornesLe` posé, `bornesM` = N  → la plus proche est à N mètres.
      *
      * Les deux premiers états ne se disent PAS pareil à l'écran. Les confondre ferait
      * passer un lieu non mesuré pour un lieu sans borne — un renseignement faux présenté
      * avec l'aplomb d'un fait (garde-fou n°3). D'où la date SÉPARÉE de la distance :
      * un seul champ ne peut pas porter la différence.
+     *
+     * ⚠️ `bornesM` N'EST PLUS PLAFONNÉ À 350 m depuis le 2026-08-06 (« je veux plus à 5 min
+     * à pied, je veux la plus proche ») : c'est la distance de la plus proche, point. Le
+     * plafond faisait écrire NULL — donc « aucune » — sur la quasi-totalité des employeurs.
+     * La migration 0012 a effacé les dates pour que tout soit remesuré au nouveau sens ;
+     * garder les anciennes valeurs aurait mélangé deux définitions dans une même colonne.
+     *
+     * `bornesRapide` est un booléen NULLABLE, et les trois états comptent là aussi :
+     * OpenStreetMap ne déclare pas toujours la puissance, et « on ne sait pas » ne doit pas
+     * s'afficher « standard ». `bornesTarif` porte ce qu'OSM PUBLIE (« gratuite », un tarif
+     * relevé sur la borne), jamais un prix moyen calculé — la base n'en contient pas.
      */
     bornesM: integer("bornes_m"),
     bornesNom: text("bornes_nom"),
+    bornesRapide: boolean("bornes_rapide"),
+    bornesTarif: text("bornes_tarif"),
     bornesLe: timestamp("bornes_le", { withTimezone: true }),
 
     geocodeLe: timestamp("geocode_le", { withTimezone: true }).notNull().defaultNow(),

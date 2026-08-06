@@ -15,11 +15,8 @@ import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { palier } from "@/lib/scoring";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { Fait } from "./Icone";
-import { RAYON_5_MIN_M, minutesAPied } from "@/lib/bornes";
+import { libelleBorne, libelleDistanceBorne } from "@/lib/bornes";
 import { ADRESSE_ABSENTE, mentionSource } from "@/lib/adresse";
-
-/** Le seuil, dit en toutes lettres — dérivé de la constante, jamais recopié. */
-const MINUTES_LIBELLE = `${minutesAPied(RAYON_5_MIN_M)} min`;
 
 export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
   return (
@@ -63,13 +60,20 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                 <Fait genre="route" discret={x.km === null}>
                   {x.km === null ? "—" : `${String(x.km).replace(".", ",")} km`}
                 </Fait>
+                {/* LA BORNE LA PLUS PROCHE, sans plafond (demande de Marc, 2026-08-06).
+                    Ce qu'on en sait — rapide, marque, tarif — suit la distance quand
+                    OpenStreetMap le publie, et rien ne s'écrit à sa place quand il ne le
+                    publie pas : une borne sans puissance déclarée n'est pas « standard ». */}
                 <Fait genre="borne" discret={x.bornes === null || x.bornes.plusProcheM === null}>
                   {x.bornes === null
                     ? "non mesuré"
                     : x.bornes.plusProcheM === null
-                      ? `aucune < ${MINUTES_LIBELLE}`
-                      : `${minutesAPied(x.bornes.plusProcheM)} min`}
+                      ? "aucune trouvée"
+                      : libelleDistanceBorne(x.bornes.plusProcheM)}
                 </Fait>
+                {x.bornes && x.bornes.plusProcheM !== null && libelleBorne(x.bornes) ? (
+                  <span className="carte-liste__bornes">{libelleBorne(x.bornes)}</span>
+                ) : null}
               </p>
               {x.lecture ? <p className="carte-liste__lecture">{x.lecture}</p> : null}
               {x.offres.length > 0 ? (

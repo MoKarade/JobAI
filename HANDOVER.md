@@ -6,6 +6,43 @@
 
 ---
 
+## Session 2026-08-06 — la borne la plus proche (et non plus « aucune » partout)
+
+### État en une page
+
+| | |
+|---|---|
+| **Gate** | `typecheck` + `test` (**694**) + `lint` (0 avertissement) + `build` verts, jugés par exit code. |
+| **Le vrai défaut des bornes** | La mesure fonctionnait (`bornes=81/81`, aucune ligne d'erreur, migration `0011` appliquée) — c'est le **plafond de 350 m** qui rendait la réponse inutile : presque aucun employeur industriel n'a de borne à trois coins de rue, donc l'écran affichait « aucune » partout. Exact, et sans valeur. |
+| **[BORNE-05]** | Le plafond est retiré : `proximiteBorne` rend **la plus proche, quelle que soit sa distance**. La portée de la requête passe de 350 m à 15 km (`PORTEE_RECHERCHE_M`), et `ETENDUE_MAX_DEG` de 2 à 3 — la marge coûte ~0,4° en longitude, et un lot Portneuf↔Charlevoix arrivait à 1,99°, au bord du refus. |
+| **Ce qu'on rapporte en plus** | La **marque** (`network` → `brand` → `operator` → `name` : le réseau AVANT le nom, qui porte souvent le stationnement d'accueil), la **vitesse** (`fast_charge`, prises à courant continu, puissance ≥ 25 kW) et le **tarif publié**. Nouvelles colonnes `bornes_rapide`, `bornes_tarif` ; migration `0012` efface les dates pour tout remesurer au nouveau sens. |
+| **Prix moyen : non** | ⚠️ **OpenStreetMap ne porte pas de prix moyen.** Il porte `fee` (payant ou non) et, plus rarement, `charge` — le tarif relevé sur la borne. On rend ça, et « payante, tarif non publié » sinon. Fabriquer une moyenne à partir de tarifs de catalogue donnerait un chiffre crédible que personne n'a mesuré (garde-fou n°3). |
+| **Couverture réelle** | Inconnue tant que la passe n'a pas tourné : le proxy de la session **refuse Overpass** (403 au CONNECT sur les trois instances), impossible de mesurer d'ici. D'où la ligne `[bornes] … marque=X/N vitesse=Y/N tarif=Z/N` — c'est la production qui répondra, pas une supposition. |
+
+### Deux défauts trouvés en écrivant les tests
+
+- **`prisePresente` rendait `true` sur un tag ABSENT.** Écrit `texte(v)?.toLowerCase()` puis
+  comparé à `null`, le prédicat comparait en fait `undefined` à `null` : toutes les bornes
+  passaient pour rapides, y compris celles qui déclarent `socket:chademo=no`. Le `null` se
+  teste **avant** le `?.`, jamais après.
+- **La boîte et la distance n'utilisaient pas le même modèle de Terre.** Les boîtes
+  employaient 111 320 m par degré (WGS84 à l'équateur), `distanceM` une sphère de 6 371 km,
+  soit 111 195 m. La boîte était 0,11 % plus petite que la portée demandée, mesurée par la
+  fonction même qui filtre ensuite : 17 m de manque sur 15 km — invisible à 350 m. Un seul
+  `RAYON_TERRE_M`, partagé.
+
+### Ce qui reste ouvert
+
+- **`[LIEU-01]`** — « toutes les offres et entreprises aient un emplacement ». Les pistes
+  mesurées en production montrent que **Adecco** (« ADECCO QUÉBEC ») et **S Huot**
+  (« RÉAL HUOT INC. ») existent bien au registre : c'est le nettoyage de nom qui échoue,
+  pas le registre. `Permafil`, `Agilean`, `AMETEK` en sont réellement absents.
+- **`[VEILLE-05]`** — « qu'il m'en trouve des nouvelles chaque jour ». Les sept sources
+  automatiques sont closes ; le seul canal vivant reste `POST /api/ingest/depot`.
+- **Signature des commits** : toujours bloquée (clé de signature de 0 octet dans le conteneur).
+
+---
+
 ## Session 2026-08-05 (soir) — le registre des entreprises, et les adresses qui viennent avec
 
 ### État en une page

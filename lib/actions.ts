@@ -39,12 +39,7 @@ import { employeursASituer, planifierDistances } from "./distances";
 import { villesARattraper } from "./ingest/pipeline";
 import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
-import {
-  ETENDUE_VIDE_SUSPECTE_KM,
-  RAYON_5_MIN_M,
-  boiteEnglobante,
-  proximiteBorne,
-} from "./bornes";
+import { ETENDUE_VIDE_SUSPECTE_KM, boiteEnglobante, proximiteBorne } from "./bornes";
 import { DELAI_MAX_MS, ETENDUE_MAX_DEG, chercherBornesBoite } from "./overpass";
 import { adresseARattraper, bornesAMesurer, positionARaffiner } from "./travaux";
 import {
@@ -883,14 +878,35 @@ async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
   }
 
   let mesurees = 0;
+  // Ce qu'OpenStreetMap renseigne VRAIMENT, compté sur le lot. Sans ce relevé, la seule
+  // façon de savoir si « rapide » et « tarif » sont utiles serait de regarder l'écran une
+  // entreprise à la fois — et une couverture faible passerait pour un défaut d'affichage.
+  let avecMarque = 0;
+  let avecVitesse = 0;
+  let avecTarif = 0;
+
   for (const l of lignes) {
-    const p = proximiteBorne({ lat: l.lat, lon: l.lon }, r.bornes, RAYON_5_MIN_M);
+    const p = proximiteBorne({ lat: l.lat, lon: l.lon }, r.bornes);
     await db
       .update(entreprisesLieux)
-      .set({ bornesM: p.plusProcheM, bornesNom: p.nom, bornesLe: new Date() })
+      .set({
+        bornesM: p.plusProcheM,
+        bornesNom: p.nom,
+        bornesRapide: p.rapide,
+        bornesTarif: p.tarif,
+        bornesLe: new Date(),
+      })
       .where(eq(entreprisesLieux.nom, l.nom));
     mesurees++;
+    if (p.nom !== null) avecMarque++;
+    if (p.rapide !== null) avecVitesse++;
+    if (p.tarif !== null) avecTarif++;
   }
+
+  console.log(
+    `[bornes] ${r.bornes.length} borne(s) dans la boîte · ${mesurees} lieu(x) mesuré(s) · ` +
+      `marque=${avecMarque}/${mesurees} vitesse=${avecVitesse}/${mesurees} tarif=${avecTarif}/${mesurees}`,
+  );
 
   return { candidates: lignes.length, mesurees, echecs: 0 };
 }

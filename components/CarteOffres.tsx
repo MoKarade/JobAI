@@ -28,7 +28,7 @@ import { useEffect, useRef, useState } from "react";
 import { centreDuCadrage, type Epingle, type EntrepriseSurCarte } from "@/lib/carte";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { couleurNote } from "@/lib/couleurNote";
-import { minutesAPied } from "@/lib/bornes";
+import { libelleBorne, libelleDistanceBorne } from "@/lib/bornes";
 import { mentionSource } from "@/lib/adresse";
 
 /** Une cible sans offre active n'a pas de palier : teinte neutre, pas un faux « C ». */
@@ -72,12 +72,17 @@ function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string 
     );
   }
   // Les bornes : trois états, trois phrases — « pas regardé » n'est pas « aucune ».
+  //
+  // ⚠️ LA PLUS PROCHE, PAS « À MOINS DE 5 MIN » (demande de Marc, 2026-08-06). Le détail
+  // (rapide, marque, tarif) ne s'ajoute que s'il est publié : `libelleBorne` rend une chaîne
+  // vide quand OpenStreetMap ne dit rien, et une chaîne vide ne s'affiche pas.
+  const detail = e.bornes ? libelleBorne(e.bornes) : "";
   const bornes =
     e.bornes === null
       ? null
       : e.bornes.plusProcheM === null
-        ? "Aucune borne de recharge à 5 min à pied"
-        : `Borne à ~${minutesAPied(e.bornes.plusProcheM)} min à pied${e.bornes.nom ? ` · ${e.bornes.nom}` : ""}`;
+        ? "Aucune borne de recharge trouvée alentour"
+        : `Borne à ${libelleDistanceBorne(e.bornes.plusProcheM)}${detail ? ` · ${detail}` : ""}`;
   if (bornes) morceaux.push(`<span class="popup-bornes">${echapper(bornes)}</span>`);
   if (e.lecture) {
     const lecture = e.lecture.length > 160 ? `${e.lecture.slice(0, 157)}…` : e.lecture;
