@@ -1,23 +1,52 @@
-:root {
-  /* Un fond plus NEUTRE et plus clair : l'ancien tirait vers le crème (teinte 90), ce qui
-     donnait un voile jaune sur toute la page. Une interface épurée n'a pas de couleur de
-     fond — elle a de la lumière, et laisse la couleur aux seuls éléments qui la méritent. */
-  --bg: oklch(98.5% 0.002 265);
-  --surface: oklch(100% 0 0);
-  --text: oklch(21% 0.018 265);
-  /* Le texte secondaire remonté : à 48 %, il passait sous le contraste AA sur surface
-     blanche pour les petites tailles, et « discret » finissait par vouloir dire « illisible ». */
-  --text-soft: oklch(45% 0.014 265);
-  /* Les bordures s'effacent : dans une interface épurée, ce sont l'espace et l'ombre qui
-     séparent, pas des traits. Celles qui restent doivent être à peine là. */
-  --border: oklch(93% 0.004 265);
-  --accent: oklch(58% 0.19 275);
-  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIRECTION VISUELLE — décidée avec Marc le 2026-08-05, question par question.
 
-  /* ÉCHELLE TYPOGRAPHIQUE — cinq tailles, pas douze.
-     Le désordre visuel vient rarement des couleurs : il vient d'une quinzaine de tailles
-     de police choisies au cas par cas. Cinq degrés suffisent à tout hiérarchiser, et
-     l'œil reconnaît le rythme d'un écran à l'autre. */
+   Ce qu'il a demandé : « plus simple, plus rond, plus propre ». Ce qu'il a
+   choisi, littéralement :
+
+     · fond gris très clair, cartes BLANCHES — la séparation se fait par la
+       LUMIÈRE, donc AUCUN contour et AUCUNE ombre portée sur les surfaces ;
+     · rayon 12 px sur les surfaces, pilule sur tout ce qui se clique,
+       10 px sur tout ce qui se saisit ;
+     · la note d'une offre dans un CERCLE ;
+     · quatre informations par offre, pas dix ;
+     · deux voix typographiques : Manrope pour ce qui se lit, DM Mono pour
+       tout ce qui se MESURE.
+
+   ⚠️ CE QUI A ÉTÉ RETIRÉ, ET POURQUOI. L'écran d'avant portait, sur chaque
+   offre, une ombre + un coin arrondi + un liseré coloré à gauche. Empilés,
+   ces trois signaux remplissaient l'écran sans rien hiérarchiser : tout avait
+   le même poids, donc rien ne ressortait. C'est la cause commune des quatre
+   griefs de Marc (trop chargé, générique, hiérarchie confuse). L'air ne vient
+   pas de marges plus grandes — il vient de la SUPPRESSION de ces trois-là.
+
+   L'ambre `#f2a31b` n'est pas un choix d'humeur : c'est `app.color`, publié au
+   hub, qui identifie JobAI parmi les autres widgets (ADR-0003). Elle reste
+   RARE — les meilleures notes, les bornes de recharge, l'onglet actif. Une
+   couleur qui apparaît partout ne signale plus rien.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Le fond descend SOUS les cartes : c'est cet écart de clarté, et lui seul,
+     qui les détache. */
+  --bg: oklch(96.5% 0.003 265);
+  --surface: oklch(100% 0 0);
+  /* Creux : survol, pastilles neutres, fonds de faits. Entre le fond et la carte. */
+  --creux: oklch(94% 0.004 265);
+  --text: oklch(19% 0.015 265);
+  --text-soft: oklch(45% 0.014 265);
+  /* Le trait ne survit QUE dans une carte, pour séparer les éléments d'une liste.
+     Il ne dessine plus aucun contour. */
+  --border: oklch(91% 0.004 265);
+  --accent: oklch(58% 0.19 275);
+
+  /* Deux voix. Les variables viennent de `next/font` (app/layout.tsx) : les
+     fichiers sont servis par notre domaine, jamais par un tiers. */
+  --font: var(--police-texte), ui-sans-serif, system-ui, sans-serif;
+  --mono: var(--police-mesure), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* ÉCHELLE TYPOGRAPHIQUE — six degrés, pas vingt-deux. L'œil reconnaît le
+     rythme d'un écran à l'autre. */
   --t-2xs: 0.7rem;
   --t-xs: 0.78rem;
   --t-s: 0.875rem;
@@ -28,11 +57,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: oklch(17% 0.015 265);
-    --surface: oklch(21% 0.018 265);
-    --text: oklch(94% 0.01 265);
-    --text-soft: oklch(72% 0.015 265);
-    --border: oklch(31% 0.02 265);
+    /* Le sombre n'est pas une inversion : le fond descend sous les cartes,
+       exactement comme le gris descend sous le blanc en clair. */
+    --bg: oklch(15% 0.012 265);
+    --surface: oklch(20% 0.015 265);
+    --creux: oklch(25% 0.016 265);
+    --text: oklch(93% 0.008 265);
+    --text-soft: oklch(72% 0.014 265);
+    --border: oklch(28% 0.018 265);
   }
 }
 
@@ -49,6 +81,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
+  font-weight: 500;
   /* 1.65 : une interligne un peu plus large se lit sensiblement mieux sur des paragraphes
      de justification, qui sont partout dans cette app. */
   line-height: 1.65;
@@ -141,7 +174,11 @@ code {
 
 :root {
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --ambre: oklch(62% 0.15 75);
+  /* ⚠️ C'EST LA COULEUR PUBLIÉE AU HUB (`app.color` = #f2a31b), pas une teinte
+     choisie ici. À 62 % de clarté elle rendait BRUNE en aplat — mesuré à l'écran.
+     #f2a31b vaut ~75 % : c'est cette valeur-là qui identifie JobAI parmi les
+     autres widgets, et un aplat doit la porter fidèlement. */
+  --ambre: oklch(75% 0.155 72);
   --vert: oklch(58% 0.13 155);
   --bleu: oklch(58% 0.14 250);
   --rouge: oklch(56% 0.19 25);
@@ -186,14 +223,18 @@ code {
   --survol: oklch(0% 0 0 / 0.045);
   --actif: oklch(62% 0.15 75 / 0.14);
 
+  /* Rondeur « douce et sobre » (choix de Marc) : 12 px sur les surfaces, pilule
+     sur ce qui se clique, 10 px sur ce qui se saisit. */
   --r-pill: 999px;
   --r-carte: 12px;
-  --r-champ: 24px;
+  --r-champ: 10px;
 
-  /* Ombres. Deux couches très douces : une pour poser, une pour diffuser. Elles
-     REMPLACENT les bordures — une carte qui a les deux paraît lourde. */
-  --ombre-1: 0 1px 2px oklch(0% 0 0 / 0.06), 0 1px 3px 1px oklch(0% 0 0 / 0.04);
-  --ombre-2: 0 1px 3px oklch(0% 0 0 / 0.10), 0 4px 8px 3px oklch(0% 0 0 / 0.06);
+  /* ⚠️ PLUS D'OMBRE SUR LES SURFACES. Choix de Marc : la séparation se fait par
+     la lumière — une carte blanche sur un fond gris se détache déjà. Ces deux
+     valeurs ne servent QUE le relief momentané d'un élément qu'on manipule
+     (menu ouvert, champ au focus), jamais l'état au repos. */
+  --ombre-1: 0 1px 2px oklch(0% 0 0 / 0.05);
+  --ombre-2: 0 2px 8px oklch(0% 0 0 / 0.10);
 
   /* ESPACEMENT — l'outil n°1 de l'épure. Élargi d'environ un quart : c'est le blanc
      autour d'un élément qui le fait respirer, pas la finesse de sa bordure. */
@@ -258,10 +299,13 @@ code {
   transition: background-color 120ms ease, color 120ms ease;
 }
 .onglet:hover { color: var(--text); background: var(--survol); }
+/* L'onglet courant prend la SURFACE, comme une carte : il appartient au même
+   monde que le contenu qu'il ouvre. Le fond suffit à le désigner — et
+   `aria-current="page"` porte l'information pour qui ne voit pas la nuance. */
 .onglet--actif {
   color: var(--text);
-  background: var(--actif);
-  font-weight: 600;
+  background: var(--surface);
+  font-weight: 700;
 }
 .onglet:focus-visible { outline: 2px solid var(--ambre); outline-offset: -2px; }
 
@@ -288,25 +332,30 @@ code {
 }
 
 /* ── Tableau de bord ─────────────────────────────────────────────────────── */
+/* ⚠️ UNE SEULE SURFACE, PAS CINQ (choix de Marc). Cinq tuiles alignées en haut
+   de page, c'est cinq boîtes de plus à l'écran pour une seule information :
+   « où en suis-je ». Elles tiennent dans une barre. */
 .bord {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
-  gap: var(--pas);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.25rem;
+  background: var(--surface);
+  border-radius: var(--r-carte);
+  padding: 1.25rem 1.6rem;
   margin: var(--pas-2) 0;
 }
 .stat {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-carte);
-  padding: 1.1rem 1.25rem;
+  padding: 0;
   /* Plus de barre de couleur à gauche : c'est le geste qui datait le plus l'interface.
      La hiérarchie passe par la taille du chiffre et l'espace autour. */
 }
 .stat--envoi { border-left-color: var(--vert); }
-.stat--reponse { border-left-color: var(--bleu); }
+.stat--reponse { border-left-color: var(--text); }
 .stat--haut { border-left-color: var(--violet); }
 .stat--neutre { border-left-color: var(--border); }
 .stat__n {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: var(--t-xl);
   font-weight: 400;
   line-height: 1.1;
@@ -329,39 +378,43 @@ code {
   font-size: var(--t-m);
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--r-champ);
-  transition: box-shadow 140ms ease, border-color 140ms ease;
+  transition: box-shadow 140ms ease;
 }
 /* Le geste le plus caractéristique : au focus, le champ se SOULÈVE et sa bordure
    s'efface. L'élévation dit « c'est ici que ça se passe » mieux qu'un contour. */
-.controles__recherche:hover { box-shadow: var(--ombre-1); }
-.controles__recherche:focus {
-  outline: none;
-  border-color: transparent;
-  box-shadow: var(--ombre-2);
-}
+/* Au focus, le champ se soulève : c'est le seul endroit où une ombre a encore un
+   rôle — dire « c'est ici que ça se passe » pendant qu'on manipule. */
+.controles__recherche:focus { outline: none; box-shadow: var(--ombre-2); }
+/* Le groupe des paliers de distance. Sans règle, ce `<span role="group">` restait un
+   conteneur en ligne : ses trois boutons pouvaient se couper en fin de ligne alors qu'ils
+   forment UNE question (« jusqu'où ? ») et se lisent ensemble. Trouvé par
+   `tests/styles.test.ts` — la classe était posée dans le JSX et n'existait nulle part ici. */
+.controles__groupe { display: inline-flex; gap: 0.3rem; align-items: center; }
+
 .filtre {
   padding: 0.5rem 1rem;
   font: inherit;
   font-size: var(--t-s);
   color: var(--text-soft);
-  background: transparent;
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 0;
   border-radius: var(--r-pill);
   cursor: pointer;
   /* Cible tactile confortable : au moins 40 px de haut sur mobile. */
   min-height: 2.5rem;
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-.filtre:hover { background: var(--survol); color: var(--text); }
+.filtre:hover { background: var(--creux); color: var(--text); }
+.filtre--actif:hover { background: var(--text); color: var(--surface); }
 /* L'état actif se porte par le REMPLISSAGE, pas par une bordure colorée : plus lisible
    d'un coup d'œil, et la couleur n'est pas le seul signal (le fond change aussi). */
 .filtre--actif {
-  color: var(--ambre-texte);
-  background: var(--actif);
+  color: var(--surface);
+  background: var(--text);
   border-color: transparent;
-  font-weight: 600;
+  font-weight: 700;
 }
 .filtre:focus-visible { outline: 2px solid var(--ambre-texte); outline-offset: 2px; }
 .controles__recherche:focus-visible { outline: 2px solid var(--ambre-texte); outline-offset: 2px; }
@@ -373,44 +426,96 @@ code {
 
 /* ── Cartes d'offre ──────────────────────────────────────────────────────── */
 .liste { display: flex; flex-direction: column; gap: 0.75rem; }
+/* ⚠️ NI CONTOUR, NI OMBRE, NI LISERÉ. Les trois ensemble remplissaient l'écran
+   sans rien hiérarchiser — c'est la cause commune des quatre griefs de Marc.
+   Une carte blanche sur un fond gris se détache déjà : la lumière suffit. */
 .carte {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--r-carte);
-  padding: 1.15rem 1.35rem;
+  padding: 1.25rem 1.4rem;
   display: grid;
-  gap: 0.6rem;
-  transition: box-shadow 140ms ease, border-color 140ms ease;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.35rem 1.15rem;
+  transition: background-color 120ms ease;
 }
-/* L'élévation au survol remplace la bordure de couleur : elle dit « cliquable » sans
-   rien ajouter à l'écran quand on ne survole pas. */
-.carte:hover { box-shadow: var(--ombre-1); border-color: transparent; }
-.carte--A { border-left-color: var(--vert); }
-.carte--B { border-left-color: var(--ambre); }
-.carte--C { border-left-color: var(--text-soft); }
+/* Le survol change la surface au lieu de la soulever : pas d'ombre au repos, donc
+   pas d'ombre qui apparaît — le geste reste dans le même registre. */
+.carte:hover { background: var(--creux); }
+/* Les paliers ne se disent plus par un trait à gauche mais par le cercle de la
+   note, ci-dessous. Ces classes restent utilisées par le JSX ; elles ne portent
+   plus de bordure. */
+.carte--A,
+.carte--B,
+.carte--C { border-left: 0; }
 .carte--histo { opacity: 0.62; }
 .carte--histo:hover { opacity: 0.9; }
 
+/* ── LA NOTE : un cercle (choix de Marc) ────────────────────────────────────
+   L'ambre est RÉSERVÉE aux meilleures. Le palier intermédiaire prend l'encre,
+   le reste un gris neutre : trois niveaux nettement distincts, et le même code
+   que les épingles de la carte — sinon la liste et le plan ne se répondent pas. */
 .note {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
   font-family: var(--mono);
-  font-size: var(--t-l);
-  font-weight: 700;
+  font-size: var(--t-m);
+  font-weight: 500;
   line-height: 1;
   text-align: center;
+  background: var(--creux);
+  color: var(--text-soft);
+  align-self: start;
 }
-.note small { display: block; font-size: var(--t-2xs); font-weight: 400; color: var(--text-soft); }
-.note--A { color: var(--vert); }
-.note--B { color: var(--ambre); }
-.note--C { color: var(--text-soft); }
+/* Le « /100 » disparaît du cercle : sur trois centimètres, il n'ajoute rien qu'on
+   ne sache déjà, et c'est exactement le genre de détail qui chargeait l'écran. */
+.note small { display: none; }
+.note--A { background: var(--ambre); color: oklch(20% 0.02 60); }
+.note--B { background: var(--text); color: var(--surface); }
+.note--C { background: var(--creux); color: var(--text-soft); }
 
-.carte__tete { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
-.carte__entreprise { font-weight: 600; }
+/* Trois colonnes : la note, le corps, la distance. Le corps s'empile en une
+   colonne — l'entreprise, puis le poste, puis l'unique signal. */
+.carte { grid-template-columns: auto 1fr auto; }
+.carte__tete { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.carte__entreprise {
+  font-weight: 700;
+  font-size: var(--t-m);
+  color: var(--text);
+  text-decoration: none;
+}
+.carte__entreprise:hover { text-decoration: underline; text-underline-offset: 3px; }
 .carte__poste { color: var(--text-soft); font-size: var(--t-s); }
-.carte__tete a { color: var(--bleu); font-size: var(--t-xs); }
+/* L'unique signal : le salaire quand il est affiché. En mesure, donc en mono. */
+.carte__tete > .badge-perimee { align-self: flex-start; margin-top: 0.3rem; }
+.carte__signal {
+  align-self: flex-start;
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  margin-top: 0.2rem;
+}
+.carte__km {
+  font-family: var(--mono);
+  font-size: var(--t-s);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+  text-align: right;
+  align-self: start;
+}
+.carte__km--inconnue { color: var(--text-soft); }
+
+/* Ce qui traverse toute la largeur, sous les trois colonnes. */
+.carte__notes,
+.carte .controles-offre { grid-column: 1 / -1; }
 
 .carte__raisons,
 .carte__meta,
-.carte__notes,
 .carte__note-perso,
 .carte .pastille { grid-column: 2 / -1; }
 
@@ -454,7 +559,7 @@ code {
   border-radius: var(--r-pill);
   background: var(--survol);
 }
-.pastille--Identifiee { color: var(--bleu); }
+.pastille--Identifiee { color: var(--text); }
 .pastille--CVenvoye { color: var(--vert); }
 .pastille--Relance { color: var(--ambre); }
 .pastille--Entrevue { color: var(--violet); }
@@ -504,23 +609,22 @@ code {
 }
 
 /* ── Contrôles d'une offre (statut, priorité, note) ──────────────────────── */
+/* Plus de filet au-dessus : la carte n'a plus aucun trait, et celui-ci coupait
+   l'offre en deux pour séparer ce qui lui appartient déjà. L'espace suffit. */
 .controles-offre {
-  grid-column: 2 / -1;
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
-  align-items: flex-end;
-  margin-top: 0.35rem;
-  padding-top: 0.6rem;
-  border-top: 1px solid var(--border);
+  gap: 0.4rem 0.6rem;
+  align-items: center;
+  margin-top: 0.6rem;
 }
-.controle { display: flex; flex-direction: column; gap: 0.2rem; }
+/* Les étiquettes passent en ligne et se rétractent : « Statut » sur deux lignes
+   au-dessus d'un menu qui dit déjà « Identifiée » répétait l'évidence. */
+.controle { display: flex; flex-direction: row; align-items: center; gap: 0.4rem; }
 .controle--large { flex: 1 1 14rem; }
 .controle__l {
-  font-family: var(--mono);
   font-size: var(--t-2xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--text-soft);
 }
 .select,
@@ -528,10 +632,10 @@ code {
   font: inherit;
   font-size: var(--t-s);
   color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 0.25rem;
-  padding: 0.35rem 0.5rem;
+  background: var(--creux);
+  border: 0;
+  border-radius: var(--r-champ);
+  padding: 0.35rem 0.6rem;
   min-height: 2.25rem;
 }
 .zone-note { width: 100%; resize: vertical; font-size: var(--t-s); }
@@ -614,7 +718,7 @@ code {
 .afaire__item--entrevue .afaire__genre { border-color: var(--violet); color: var(--violet); }
 .afaire__item--relancer .afaire__genre { border-color: var(--ambre); color: var(--ambre); }
 .afaire__item--postuler .afaire__genre { border-color: var(--vert); color: var(--vert); }
-.afaire__item--verifier .afaire__genre { border-color: var(--bleu); color: var(--bleu); }
+.afaire__item--verifier .afaire__genre { border-color: var(--text); color: var(--text); }
 .afaire__lien { font-size: var(--t-m); font-weight: 600; }
 .afaire__motif { font-size: var(--t-xs); color: var(--text-soft); }
 
@@ -622,6 +726,34 @@ code {
   /* Sous 30 rem, deux colonnes écrasent le titre : l'étiquette repasse au-dessus. */
   .afaire__item { grid-template-columns: 1fr; }
   .afaire__genre { grid-row: auto; justify-self: start; }
+}
+
+/* ⚠️ LE PLAN ET SA COLONNE DE LECTURE (choix de Marc, 2026-08-05).
+   Empilés, il fallait faire défiler pour relier une épingle à sa fiche : le plan
+   sortait de l'écran au moment précis où on lisait ce qu'il montre. Sous 56 rem,
+   la colonne repasse dessous — sur un téléphone, l'empilement est le bon choix,
+   et deux colonnes de 10 rem ne servent personne. */
+.plan-ecran {
+  display: grid;
+  grid-template-columns: 1fr 21rem;
+  gap: 0.75rem;
+  align-items: start;
+  margin: var(--pas-2) 0;
+}
+@media (max-width: 56rem) {
+  .plan-ecran { grid-template-columns: 1fr; }
+}
+/* La liste devient une surface au même titre que le plan, et défile toute seule
+   quand elle dépasse : la page ne s'allonge plus au rythme du nombre de lieux. */
+.plan-ecran .carte-liste {
+  max-height: 32rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--r-carte);
+  margin: 0;
+}
+@media (max-width: 56rem) {
+  .plan-ecran .carte-liste { max-height: none; }
 }
 
 /* ── Carte des offres ─────────────────────────────────────────────────────
@@ -902,7 +1034,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .detail__tete { display: flex; gap: 1rem; align-items: flex-start; }
 .detail__tete h1 { font-size: var(--t-l); line-height: 1.2; }
 .detail__poste { color: var(--text-soft); margin-top: 0.15rem; }
-.detail__lien { display: inline-block; margin-top: 0.5rem; color: var(--bleu-texte); font-size: var(--t-s); }
+.detail__lien { display: inline-block; margin-top: 0.5rem; color: var(--text); font-size: var(--t-s); }
 /* Deux liens côte à côte : l'annonce et le trajet. L'espacement les distingue, la couleur
    ambre marque le trajet — accompagnée du libellé, jamais seule (WCAG 1.4.1). */
 .detail__lien--trajet { margin-left: 1rem; color: var(--ambre-texte); }
@@ -949,16 +1081,23 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 }
 
 /* ── Offres périmées ─────────────────────────────────────────────────────── */
-.carte--perimee { opacity: 0.55; }
-.carte--perimee:hover { opacity: 0.85; }
+/* ⚠️ PAS d'opacité sur la carte entière. À 55 %, TOUT passait sous le contraste
+   minimum — y compris les menus de statut, qu'on doit pouvoir manipuler sur une
+   offre fermée (c'est même là qu'on la classe « Refusée »). Une offre périmée
+   n'est pas une offre illisible : c'est son ÉTAT qui est terne, pas son texte.
+   Le badge rouge et le nom grisé suffisent à la faire reculer. */
+.carte--perimee .carte__entreprise,
+.carte--perimee .carte__poste { color: var(--text-soft); }
 .badge-perimee {
   font-family: var(--mono);
   font-size: var(--t-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding: 0.1rem 0.4rem;
+  padding: 0.15rem 0.6rem;
   color: var(--rouge);
+  background: transparent;
   border: 1px solid currentColor;
+  border-radius: var(--r-pill);
 }
 .bouton--reouvrir { border-color: var(--vert); color: var(--vert); }
 
@@ -988,6 +1127,11 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin: 0 0 4px;
   font-size: var(--t-m);
 }
+/* Rien à relancer : le bloc se fait discret sans disparaître. Il DOIT rester visible —
+   « aucune relance à faire » est un vrai résultat, et le taire laisserait croire que le
+   bloc n'a pas chargé. */
+.relances--vide { opacity: 0.85; }
+
 .relances__resume,
 .relances__rien,
 .relances__reste {

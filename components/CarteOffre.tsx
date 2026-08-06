@@ -3,39 +3,29 @@
 // Composant de PRÉSENTATION pur : il reçoit une offre et l'affiche. Aucune logique de
 // notation ni de filtrage ici — elles vivent dans `lib/scoring.ts`, testées.
 //
-// La justification s'affiche depuis `raisons` (un ton, un texte). L'artifact d'origine
-// stockait du HTML et l'injectait tel quel ; React échappe tout par défaut, donc même si
-// un texte contenait des chevrons, ils s'afficheraient au lieu d'être interprétés.
+// ⚠️ CE QUE LA LISTE MONTRE, ET CE QU'ELLE NE MONTRE PLUS (choix de Marc, 2026-08-05).
+// Quatre informations : la note, l'entreprise, le poste, la distance. Plus UN signal, et
+// seulement s'il change la décision — le salaire quand il est affiché, ou « périmée ».
+// Les raisons de la note, les dates et les liens externes vivent désormais sur la fiche
+// (`/offre/<id>`), où on les lit quand on a décidé de s'y intéresser.
+//
+// Ce qui RESTE malgré la coupe : `ControlesOffre`. Changer un statut est une ACTION, pas
+// une information — l'enterrer derrière un clic ajouterait un aller-retour à chaque geste
+// de suivi, ce qui est le contraire de simplifier. Et `notes`, parce que c'est le texte de
+// Marc : il n'apparaît que s'il l'a écrit lui-même.
 
 import Link from "next/link";
 import type { Offre } from "@/lib/types";
 import { palier } from "@/lib/scoring";
 import { ControlesOffre } from "./ControlesOffre";
-import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 
 /** Les distances s'écrivent à la française : 3,5 km. */
 function formaterKm(km: number): string {
   return `${km.toString().replace(".", ",")} km`;
 }
 
-/**
- * Un lien n'est rendu cliquable que s'il est en http(s) — même règle que le hub.
- * Un `javascript:` ou un `data:` dans un champ de données ne doit jamais devenir un lien.
- */
-function lienSur(brut: string): string | null {
-  if (!brut) return null;
-  try {
-    const u = new URL(brut);
-    return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
-  } catch {
-    return null;
-  }
-}
-
 export function CarteOffre({ offre }: { offre: Offre }) {
   const p = palier(offre.score);
-  const href = lienSur(offre.lien);
-  const trajet = lienTrajetGoogleMaps(offre.entreprise);
   const perimee = offre.perimeeLe !== null;
 
   return (
@@ -44,57 +34,32 @@ export function CarteOffre({ offre }: { offre: Offre }) {
         perimee ? " carte--perimee" : ""
       }`}
     >
+      {/* Le « /100 » a disparu du cercle : sur trois centimètres il n'ajoute rien qu'on
+          ne sache déjà. Il reste dans l'infobulle et sur la fiche. */}
       <div className={`note note--${p}`} title="Note de fit sur 100 — voir le barème">
         {offre.score ?? "–"}
-        <small>{offre.score === null ? "histo" : "/100"}</small>
       </div>
 
       <div className="carte__tete">
-        {/* L'entreprise mène au détail interne ; « offre ↗ » mène à l'annonce externe.
-            Deux destinations différentes, donc deux liens distincts — un seul lien qui
-            fait les deux selon le contexte serait un piège. */}
         <Link href={`/offre/${offre.id}`} className="carte__entreprise">
           {offre.entreprise}
         </Link>
         <span className="carte__poste">{offre.poste}</span>
-        {/* L'état « périmée » se voit AVANT le contenu : sans ça, on lit une offre
-            fermée comme une piste ouverte. */}
-        {perimee ? <span className="badge-perimee">périmée</span> : null}
-        {href ? (
-          <a href={href} target="_blank" rel="noopener noreferrer">
-            offre ↗
-          </a>
-        ) : null}
-        {/* Le trajet s'ouvre DANS Google Maps, où Marc est connecté : sa maison, ses
-            endroits et la durée réelle y sont — sans que l'app transmette l'origine. */}
-        {trajet ? (
-          <a href={trajet} target="_blank" rel="noopener noreferrer">
-            trajet ↗
-          </a>
+        {/* UN signal, et un seul. « Périmée » l'emporte sur le salaire : savoir qu'une
+            offre est fermée change la décision plus que savoir ce qu'elle payait. */}
+        {perimee ? (
+          <span className="badge-perimee">périmée</span>
+        ) : offre.salaireAffiche ? (
+          <span className="carte__signal">{offre.salaireAffiche}</span>
         ) : null}
       </div>
 
-      {offre.raisons.length > 0 ? (
-        <ul className="carte__raisons">
-          {offre.raisons.map((r, i) => (
-            <li key={i} className={`raison raison--${r.ton}`}>
-              {r.texte}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      <div className="carte__meta">
-        {offre.km !== null ? (
-          <span className="etiquette etiquette--km">{formaterKm(offre.km)}</span>
-        ) : null}
-        {offre.salaireAffiche ? (
-          <span className="etiquette etiquette--salaire">{offre.salaireAffiche}</span>
-        ) : null}
-        <span className="carte__date">
-          {offre.histo ? "envoyée" : "vue"} {offre.dateEnvoi || offre.dateReperage}
-        </span>
-      </div>
+      {/* La distance est le critère n°1 de Marc : elle garde sa colonne, alignée à
+          droite, en chiffres tabulaires pour que les lignes se comparent d'un coup d'œil.
+          « — » quand elle n'est pas mesurée : jamais un zéro plausible (garde-fou n°3). */}
+      <p className="carte__km">
+        {offre.km !== null ? formaterKm(offre.km) : <span className="carte__km--inconnue">—</span>}
+      </p>
 
       {offre.notes ? <p className="carte__notes">{offre.notes}</p> : null}
 

@@ -120,22 +120,29 @@ export function CarteFiltrable({
         {filtreActif ? " · filtre actif : seules les entreprises qui ont une offre correspondante" : ""}
       </p>
 
-      <CarteOffres epingles={vue.epingles} cadre={cadre} />
+      {/* ⚠️ LE PLAN ET LA LISTE CÔTE À CÔTE (choix de Marc, 2026-08-05).
+          Empilés, il fallait faire défiler pour relier une épingle à sa fiche — le plan
+          sortait de l'écran au moment précis où on lisait ce qu'il montre. La liste
+          devient la colonne de lecture du plan ; sous 56 rem elle repasse dessous, où
+          l'empilement redevient le bon choix. */}
+      <div className="plan-ecran">
+        <CarteOffres epingles={vue.epingles} cadre={cadre} />
 
-      {vue.epingles.length === 0 ? (
-        <div className="etat">
-          <h2>Aucune entreprise à afficher</h2>
-          <p>
-            {filtreActif
-              ? "Aucune entreprise ne correspond aux filtres. En retirer un ramènera des épingles."
-              : vue.aSituer.length > 0
-                ? "Les entreprises n’ont pas encore été localisées. Ça se fait tout seul, au fil des passages — le bouton ci-dessus force une passe."
-                : "Aucune offre active et aucune entreprise cible à montrer."}
-          </p>
-        </div>
-      ) : (
-        <ListeCarte epingles={vue.epingles} />
-      )}
+        {vue.epingles.length === 0 ? (
+          <div className="etat">
+            <h2>Aucune entreprise à afficher</h2>
+            <p>
+              {filtreActif
+                ? "Aucune entreprise ne correspond aux filtres. En retirer un ramènera des épingles."
+                : vue.aSituer.length > 0
+                  ? "Les entreprises n’ont pas encore été localisées. Ça se fait tout seul, au fil des passages — le bouton ci-dessus force une passe."
+                  : "Aucune offre active et aucune entreprise cible à montrer."}
+            </p>
+          </div>
+        ) : (
+          <ListeCarte epingles={vue.epingles} />
+        )}
+      </div>
 
       {vue.aSituer.length > 0 ? (
         <p className="carte__manquants">
