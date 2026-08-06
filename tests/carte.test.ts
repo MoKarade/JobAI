@@ -12,7 +12,9 @@ import {
   apparier,
   cadrage,
   centreDuCadrage,
+  compterEntreprises,
   construireVue,
+  filtrerAdresseConnue,
   villeDeLEntreprise,
   type PositionEntreprise,
 } from "../lib/carte";
@@ -454,5 +456,62 @@ describe("centre du cadrage — garde-fou n°1", () => {
     const montreal = centreDuCadrage({ latMin: 45.4, latMax: 45.6, lonMin: -73.7, lonMax: -73.5 })!;
     expect(quebec.lat).toBeCloseTo(46.8, 6);
     expect(quebec.lat).not.toBeCloseTo(montreal.lat, 1);
+  });
+});
+
+describe("« je veux pas si y'a pas au moins l'adresse de l'entreprise »", () => {
+  /** Une épingle minimale, avec juste ce que le filtre regarde. */
+  function epingle(precision: "exacte" | "ville", ...adresses: (string | null)[]) {
+    return {
+      lat: 46.8,
+      lon: -71.2,
+      precision,
+      ville: "Québec",
+      entreprises: adresses.map((adresse, i) => ({
+        nom: `E${i}`,
+        ville: "Québec",
+        km: null,
+        adresse,
+        adresseSource: adresse === null ? null : ("osm" as const),
+        bornes: null,
+        lecture: "",
+        offres: [],
+      })),
+    };
+  }
+
+  it("écarte les entreprises sans adresse, garde les autres", () => {
+    const r = filtrerAdresseConnue([epingle("ville", "1 rue Test", null, null)]);
+    expect(compterEntreprises(r)).toBe(1);
+    expect(r[0]!.entreprises[0]!.adresse).toBe("1 rue Test");
+  });
+
+  it("SUPPRIME l'épingle devenue vide — un marqueur sans contenu ne veut rien dire", () => {
+    // ⚠️ Le cas qui distingue un vrai filtre d'un filtre à moitié fait : sans ça, la carte
+    // garderait des marqueurs cliquables qui n'ouvrent rien.
+    expect(filtrerAdresseConnue([epingle("ville", null, null)])).toEqual([]);
+  });
+
+  it("ne touche PAS à ce qui a une adresse, épingle exacte ou pas", () => {
+    // Une adresse du registre coexiste avec une épingle au centre-ville : c'est
+    // précisément le cas que le filtre doit GARDER, sinon il jetterait ce que le registre
+    // vient d'apporter.
+    const avant = [epingle("ville", "2 rue Test"), epingle("exacte", "3 rue Test")];
+    expect(compterEntreprises(filtrerAdresseConnue(avant))).toBe(2);
+  });
+
+  it("ne mute pas l'entrée — la vue complète reste disponible pour le compte", () => {
+    // ⚠️ Discrimination : `masquees` se calcule en comparant l'avant et l'après. Si le
+    // filtre mutait le tableau reçu, les deux comptes seraient identiques et l'écran
+    // annoncerait « 0 masquée » en en cachant 41.
+    const avant = [epingle("ville", "4 rue Test", null)];
+    const apres = filtrerAdresseConnue(avant);
+    expect(compterEntreprises(avant)).toBe(2);
+    expect(compterEntreprises(apres)).toBe(1);
+    expect(compterEntreprises(avant) - compterEntreprises(apres)).toBe(1);
+  });
+
+  it("rend un tableau vide sans lever", () => {
+    expect(filtrerAdresseConnue([])).toEqual([]);
   });
 });

@@ -1361,3 +1361,19 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .controles__compte {
   max-width: 68ch;
 }
+
+/* L'interrupteur « seulement celles dont on connaît l'adresse » : une bascule discrète,
+   au même niveau de gris que le compte qu'elle accompagne. Elle n'a pas à crier — c'est un
+   réglage d'affichage, pas une action. La cible reste confortable au doigt. */
+.carte__bascule {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 24px;
+  cursor: pointer;
+}
+.carte__bascule input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+}

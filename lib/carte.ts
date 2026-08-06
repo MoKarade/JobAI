@@ -353,3 +353,31 @@ export function centreDuCadrage(
     lon: (cadre.lonMin + cadre.lonMax) / 2,
   };
 }
+
+/**
+ * Ne garde que les entreprises dont on connaît l'ADRESSE.
+ *
+ * Demande de Marc, 2026-08-06 : « 41 sans adresse… je veux pas si y'a pas au moins
+ * l'adresse de l'entreprise ». Il a raison sur le fond : une épingle posée au centre d'une
+ * ville, sans adresse, ne répond à AUCUNE des questions qu'on pose à une carte. Elle ne dit
+ * pas où aller, pas combien de temps il faut, pas si c'est dans le bon parc industriel.
+ * Elle occupe l'écran en donnant l'impression d'une couverture qui n'existe pas.
+ *
+ * ⚠️ CE N'EST PAS UNE SUPPRESSION, ET L'ÉCRAN DOIT LE DIRE. Les entreprises écartées
+ * restent en base, leurs offres restent dans la liste d'accueil, et le compte des masquées
+ * est affiché. Un filtre qui retire silencieusement 41 employeurs serait exactement le
+ * défaut qu'on corrige : une couverture qu'on croit complète et qui ne l'est pas.
+ *
+ * PURE, et elle rend un NOUVEAU tableau : les épingles vidées de toutes leurs entreprises
+ * disparaissent, sinon la carte porterait des marqueurs sans contenu.
+ */
+export function filtrerAdresseConnue(epingles: readonly Epingle[]): Epingle[] {
+  return epingles
+    .map((e) => ({ ...e, entreprises: e.entreprises.filter((x) => x.adresse !== null) }))
+    .filter((e) => e.entreprises.length > 0);
+}
+
+/** Combien d'entreprises un ensemble d'épingles porte. Le compte doit rester vérifiable. */
+export function compterEntreprises(epingles: readonly Epingle[]): number {
+  return epingles.reduce((n, e) => n + e.entreprises.length, 0);
+}

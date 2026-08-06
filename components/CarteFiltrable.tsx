@@ -24,7 +24,13 @@
 import { useMemo, useState } from "react";
 import type { EntrepriseCible } from "@/lib/reference";
 import type { Offre } from "@/lib/types";
-import { cadrage, construireVue, type PositionEntreprise } from "@/lib/carte";
+import {
+  cadrage,
+  compterEntreprises,
+  construireVue,
+  filtrerAdresseConnue,
+  type PositionEntreprise,
+} from "@/lib/carte";
 import {
   FILTRES_VIDES,
   filtrer,
@@ -69,10 +75,26 @@ export function CarteFiltrable({
     () => construireVue(retenues, filtreActif ? [] : cibles, table),
     [retenues, cibles, table, filtreActif],
   );
-  const cadre = useMemo(() => cadrage(vue.epingles), [vue.epingles]);
 
-  const entreprises = vue.epingles.reduce((n, e) => n + e.entreprises.length, 0);
-  const exactes = vue.epingles
+  // ⚠️ ALLUMÉ PAR DÉFAUT (demande de Marc, 2026-08-06 : « je veux pas si y'a pas au moins
+  // l'adresse de l'entreprise »). Une épingle au centre d'une ville, sans adresse, ne
+  // répond à aucune des questions qu'on pose à une carte — elle occupe l'écran en donnant
+  // l'impression d'une couverture qui n'existe pas. L'interrupteur existe quand même :
+  // c'est un choix d'affichage, pas une donnée effacée, et le compte des masquées reste
+  // écrit juste à côté.
+  const [adresseSeulement, setAdresseSeulement] = useState(true);
+
+  const epingles = useMemo(
+    () => (adresseSeulement ? filtrerAdresseConnue(vue.epingles) : vue.epingles),
+    [vue.epingles, adresseSeulement],
+  );
+  const cadre = useMemo(() => cadrage(epingles), [epingles]);
+
+  const entreprises = compterEntreprises(epingles);
+  // Le compte de RÉFÉRENCE reste celui d'avant filtrage : c'est lui qui permet de dire
+  // combien sont masquées, et un total qui bouge avec le filtre ne se vérifie pas.
+  const masquees = compterEntreprises(vue.epingles) - entreprises;
+  const exactes = epingles
     .filter((e) => e.precision === "exacte")
     .reduce((n, e) => n + e.entreprises.length, 0);
 
@@ -84,7 +106,7 @@ export function CarteFiltrable({
   // entreprise qu'aucun géocodeur n'a su placer. Tout ranger sous « au centre-ville »
   // effacerait ce gain de l'écran alors qu'il est en base et affiché juste en dessous,
   // dans la liste. Trois états valent mieux qu'un ratio qui répond à côté.
-  const adresseSansEpingle = vue.epingles
+  const adresseSansEpingle = epingles
     .filter((e) => e.precision !== "exacte")
     .reduce(
       (n, e) => n + e.entreprises.filter((x) => x.adresseSource !== null).length,
@@ -105,7 +127,7 @@ export function CarteFiltrable({
 
       <CompteFiltre
         affichees={entreprises}
-        total={entreprises + vue.aSituer.length + vue.sansLieu.length}
+        total={entreprises + masquees + vue.aSituer.length + vue.sansLieu.length}
         sansDistance={sansDistance}
         nom="entreprise"
       />
@@ -118,6 +140,24 @@ export function CarteFiltrable({
         {sansAdresse > 0 ? ` · ${sansAdresse} sans adresse` : ""}
         {vue.aSituer.length > 0 ? ` · ${vue.aSituer.length} en attente de localisation` : ""}
         {filtreActif ? " · filtre actif : seules les entreprises qui ont une offre correspondante" : ""}
+      </p>
+
+      {/* ⚠️ CE QUI EST MASQUÉ SE DIT, TOUJOURS. Un filtre qui retire 41 employeurs sans
+          l'écrire produirait exactement le défaut qu'il corrige : une couverture qu'on
+          croit complète et qui ne l'est pas. Et la phrase précise où elles sont restées —
+          rien n'est effacé, leurs offres sont toujours dans la liste d'accueil. */}
+      <p className="carte__compte">
+        <label className="carte__bascule">
+          <input
+            type="checkbox"
+            checked={adresseSeulement}
+            onChange={(e) => setAdresseSeulement(e.target.checked)}
+          />{" "}
+          Seulement les entreprises dont on connaît l&apos;adresse
+        </label>
+        {adresseSeulement && masquees > 0
+          ? ` — ${masquees} masquée${masquees > 1 ? "s" : ""}, sans adresse connue. Leurs offres restent dans la liste d'accueil.`
+          : ""}
       </p>
 
       {/* ⚠️ LE PLAN ET LA LISTE CÔTE À CÔTE (choix de Marc, 2026-08-05).
@@ -133,10 +173,10 @@ export function CarteFiltrable({
             la seconde (21 rem), et la liste retombait à la ligne. Mettre un composant dans
             une grille exige de vérifier ce qu'il rend À SA RACINE, jamais de le supposer. */}
         <div className="plan-ecran__plan">
-          <CarteOffres epingles={vue.epingles} cadre={cadre} />
+          <CarteOffres epingles={epingles} cadre={cadre} />
         </div>
 
-        {vue.epingles.length === 0 ? (
+        {epingles.length === 0 ? (
           <div className="etat">
             <h2>Aucune entreprise à afficher</h2>
             <p>
@@ -148,7 +188,7 @@ export function CarteFiltrable({
             </p>
           </div>
         ) : (
-          <ListeCarte epingles={vue.epingles} />
+          <ListeCarte epingles={epingles} />
         )}
       </div>
 
