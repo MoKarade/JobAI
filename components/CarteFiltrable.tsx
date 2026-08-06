@@ -126,7 +126,15 @@ export function CarteFiltrable({
           devient la colonne de lecture du plan ; sous 56 rem elle repasse dessous, où
           l'empilement redevient le bon choix. */}
       <div className="plan-ecran">
-        <CarteOffres epingles={vue.epingles} cadre={cadre} />
+        {/* ⚠️ L'ENVELOPPE EST OBLIGATOIRE, ET SON ABSENCE A CASSÉ L'ÉCRAN EN PRODUCTION.
+            `CarteOffres` rend un FRAGMENT : sa barre d'outils et son plan sont deux
+            éléments FRÈRES. Sans ce `div`, la grille recevait TROIS enfants au lieu de
+            deux — la barre prenait la première colonne, le plan se retrouvait écrasé dans
+            la seconde (21 rem), et la liste retombait à la ligne. Mettre un composant dans
+            une grille exige de vérifier ce qu'il rend À SA RACINE, jamais de le supposer. */}
+        <div className="plan-ecran__plan">
+          <CarteOffres epingles={vue.epingles} cadre={cadre} />
+        </div>
 
         {vue.epingles.length === 0 ? (
           <div className="etat">

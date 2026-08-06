@@ -17,6 +17,8 @@
 import Link from "next/link";
 import type { Offre } from "@/lib/types";
 import { palier } from "@/lib/scoring";
+import { couleurNote, encreSurNote } from "@/lib/couleurNote";
+import { Fait } from "./Icone";
 import { ControlesOffre } from "./ControlesOffre";
 
 /** Les distances s'écrivent à la française : 3,5 km. */
@@ -36,7 +38,15 @@ export function CarteOffre({ offre }: { offre: Offre }) {
     >
       {/* Le « /100 » a disparu du cercle : sur trois centimètres il n'ajoute rien qu'on
           ne sache déjà. Il reste dans l'infobulle et sur la fiche. */}
-      <div className={`note note--${p}`} title="Note de fit sur 100 — voir le barème">
+      {/* ⚠️ LA COULEUR EST CALCULÉE, PAS CHOISIE (demande de Marc : « de plus en plus
+          verte plus ça se rapproche de 100 »). Elle vient d'une fonction pure et testée —
+          une couleur qui encode une donnée est un calcul, pas du style. Le nombre reste
+          écrit dedans : qui ne distingue pas le vert de l'ambre lit « 82 » et sait tout. */}
+      <div
+        className={`note note--${p}`}
+        style={{ background: couleurNote(offre.score), color: encreSurNote() }}
+        title={offre.score === null ? "Jamais notée" : `${offre.score} sur 100`}
+      >
         {offre.score ?? "–"}
       </div>
 
@@ -58,7 +68,9 @@ export function CarteOffre({ offre }: { offre: Offre }) {
           droite, en chiffres tabulaires pour que les lignes se comparent d'un coup d'œil.
           « — » quand elle n'est pas mesurée : jamais un zéro plausible (garde-fou n°3). */}
       <p className="carte__km">
-        {offre.km !== null ? formaterKm(offre.km) : <span className="carte__km--inconnue">—</span>}
+        <Fait genre="route" discret={offre.km === null}>
+          {offre.km !== null ? formaterKm(offre.km) : "—"}
+        </Fait>
       </p>
 
       {offre.notes ? <p className="carte__notes">{offre.notes}</p> : null}

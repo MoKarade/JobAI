@@ -13,6 +13,7 @@ import Link from "next/link";
 import type { Epingle } from "@/lib/carte";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { palier } from "@/lib/scoring";
+import { Fait } from "./Icone";
 import { RAYON_5_MIN_M, minutesAPied } from "@/lib/bornes";
 import { ADRESSE_ABSENTE, mentionSource } from "@/lib/adresse";
 
@@ -51,21 +52,23 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                   </span>
                 ) : null}
               </p>
+              {/* ⚠️ MOINS DE TEXTE, PAS MOINS D'INFORMATION (demande de Marc, 2026-08-06).
+                  « 26,4 km du domicile (mesuré) » devient une icône et « 26,4 km » : ce que
+                  la phrase disait en plus — d'où on mesure, et que c'est mesuré — est vrai
+                  de TOUTES les lignes, donc le répéter partout n'apprenait rien. L'icône
+                  porte son nom au lecteur d'écran (`components/Icone.tsx`), sans quoi
+                  couper la phrase couperait aussi le sens. */}
               <p className="carte-liste__faits">
-                {x.km === null
-                  ? "distance non mesurée"
-                  : `${String(x.km).replace(".", ",")} km du domicile (mesuré)`}
-              </p>
-              {/* BORNES DE RECHARGE — trois états, trois phrases. « Pas encore regardé »
-                  n'est pas « aucune borne » : le second est une information, le premier
-                  une absence de mesure, et les confondre serait affirmer ce qu'on ignore. */}
-              <p className="carte-liste__bornes">
-                {x.bornes === null
-                  ? "Bornes de recharge : pas encore regardé."
-                  : x.bornes.plusProcheM === null
-                    ? `Aucune borne de recharge à moins de ${MINUTES_LIBELLE} à pied.`
-                    : `Borne de recharge à ~${minutesAPied(x.bornes.plusProcheM)} min à pied` +
-                      `${x.bornes.nom ? ` (${x.bornes.nom})` : ""} — ${x.bornes.plusProcheM} m à vol d’oiseau.`}
+                <Fait genre="route" discret={x.km === null}>
+                  {x.km === null ? "—" : `${String(x.km).replace(".", ",")} km`}
+                </Fait>
+                <Fait genre="borne" discret={x.bornes === null || x.bornes.plusProcheM === null}>
+                  {x.bornes === null
+                    ? "non mesuré"
+                    : x.bornes.plusProcheM === null
+                      ? `aucune < ${MINUTES_LIBELLE}`
+                      : `${minutesAPied(x.bornes.plusProcheM)} min`}
+                </Fait>
               </p>
               {x.lecture ? <p className="carte-liste__lecture">{x.lecture}</p> : null}
               {x.offres.length > 0 ? (
@@ -77,7 +80,7 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                     >
                       <Link href={`/offre/${o.id}`}>{o.poste}</Link>
                       <span className="carte-liste__faits">
-                        {o.score === null ? "note –" : `${o.score}/100`}
+                        {o.score === null ? "–" : o.score}
                         {o.km === null ? "" : ` · ${String(o.km).replace(".", ",")} km`}
                       </span>
                     </li>
