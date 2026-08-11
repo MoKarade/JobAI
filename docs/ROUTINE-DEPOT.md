@@ -103,14 +103,47 @@ retenues par `trier()`, 1 sous le plancher d'adéquation. Mesuré, pas supposé.
 Les deux canaux coexistent sans se gêner : le dédoublonnage se fait sur `refSource`, donc
 une offre déposée par les deux n'entre qu'une fois.
 
+## ⚠️ La Routine ne doit PAS ouvrir une session neuve — mesuré le 2026-08-11
+
+Elle l'a fait pendant deux jours, et les deux exécutions se sont terminées de la même façon :
+**gate vert, push refusé**. Le proxy git répond 403 parce que `MoKarade/JobAI` n'est pas dans
+les sources d'une session fraîchement allumée. Deux commits valides sont morts avec leur
+conteneur.
+
+Le message d'erreur dit « ajoutez le dépôt aux sources de la session », et j'ai relayé ça à
+Marc deux fois comme si c'était un geste à sa portée. **C'était faux.** La vérification :
+
+| Fait | Mesuré |
+|---|---|
+| L'outil `add_repo` existe et attache bien `mokarade/jobai` en écriture | Oui — **depuis une session de développement** |
+| Une session allumée par une Routine y a accès | **Non** : sa liste d'outils autorisés ne contient aucun `mcp__*` |
+| Une session de développement joint `emploi.hubperso.com` | **Non** — 403 au CONNECT, re-mesuré le 11/08 sur `OPTIONS` **et** `POST` |
+
+Les deux moitiés d'accès ne sont donc pas où on croyait : la session de développement a le
+dépôt **et** Indeed **et** la recherche web, mais pas le réseau vers l'app ; la session neuve
+a le réseau mais ni le dépôt ni les outils pour l'obtenir.
+
+**Correctif appliqué** : la Routine ne crée plus de session. Elle tire dans la session de
+développement (`persistent_session_id`), qui a déjà tout ce qu'il faut. Rien à ajouter, rien
+à autoriser, aucun jeton nulle part.
+
+⚠️ *Conséquence à connaître* : si cette session est archivée, la Routine n'a plus de cible et
+il faut la recréer depuis la nouvelle session. C'est le prix de ce chemin, et il est plus
+petit que celui d'un commit perdu chaque matin.
+
 ## Le prompt de la Routine — SOURCE DE VÉRITÉ
 
 > Fréquence : **une fois par jour**, le matin (11:00 UTC). Le stock ne monte pas parce qu'un
 > dépôt a eu lieu une fois en 72 h.
 >
-> Ce bloc EST le prompt de la Routine `JobAI — veille Indeed quotidienne`. Le modifier ici
-> sans le reporter dans la Routine (ou l'inverse) fait diverger deux versions dont une seule
-> s'exécute — et c'est celle qu'on ne lit pas qui gagne.
+> Ce bloc décrit le travail attendu. La Routine `JobAI — veille quotidienne (session avec le
+> dépôt)` en porte une forme abrégée, puisqu'elle tire dans une session qui connaît déjà le
+> projet. Le modifier ici sans le reporter (ou l'inverse) fait diverger deux versions dont
+> une seule s'exécute — et c'est celle qu'on ne lit pas qui gagne.
+>
+> ⚠️ **Le quota Indeed est partagé et se vide vite** (mesuré le 11/08 : ~48 appels, puis
+> « Rate limit exceeded, try again in 29 seconds »). Espacer les appels, attendre le délai
+> annoncé, ne jamais paralléliser ni boucler.
 
 ```
 Tu alimentes JobAI, le suivi de recherche d'emploi de Marc dans la région de Québec.

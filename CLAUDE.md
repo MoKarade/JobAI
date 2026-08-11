@@ -569,6 +569,31 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   l'`ignoreCommand` de `vercel.json` payant, puisqu'un lot de docs ou de tests ne coûte alors
   aucun déploiement.
 
+- **Une Routine qui allume une session NEUVE n'hérite de rien : ni des dépôts attachés, ni
+  des outils MCP de la session qui l'a créée.** Deux exécutions d'affilée ont fini
+  identiquement — gate vert, `git push` refusé 403 — parce que `MoKarade/JobAI` n'est pas
+  dans les sources d'une session fraîche, et que la liste d'outils autorisés d'une session
+  allumée par un déclencheur ne contient aucun `mcp__*` : elle ne peut donc même pas s'ajouter
+  le dépôt elle-même. Deux commits valides sont morts avec leur conteneur.
+  ⚠️ **Et j'ai relayé DEUX FOIS à Marc le message d'erreur (« ajoutez le dépôt aux sources »)
+  comme si c'était un geste à sa portée, sans vérifier que ce chemin existait de son côté.**
+  Un message d'erreur décrit l'état du système, pas toujours une action disponible à
+  l'utilisateur : avant de le transmettre comme consigne, vérifier que le geste EXISTE là où
+  on l'envoie. C'est la même faute que « CI verte ≠ code en production », appliquée à une
+  instruction plutôt qu'à un statut.
+  Le correctif n'a pas été d'élargir une permission mais de changer de cible : la Routine
+  tire désormais dans la session de développement (`persistent_session_id`), qui a déjà le
+  dépôt, Indeed et la recherche web. Corollaire de la leçon « deux acteurs, chacun la moitié
+  d'un accès » : avant d'élargir, VÉRIFIER OÙ SONT VRAIMENT LES MOITIÉS — ici la session
+  neuve avait le réseau vers l'app (qu'elle a mesuré) et la session de développement ne
+  l'a pas (re-mesuré 403 au CONNECT le 11/08), l'inverse de ce que j'avais supposé.
+- **Un quota d'API partagé ne se mesure qu'en le heurtant, et il se referme en s'aggravant.**
+  Indeed a rendu « Rate limit exceeded, try again in 26 s », puis 29, puis 51 après deux
+  tentatives — le délai CROÎT à chaque appel refusé. Une boucle de retente serré ne fait donc
+  pas qu'échouer : elle repousse le moment où le quota revient. Espacer, attendre le délai
+  ANNONCÉ, ne jamais paralléliser. Et un travail de fond qui partage ce quota avec une
+  Routine doit supposer qu'il arrive APRÈS elle, pas avant.
+
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 
 La note de fit est le cœur du produit : elle décide ce que Marc regarde en premier.
