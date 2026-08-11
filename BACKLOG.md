@@ -688,6 +688,39 @@
 
 ---
 
+## Chantier #06 — Précision de la veille ⬜
+
+> Cadré par **ADR-0005**. Ordre imposé : la profondeur AVANT le volume (décision Marc,
+> 2026-08-11). Mesure de départ : 20 des 22 offres du 11 août notent **68**, et 68 est
+> exactement la note d'un titre sans description — 30 de ces points viennent de ce qu'on
+> ignore.
+
+- [ ] **[VEILLE-06]** Lire l'annonce de chaque offre retenue (`get_job_details`) et en tirer
+      les QUATRE champs qu'elle porte ensemble : description, salaire, adresse, séniorité.
+      La description entre dans le dépôt (le schéma la porte déjà, on l'envoie vide).
+- [ ] **[VEILLE-06b]** Corriger les deux défauts de barème qui récompensent l'ignorance :
+      `immigration` note **10/10** sans avoir rien lu, `seniorite` note **11** sans donnée
+      contre **9** avec. Un défaut neutre se place au milieu de sa plage.
+      ⚠️ Barème ⇒ audit sur les 38 offres du seed avant/après (§8 de `CLAUDE.md`).
+- [ ] **[VEILLE-06c]** File d'attente `data/veille/attente.json` (HORS `data/depot/`, donc
+      jamais ingérée) : une offre non lue faute de quota n'est pas déposée, elle est reprise
+      EN PREMIER le lendemain. Sans cette file, « garder pour demain » perd l'offre au
+      prochain tri de la source.
+- [ ] **[LIEU-05]** Table `employeurs_adresse` (nom, adresse, source, url, dernier essai,
+      échecs) : la recherche cible les employeurs SANS adresse et NON essayés récemment, plus
+      jamais l'offre. Le budget d'un matin va aux employeurs neufs.
+- [ ] **[LIEU-06]** Remplacer la garde « la ville doit apparaître dans l'adresse » par la
+      garde du GÉOCODEUR (l'adresse tombe à moins de N km du centre de la ville annoncée).
+      Récupère les arrondissements (« Sainte-Foy » pour « Québec »), reste strict sur les
+      homonymes.
+- [ ] **[LIEU-07]** Sonder Overpass par NOM d'entreprise sur la région — autre question que
+      Nominatim, frontière réseau déjà ouverte. **Témoin négatif obligatoire** avant d'y
+      croire (leçon « un HTTP 200 ne prouve rien »).
+- [ ] **[VEILLE-07]** Volume, APRÈS la profondeur : pagination (ZipRecruiter rend `limit: 5`
+      pour `total: 63` — on capte 8 %), plus de villes (Saint-Augustin, Beauport,
+      Charlesbourg, Sainte-Foy, Saint-Nicolas, Saint-Apollinaire), rotation sur plusieurs
+      jours, les deux connecteurs selon leur rôle (ZipRecruiter = largeur, Indeed = texte).
+
 ## Découvertes et dette (à trier)
 
 - 🔧 **`[SCORE-SENIORITE-LETTRES]` — le barème ne lit pas les années écrites en toutes
