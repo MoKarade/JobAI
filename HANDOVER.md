@@ -6,6 +6,47 @@
 
 ---
 
+## Session 2026-08-11 — la Routine poussait dans le vide, et je regardais le mauvais blocage
+
+### État en une page
+
+| | |
+|---|---|
+| **Gate** | `typecheck` + `test` (**735**) + `lint` + `build` verts, jugés par exit code. |
+| **Ce qui s'est passé les 9 et 11** | La Routine a tourné deux fois, correctement : 142 offres trouvées, 66 après dédoublonnage, gate vert. **Les deux fois, `git push` a été refusé 403** — et les deux commits sont morts avec leur conteneur. |
+| **La cause, mesurée** | `MoKarade/JobAI` n'est pas dans les sources d'une session fraîchement allumée, et la liste d'outils autorisés d'une telle session ne contient **aucun `mcp__*`** : elle ne peut donc même pas s'ajouter le dépôt. `add_repo` existe pourtant — mais seulement depuis une session de développement. |
+| **Ma faute** | J'ai relayé **deux fois** à Marc le message d'erreur (« ajoutez le dépôt aux sources ») comme si c'était un geste à sa portée, sans vérifier que ce chemin existait de son côté. Il n'existait pas. |
+| **Correctif** | La Routine ne crée plus de session : elle tire dans la session de développement (`persistent_session_id`), qui a déjà le dépôt, Indeed et la recherche web. Ancien déclencheur supprimé. **Rien à faire côté Marc.** |
+| **Prix assumé** | Si cette session est archivée, la Routine perd sa cible et se recrée depuis la nouvelle. Plus petit que le prix d'un commit perdu chaque matin. |
+
+### Ce que j'ai vérifié plutôt que repris sur parole
+
+La session de la Routine rapportait `OPTIONS …/api/ingest/depot` → **204**, et en concluait
+que l'en-tête de `lib/ingest/depotFichier.ts` était périmé. Re-mesuré depuis cette session le
+11/08, sur `OPTIONS` **et** sur `POST` : **403 au CONNECT**, les deux fois. La prémisse de
+l'en-tête tient donc pour cette session, et elle n'a pas été réécrite. L'asymétrie est réelle
+mais inverse de ce qui était supposé — c'est la session NEUVE qui a le réseau, pas celle de
+développement.
+
+### Ce que la Routine a bien fait, et qui est maintenant dans le prompt
+
+Elle a **exclu les agences de placement** de la recherche d'adresse (Manpower, Randstad,
+Groupe RP, Horus, Recrutement Harmonie) : l'adresse d'une agence est le bureau du recruteur,
+pas le lieu de travail — exactement le défaut AMETEK. Idem Voyages Laurier (quatre
+succursales, aucune adresse complète) et Wabtec (siège américain). Elle a préféré le vide à
+l'approximation. La règle est passée dans `docs/ROUTINE-DEPOT.md` : un jugement qui dépend de
+la lucidité d'une exécution à l'autre n'est pas une garde.
+
+### Ce qui reste ouvert
+
+- **Le quota Indeed se referme en s'aggravant** : 26 s → 29 → 51 → 58 à chaque appel refusé.
+  La veille du 11 n'a pas pu être reprise à la main dans la foulée de l'exécution du matin.
+- **Cinq reverts de conteneur** dans la journée. Deux éditions non poussées ont été perdues
+  et refaites. La règle « seul un push protège » se paie à chaque fois qu'on l'oublie.
+- **Signature des commits** : toujours bloquée (clé de signature de 0 octet dans le conteneur).
+
+---
+
 ## Session 2026-08-06 — la borne la plus proche, le registre épuisé, la veille débloquée
 
 ### État en une page

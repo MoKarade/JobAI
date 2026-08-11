@@ -194,6 +194,14 @@ pas laquelle est bonne, donc on ne prend ni l'une ni l'autre. Ne « corrige » J
 pour faire passer une adresse : l'app rejette le cas de toute façon, et tu aurais faussé la
 seule vérification qui existe.
 
+⚠️ PAS D'ADRESSE POUR UNE AGENCE DE PLACEMENT. Manpower, Randstad, Groupe RP, Horus,
+Recrutement Harmonie, Bédard Ressources… — leur adresse est le BUREAU DU RECRUTEUR, pas le
+lieu de travail. C'est le défaut AMETEK sous un autre visage : plausible, faux,
+indiscernable une fois en base. Champ vide. Même règle pour une entreprise à plusieurs
+succursales dont aucune n'est désignée par l'annonce : on ne devine pas laquelle.
+*(Règle trouvée par l'exécution du 11/08, qui l'a appliquée d'elle-même — elle est ici
+pour ne pas dépendre du jugement d'une exécution à l'autre.)*
+
 Un champ vide est une BONNE réponse. Trois annonces sur quatre n'en donnent aucune.
 
 ═══ 3. NE FILTRE RIEN D'AUTRE ═══
