@@ -31,6 +31,9 @@ export function estCheminPublic(chemin: string): boolean {
   // recevrait une redirection vers l'écran de connexion, et la veille ne tournerait
   // jamais — en silence, puisque le cron ne remonte pas les redirections comme des échecs.
   if (chemin === "/api/cron/veille") return true;
+  // Même famille, même CRON_SECRET (factorisé dans `lib/cronAuth.ts`) : une seconde passe
+  // de géocodage quotidienne, à une autre heure que la veille (chantier #07, [CARTE-03]).
+  if (chemin === "/api/cron/geocodage") return true;
   // Même famille : gardée par `INGEST_TOKEN`, en temps constant, échec fermé. C'est le
   // point d'entrée par lequel une Routine dépose ce qu'elle a trouvé — elle a le
   // connecteur Indeed mais aucun accès au dépôt, et aucune session Google.

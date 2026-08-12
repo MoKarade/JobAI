@@ -799,13 +799,9 @@ FAIT le 2026-08-12 (tout gaté, discrimination prouvée par stash) :
       existe à la première visite au lieu d'attendre des jours de passes budgétées. Le log
       de passe dit `placées=N`.
 
-RESTE — vérification de bout en bout (rien à coder, tout à CONSTATER) :
-- [ ] **[V-CRON-13]** Demain 15:00 UTC (11:00 chez Marc) : le cron tourne sur le build qui
-      embarque ENFIN les dépôts. Attendu : `sources` du JSON avec `depot-fichier ok:true`
-      et offres > 0 ; ~110 actives (38 seed + dépôts des 11-12 en fenêtre, les périmées à
-      tort RESSUSCITENT — mécanique codée, rien à faire) ; carte pleine dès la première
-      visite (placement immédiat). ⚠️ Pour ne pas attendre : `GET /api/cron/veille` avec
-      `Authorization: Bearer $CRON_SECRET` (Marc seul a le secret) ingère TOUT DE SUITE.
+- [x] **[V-CRON-13]** Constaté le 2026-08-12 par déclenchement manuel (Marc, une fois le bon
+      projet Vercel identifié) : `depot-fichier ok:true`, 115 offres trouvées (55 nouvelles,
+      30 revenues). Le bundle embarque bien les dépôts — la cause racine est fermée.
 - [ ] **[V-31-07]** Les ~40 offres du 31/07 sont hors fenêtre : elles reviendront par les
       balayages qui les re-trouvent (résurrection automatique). NE PAS les restaurer à la
       main — une offre que plus aucune source ne publie est peut-être vraiment fermée.
@@ -815,6 +811,52 @@ RESTE — vérification de bout en bout (rien à coder, tout à CONSTATER) :
       ouvertes périment, le correctif est côté ROUTINE (re-recherche nommée des offres en
       péril, bornée ~10 req/jour) — PAS un seuil plus haut (il retarderait symétriquement
       la péremption honnête).
+
+### [CARTE-03] — 115 offres, 93 sur la carte, 60 « sans adresse » : le débit du géocodage
+
+> Marc (2026-08-12), une fois [FIX-BUNDLE] déployé : « 115 offres mais sur la carte que 93…
+> et 60 sans adresse c'est inacceptable ». **Ce n'est pas une régression : c'est la
+> conséquence DIRECTE et VOULUE de [CARTE-CENTREVILLE].** Avant le 12/08, ces 60 employeurs
+> étaient dans `aSituer` — invisibles, jamais comptés. Le placement immédiat les rend
+> visibles, honnêtes (pointillé + fiche « ville seulement »), mais leur adresse RÉELLE reste
+> à trouver — et c'est là qu'est le vrai plafond.
+
+**Mesuré, pas supposé** (lecture de `lib/geocodage.ts` + `lib/actions.ts` + l'historique
+git) :
+- Les deux leviers GRATUITS ont DÉJÀ tourné sur ces 60 dans la même passe : la recherche OSM
+  par NOM d'entreprise (5 candidats, `NB_CANDIDATS_ENTREPRISE`) et le registre des
+  entreprises du Québec (28 821 établissements, sans coût réseau, `adressesDepuisRegistre`).
+  Les 17 « adresse connue, épinglé au centre-ville » sont leur succès ; les 60 restants n'ont
+  matché ni l'un ni l'autre — ce ne sont pas des PME au registre ou trouvables par leur nom
+  sur OpenStreetMap.
+- Le seul levier qui reste (`raffinerPositions`, Nominatim) est plafonné à **8 requêtes par
+  passe** — `MAX_VILLES_PAR_PASSE` (`lib/geocodage.ts`), un plafond de SÉCURITÉ dérivé du
+  pire cas sous le mur de 60 s d'une fonction Vercel, PAS un oubli. `MAX_SITUATIONS_CRON`
+  vaut aussi 8 depuis ADR-01 (2026-07-31) **pour la même raison** — le porter plus haut ne
+  changerait RIEN, `geocoderSerie` tronque déjà à 8 en interne. (Trouvé en chemin : le
+  commentaire du cron affirmait encore « Douze », resté faux onze jours — corrigé.)
+- Donc : agrandir UNE passe exigerait de re-dériver ce pire cas sur TOUTES les étapes qui
+  partagent le budget (situer, adresses, raffinage, bornes) — pas fait ici, risque réel.
+
+**Fait le 2026-08-12** — le levier sûr : une PASSE DE PLUS, pas une plus grosse.
+- [x] **[CARTE-03]** `app/api/cron/geocodage/route.ts` : second cron, appelle SEULEMENT
+      `mesurerDistances` (zéro ingestion, zéro péremption), même budget que la veille
+      (`lib/geocodageCron.ts`, partagé pour ne jamais diverger), même verrou `reserverPasse`.
+      `vercel.json` : `0 3 * * *` (12 h d'écart avec la veille, `0 15 * * *`) — double le
+      débit quotidien de raffinage sans toucher au plafond par-passe. Auth factorisée
+      (`lib/cronAuth.ts`) pour que les deux crons ne divergent plus jamais sur ce point.
+      ⚠️ Le plan Vercel de Marc doit accepter un 2ᵉ cron : à vérifier au premier déploiement
+      (échec de déploiement clair et sans risque si le plan Hobby le refuse — pas une panne
+      silencieuse).
+
+RESTE — vérification (rien à coder, à CONSTATER après déploiement) :
+- [ ] **[V-CARTE-03]** Après quelques jours : le compte de « sans adresse » doit baisser
+      d'environ 16/jour (2 passes × 8). Un reliquat qui ne baisse PLUS après plusieurs passes
+      = ces employeurs sont introuvables sur les deux services publics — c'est une limite des
+      DONNÉES, pas du code ; le dire à Marc plutôt que de rouvrir `MAX_VILLES_PAR_PASSE`.
+- [ ] **[V-CARTE-03-CRON]** Si le déploiement Vercel refuse le second cron (plan Hobby ?),
+      basculer sur : Marc revisite `/carte` quelques fois par jour (6 par passe, 5 min de
+      cooldown, déjà en place) — accélérant manuel sans changement de code.
 
 ## Découvertes et dette (à trier)
 

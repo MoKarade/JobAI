@@ -13,7 +13,6 @@
 // Elle ne moissonne aucun site qui l'interdit. Uniquement le flux RSS public du
 // Guichet-Emplois et les API que les entreprises publient pour diffuser leurs postes.
 
-import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -23,6 +22,8 @@ import { colonnesOffre } from "@/lib/persistance";
 import { mesurerDistances } from "@/lib/actions";
 import { EPOQUE_A_RETENTER } from "@/lib/travaux";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "@/lib/synchro";
+import { autoriserCron } from "@/lib/cronAuth";
+import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "@/lib/geocodageCron";
 import { executerPasse } from "@/lib/ingest/passe";
 import { recuperer } from "@/lib/ingest/sources";
 import type { AtsEntreprise } from "@/lib/ingest/types";
@@ -33,36 +34,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const CLE_JOURNAL = "veille-journal";
-
-/**
- * Employeurs situés par passage du cron.
- *
- * Douze : à 1,1 s entre deux requêtes Nominatim, une passe complète (villes + entreprises)
- * tient largement sous les 60 s de la fonction, ingestion comprise. C'est aussi ce qui fait
- * converger un stock de quarante employeurs en quelques nuits sans que Marc ouvre l'app —
- * les passes déclenchées par un affichage restent volontairement plus discrètes.
- */
-const MAX_SITUATIONS_CRON = 8;
-
-/**
- * Temps accordé au géocodage du cron, villes et entreprises confondues.
- *
- * Le plafond en NOMBRE ne borne pas la DURÉE — une revue l'a mesuré : deux séries de huit
- * requêtes valent ~80 s dans le pire cas (chacune peut aller jusqu'à `DELAI_MAX_REQUETE_MS`),
- * bien au-delà des 60 s de la fonction. Un mur atteint tue le processus sans exécuter le
- * moindre `catch` : ni trace, ni acquis enregistré. Vingt-cinq secondes laissent de la marge
- * à l'ingestion, qui passe AVANT et qui est l'essentiel.
- */
-const BUDGET_GEOCODAGE_CRON_MS = 25_000;
 const CLE_ATS = "veille-ats";
 const CLE_CURSEUR = "veille-curseur";
-
-/** Comparaison en temps constant, sur des empreintes de longueur fixe. */
-function memeSecret(a: string, b: string): boolean {
-  const ha = createHash("sha256").update(a).digest();
-  const hb = createHash("sha256").update(b).digest();
-  return timingSafeEqual(ha, hb);
-}
 
 /**
  * Le jour courant dans le fuseau de Marc.
@@ -104,21 +77,8 @@ async function ecrireEtat(cle: string, valeur: unknown): Promise<void> {
 }
 
 export async function GET(requete: Request) {
-  const attendu = process.env.CRON_SECRET;
-  if (!attendu || attendu.trim() === "") {
-    return NextResponse.json(
-      { ok: false, erreur: "veille désactivée : CRON_SECRET absent" },
-      { status: 503, headers: { "Cache-Control": "no-store" } },
-    );
-  }
-
-  const fourni = requete.headers.get("authorization") ?? "";
-  if (!memeSecret(fourni, `Bearer ${attendu}`)) {
-    return NextResponse.json(
-      { ok: false, erreur: "non autorisé" },
-      { status: 401, headers: { "Cache-Control": "no-store" } },
-    );
-  }
+  const refus = autoriserCron(requete);
+  if (refus) return refus;
 
   if (!process.env.DATABASE_URL) {
     return NextResponse.json(

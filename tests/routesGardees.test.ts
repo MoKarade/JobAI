@@ -34,6 +34,9 @@ const EXEMPTIONS: Readonly<Record<string, string>> = {
     "échec fermé : 503 si le secret n'est pas configuré, 401 s'il est faux. Derrière la " +
     "garde de session, l'appel quotidien de Vercel recevrait une redirection HTML et la " +
     "veille ne tournerait jamais, sans qu'aucune alerte ne se déclenche.",
+  "/api/cron/geocodage":
+    "Même famille que /api/cron/veille, même CRON_SECRET (lib/cronAuth.ts) : une seconde " +
+    "passe de géocodage quotidienne, à une autre heure ([CARTE-03], 2026-08-12).",
 };
 
 /** Parcourt `app/` et rend la route de chaque `page.tsx` / `route.ts`. */

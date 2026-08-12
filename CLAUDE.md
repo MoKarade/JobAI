@@ -670,6 +670,23 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   Corollaire vécu : ces réfutations ont fait GAGNER du temps (une table entière non écrite,
   un barème non touché) ; les écrire dans l'ADR vaut mieux que de les taire, sinon la
   prochaine session refera le mauvais chantier avec le même raisonnement.
+- **Un plafond « configurable » peut être un LEURRE si un cap interne, plus bas, tronque déjà
+  tout ce qui le dépasse.** `[CARTE-03]`, 2026-08-12 : Marc voyait 60 employeurs « sans
+  adresse » et je m'apprêtais à monter `MAX_SITUATIONS_CRON` (8→20) pour accélérer le
+  raffinage Nominatim. Lire `geocoderSerie` (lib/geocodage.ts) avant de toucher au nombre a
+  montré que `MAX_VILLES_PAR_PASSE = 8` tronque DÉJÀ chaque série en interne, quel que soit
+  le paramètre reçu — et l'historique (ADR-01, 2026-07-31) confirmait que ce plafond app-level
+  avait DÉJÀ été ramené de 12 à 8 pour cette exacte raison (« mon "12" était un leurre »). Le
+  commentaire du cron disait pourtant encore « Douze » onze jours plus tard : **un
+  commentaire qui reste faux après que la valeur a changé est indiscernable d'un commentaire
+  vrai** tant que personne ne recroise le texte et le nombre. Deux règles : (a) avant
+  d'agrandir un plafond, chercher s'il existe un cap PLUS BAS, plus profond dans la pile, qui
+  le rendrait sans effet — grep le nom de la constante voisine (`MAX_*`, `LIMITE_*`) dans le
+  fichier qu'elle appelle ; (b) quand un plafond par-passe est un vrai calcul de sécurité
+  (pire cas × nombre de requêtes sous un mur de temps de fonction), le lever exige de
+  re-dériver ce calcul pour TOUTES les étapes qui partagent le budget — le levier sûr, qui
+  n'y touche pas, est d'ajouter une PASSE (un second cron, à une autre heure) plutôt que
+  d'agrandir la passe existante.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

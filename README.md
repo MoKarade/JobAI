@@ -37,13 +37,18 @@ les décisions dans [`docs/adr/`](./docs/adr/).
   (Guichet-Emplois 404, ATS américains sans employeur local, pas de flux chez Jobillico /
   Québec emploi / Isarta) — le dépôt est aujourd'hui le vrai chemin d'entrée.
 - **Distance et carte** — domicile géocodé une fois et conservé en base, mesure automatique
-  après réponse, bornée à une passe / 5 min.
+  après réponse, bornée à une passe / 5 min. Deux crons de géocodage (`vercel.json`) :
+  `/api/cron/veille` (15:00 UTC, ingestion + géocodage) et `/api/cron/geocodage` (03:00 UTC,
+  géocodage seul — [CARTE-03], `BACKLOG.md`). Le plafond par passe (8 requêtes Nominatim,
+  `MAX_VILLES_PAR_PASSE`) est une limite de SÉCURITÉ dérivée du mur de 60 s d'une fonction
+  Vercel dans le pire cas — l'augmenter accélérerait le géocodage mais exigerait de
+  re-dériver ce calcul ; le second cron double le débit sans y toucher.
 - **Migrations automatiques** (`lib/migrations.ts`) — appliquées au démarrage, mémorisées par
   processus. Aucune commande à lancer à la main après un déploiement.
 - **Endpoint hub** (`app/api/hub/summary/route.ts`) — jeton `x-hub-token` vérifié en temps
   constant, `Cache-Control: no-store`, summary honnêtement `building` tant qu'aucune donnée
   réelle n'existe.
-- TypeScript strict, **473 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
+- TypeScript strict, **783 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
 
 ### Ce qui n'existe PAS encore
 
