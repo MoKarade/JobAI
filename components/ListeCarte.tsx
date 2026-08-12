@@ -102,9 +102,7 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <p className="carte-liste__faits">Aucune offre active repérée.</p>
-              )}
+              ) : null}
               {trajet ? (
                 <a
                   href={trajet}

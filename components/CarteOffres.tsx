@@ -31,7 +31,14 @@ import { couleurNote } from "@/lib/couleurNote";
 import { libelleBorne, libelleDistanceBorne } from "@/lib/bornes";
 import { mentionSource } from "@/lib/adresse";
 
-/** Une cible sans offre active n'a pas de palier : teinte neutre, pas un faux « C ». */
+/**
+ * Teinte neutre de repli — plus un cas nominal depuis le 2026-08-12.
+ *
+ * `construireVue` n'émet plus d'entreprise sans offre vivante, donc cette teinte ne devrait
+ * jamais être choisie. Elle reste comme DÉFAUT SÛR : si une épingle arrivait un jour sans
+ * offre, mieux vaut un gris franc qu'un faux palier « C » qui lui donnerait une note qu'elle
+ * n'a pas. Ce n'est pas une affirmation sur le produit, c'est une ceinture.
+ */
 const TEINTE_SANS_OFFRE = "#7a8194";
 
 function echapper(texte: string): string {
@@ -100,10 +107,10 @@ function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string 
     const reste =
       e.offres.length > 6 ? `<li><small>+ ${e.offres.length - 6} autres</small></li>` : "";
     morceaux.push(`<ul class="popup-offres">${lignes}${reste}</ul>`);
-  } else {
-    // Une cible sans offre active reste une information : c'est la liste de chasse.
-    morceaux.push(`<span class="popup-lecture">Aucune offre active repérée.</span>`);
   }
+  // Il n'y a plus de branche « sans offre » : depuis le 2026-08-12, `construireVue` n'émet
+  // aucune entreprise dont la liste d'offres vivantes est vide (demande de Marc). Garder un
+  // rendu pour ce cas laisserait le code AFFIRMER une règle qui n'existe plus.
 
   const trajet = lienTrajetGoogleMaps(e.nom);
   if (trajet) {

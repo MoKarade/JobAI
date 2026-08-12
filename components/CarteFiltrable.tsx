@@ -62,19 +62,20 @@ export function CarteFiltrable({
   const retenues = useMemo(() => filtrer(offres, filtres), [offres, filtres]);
   const sansDistance = useMemo(() => sansDistanceMesuree(offres, filtres), [offres, filtres]);
 
-  // ⚠️ Les cibles ne sont montrées SANS OFFRE que lorsqu'aucun filtre n'est posé.
+  // ⚠️ LES CIBLES SONT TOUJOURS PASSÉES, MAIS ELLES N'AJOUTENT PLUS D'ÉPINGLE.
   //
-  // Une cible sans offre active est une information de carte quand on regarde le marché
-  // (« Poly-Robotics — candidature spontanée possible »). Mais dès que Marc filtre, il pose
-  // une QUESTION : « qu'est-ce qui est à 25 km ? ». Y répondre avec des entreprises qui
-  // n'ont aucune offre correspondante serait répondre à côté — et lui faire croire que ces
-  // épingles satisfont son filtre.
+  // Ce code passait `[]` dès qu'un filtre était posé, pour éviter que des entreprises sans
+  // offre viennent « répondre à côté » d'une question comme « qu'est-ce qui est à 25 km ? ».
+  // Depuis le 2026-08-12, `construireVue` écarte elle-même toute entreprise sans offre
+  // vivante (demande de Marc) : la distinction n'a donc plus d'effet sur les épingles.
+  //
+  // Et la garder aurait un COÛT : la liste des cibles ne sert plus à peupler la carte, elle
+  // porte la fiche d'une entreprise (sa lecture, sa ville, sa distance de référence). La
+  // vider sous filtre revenait à effacer ces faits pour des entreprises qui, elles, ont bien
+  // une offre retenue. On la passe donc toujours.
   const filtreActif = unFiltreEstActif(filtres);
 
-  const vue = useMemo(
-    () => construireVue(retenues, filtreActif ? [] : cibles, table),
-    [retenues, cibles, table, filtreActif],
-  );
+  const vue = useMemo(() => construireVue(retenues, cibles, table), [retenues, cibles, table]);
 
   // ⚠️ ALLUMÉ PAR DÉFAUT (demande de Marc, 2026-08-06 : « je veux pas si y'a pas au moins
   // l'adresse de l'entreprise »). Une épingle au centre d'une ville, sans adresse, ne
@@ -184,7 +185,7 @@ export function CarteFiltrable({
                 ? "Aucune entreprise ne correspond aux filtres. En retirer un ramènera des épingles."
                 : vue.aSituer.length > 0
                   ? "Les entreprises n’ont pas encore été localisées. Ça se fait tout seul, au fil des passages — le bouton ci-dessus force une passe."
-                  : "Aucune offre active et aucune entreprise cible à montrer."}
+                  : "Aucune offre active à montrer."}
             </p>
           </div>
         ) : (

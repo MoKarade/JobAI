@@ -95,7 +95,10 @@ describe("construction de la vue par entreprise", () => {
     // Les replis d'une ville partagent la même position (son centre) : des cercles empilés
     // se masqueraient l'un l'autre.
     const vue = construireVue(
-      [],
+      // Chaque entreprise porte une offre vivante : depuis le 2026-08-12 la carte ne montre
+      // que ce qui en a une, donc une fixture vide ne produirait plus AUCUNE épingle et le
+      // test passerait à vide sans rien vérifier du regroupement.
+      [offre({ id: "l", entreprise: "Laserax" }), offre({ id: "q", entreprise: "Qualtech" })],
       ENTREPRISES_CIBLES,
       positions([
         ["Laserax", "ville", 46.81, -71.21],
@@ -109,7 +112,7 @@ describe("construction de la vue par entreprise", () => {
 
   it("ne mélange JAMAIS une position exacte dans un groupe approximatif", () => {
     const vue = construireVue(
-      [],
+      [offre({ id: "l", entreprise: "Laserax" }), offre({ id: "q", entreprise: "Qualtech" })],
       ENTREPRISES_CIBLES,
       positions([
         ["Laserax", "exacte", 46.75, -71.29],
@@ -122,10 +125,31 @@ describe("construction de la vue par entreprise", () => {
     expect(vue.epingles).toHaveLength(2);
   });
 
-  it("affiche une cible SANS offre active — c'est la liste de chasse, pas un vide", () => {
+  it("n'affiche PAS une cible sans offre vivante", () => {
+    // ⚠️ CE TEST A ÉTÉ RETOURNÉ LE 2026-08-12, PAS SUPPRIMÉ.
+    // Il affirmait l'inverse (« c'est la liste de chasse, pas un vide ») : la carte
+    // s'amorçait avec toutes les cibles pour montrer le paysage industriel. Marc a tranché
+    // dans l'autre sens : « je veux jamais voir une boîte et aucune offre active repérée, je
+    // veux toujours voir toutes les offres que j'ai seulement ». Une épingle sans offre est
+    // un clic pour rien, et elle dilue celles qui comptent.
+    // Le garder — retourné — protège le nouveau choix : sans lui, un futur refactor
+    // ré-amorcerait la vue avec les cibles sans que rien ne le signale.
     const vue = construireVue([], ENTREPRISES_CIBLES, positions([["Robotiq", "exacte", 46.7, -71.28]]));
+    expect(vue.epingles.flatMap((e) => e.entreprises).find((x) => x.nom === "Robotiq")).toBeUndefined();
+    expect(vue.epingles).toEqual([]);
+  });
+
+  it("affiche la cible DÈS qu'une offre vivante s'y rattache", () => {
+    // Le pendant du test ci-dessus : la cible n'est pas OUBLIÉE, elle est en attente.
+    // Sans ce volet, « ne rien afficher » passerait pour un succès même si la carte était
+    // devenue incapable de montoir quoi que ce soit.
+    const vue = construireVue(
+      [offre({ id: "vive", entreprise: "Robotiq", score: 70 })],
+      ENTREPRISES_CIBLES,
+      positions([["Robotiq", "exacte", 46.7, -71.28]]),
+    );
     const robotiq = vue.epingles.flatMap((e) => e.entreprises).find((x) => x.nom === "Robotiq")!;
-    expect(robotiq.offres).toEqual([]);
+    expect(robotiq.offres).toHaveLength(1);
     expect(robotiq.lecture.length).toBeGreaterThan(0);
   });
 
@@ -150,7 +174,12 @@ describe("construction de la vue par entreprise", () => {
       ENTREPRISES_CIBLES,
       positions([["Laserax", "exacte", 46.75, -71.29]]),
     );
-    expect(vue.epingles[0]!.entreprises[0]!.offres).toEqual([]);
+    // ⚠️ ASSERTION RENFORCÉE LE 2026-08-12. Avant, on vérifiait que l'épingle existait avec
+    // zéro offre. Depuis que la carte ne montre que ce qui a une offre vivante, une entreprise
+    // dont TOUTES les offres sont mortes ne produit AUCUNE épingle — et c'est une preuve plus
+    // forte : si `histo` ou `perimeeLe` étaient comptées comme vivantes, une épingle
+    // apparaîtrait ici et le test tomberait.
+    expect(vue.epingles).toEqual([]);
   });
 
   it("range les épingles dans un ordre STABLE", () => {
@@ -168,10 +197,20 @@ describe("construction de la vue par entreprise", () => {
 });
 
 describe("ce qui manque est COMPTÉ, jamais masqué", () => {
-  it("liste les entreprises cibles encore à situer", () => {
-    const vue = construireVue([], ENTREPRISES_CIBLES, new Map());
+  it("liste les entreprises À SITUER — celles qui portent une offre et n'ont pas de position", () => {
+    // ⚠️ REFORMULÉ LE 2026-08-12, et il protège toujours la même chose : ce qui manque est
+    // COMPTÉ, jamais masqué. Ce qui a changé, c'est QUI mérite d'être situé. Le test exigeait
+    // les 36 cibles ; la carte ne montrant plus que les entreprises qui ont une offre vivante,
+    // géocoder les autres dépenserait le budget Nominatim pour des épingles invisibles.
+    const vue = construireVue(
+      [offre({ id: "a", entreprise: "Laserax" }), offre({ id: "b", entreprise: "Qualtech" })],
+      ENTREPRISES_CIBLES,
+      new Map(),
+    );
     expect(vue.epingles).toEqual([]);
-    expect(vue.aSituer.length).toBe(ENTREPRISES_CIBLES.length);
+    expect(vue.aSituer.sort()).toEqual(["Laserax", "Qualtech"]);
+    // Et le reste des cibles, sans offre, ne réclame AUCUN géocodage.
+    expect(vue.aSituer.length).toBeLessThan(ENTREPRISES_CIBLES.length);
   });
 
   it("un employeur hors cibles AVEC ville attend une passe, sans doublon", () => {
@@ -313,22 +352,30 @@ describe("la carte part des OFFRES, pas d'une liste tenue à la main", () => {
     expect(apparier("ISS", "ISS Facility Services")).toBe(false);
   });
 
-  it("une cible SANS offre reste affichée : c'est la liste de chasse", () => {
+  it("une cible sans offre ne paraît plus, et ne consomme plus de géocodage", () => {
+    // ⚠️ RETOURNÉ LE 2026-08-12 (demande de Marc). Le second volet compte autant que le
+    // premier : le `continue` est placé AVANT la recherche de position, donc l'entreprise
+    // sort AUSSI de `aSituer`. Géocoder un lieu qui ne sera jamais épinglé dépenserait le
+    // budget Nominatim — une passe / 5 min — au détriment des employeurs qui ont une offre.
     const vue = construireVue(
       [],
       ENTREPRISES_CIBLES,
       positions([["Laserax", "exacte", 46.75, -71.29]]),
     );
-    const laserax = vue.epingles.flatMap((e) => e.entreprises).find((x) => x.nom === "Laserax");
-    expect(laserax).toBeDefined();
-    expect(laserax!.offres).toEqual([]);
+    expect(vue.epingles.flatMap((e) => e.entreprises).find((x) => x.nom === "Laserax")).toBeUndefined();
+    expect(vue.aSituer).toEqual([]);
+    expect(vue.sansLieu).toEqual([]);
   });
 });
 
 describe("garde-fou n°1 — la carte ne dit rien du domicile", () => {
   it("le cadrage se déduit des ENTREPRISES, jamais d'un point de référence", () => {
     const vue = construireVue(
-      [],
+      // Offres vivantes exigées depuis le 2026-08-12 : sans elles, aucune épingle et le
+      // cadrage n'aurait rien à déduire — le test passerait à vide.
+      // Les DEUX entreprises positionnées portent une offre : le cadrage doit englober les
+      // deux épingles, donc chacune doit exister.
+      [offre({ id: "l", entreprise: "Laserax" }), offre({ id: "d", entreprise: "Chantier Davie" })],
       ENTREPRISES_CIBLES,
       positions([
         ["Laserax", "exacte", 46.75, -71.29],
@@ -397,8 +444,12 @@ describe("l'adresse, quand on la connaît", () => {
   });
 
   it("une entreprise pas encore située n'a évidemment pas d'adresse", () => {
-    const vue = construireVue([], ENTREPRISES_CIBLES, new Map());
-    expect(vue.aSituer.length).toBeGreaterThan(0);
+    const vue = construireVue(
+      [offre({ id: "a", entreprise: "Laserax" })],
+      ENTREPRISES_CIBLES,
+      new Map(),
+    );
+    expect(vue.aSituer).toEqual(["Laserax"]);
     expect(vue.epingles).toEqual([]);
   });
 

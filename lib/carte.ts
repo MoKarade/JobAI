@@ -241,6 +241,24 @@ export function construireVue(
   const groupesVille = new Map<string, Epingle>();
 
   for (const entreprise of parEntreprise.values()) {
+    // ⚠️ UNE ENTREPRISE SANS OFFRE VIVANTE NE PARAÎT PAS. Demande de Marc, 2026-08-12 :
+    // « dans maps je veux jamais voir une boîte et aucune offre active repérée, je veux
+    // toujours voir toutes les offres que j'ai seulement ».
+    //
+    // Ce n'était pas un bug d'affichage mais un CHOIX DE DÉPART : la vue s'amorce avec
+    // toutes les `ENTREPRISES_CIBLES` — le paysage industriel de la région — puis y
+    // raccroche les offres vivantes. L'intention se défendait (« voilà qui embauche par
+    // ici »), mais la carte sert à décider où postuler : une épingle sans offre est un clic
+    // pour rien, et elle dilue celles qui comptent. Mesuré sur le jeu de départ : 4 boîtes
+    // vides sur 36. La cible reste déclarée dans `lib/reference.ts` — elle n'est pas
+    // oubliée, elle réapparaîtra d'elle-même dès qu'une offre vivante s'y rattachera.
+    //
+    // Le `continue` est posé AVANT la recherche de position, donc ces entreprises sortent
+    // aussi de `aSituer` et `sansLieu` : géocoder un lieu qui ne sera jamais épinglé
+    // dépenserait le budget Nominatim — borné à une passe / 5 min — pour rien, au détriment
+    // des employeurs qui, eux, portent une offre.
+    if (entreprise.offres.length === 0) continue;
+
     // `positionDe` et non `positions.get` : la position peut avoir été inscrite sous le nom
     // de la cible OU sous celui que porte une annonce — la mesure des distances géocode
     // `offre.entreprise`, la passe de la carte géocode `cible.nom`. La règle est partagée
