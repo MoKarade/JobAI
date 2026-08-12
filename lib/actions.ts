@@ -30,6 +30,7 @@ import {
   deciderPrecision,
   distanceKm,
   geocoderEntreprises,
+  geocoderEntrepriseGoogle,
   geocoderLieux,
   geocoderPlusieurs,
   villeGeocodable,
@@ -693,6 +694,15 @@ interface Raffinage {
    */
   parAdresse: number;
   /**
+   * Précisées par Google Maps Geocoding, en repli de Nominatim ([CARTE-03], 2026-08-12).
+   * `0` avec `GOOGLE_MAPS_API_KEY` absente ne veut RIEN dire (le repli ne s'est pas
+   * déclenché) — distinct de `0` avec la clé posée (le repli a tourné et n'a rien trouvé).
+   * Voir `googleTente` pour lever l'ambiguïté.
+   */
+  parGoogle: number;
+  /** Le repli Google a-t-il seulement été TENTÉ cette passe (clé configurée) ? */
+  googleTente: boolean;
+  /**
    * Les NOMS (`entreprisesLieux.nom`) des entreprises qui viennent de passer de « ville » à
    * « exacte ». Sert à forcer le recalcul de la distance de leurs offres — sans cette liste,
    * une offre déjà mesurée depuis le centre-ville garderait ce chiffre approximatif à vie
@@ -755,6 +765,8 @@ async function raffinerPositions(
     toujoursAuCentre: 0,
     horsRayon: 0,
     parAdresse: 0,
+    parGoogle: 0,
+    googleTente: false,
     entreprisesPrecisees: [],
     entreprisesToujoursAuCentre: [],
     entreprisesHorsRayon: [],
@@ -832,14 +844,76 @@ async function raffinerPositions(
     if (venueDeLAdresse) parAdresse++;
   }
 
+  // ⚠️ GOOGLE MAPS GEOCODING, EN REPLI DE NOMINATIM — [CARTE-03], 2026-08-12.
+  //
+  // Seulement pour ce que Nominatim n'a PAS résolu cette passe : introuvable sous aucun des
+  // `NB_CANDIDATS_ENTREPRISE` candidats, OU trouvé mais hors rayon (homonyme). Jamais pour
+  // reconfirmer ce qui a déjà marché — ce serait payer une requête pour rien.
+  //
+  // Inactif tant que `GOOGLE_MAPS_API_KEY` n'est pas posée : la fonctionnalité se dégrade
+  // silencieusement à « pas encore configurée », pas à une panne. Voir .env.example.
+  let parGoogle = 0;
+  const entreprisesResoluesParGoogle = new Set<string>();
+  const cleGoogle = process.env.GOOGLE_MAPS_API_KEY?.trim();
+  const googleTente = Boolean(cleGoogle);
+
+  if (cleGoogle) {
+    const debutFonction = maintenant.getTime();
+    const aRetenter = [...r.introuvables, ...entreprisesHorsRayon];
+
+    try {
+      for (const nom of aRetenter) {
+        // Même garde-temps que le reste de la passe : Google n'exige pas la cadence de
+        // Nominatim, mais reste sous le MÊME mur de 60 s que tout le reste de la fonction.
+        if (budgetMs !== null && Date.now() - debutFonction >= budgetMs) break;
+
+        const ville = villePar.get(nom);
+        if (!ville) continue;
+        const centre = centreDe(ville);
+        if (!centre) continue;
+
+        const c = await geocoderEntrepriseGoogle(nom, ville, cleGoogle, { recuperer: fetch });
+        if (c === null) continue; // introuvable chez Google aussi : reste au centre-ville.
+        if (distanceKm(c, centre) > RAYON_VALIDATION_KM) continue; // même garde que Nominatim.
+
+        await db
+          .update(entreprisesLieux)
+          .set({
+            lat: c.lat,
+            lon: c.lon,
+            precision: "exacte" as const,
+            adresse: c.adresse,
+            adresseSource: c.adresse === null ? null : ("google" as const),
+            geocodeLe: maintenant,
+          })
+          .where(eq(entreprisesLieux.nom, nom));
+
+        precisees++;
+        parGoogle++;
+        entreprisesPrecisees.push(nom);
+        entreprisesResoluesParGoogle.add(nom);
+      }
+    } catch (err) {
+      // Une panne Google (quota, clé invalide, réseau) ne doit pas faire perdre ce que
+      // Nominatim a déjà résolu cette passe : elle est enregistrée, pas relancée en boucle.
+      console.error("[raffinage] Google Maps Geocoding impossible", err);
+    }
+  }
+
+  const introuvablesFinal = [...r.introuvables, ...entreprisesHorsRayon].filter(
+    (nom) => !entreprisesResoluesParGoogle.has(nom),
+  );
+
   return {
     candidates: tentables.length,
     precisees,
-    toujoursAuCentre: r.introuvables.length,
+    toujoursAuCentre: introuvablesFinal.length,
     horsRayon,
     parAdresse,
+    parGoogle,
+    googleTente,
     entreprisesPrecisees,
-    entreprisesToujoursAuCentre: [...r.introuvables],
+    entreprisesToujoursAuCentre: introuvablesFinal,
     entreprisesHorsRayon,
   };
 }
@@ -1242,6 +1316,8 @@ export async function mesurerDistances(
       toujoursAuCentre: 0,
       horsRayon: 0,
       parAdresse: 0,
+      parGoogle: 0,
+      googleTente: false,
       entreprisesPrecisees: [],
       entreprisesToujoursAuCentre: [],
       entreprisesHorsRayon: [],
@@ -1312,8 +1388,9 @@ export async function mesurerDistances(
         `${registre.absentes > 0 ? ` (${registre.absentes} absentes)` : ""} ` +
         `precisees=${raffinage.precisees}/${raffinage.candidates}` +
         `${raffinage.parAdresse > 0 ? ` (${raffinage.parAdresse} par adresse)` : ""}` +
+        `${raffinage.googleTente ? ` (${raffinage.parGoogle} par Google)` : " (Google non configuré)"}` +
         `${raffinage.toujoursAuCentre > 0 ? ` (${raffinage.toujoursAuCentre} toujours au centre)` : ""}` +
-        `${raffinage.horsRayon > 0 ? ` (${raffinage.horsRayon} hors rayon)` : ""} ` +
+        `${raffinage.horsRayon > 0 ? ` (${raffinage.horsRayon} hors rayon Nominatim)` : ""} ` +
         `bornes=${bornes.mesurees}/${bornes.candidates}` +
         `${bornes.echecs > 0 ? ` (${bornes.echecs} en échec)` : ""} ` +
         `budget restant=${restant === null ? "illimité" : `${restant} ms`}`,

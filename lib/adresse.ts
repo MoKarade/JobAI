@@ -8,6 +8,10 @@
 //
 //   · OpenStreetMap donne l'emplacement d'un objet CARTOGRAPHIÉ — l'usine est là où
 //     l'épingle est. C'est la meilleure réponse quand elle existe.
+//   · GOOGLE MAPS GEOCODING, en repli quand Nominatim (OpenStreetMap) ne reconnaît pas la
+//     raison sociale — son cœur de métier, contrairement à Nominatim. Une réponse
+//     STRUCTURÉE d'un géocodeur, de la même nature qu'OpenStreetMap : pas de mise en garde
+//     « à confirmer », qui n'aurait pas de sens ici ([CARTE-03], 2026-08-12).
 //   · Le Registre des entreprises donne le DOMICILE LÉGAL de l'entreprise. Ce peut être
 //     son usine, mais tout aussi bien le bureau de son comptable, un siège social à
 //     Montréal, ou une case postale. Afficher ça comme « l'adresse » enverrait Marc à la
@@ -26,11 +30,12 @@
 // répété dans la liste et dans la fenêtre de la carte, il finirait par diverger, et c'est
 // la version la plus vague qui survivrait.
 
-export type SourceAdresse = "osm" | "registre" | "offre" | "recherche";
+export type SourceAdresse = "osm" | "google" | "registre" | "offre" | "recherche";
 
 /** Ce que l'écran ajoute après une adresse, pour dire ce qu'elle vaut. */
 export function mentionSource(source: SourceAdresse | null): string {
   if (source === "osm") return "OpenStreetMap";
+  if (source === "google") return "Google Maps";
   if (source === "registre") return "registre des entreprises — domicile légal";
   if (source === "offre") return "annoncée dans l'offre";
   // ⚠️ LA MENTION LA PLUS IMPORTANTE DES QUATRE. Une adresse trouvée sur le web a passé la

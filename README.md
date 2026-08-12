@@ -42,13 +42,16 @@ les décisions dans [`docs/adr/`](./docs/adr/).
   géocodage seul — [CARTE-03], `BACKLOG.md`). Le plafond par passe (8 requêtes Nominatim,
   `MAX_VILLES_PAR_PASSE`) est une limite de SÉCURITÉ dérivée du mur de 60 s d'une fonction
   Vercel dans le pire cas — l'augmenter accélérerait le géocodage mais exigerait de
-  re-dériver ce calcul ; le second cron double le débit sans y toucher.
+  re-dériver ce calcul ; le second cron double le débit sans y toucher. **Google Maps
+  Geocoding** (ADR-0007) complète Nominatim et le registre du Québec en troisième repli,
+  seulement pour ce que les deux premiers ratent — optionnel (`GOOGLE_MAPS_API_KEY`, voir
+  `.env.example`), inactif sans clé posée.
 - **Migrations automatiques** (`lib/migrations.ts`) — appliquées au démarrage, mémorisées par
   processus. Aucune commande à lancer à la main après un déploiement.
 - **Endpoint hub** (`app/api/hub/summary/route.ts`) — jeton `x-hub-token` vérifié en temps
   constant, `Cache-Control: no-store`, summary honnêtement `building` tant qu'aucune donnée
   réelle n'existe.
-- TypeScript strict, **789 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
+- TypeScript strict, **798 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
 
 ### Ce qui n'existe PAS encore
 

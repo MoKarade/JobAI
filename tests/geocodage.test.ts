@@ -14,14 +14,17 @@ import {
   deciderPrecision,
   distanceKm,
   entete,
+  geocoderEntrepriseGoogle,
   geocoderPlusieurs,
   geocoderVille,
   lireReponse,
   lireReponseEntreprise,
+  lireReponseGoogle,
   nomEchoDansResultat,
   NB_CANDIDATS_ENTREPRISE,
   urlRecherche,
   urlRechercheEntreprise,
+  urlRechercheGoogle,
   geocoderEntreprises,
   villeGeocodable,
 } from "../lib/geocodage";
@@ -176,6 +179,107 @@ describe("recherche d'entreprise", () => {
     );
     expect(r2.trouvees.map((t) => t.nom)).toEqual(["A-Entreprise"]);
     expect(r2.panne).toMatch(/500/);
+  });
+});
+
+// [CARTE-03], 2026-08-12 : Google Maps Geocoding, en repli de Nominatim.
+describe("Google Maps Geocoding — l'URL", () => {
+  it("cadre la requête par la ville, restreint DUR au Canada, porte la clé", () => {
+    const url = urlRechercheGoogle("Laserax", "Québec", "cle-de-test");
+    const u = new URL(url);
+    expect(u.origin + u.pathname).toBe("https://maps.googleapis.com/maps/api/geocode/json");
+    expect(u.searchParams.get("address")).toBe("Laserax, Québec, Québec, Canada");
+    expect(u.searchParams.get("components")).toBe("country:CA");
+    expect(u.searchParams.get("key")).toBe("cle-de-test");
+  });
+});
+
+describe("Google Maps Geocoding — lecture de la réponse", () => {
+  const okGoogle = (lat: number, lon: number, adresse = "123 rue Factice, Lévis, QC") => ({
+    status: "OK",
+    results: [{ geometry: { location: { lat, lng: lon } }, formatted_address: adresse }],
+  });
+
+  it("ZERO_RESULTS n'est PAS une panne — une PME absente de Google, ça arrive", () => {
+    expect(lireReponseGoogle({ status: "ZERO_RESULTS", results: [] })).toBeNull();
+  });
+
+  it("OK rend les coordonnées et l'adresse formatée", () => {
+    expect(lireReponseGoogle(okGoogle(46.75, -71.29))).toMatchObject({
+      lat: 46.75,
+      lon: -71.29,
+      adresse: "123 rue Factice, Lévis, QC",
+    });
+  });
+
+  it("un résultat hors des bornes régionales est refusé — même garde que Nominatim", () => {
+    expect(lireReponseGoogle(okGoogle(49.28, -123.12))).toBeNull(); // Vancouver
+  });
+
+  it("tout statut AUTRE que OK/ZERO_RESULTS est une PANNE, pas une absence", () => {
+    expect(() => lireReponseGoogle({ status: "OVER_QUERY_LIMIT" })).toThrow(/OVER_QUERY_LIMIT/);
+    expect(() => lireReponseGoogle({ status: "REQUEST_DENIED" })).toThrow(/REQUEST_DENIED/);
+    expect(() =>
+      lireReponseGoogle({ status: "REQUEST_DENIED", error_message: "clé invalide" }),
+    ).toThrow(/clé invalide/);
+  });
+});
+
+describe("Google Maps Geocoding — géocoder UNE entreprise", () => {
+  function faussetFetchGoogle(reponse: unknown) {
+    const recuperer = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => reponse,
+    })) as unknown as typeof fetch;
+    return { recuperer };
+  }
+
+  it("accepte un résultat qui PORTE le nom cherché", async () => {
+    const { recuperer } = faussetFetchGoogle({
+      status: "OK",
+      results: [
+        {
+          geometry: { location: { lat: 46.75, lng: -71.29 } },
+          formatted_address: "Laserax, 123 rue Factice, Lévis, QC",
+        },
+      ],
+    });
+    const c = await geocoderEntrepriseGoogle("Laserax", "Lévis", "cle", { recuperer });
+    expect(c).toMatchObject({ lat: 46.75, lon: -71.29 });
+  });
+
+  it("REJETTE un résultat dont l'adresse ne porte pas le nom — même garde que Nominatim", async () => {
+    // Google a répondu, mais pas avec l'entreprise cherchée : un homonyme ou une approximation
+    // qu'il ne faut pas accepter sous silence (garde-fou n°3).
+    const { recuperer } = faussetFetchGoogle({
+      status: "OK",
+      results: [
+        {
+          geometry: { location: { lat: 46.75, lng: -71.29 } },
+          formatted_address: "456 boulevard Factice, Lévis, QC",
+        },
+      ],
+    });
+    const c = await geocoderEntrepriseGoogle("Laserax", "Lévis", "cle", { recuperer });
+    expect(c).toBeNull();
+  });
+
+  it("ZERO_RESULTS rend null, pas une erreur", async () => {
+    const { recuperer } = faussetFetchGoogle({ status: "ZERO_RESULTS", results: [] });
+    const c = await geocoderEntrepriseGoogle("PME Inconnue", "Lévis", "cle", { recuperer });
+    expect(c).toBeNull();
+  });
+
+  it("un HTTP non-ok est une panne", async () => {
+    const recuperer = (async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    })) as unknown as typeof fetch;
+    await expect(
+      geocoderEntrepriseGoogle("Laserax", "Lévis", "cle", { recuperer }),
+    ).rejects.toThrow(/500/);
   });
 });
 

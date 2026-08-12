@@ -254,6 +254,11 @@ export const entreprisesLieux = pgTable(
      *
      *   · `osm`      → un objet cartographié dans OpenStreetMap, à l'endroit où il est.
      *                  C'est le LIEU. Quand elle existe, c'est la meilleure réponse.
+     *   · `google`   → Google Maps Geocoding, repli quand Nominatim (gratuit, communautaire,
+     *                  souvent muet sur une PME) ne rend rien d'exploitable. Une réponse
+     *                  STRUCTURÉE d'un géocodeur, pas une page web à interpréter — même
+     *                  validation de plausibilité (distance au centre de la ville) que
+     *                  `osm`. [CARTE-03], 2026-08-12.
      *   · `registre` → le Registre des entreprises du Québec. C'est le DOMICILE LÉGAL, qui
      *                  peut parfaitement être le bureau du comptable et non l'usine. Une
      *                  adresse de registre affichée sans le dire serait une donnée
@@ -262,7 +267,9 @@ export const entreprisesLieux = pgTable(
      * `null` quand `adresse` est nulle. Une adresse sans source déclarée ne devrait pas
      * exister : c'est ce que vérifie la contrainte plus bas.
      */
-    adresseSource: text("adresse_source", { enum: ["osm", "registre", "offre", "recherche"] }),
+    adresseSource: text("adresse_source", {
+      enum: ["osm", "google", "registre", "offre", "recherche"],
+    }),
 
     /**
      * BORNES DE RECHARGE — trois états, et il faut les trois.
@@ -310,7 +317,7 @@ export const entreprisesLieux = pgTable(
     ),
     check(
       "entreprises_lieux_adresse_source_ck",
-      sql`${table.adresseSource} IN ('osm', 'registre', 'offre', 'recherche')`,
+      sql`${table.adresseSource} IN ('osm', 'google', 'registre', 'offre', 'recherche')`,
     ),
     // ⚠️ UNE ADRESSE SANS SOURCE N'A PAS LE DROIT D'EXISTER, et réciproquement.
     //

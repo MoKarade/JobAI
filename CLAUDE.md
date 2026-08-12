@@ -713,6 +713,33 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   alors que la mécanique avançait. Un champ calculé qui ne sort pas de la fonction qui le
   produit est une PROMESSE d'observabilité non tenue — l'exposer coûte une ligne, pas exposer
   coûte un diagnostic à l'aveugle la prochaine fois que quelqu'un demande « ça a marché ? ».
+- **Un mécanisme demandé peut déjà exister sous un nom qu'on ne cherchait pas.** Marc a
+  demandé (2026-08-12) « une recherche web quand Nominatim échoue » — je m'apprêtais à
+  construire un appel LLM avant de découvrir que `[LIEU-04]` (2026-08-06) avait DÉJÀ câblé
+  une recherche web, côté Routine (elle a l'accès web, l'app n'appelle aucun LLM), avec la
+  valeur `adresse_source = "recherche"` déjà dans le schéma et déjà affichée (« trouvée sur
+  le web — à confirmer »). Le signal que j'ai failli manquer : un `grep` de la fonctionnalité
+  DEMANDÉE (« recherche web ») aurait dû précéder toute conception, pas juste un `grep` du
+  fichier que je pensais devoir modifier. Corollaire : **un ADR annulé n'est pas un ADR à
+  ignorer.** ADR-0004 (Google Maps complet) a été accepté PUIS annulé le jour même — je l'ai
+  lu avant de proposer Google Maps Geocoding (ADR-0007) et j'ai pu montrer en quoi les deux
+  ne se contredisent pas (repli étroit et optionnel vs remplacement complet de l'UI). Sans
+  cette lecture, j'aurais soit rouvert un débat déjà tranché, soit laissé Marc découvrir la
+  contradiction après coup. Réflexe : avant tout nouveau mécanisme, `grep` le CONCEPT (pas
+  le nom de fichier supposé) dans le code ET dans `docs/adr/`.
+- **`drizzle-kit generate` peut proposer un diff halluciné si l'historique des snapshots a
+  un trou.** Les migrations 0012 à 0014 avaient été écrites À LA MAIN (bon réflexe pour des
+  changements simples), mais sans jamais lancer `db:generate` — leurs `meta/NNNN_snapshot.json`
+  n'existent donc pas. Au premier VRAI `db:generate` depuis (migration 0015), l'outil a
+  comparé mon schéma contre son DERNIER snapshot connu (0011) et proposé de RECRÉER deux
+  colonnes (`bornes_rapide`/`bornes_tarif`) déjà en production depuis 0012 — un
+  `ADD COLUMN` sur une colonne existante aurait fait échouer le déploiement suivant
+  (« column already exists »), silencieusement jusqu'au moment où `lib/migrations.ts` le
+  tenterait vraiment. Réflexe : **relire CHAQUE ligne d'un SQL généré contre l'historique
+  des migrations DÉJÀ APPLIQUÉES**, pas seulement contre le schéma visé — surtout après une
+  ou plusieurs migrations écrites à la main sans régénérer les snapshots. Le snapshot le
+  plus RÉCENT (celui que `generate` vient de produire) redevient correct pour l'avenir ; ce
+  sont les migrations SQL intermédiaires qu'il faut vérifier une à une.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

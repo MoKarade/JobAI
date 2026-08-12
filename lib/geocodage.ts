@@ -474,6 +474,90 @@ export function choisirCandidatAdresse(charge: unknown, adresse: string): Coordo
 }
 
 /**
+ * L'URL Google Maps Geocoding pour une ENTREPRISE.
+ *
+ * [CARTE-03], 2026-08-12 : repli quand Nominatim ne reconnaît pas la raison sociale — son
+ * cœur de métier, contrairement à Nominatim (communautaire, sparse sur les PME).
+ * `components=country:CA` restreint DUR au Canada (pas un simple biais comme le `region=`
+ * de l'API) — même esprit que `countrycodes=ca` côté Nominatim. Ça ne dispense PAS de
+ * revalider par la distance ensuite : le pays seul n'exclut pas un homonyme à Montréal.
+ */
+export function urlRechercheGoogle(nom: string, ville: string, cle: string): string {
+  const p = new URLSearchParams({
+    address: `${nom}, ${ville}, Québec, Canada`,
+    components: "country:CA",
+    key: cle,
+  });
+  return `https://maps.googleapis.com/maps/api/geocode/json?${p.toString()}`;
+}
+
+/**
+ * Lit une réponse Google Maps Geocoding, ou rend `null` (introuvable, pas une panne).
+ *
+ * `status` distingue ce que Nominatim exprime par la présence/absence d'un résultat :
+ * `ZERO_RESULTS` = Google ne connaît pas cette PME sous ce nom, un fait à enregistrer,
+ * pas une erreur. `OK` = au moins un résultat, à revalider comme les autres (bornes
+ * régionales). Tout le reste (`OVER_QUERY_LIMIT`, `REQUEST_DENIED`, `INVALID_REQUEST`,
+ * `UNKNOWN_ERROR`) est une PANNE de plateforme — LÈVE, pour être réessayée plus tard,
+ * jamais confondue avec « cette entreprise n'existe pas ».
+ */
+export function lireReponseGoogle(charge: unknown): Coordonnees | null {
+  const c = charge as { status?: unknown; results?: unknown[]; error_message?: unknown };
+  if (c?.status === "ZERO_RESULTS") return null;
+  if (c?.status !== "OK") {
+    const detail = typeof c?.error_message === "string" ? ` (${c.error_message})` : "";
+    throw new Error(`Google Maps Geocoding a répondu ${String(c?.status)}${detail}`);
+  }
+
+  const resultat = Array.isArray(c.results) ? c.results[0] : undefined;
+  const r = resultat as
+    | { geometry?: { location?: { lat?: unknown; lng?: unknown } }; formatted_address?: unknown }
+    | undefined;
+  const lat = Number(r?.geometry?.location?.lat);
+  const lon = Number(r?.geometry?.location?.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (lat < BORNES.latMin || lat > BORNES.latMax) return null;
+  if (lon < BORNES.lonMin || lon > BORNES.lonMax) return null;
+
+  const brute = typeof r?.formatted_address === "string" ? r.formatted_address.trim() : "";
+  return { lat, lon, adresse: brute === "" ? null : brute.slice(0, 300) };
+}
+
+/**
+ * Géocode UNE entreprise via Google Maps Geocoding.
+ *
+ * ⚠️ MÊME GARDE QUE NOMINATIM, ET C'EST DÉLIBÉRÉ : `nomEchoDansResultat` sur l'adresse
+ * rendue. Google est meilleur pour RECONNAÎTRE une raison sociale, mais ça ne veut pas dire
+ * qu'il ne se trompe jamais — un géocodeur qui approxime silencieusement vers l'adresse la
+ * plus proche plutôt que de rendre `ZERO_RESULTS` est le même risque d'homonyme que
+ * Nominatim, avec une garde-fou n°3 qui ne fait pas d'exception pour un fournisseur payant.
+ * Pas de délai imposé entre requêtes : ce n'est pas un service communautaire à ménager, et
+ * l'appelant reste libre de les enchaîner (sous le même budget de temps que le reste).
+ */
+export async function geocoderEntrepriseGoogle(
+  nom: string,
+  ville: string,
+  cle: string,
+  outils: Pick<OutilsGeocodage, "recuperer">,
+): Promise<Coordonnees | null> {
+  const reponse = await outils.recuperer(urlRechercheGoogle(nom, ville, cle), {
+    signal: AbortSignal.timeout(DELAI_MAX_REQUETE_MS),
+  });
+  if (!reponse.ok) {
+    throw new Error(`Google Maps Geocoding a répondu HTTP ${reponse.status} pour « ${nom} »`);
+  }
+
+  const c = lireReponseGoogle(await reponse.json());
+  if (c === null) return null;
+
+  const libelle = c.adresse ?? "";
+  if (!nomEchoDansResultat(nom, libelle)) return null;
+
+  return c;
+}
+
+/**
  * Distance à vol d'oiseau entre deux points, en km (haversine).
  * Sert à VALIDER une résolution d'entreprise contre le centre de sa ville attendue.
  */

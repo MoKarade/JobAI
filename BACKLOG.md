@@ -874,6 +874,55 @@ git) :
       introuvables sur les deux services publics — une limite des DONNÉES, pas du code ; le
       dire à Marc plutôt que de rouvrir `MAX_VILLES_PAR_PASSE`.
 
+### [CARTE-03] suite — Google Maps Geocoding + plafond de la Routine
+
+> Marc, 2026-08-12 : « je veux que quand les offres s'importent, si on trouve pas l'adresse
+> avec Nominatim on fasse une recherche web ou maps ». Découverte en creusant : une
+> recherche web existe DÉJÀ, mais côté Routine (ingestion, `[LIEU-04]`), pas côté app —
+> parce que c'est la Routine qui a l'accès web, JobAI n'appelle aucun LLM. Deux leviers
+> distincts, demandés ensemble (« fais les deux »).
+
+**[ROUTINE-QUOTA] — corrigé un chiffre qui n'existait pas.** `docs/ROUTINE-DEPOT.md`
+décrivait un « budget ~40 offres » pour l'étape d'adresse ; le PROMPT RÉEL de la Routine
+(`trig_01YJyokbyHj7ZzHJC8jyiYCY`, tire dans cette même session) n'a jamais eu ce plafond —
+elle tente déjà TOUTES les offres retenues, bornée seulement par le quota Indeed partagé
+(~44-48 appels avant refus). Le vrai levier manquant était l'ORDRE de lecture, pas un
+nombre à augmenter. Fait le 2026-08-12 :
+- [x] Live routine + doc : tri explicite par `publieeLe` décroissant (les plus récentes
+      d'abord) AVANT la boucle `get_job_details` — sans lui, l'ordre par défaut d'Indeed ne
+      garantit pas de traiter les offres fraîches en premier quand le quota coupe.
+- [x] Un refus de quota sur CETTE étape (distinct de la recherche) : attendre le délai
+      annoncé, réessayer UNE fois, puis arrêter l'étape (jamais boucler indéfiniment).
+- [x] Le compte « offres SANS aucune tentative faute de quota » ajouté au rapport.
+
+RESTE — à observer sur les prochains dépôts (rien à coder) :
+- [ ] **[V-ROUTINE-QUOTA]** Vérifier que le tri par date change vraiment QUI obtient une
+      tentative d'adresse un jour chargé, et que le compte « sans tentative » rapporté à
+      l'étape 5 est cohérent avec le nombre d'offres du jour.
+
+**[CARTE-03-GOOGLE] — Google Maps Geocoding, troisième repli.** ADR-0007. Marc a choisi
+Google Maps Geocoding (sur 4 options présentées) pour les entreprises que Nominatim ET le
+registre ratent encore. Fait le 2026-08-12, gate vert :
+- [x] `lib/geocodage.ts` : `urlRechercheGoogle` / `lireReponseGoogle` /
+      `geocoderEntrepriseGoogle`, mêmes gardes que Nominatim (nom + distance), testés.
+- [x] `raffinerPositions` (`lib/actions.ts`) : tente Google UNIQUEMENT sur ce que Nominatim
+      a raté cette passe (introuvable ou hors rayon), jamais en plus de ce qu'il a résolu.
+- [x] `adresse_source` : cinquième valeur `google` (migration `drizzle/0015_adresse_google.sql`),
+      distincte de `recherche` — une réponse structurée n'a pas besoin du « à confirmer ».
+- [x] `Raffinage.parGoogle` / `.googleTente` exposés dans les logs `[distances]` des deux
+      crons — la même leçon que `precisees` : un chiffre calculé mais jamais renvoyé cache
+      un angle mort.
+- [x] `.env.example` : `GOOGLE_MAPS_API_KEY`, optionnelle, marche à suivre pour l'obtenir.
+
+RESTE — geste de Marc, puis vérification (rien à coder) :
+- [ ] **[V-CARTE-03-GOOGLE-CLE]** Marc doit créer la clé Google Cloud (Geocoding API
+      seule, restreinte), la poser dans Vercel (`GOOGLE_MAPS_API_KEY`), redéployer. Sans
+      elle, le repli reste inactif — dégradation silencieuse et honnête, pas une panne.
+- [ ] **[V-CARTE-03-GOOGLE]** Une fois la clé posée : lire `[distances] … (N par Google)`
+      dans les logs d'une passe réelle. `googleTente=true` avec `parGoogle=0` sur plusieurs
+      passes = ces employeurs sont introuvables aussi chez Google — limite des données, pas
+      du code.
+
 ## Découvertes et dette (à trier)
 
 - 🔧 **`[SCORE-SENIORITE-LETTRES]` — le barème ne lit pas les années écrites en toutes

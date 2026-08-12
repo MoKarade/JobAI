@@ -16,3 +16,8 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 |---|---|---|
 | [0001](./0001-fondations-jobai.md) | Fondations de JobAI (identité, stack, phases, périmètre) | Accepté — volet workflow git modifié par ADR-0002 |
 | [0002](./0002-developpement-direct-sur-main.md) | Développement direct sur `main`, sans branche ni PR | Accepté |
+| [0003](./0003-direction-visuelle.md) | Direction visuelle : densité FinanceAI, accent ambre conservé | Accepté |
+| [0004](./0004-carte-google-maps.md) | Carte Google Maps : entreprises précises, domicile affiché, trajets | Annulé le jour même |
+| [0005](./0005-precision-de-la-veille.md) | Précision de la veille | Révisé (3 conclusions sur 4 réfutées par la mesure) |
+| [0006](./0006-variantes-de-raison-sociale.md) | Dédoublonner malgré les variantes de raison sociale | Accepté |
+| [0007](./0007-google-maps-geocoding-repli.md) | Google Maps Geocoding, en repli étroit de Nominatim | Accepté |

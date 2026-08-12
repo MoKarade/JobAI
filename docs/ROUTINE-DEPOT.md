@@ -170,9 +170,20 @@ DÉDOUBLONNE par lien AVANT toute autre chose : le même poste sort de plusieurs
 sans ça tu paies dix fois le même détail.
 
 ═══ 2. L'ADRESSE, EN DEUX TEMPS — LE CŒUR DU TRAVAIL ═══
-Budget : environ 40 offres passent par cette étape, les PLUS RÉCEMMENT PUBLIÉES d'abord.
-Au-delà, dépose-les quand même SANS adresse, et DIS combien tu as laissées de côté à
-l'étape 5. Un plafond tu, c'est une couverture qu'on croit complète et qui ne l'est pas.
+`get_job_details` sur CHAQUE offre retenue, LES PLUS RÉCEMMENT PUBLIÉES D'ABORD, tant que le
+quota tient (mesuré : ~44 lectures avant refus — pas un plafond choisi, la limite réelle
+d'Indeed). ⚠️ Corrigé le 2026-08-12 : cette étape portait un « budget ~40 » qui n'a JAMAIS
+existé dans la Routine réelle (elle tentait déjà toutes les offres) — seule cette doc le
+disait, ce qui a fait chercher un chiffre à augmenter là où le vrai levier est l'ORDRE de
+lecture. Sans tri explicite par date de publication, l'ordre par défaut d'Indeed ne garantit
+PAS de traiter les offres les plus fraîches en premier quand le quota coupe la boucle.
+
+Un refus de quota ICI (même service que la recherche de l'étape 1, comportement distinct) :
+attendre le délai annoncé, RÉESSAYER cette offre une fois. Un second refus consécutif sur la
+même offre ⇒ arrêter l'étape et déposer ce qui est prêt SANS adresse pour le reste — jamais
+boucler indéfiniment sur un quota qui ne revient pas dans l'immédiat. Combien d'offres n'ont
+eu AUCUNE tentative faute de quota se dit à l'étape 5 : un plafond tu, c'est une couverture
+qu'on croit complète et qui ne l'est pas.
 
 2a. DANS LE TEXTE. `get_job_details` avec le `job_id`. Lis TOUT le corps, pas seulement
 l'en-tête : l'adresse civique (numéro + voie) se cache dans « Location : … »,
@@ -244,7 +255,7 @@ Puis, en un seul enchaînement :
 Cinq lignes, pas plus :
   offres trouvées / après dédoublonnage / écrites
   adresses : N annonce · N recherche · N aucune
-  offres passées SANS adresse faute de budget : N
+  offres SANS AUCUNE tentative faute de quota Indeed épuisé : N
   gate : vert / rouge (et pourquoi)
   push : ok / échec
 ```
