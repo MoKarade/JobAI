@@ -11,7 +11,7 @@
 // ne peut donc pas se fabriquer une place en tête de liste, même en l'écrivant dans le lot.
 
 import { z } from "zod";
-import { normaliserLieu } from "./region";
+import { estDansLaRegion, normaliserLieu } from "./region";
 
 /**
  * Un lien d'offre — et il doit être en http(s).
@@ -128,10 +128,16 @@ export function adresseUtilisable(brut: string): boolean {
  * indépendant, venu d'une autre source, et deux faits indépendants qui concordent valent
  * infiniment mieux qu'un seul qui affirme.
  *
- * ⚠️ ELLE REFUSE PLUTÔT QU'ELLE NE DEVINE, et ça lui coûte des cas justes. Une adresse dans
- * un arrondissement (« Sainte-Foy » pour une offre annoncée à « Québec ») sera rejetée. Le
- * coût est assumé : ne pas prendre une bonne adresse fait perdre une épingle, en prendre une
- * mauvaise envoie Marc à la mauvaise porte. Les deux erreurs ne se valent pas.
+ * ⚠️ ELLE ACCEPTE LES ARRONDISSEMENTS DEPUIS LE 2026-08-12, et ce paragraphe disait le
+ * contraire jusque-là : « Sainte-Foy pour une offre annoncée à Québec sera rejetée ». C'était
+ * vrai, et c'était le défaut — Sainte-Foy EST Québec, à sept kilomètres du centre, et on
+ * perdait ainsi les adresses mêmes qu'on cherchait. Le second volet de la garde consulte
+ * maintenant le référentiel des municipalités de la région (voir le corps de la fonction).
+ *
+ * Ce qui n'a PAS changé : elle refuse plutôt qu'elle ne devine. Ne pas prendre une bonne
+ * adresse fait perdre une épingle ; en prendre une mauvaise envoie Marc à la mauvaise porte.
+ * Les deux erreurs ne se valent pas, et l'élargissement ne tient que parce que le géocodeur
+ * reste l'arbitre final par la DISTANCE.
  *
  * Sans ville annoncée, il n'y a RIEN à vérifier — donc on refuse. Une adresse invérifiable
  * n'est pas une adresse prudente, c'est une adresse dont on ignore si elle est bonne.
@@ -139,5 +145,29 @@ export function adresseUtilisable(brut: string): boolean {
 export function villeCoherente(adresse: string, villeAnnoncee: string): boolean {
   const ville = normaliserLieu(villeAnnoncee);
   if (ville === "" || !adresseUtilisable(adresse)) return false;
-  return normaliserLieu(adresse).includes(ville);
+
+  // 1. L'adresse nomme la ville annoncée. Cas nominal, inchangé.
+  if (normaliserLieu(adresse).includes(ville)) return true;
+
+  // 2. ⚠️ SINON, ELLE DOIT NOMMER UNE MUNICIPALITÉ DE LA RÉGION — élargissement du
+  //    2026-08-12 (`[LIEU-06]`, ADR-0005).
+  //
+  //    La règle « le nom de la ville doit apparaître dans l'adresse » rejetait les
+  //    ARRONDISSEMENTS. Exemple mesuré : « 1234 rue de Marly, Sainte-Foy » pour une annonce
+  //    à « Québec » était refusée, alors que Sainte-Foy EST Québec, à sept kilomètres du
+  //    centre. Idem Beauport et Charlesbourg. On perdait exactement les adresses qu'on
+  //    cherchait, et le motif du refus ressemblait à de la prudence.
+  //
+  //    `situer` est le bon arbitre parce qu'il teste HORS_PORTEE **avant** d'accepter :
+  //    l'exemple « 100 rue Sainte-Catherine, Montréal, QC » contient « Québec » (la province)
+  //    et reste pourtant rejeté. Une garde écrite à la main ici aurait raté ce piège — et
+  //    surtout elle aurait dupliqué un référentiel que le filtre régional tient déjà. Une
+  //    seule liste de municipalités, deux consommateurs.
+  //
+  //    ⚠️ CETTE GARDE N'EST QU'UN PRÉ-FILTRE, et c'est ce qui rend l'élargissement sûr :
+  //    l'arbitre FINAL est le géocodeur, qui rejette toute résolution à plus de
+  //    `RAYON_VALIDATION_KM` (30 km) du centre de la ville annoncée et retombe alors sur ce
+  //    centre SANS conserver l'adresse. Le rôle d'ici est d'éviter une requête inutile, pas
+  //    de trancher la vérité géographique — c'est une question de distance, pas de chaînes.
+  return estDansLaRegion(adresse);
 }

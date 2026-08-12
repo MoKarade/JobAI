@@ -16,7 +16,7 @@ import {
   lireDepot,
   sourceDepotFichier,
 } from "../lib/ingest/depotFichier";
-import { adresseUtilisable } from "../lib/ingest/depotSchema";
+import { adresseUtilisable, villeCoherente } from "../lib/ingest/depotSchema";
 import { adressesAnnoncees } from "../lib/ingest/passe";
 
 const LOT_MINIMAL = JSON.stringify({
@@ -347,5 +347,48 @@ describe("la recherche web — la source la plus risquée, et ce qui la rend acc
       }),
     ]);
     expect(r).toEqual([]);
+  });
+});
+
+// ⚠️ ADRESSES FACTICES, MARQUÉES POUR `piiGuard`.
+// Le garde scanne tous les fichiers de test sauf lui-même : un fichier qui vérifie une garde
+// d'ADRESSE en contient forcément. La convention du dépôt (`estExemple`) existe pour ça — on
+// l'utilise plutôt que d'ajouter ce fichier aux exclusions, qui laisserait un angle mort.
+const ARR_MARLY = "1234 rue de Marly, Sainte-Foy, QC G1X 3M4"; // adresse exemple, factice
+const ARR_CHUTES = "500 boulevard des Chutes, Beauport, QC"; // adresse exemple, factice
+const ARR_EINSTEIN = "2700 rue Einstein, Charlesbourg, QC"; // adresse exemple, factice
+const HORS_MTL = "100 rue Sainte-Catherine, Montréal, QC"; // adresse exemple, factice
+const HORS_TO = "1 Yonge Street, Toronto, ON"; // adresse exemple, factice
+
+describe("villeCoherente — la garde qui rend la recherche d'adresse acceptable", () => {
+  // ⚠️ ÉLARGIE LE 2026-08-12 (`[LIEU-06]`). Elle exigeait que le NOM de la ville annoncée
+  // apparaisse dans l'adresse, ce qui rejetait les arrondissements — soit exactement les
+  // adresses que la veille cherche. Les deux volets ci-dessous comptent autant l'un que
+  // l'autre : sans le second, l'élargissement serait une porte ouverte.
+
+  it("accepte un arrondissement de la ville annoncée", () => {
+    // Mesuré avant le correctif : ces trois-là étaient REFUSÉS. Sainte-Foy est à ~7 km du
+    // centre de Québec, Beauport ~9, Charlesbourg ~10 — tous largement dans le rayon de
+    // validation du géocodeur (30 km), qui reste l'arbitre final.
+    for (const a of [
+      ARR_MARLY,
+      ARR_CHUTES,
+      ARR_EINSTEIN,
+    ]) {
+      expect(villeCoherente(a, "Québec"), `« ${a} » doit être accepté`).toBe(true);
+    }
+  });
+
+  it("refuse toujours une adresse d'une AUTRE ville, même si le mot « Québec » y figure", () => {
+    // LE PIÈGE QUE L'ÉLARGISSEMENT AURAIT PU OUVRIR : « Montréal, QC » contient « Québec »
+    // (la province). C'est `situer` qui sauve la mise en testant HORS_PORTEE AVANT
+    // d'accepter — une garde réécrite à la main ici l'aurait raté.
+    expect(villeCoherente(HORS_MTL, "Québec")).toBe(false);
+    expect(villeCoherente(HORS_TO, "Québec")).toBe(false);
+  });
+
+  it("garde ses refus d'origine : forme inutilisable, ou ville annoncée absente", () => {
+    expect(villeCoherente("Québec", "Québec")).toBe(false); // aucun chiffre : pas une adresse
+    expect(villeCoherente(ARR_MARLY, "")).toBe(false); // sans ville annoncée : rien à vérifier
   });
 });

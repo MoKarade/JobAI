@@ -742,10 +742,14 @@
 - [ ] **[LIEU-05]** Table `employeurs_adresse` (nom, adresse, source, url, dernier essai,
       échecs) : la recherche cible les employeurs SANS adresse et NON essayés récemment, plus
       jamais l'offre. Le budget d'un matin va aux employeurs neufs.
-- [ ] **[LIEU-06]** Remplacer la garde « la ville doit apparaître dans l'adresse » par la
-      garde du GÉOCODEUR (l'adresse tombe à moins de N km du centre de la ville annoncée).
-      Récupère les arrondissements (« Sainte-Foy » pour « Québec »), reste strict sur les
-      homonymes.
+- [x] **[LIEU-06]** ~~Remplacer la garde de ville par celle du géocodeur~~ **FAIT, et plus
+      simple que prévu** : la garde du géocodeur EXISTAIT DÉJÀ (`RAYON_VALIDATION_KM = 30`,
+      `lib/geocodage.ts`). Le défaut était un PRÉ-FILTRE en amont qui rejetait avant qu'elle
+      puisse trancher. `villeCoherente` consulte désormais le référentiel des municipalités
+      (`situer`, déjà partagé avec le filtre régional) : Sainte-Foy, Beauport et Charlesbourg
+      passent, Montréal reste refusé — `situer` teste HORS_PORTEE AVANT d'accepter, donc le
+      mot « Québec » dans « Montréal, QC » ne trompe pas. Le géocodeur reste l'arbitre final
+      par la DISTANCE.
 - [ ] **[LIEU-07]** Sonder Overpass par NOM d'entreprise sur la région — autre question que
       Nominatim, frontière réseau déjà ouverte. **Témoin négatif obligatoire** avant d'y
       croire (leçon « un HTTP 200 ne prouve rien »).
