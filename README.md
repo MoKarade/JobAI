@@ -29,7 +29,11 @@ les décisions dans [`docs/adr/`](./docs/adr/).
   références (`/references`).
 - **Veille** — `POST /api/ingest/depot` reçoit des lots d'offres (une Routine claude.ai
   envoie, l'app trie : filtre régional, plancher de score, dédoublonnage). Le cron
-  `/api/cron/veille` applique les mêmes règles. ⚠️ Les sources automatiques sont mortes
+  `/api/cron/veille` applique les mêmes règles. ⏱️ **L'ordre des deux compte** : la Routine
+  part à 11:00 UTC et met jusqu'à trois heures (mesuré le 2026-08-12 : 11:06 → 13:55, la
+  lecture des annonces domine), puis le déploiement suit. Le cron est donc à **15:00 UTC**
+  pour lire le dépôt du JOUR. Aux deux à 11:00, il lisait celui de la veille. Rien n'était
+  perdu — `fichiersDansLaFenetre` couvre 7 jours — mais les offres arrivaient un jour tard. ⚠️ Les sources automatiques sont mortes
   (Guichet-Emplois 404, ATS américains sans employeur local, pas de flux chez Jobillico /
   Québec emploi / Isarta) — le dépôt est aujourd'hui le vrai chemin d'entrée.
 - **Distance et carte** — domicile géocodé une fois et conservé en base, mesure automatique

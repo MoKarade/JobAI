@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron/veille",
-      "schedule": "0 11 * * *"
+      "schedule": "0 15 * * *"
     }
   ],
   "ignoreCommand": "bash scripts/build-necessaire.sh"

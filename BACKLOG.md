@@ -710,11 +710,12 @@
       (`expurgerPII`, PURE) + garde « aucune PII de tiers dans les descriptions d'un dépôt »
       dans `piiGuard`. Né d'un cas RÉEL : une annonce Randstad portait le nom, le courriel et
       le LinkedIn personnels d'un recruteur. La boîte de rôle (`carriere@…`) survit.
-- [ ] **[VEILLE-09]** Décaler le cron de l'app (`vercel.json`, `/api/cron/veille`) de 11:00 à
+- [x] **[VEILLE-09]** Décaler le cron de l'app (`vercel.json`, `/api/cron/veille`) de 11:00 à
       14:00 UTC. Aujourd'hui la Routine et le cron partent à la même heure : la Routine met
       30-60 min à livrer, donc l'app ingère le dépôt de la VEILLE. La fenêtre de 7 jours de
       `fichiersDansLaFenetre` évite toute perte, mais les offres arrivent avec un jour de
-      retard. Décision de Marc : c'est un changement de comportement en production.
+      retard. Décision de Marc (2026-08-12) : fait. Posé à **15:00** et non 14:00 —
+      la veille du jour a duré 11:06 → 13:55 UTC, 14:00 aurait été trop juste.
 - [ ] **[LIEU-05]** Table `employeurs_adresse` (nom, adresse, source, url, dernier essai,
       échecs) : la recherche cible les employeurs SANS adresse et NON essayés récemment, plus
       jamais l'offre. Le budget d'un matin va aux employeurs neufs.
