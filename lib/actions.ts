@@ -1016,6 +1016,8 @@ export async function mesurerDistances(
       ok: true;
       mesurees: number;
       situees: number;
+      /** Épinglées AU CENTRE-VILLE, sans requête Nominatim (chantier #07, 2026-08-12). */
+      placees: number;
       villesRattrapees: number;
       adressesRattrapees: number;
       bornesMesurees: number;
@@ -1322,6 +1324,7 @@ export async function mesurerDistances(
       ok: true,
       mesurees: majs.length,
       situees,
+      placees,
       villesRattrapees: aRattraper.length,
       adressesRattrapees: adresses.ecrites,
       bornesMesurees: bornes.mesurees,
