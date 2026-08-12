@@ -104,10 +104,19 @@ describe("la fenêtre de relecture — ce qui empêche l'immortalité des offres
 });
 
 describe("la source", () => {
-  it("un dossier absent n'est PAS une erreur — c'est l'état normal avant tout dépôt", async () => {
+  it("un dossier absent est une PANNE dite — plus jamais un vide silencieux", async () => {
+    // ⚠️ TEST RETOURNÉ LE 2026-08-12. Il affirmait l'inverse (« l'état normal avant tout
+    // dépôt ») — et cet « état normal » a masqué l'incident du jour : le bundle serverless
+    // n'embarquait pas data/depot, la prod lisait un dossier absent, et la source rendait
+    // ok:true offres:[] — indiscernable d'un jour sans dépôt. Zéro ingestion, péremption en
+    // série, aucun voyant. Le dossier est versionné : son absence = déploiement amputé.
+    void 0;
+  });
+  it("(suite du test retourné)", async () => {
     const s = sourceDepotFichier("2026-08-06", "/chemin/qui/nexiste/pas");
     const r = await s.interroger(async () => "");
-    expect(r).toEqual({ ok: true, source: "depot-fichier", offres: [] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erreur).toContain("data/depot introuvable");
   });
 
   it("lit les dépôts RÉELS du projet sans lever", async () => {

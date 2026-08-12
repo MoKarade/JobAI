@@ -12,7 +12,7 @@
 // de lancer une passe ?), pas le dialecte SQL.
 
 import { describe, it, expect } from "vitest";
-import {
+import { appliquerSeed,
   CLE_SEED,
   DELAI_PASSE_AUTO_MS,
   PREFIXE_EN_COURS,
@@ -179,5 +179,49 @@ describe("temporisation des passes automatiques", () => {
       }),
     } as never;
     expect(await reserverPasse(dbCasse, CLE, DELAI_PASSE_AUTO_MS, t0)).toBe(false);
+  });
+});
+
+describe("appliquerSeed n'écrit QUE le jeu de départ (fix du 2026-08-12)", () => {
+  // ⚠️ LE BUG QUE CE TEST FERME, trouvé par revue adversariale : l'ancien code mappait
+  // TOUTES les lignes de la base et fabriquait un stub `{} as Offre` pour une offre
+  // INGÉRÉE PAR LA VEILLE (hors seed) — sans `raisons`. La boucle d'écriture faisait
+  // `db.delete(offerReasons)` PUIS `o.raisons.length` → TypeError : la synchro crashait
+  // au premier changement d'empreinte dès qu'une offre ingérée existait, après avoir
+  // écrit une partie du lot. Le fake db ci-dessous journalise chaque opération : on prouve
+  // à la fois l'absence de crash ET que l'offre ingérée n'est jamais touchée.
+  function fakeDb(lignesExistantes: { id: string }[]) {
+    const operations: string[] = [];
+    const thenable = (nom: string) => ({
+      set: (_v: unknown) => ({ where: (_c: unknown) => { operations.push(nom); return Promise.resolve(); } }),
+      values: (_v: unknown) => { operations.push(nom); return Promise.resolve(); },
+      where: (_c: unknown) => { operations.push(nom); return Promise.resolve(); },
+    });
+    const db = {
+      select: () => ({ from: () => Promise.resolve(lignesExistantes) }),
+      update: (_t: unknown) => thenable("update"),
+      insert: (_t: unknown) => thenable("insert"),
+      delete: (_t: unknown) => thenable("delete"),
+    };
+    return { db: db as never, operations };
+  }
+
+  it("une offre ingérée par la veille (hors seed) ne crashe plus la synchro, et n'est pas réécrite", async () => {
+    const duSeed = SEED[0]!;
+    const ingeree = {
+      id: "qualtech-technicien-automatisation",
+      statut: "reperee", priorite: null, dateEnvoi: null, userNote: null,
+    };
+    const { db, operations } = fakeDb([
+      { id: duSeed.id, statut: duSeed.statut, priorite: null, dateEnvoi: null, userNote: null } as never,
+      ingeree as never,
+    ]);
+    // L'ancien code levait TypeError ici. Le nouveau doit finir, et n'écrire que le seed.
+    const r = await appliquerSeed(db);
+    expect(r.majs + r.crees).toBe(SEED.length);
+    // Chaque offre écrite = 1 update/insert + 1 delete (raisons) [+ 1 insert raisons] :
+    // si l'ingérée était traitée, on verrait AU MOINS une opération de plus que le seed
+    // n'en justifie. Borne : ≤ 3 opérations par offre du SEED, aucune pour l'ingérée.
+    expect(operations.length).toBeLessThanOrEqual(SEED.length * 3);
   });
 });

@@ -119,10 +119,15 @@ export function brutesDuDepot(lot: Depot): OffreBrute[] {
 /**
  * La source « dépôt de fichiers ». Elle ignore le récupérateur réseau : c'est le but.
  *
- * Un dossier absent n'est PAS une erreur — c'est l'état normal tant qu'aucun dépôt n'a été
- * poussé. Un fichier illisible, lui, EST une erreur et se dit : un lot silencieusement
- * ignoré est indiscernable d'un lot vide, et c'est la classe de panne que ce dépôt a déjà
- * payée plusieurs fois.
+ * ⚠️ UN DOSSIER ABSENT EST UNE PANNE, ET ELLE SE DIT. Ce commentaire affirmait l'inverse
+ * (« l'état normal tant qu'aucun dépôt n'a été poussé ») — c'était vrai avant le premier
+ * commit de dépôt, et c'est devenu le masque d'un incident : en serverless, le traceur de
+ * Next n'embarquait pas `data/depot` (readdir invisible au build), le dossier manquait en
+ * production, et ce code rendait le manque comme un jour sans offres. Résultat : zéro
+ * ingestion ET péremption en série des offres déjà suivies, sans une ligne d'erreur.
+ * Depuis que le dossier est versionné avec des fichiers, son absence ne peut signifier
+ * qu'une chose : le déploiement est amputé. Un fichier illisible, lui, reste une erreur
+ * par fichier — un lot silencieusement ignoré est indiscernable d'un lot vide.
  */
 export function sourceDepotFichier(aujourdhui: string, racine = process.cwd()): Source {
   return {
@@ -134,7 +139,12 @@ export function sourceDepotFichier(aujourdhui: string, racine = process.cwd()): 
       try {
         noms = await readdir(dossier);
       } catch {
-        return { ok: true, source: "depot-fichier", offres: [] };
+        return {
+          ok: false,
+          source: "depot-fichier",
+          erreur:
+            "dossier data/depot introuvable — bundle serverless amputé ? (outputFileTracingIncludes)",
+        };
       }
 
       const offres: OffreBrute[] = [];

@@ -77,13 +77,15 @@ export function CarteFiltrable({
 
   const vue = useMemo(() => construireVue(retenues, cibles, table), [retenues, cibles, table]);
 
-  // ⚠️ ALLUMÉ PAR DÉFAUT (demande de Marc, 2026-08-06 : « je veux pas si y'a pas au moins
-  // l'adresse de l'entreprise »). Une épingle au centre d'une ville, sans adresse, ne
-  // répond à aucune des questions qu'on pose à une carte — elle occupe l'écran en donnant
-  // l'impression d'une couverture qui n'existe pas. L'interrupteur existe quand même :
-  // c'est un choix d'affichage, pas une donnée effacée, et le compte des masquées reste
-  // écrit juste à côté.
-  const [adresseSeulement, setAdresseSeulement] = useState(true);
+  // ⚠️ ÉTEINT PAR DÉFAUT depuis le 2026-08-12 — demande de Marc : « dans maps je veux
+  // jamais voir une boîte et aucune offre active repérée, je veux toujours voir toutes les
+  // offres que j'ai seulement ». Elle RÉVISE celle du 2026-08-06 (« je veux pas si y'a pas
+  // au moins l'adresse ») qui allumait ce filtre : combinée à une acquisition d'adresses
+  // en panne (registre 0/65 ce jour-là), elle réduisait la carte à 8 épingles pour 30
+  // offres suivies — l'exact contraire de « toutes mes offres ». L'interrupteur reste :
+  // c'est un choix d'affichage, pas une donnée effacée, et une épingle sans adresse est
+  // dite honnêtement (pointillé + « position approximative » + « adresse inconnue »).
+  const [adresseSeulement, setAdresseSeulement] = useState(false);
 
   const epingles = useMemo(
     () => (adresseSeulement ? filtrerAdresseConnue(vue.epingles) : vue.epingles),

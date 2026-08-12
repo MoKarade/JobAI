@@ -760,6 +760,62 @@
       Charlesbourg, Sainte-Foy, Saint-Nicolas, Saint-Apollinaire), rotation sur plusieurs
       jours, les deux connecteurs selon leur rôle (ZipRecruiter = largeur, Indeed = texte).
 
+## Chantier #07 — Chaque offre du jour, toutes sur la carte ⏳
+
+> Réponse à Marc (2026-08-12) : « 30 offres suivies au total et 8 placées sur la carte, ça
+> marche vraiment pas bien, il faut tout refaire ». **Diagnostic par panel adversarial (6
+> agents, sondes exécutées, dont un vrai `npm run build`) : il ne fallait PAS tout refaire.**
+> La mécanique (tri, péremption, fenêtre 7 j, résurrection, honnêteté de la carte) tient
+> toutes les sondes. Le symptôme entier venait d'UN défaut d'empaquetage + 2 bugs + 2 défauts
+> de comportement, tous fermés le jour même.
+>
+> **LA CAUSE RACINE, prouvée as-built** : le traceur Next n'embarquait pas `data/depot` dans
+> la fonction serverless (readdir invisible au build — traces NFT : 91 fichiers, zéro dépôt).
+> En prod, le cron lisait un dossier ABSENT, rendu silencieusement comme « aucune offre » :
+> AUCUN dépôt fichier jamais ingéré, et — pire — chaque cron « ne voyait plus » les 40 offres
+> ingérées par la route POST du 31/07 → toutes périmées en 3 balayages → retour à ~30, le
+> chiffre exact de Marc. Les 8 épinglées = filtre « adresse connue seulement » ON par défaut
+> (demande du 06/08) sur un stock où l'acquisition d'adresses était en panne (registre 0/65).
+
+FAIT le 2026-08-12 (tout gaté, discrimination prouvée par stash) :
+- [x] **[FIX-BUNDLE]** `outputFileTracingIncludes: { "/api/cron/veille": ["./data/depot/**"] }`
+      dans `next.config.mjs` — la ligne qui fait exister les dépôts en production.
+- [x] **[FIX-ENOENT]** `sourceDepotFichier` : dossier absent = **panne dite** (`ok:false`),
+      plus jamais un vide silencieux. Test retourné avec son histoire.
+- [x] **[FIX-BALAYAGE-AVEUGLE]** une passe dont AUCUNE source n'a répondu **suspend le
+      balayage** : compteurs d'absences inchangés, suspension nommée dans le résumé. Le
+      discriminant inverse est aussi testé : une seule source ok ⇒ péremption honnête intacte.
+- [x] **[FIX-VUE-VARIANTE]** le marquage « vue » résout vers l'id STOCKÉ (`idsStockesVus`,
+      partagé passe + route POST) — l'ancien calcul laissait une offre suivie prendre des
+      absences pendant qu'une source la re-publiait sous une variante de raison sociale
+      (bug né d'ADR-0006 le matin même, trouvé par la contre-vérification du panel).
+- [x] **[FIX-SEED-CRASH]** `appliquerSeed` ne touche plus que le seed : une offre ingérée
+      par la veille provoquait un TypeError en pleine synchro (stub sans `raisons`), après
+      écriture partielle du lot.
+- [x] **[CARTE-DEFAUT]** filtre « adresse connue seulement » **éteint par défaut** — la
+      demande du 12/08 (« toutes mes offres ») révise celle du 06/08.
+- [x] **[CARTE-CENTREVILLE]** placement **centre-ville immédiat** des employeurs à ville
+      connue (0 requête Nominatim, `geocodeLe: EPOQUE_A_RETENTER` ⇒ raffinage dû) : l'épingle
+      existe à la première visite au lieu d'attendre des jours de passes budgétées. Le log
+      de passe dit `placées=N`.
+
+RESTE — vérification de bout en bout (rien à coder, tout à CONSTATER) :
+- [ ] **[V-CRON-13]** Demain 15:00 UTC (11:00 chez Marc) : le cron tourne sur le build qui
+      embarque ENFIN les dépôts. Attendu : `sources` du JSON avec `depot-fichier ok:true`
+      et offres > 0 ; ~110 actives (38 seed + dépôts des 11-12 en fenêtre, les périmées à
+      tort RESSUSCITENT — mécanique codée, rien à faire) ; carte pleine dès la première
+      visite (placement immédiat). ⚠️ Pour ne pas attendre : `GET /api/cron/veille` avec
+      `Authorization: Bearer $CRON_SECRET` (Marc seul a le secret) ingère TOUT DE SUITE.
+- [ ] **[V-31-07]** Les ~40 offres du 31/07 sont hors fenêtre : elles reviendront par les
+      balayages qui les re-trouvent (résurrection automatique). NE PAS les restaurer à la
+      main — une offre que plus aucune source ne publie est peut-être vraiment fermée.
+- [ ] **[V-ROTATION]** Mesuré par le panel : 68 % des offres d'un jour ne sont pas re-vues
+      le lendemain (rotation des top-10) ; plancher de vie 10 jours (fenêtre 7 + seuil 3).
+      Après une semaine de régime réparé, relire les péremptions : si des offres encore
+      ouvertes périment, le correctif est côté ROUTINE (re-recherche nommée des offres en
+      péril, bornée ~10 req/jour) — PAS un seuil plus haut (il retarderait symétriquement
+      la péremption honnête).
+
 ## Découvertes et dette (à trier)
 
 - 🔧 **`[SCORE-SENIORITE-LETTRES]` — le barème ne lit pas les années écrites en toutes

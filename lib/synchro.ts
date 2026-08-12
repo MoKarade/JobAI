@@ -143,15 +143,26 @@ export async function reserverPasse(
 export async function appliquerSeed(db: Db): Promise<{ crees: number; majs: number }> {
   const existantes = await db.select().from(offers);
 
+  // ⚠️ LA SYNCHRO DU SEED NE TOUCHE QUE LES OFFRES DU SEED. Bug trouvé par revue
+  // adversariale le 2026-08-12 : l'ancien code mappait TOUTES les lignes de la base et
+  // fabriquait, pour une offre INGÉRÉE PAR LA VEILLE (hors seed), un stub `{} as Offre` —
+  // sans `raisons`, sans rien. La boucle d'écriture faisait alors `db.delete(offerReasons)`
+  // PUIS `o.raisons.length` → TypeError : la synchro crashait au premier changement
+  // d'empreinte dès qu'une offre ingérée existait, après avoir déjà écrit une partie du
+  // lot. Une offre que le jeu de départ ne connaît pas n'a RIEN à faire dans sa synchro.
+  //
   // On ne relit que les champs que la fusion protège : le reste vient du jeu de départ.
-  const suivi: Offre[] = existantes.map((l) => ({
-    ...(SEED.find((s) => s.id === l.id) ?? ({} as Offre)),
-    id: l.id,
-    statut: l.statut,
-    priorite: l.priorite,
-    dateEnvoi: l.dateEnvoi,
-    userNote: l.userNote,
-  }));
+  const idsDuSeed = new Set(SEED.map((s) => s.id));
+  const suivi: Offre[] = existantes
+    .filter((l) => idsDuSeed.has(l.id))
+    .map((l) => ({
+      ...(SEED.find((s) => s.id === l.id) as Offre),
+      id: l.id,
+      statut: l.statut,
+      priorite: l.priorite,
+      dateEnvoi: l.dateEnvoi,
+      userNote: l.userNote,
+    }));
 
   const aEcrire = fusionner(SEED, suivi);
   const connues = new Set(existantes.map((l) => l.id));

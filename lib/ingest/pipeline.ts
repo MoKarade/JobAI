@@ -123,6 +123,42 @@ export function cleCanonique(entreprise: string, titre: string): string {
 }
 
 /**
+ * Les identifiants STOCKÉS des offres suivies qu'un lot de brutes vient de re-présenter.
+ *
+ * ⚠️ NÉE D'UN BUG TROUVÉ PAR REVUE ADVERSARIALE LE JOUR MÊME D'ADR-0006. Le marquage
+ * « vue » calculait l'id de la BRUTE et le cherchait dans `dejaSuivies` — qui contient
+ * aussi les clés canoniques. Pour une brute « Ellisdon » face à une base « EllisDon
+ * Corporation », le test passait (la canonique matchait) mais l'id ajouté était celui de
+ * la VARIANTE : aucune offre stockée ne le porte, donc l'offre prenait +1 absence PENDANT
+ * que le lot la contenait — péremption à tort en trois jours, l'exact défaut qu'ADR-0006
+ * venait de fermer côté doublons. La route POST avait le même trou sous une autre forme
+ * (comparaison entreprise+titre en minuscules STRICTES, aveugle aux variantes) : deux
+ * copies d'une même règle, déjà divergentes — d'où CETTE fonction, partagée.
+ *
+ * Résout dans LES DEUX SENS : base longue/brute courte (l'id de la brute EST la canonique
+ * de la stockée) et base courte/brute longue (la canonique de la brute EST l'id stocké).
+ */
+export function idsStockesVus(
+  brutes: readonly OffreBrute[],
+  connues: readonly { id: string; entreprise: string; poste: string }[],
+): Set<string> {
+  const idStockeParCle = new Map<string, string>();
+  for (const o of connues) {
+    idStockeParCle.set(o.id, o.id);
+    idStockeParCle.set(cleCanonique(o.entreprise, o.poste), o.id);
+  }
+  const vus = new Set<string>();
+  for (const b of brutes) {
+    const entreprise = b.entreprise.trim() || "Employeur non nommé";
+    const stocke =
+      idStockeParCle.get(idOffre(entreprise, b.titre)) ??
+      idStockeParCle.get(cleCanonique(entreprise, b.titre));
+    if (stocke !== undefined) vus.add(stocke);
+  }
+  return vus;
+}
+
+/**
  * Met en forme, dédoublonne, note et filtre.
  *
  * @param recoltes   Ce que les sources ont rendu, dans l'ordre de priorité : la PREMIÈRE

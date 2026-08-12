@@ -1098,7 +1098,53 @@ export async function mesurerDistances(
     const budgetTotal = options.budgetGeocodageMs ?? BUDGET_PASSE_PAGE_MS;
     const budgetRestant = (): number | null =>
       budgetTotal === null ? null : Math.max(0, budgetTotal - (Date.now() - departGeocodage));
-    const manquants = employeursASituer(offres, positions, villeDe);
+    let manquants = employeursASituer(offres, positions, villeDe);
+
+    // 0 bis. ÉPINGLER AU CENTRE-VILLE IMMÉDIATEMENT, SANS RÉSEAU (chantier #07, 2026-08-12).
+    //
+    // Demande de Marc : « toutes les offres placées sur la map ». Le goulot n'était pas
+    // Nominatim lui-même mais le fait de L'ATTENDRE : à ~2 s par requête sous un mur de
+    // 60 s, même une passe entière plafonne à ~28 placements — des jours de délai pour un
+    // lot quotidien, pendant lesquels l'offre n'existe sur aucune carte. Or le repli
+    // qu'on finit par écrire quand Nominatim ne connaît pas l'entreprise est... le centre
+    // de sa ville, déjà en base dans la table `villes`. On écrit donc ce repli TOUT DE
+    // SUITE pour tout employeur dont la ville est connue : zéro requête, l'épingle existe
+    // à la première visite, la précision « ville » est DITE à l'écran (pointillé + fiche).
+    //
+    // `geocodeLe: EPOQUE_A_RETENTER` : le raffinage Nominatim reste dû — l'épingle
+    // immédiate est un ACOMPTE, pas un renoncement à la position exacte. Les passes
+    // suivantes tenteront la vraie résolution au rythme budgété, comme avant.
+    let placees = 0;
+    if (manquants.length > 0) {
+      const centres = new Map((await db.select().from(villes)).map((v) => [v.nom, v]));
+      const immediates = manquants
+        .map((m) => ({ m, centre: centres.get(m.ville) }))
+        .filter((x): x is { m: (typeof manquants)[number]; centre: NonNullable<typeof x.centre> } =>
+          x.centre !== undefined,
+        )
+        .map(({ m, centre }) => ({
+          nom: m.nom,
+          lat: centre.lat,
+          lon: centre.lon,
+          precision: "ville" as const,
+          adresse: null,
+          adresseSource: null,
+          geocodeLe: EPOQUE_A_RETENTER,
+        }));
+      if (immediates.length > 0) {
+        await db.insert(entreprisesLieux).values(immediates).onConflictDoNothing();
+        placees = immediates.length;
+        const relues = await db.select().from(entreprisesLieux);
+        positions.clear();
+        for (const l of relues) {
+          positions.set(l.nom, { lat: l.lat, lon: l.lon, precision: l.precision });
+        }
+        // Ce qui vient d'être épinglé n'est plus « à situer » : Nominatim ne reçoit que
+        // les employeurs dont la VILLE elle-même est inconnue de la table.
+        manquants = employeursASituer(offres, positions, villeDe);
+      }
+    }
+
     let situees = 0;
     if (manquants.length > 0) {
       const r = await situerLot(
@@ -1213,7 +1259,7 @@ export async function mesurerDistances(
     // « 0/6 » dit que six candidates ont été écartées, et ce sont deux situations opposées.
     const restant = budgetRestant();
     console.log(
-      `[distances] passe terminée — mesurées=${majs.length} situées=${situees}/${manquants.length} ` +
+      `[distances] passe terminée — placées=${placees} mesurées=${majs.length} situées=${situees}/${manquants.length} ` +
         `villes=${aRattraper.length} ` +
         `adresses=${adresses.ecrites}/${adresses.candidates}` +
         `${adresses.horsRayon > 0 ? ` (${adresses.horsRayon} hors rayon)` : ""}` +

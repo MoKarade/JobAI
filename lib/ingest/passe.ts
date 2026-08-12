@@ -16,7 +16,7 @@
 
 import { appliquerBalayage, resumerBalayage, type JournalVeille } from "../veille";
 import type { Offre } from "../types";
-import { cleCanonique, idOffre, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
+import { cleCanonique, idsStockesVus, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
 import { RECHERCHES_GUICHET, sourceAts, sourceGuichet } from "./sources";
 import { sourceDepotFichier } from "./depotFichier";
 import { villeCoherente } from "./depotSchema";
@@ -162,15 +162,26 @@ export async function executerPasse(
   // INCONNUE, pas une offre qu'il a déjà jugée digne d'intérêt). La faire passer par
   // `trier` l'écarterait, elle ne serait jamais marquée vue, et elle se périmerait au
   // troisième jour alors qu'elle est publiée sous nos yeux.
+  // `idsStockesVus` résout chaque brute vers l'ID STOCKÉ, variantes de raison sociale
+  // comprises — le calcul « id de la brute » d'avant laissait une offre suivie prendre des
+  // absences pendant qu'une autre source la re-publiait sous « X » au lieu de « X inc. ».
   const idsVus = new Set(tri.retenues.map((o) => o.id));
-  for (const b of brutes) {
-    const id = idOffre(b.entreprise.trim() || "Employeur non nommé", b.titre);
-    if (dejaSuivies.has(id)) idsVus.add(id);
-  }
+  for (const id of idsStockesVus(brutes, connues)) idsVus.add(id);
 
   const apresAjout = [...connues, ...tri.retenues];
   const vues = apresAjout.filter((o) => idsVus.has(o.id));
-  const balayage = appliquerBalayage(apresAjout, vues, journal, aujourdhui);
+
+  // ⚠️ UN BALAYAGE QUI N'A RIEN PU VOIR NE COMPTE PAS D'ABSENCES. Incident du 2026-08-12 :
+  // le bundle prod n'embarquait pas data/depot, TOUTES les sources rendaient vide ou
+  // échec, et chaque passe quotidienne ajoutait +1 absence à tout le suivi — 40 offres
+  // périmées en trois jours par un empêchement d'infrastructure, pas par le marché.
+  // La leçon du dépôt s'applique mot pour mot : « un mécanisme qui ne peut pas atteindre
+  // sa source doit le DIRE, pas rendre un résultat vide ». Ici : aucune source en succès
+  // ⇒ le journal ne bouge pas, et le résumé nomme la suspension.
+  const aucuneSourceEnSucces = compte.every((c) => !c.ok);
+  const balayage: ReturnType<typeof appliquerBalayage> = aucuneSourceEnSucces
+    ? { offres: apresAjout, journal, nouvelles: [], perimees: [], revenues: [], enSursis: [] }
+    : appliquerBalayage(apresAjout, vues, journal, aujourdhui);
 
   return {
     sources: compte,
@@ -189,7 +200,9 @@ export async function executerPasse(
     enSursis: balayage.enSursis.length,
     offres: balayage.offres,
     journal: balayage.journal,
-    resume: `${tri.retenues.length} nouvelle${tri.retenues.length > 1 ? "s" : ""}, ${resumerBalayage(balayage)}`,
+    resume: aucuneSourceEnSucces
+      ? "balayage suspendu : aucune source n'a répondu — compteurs d'absences inchangés"
+      : `${tri.retenues.length} nouvelle${tri.retenues.length > 1 ? "s" : ""}, ${resumerBalayage(balayage)}`,
     adresses: adressesAnnoncees(brutes),
   };
 }

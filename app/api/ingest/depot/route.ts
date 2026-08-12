@@ -30,7 +30,7 @@ import { db } from "@/lib/db";
 import { offerReasons, offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { colonnesOffre } from "@/lib/persistance";
-import { cleCanonique, trier, villesACompleter } from "@/lib/ingest/pipeline";
+import { idsStockesVus, cleCanonique, trier, villesACompleter } from "@/lib/ingest/pipeline";
 import { LotDeposeSchema } from "@/lib/ingest/depotSchema";
 import { appliquerBalayage, type JournalVeille } from "@/lib/veille";
 
@@ -170,15 +170,13 @@ export async function POST(requete: Request) {
     // la veille n'a jamais vue n'est JAMAIS périmée.
     const journal = await lireJournal();
     const apresAjout = [...connues, ...tri.retenues];
+    // `idsStockesVus` (pipeline) et non une comparaison locale : l'ancienne comparaison
+    // entreprise+titre en minuscules STRICTES était aveugle aux variantes de raison
+    // sociale (« Ellisdon » ≠ « EllisDon Corporation ») — la même offre re-déposée sous
+    // l'autre graphie prenait des absences pendant qu'elle était sous nos yeux. Deux
+    // copies de la règle « vue » avaient déjà divergé ; il n'en reste qu'une, partagée.
     const idsDeposes = new Set(tri.retenues.map((o) => o.id));
-    for (const b of brutes) {
-      const proche = apresAjout.find(
-        (o) =>
-          o.entreprise.toLowerCase() === (b.entreprise || "").toLowerCase() &&
-          o.poste.toLowerCase() === b.titre.toLowerCase(),
-      );
-      if (proche) idsDeposes.add(proche.id);
-    }
+    for (const id of idsStockesVus(brutes, connues)) idsDeposes.add(id);
     const vues = apresAjout.filter((o) => idsDeposes.has(o.id));
     const balayage = appliquerBalayage(apresAjout, vues, journal, lot.jour);
 

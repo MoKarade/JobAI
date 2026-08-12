@@ -5,7 +5,7 @@
 // vérifiées alors que personne ne les a lues. Les trois se testent ici.
 
 import { describe, it, expect } from "vitest";
-import { cleCanonique,
+import { cleCanonique, idsStockesVus,
   FIT_ROLE_PLANCHER,
   idOffre,
   trier,
@@ -460,5 +460,40 @@ describe("variantes de raison sociale entre deux sources (ADR-0006)", () => {
     expect(tri.retenues).toHaveLength(1);
     expect(tri.retenues[0]?.entreprise).toBe("EllisDon Corporation"); // la première gagne
     expect(tri.doublons).toBe(1);
+  });
+});
+
+describe("idsStockesVus — le marquage « vue » résout vers l'id STOCKÉ (fix du 2026-08-12)", () => {
+  const T = "Coordonnateur de projet";
+  const connues = [
+    { id: idOffre("EllisDon Corporation", T), entreprise: "EllisDon Corporation", poste: T },
+    { id: idOffre("Laserax", "Superviseur"), entreprise: "Laserax", poste: "Superviseur" },
+  ];
+  const b = (entreprise: string, titre: string) =>
+    ({ refSource: "r", titre, entreprise, ville: "Québec", lien: "https://x.test/1",
+       description: "", publieeLe: null, adresse: "", adresseSource: null, adresseUrl: null }) as never;
+
+  it("brute VARIANTE (courte) → l'id de la version STOCKÉE (longue) est vu", () => {
+    // LE BUG QUE CE TEST FERME : l'ancien code ajoutait l'id de la BRUTE (« ellisdon-… »),
+    // qu'aucune offre stockée ne porte — l'offre prenait +1 absence PENDANT que le lot la
+    // contenait, et se périmait en trois jours sous nos yeux.
+    const vus = idsStockesVus([b("Ellisdon", T)], connues);
+    expect([...vus]).toEqual([idOffre("EllisDon Corporation", T)]);
+  });
+
+  it("sens inverse : base courte, brute longue", () => {
+    const courtes = [{ id: idOffre("Ellisdon", T), entreprise: "Ellisdon", poste: T }];
+    const vus = idsStockesVus([b("EllisDon Corporation", T)], courtes);
+    expect([...vus]).toEqual([idOffre("Ellisdon", T)]);
+  });
+
+  it("graphie identique : comportement inchangé", () => {
+    const vus = idsStockesVus([b("EllisDon Corporation", T)], connues);
+    expect([...vus]).toEqual([idOffre("EllisDon Corporation", T)]);
+  });
+
+  it("ne marque RIEN pour un employeur inconnu ou un autre poste", () => {
+    expect(idsStockesVus([b("Qualtech", T)], connues).size).toBe(0);
+    expect(idsStockesVus([b("Laserax", "Coordonnateur")], connues).size).toBe(0);
   });
 });

@@ -640,6 +640,19 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   entraient sur la carte de Québec avec une fausse distance — le critère n°1 de Marc, faux en
   silence. Corriger `ville` d'après l'annonce, jamais d'après l'en-tête de la liste.
 
+- **Un fichier commité n'existe pas en serverless tant que le traceur ne le voit pas — et
+  l'absence du chemin doit être une PANNE DITE.** Incident du 2026-08-12, prouvé par les
+  traces du build (`route.js.nft.json` : 91 fichiers, zéro dépôt) : le cron lisait
+  `data/depot` par `readdir`, invisible au traceur Next, donc ABSENT du bundle de prod.
+  Le code rendait ce manque comme « un jour sans dépôt » (`ok:true, offres:[]`) : aucune
+  ingestion, et la péremption a mangé 40 offres en 3 jours pendant que tous les voyants
+  restaient verts — le « 30 suivies » de Marc. Trois règles : (a) tout accès filesystem à
+  l'EXÉCUTION en serverless exige `outputFileTracingIncludes` ; (b) un dossier versionné
+  qui manque à l'exécution n'est jamais « l'état normal », c'est un déploiement amputé —
+  `ok:false`, nommé ; (c) **un balayage qui n'a rien pu voir ne DÉCIDE rien** : aucune
+  source en succès ⇒ compteurs d'absences gelés, suspension dite dans le résumé. La leçon
+  « un mécanisme qui ne peut pas atteindre sa source doit le DIRE » ne suffisait pas — il
+  faut aussi qu'il s'ABSTIENNE d'agir sur son vide.
 - **Un plan écrit d'après un TABLEAU de symptômes se trompe ; il se vérifie contre le CODE
   avant d'être promis.** Le 2026-08-12, l'ADR-0005 a été rédigé à partir d'un tableau de
   notes et d'un compte d'adresses manquantes. Trois de ses conclusions sur quatre n'ont pas

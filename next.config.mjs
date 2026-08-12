@@ -42,6 +42,25 @@ const CSP = [
 
 const nextConfig = {
   reactStrictMode: true,
+
+  /**
+   * ⚠️ LA LIGNE QUI FAIT EXISTER LES DÉPÔTS EN PRODUCTION. Incident du 2026-08-12.
+   *
+   * Le cron `/api/cron/veille` lit `data/depot/*.json` par `readdir(process.cwd())`. Or le
+   * traceur de Next n'embarque dans une fonction serverless QUE les fichiers qu'il voit
+   * IMPORTÉS — un `readdir` à l'exécution lui est invisible. Prouvé par les traces du
+   * build : `route.js.nft.json` liste 91 fichiers, AUCUN dépôt. En production, le dossier
+   * était donc ABSENT, et `sourceDepotFichier` rendait ce vide comme un jour sans dépôt.
+   *
+   * Conséquence mesurée : aucun dépôt fichier jamais ingéré, et — pire — chaque cron
+   * quotidien « ne voyait plus » les offres ingérées par la route POST du 31/07, qui ont
+   * TOUTES été périmées en trois balayages. Le stock est retombé de ~78 à ~30 pendant que
+   * tous les voyants restaient verts. Un fichier commité n'existe pas en serverless tant
+   * que cette clé ne le déclare pas.
+   */
+  outputFileTracingIncludes: {
+    "/api/cron/veille": ["./data/depot/**"],
+  },
   async headers() {
     return [
       {
