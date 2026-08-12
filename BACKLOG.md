@@ -720,18 +720,16 @@
       `fichiersDansLaFenetre` évite toute perte, mais les offres arrivent avec un jour de
       retard. Décision de Marc (2026-08-12) : fait. Posé à **15:00** et non 14:00 —
       la veille du jour a duré 11:06 → 13:55 UTC, 14:00 aurait été trop juste.
-- [ ] **[INGEST-05]** ⚠️ **Variantes de raison sociale entre deux sources** — révélé le
+- [x] **[INGEST-05]** **Variantes de raison sociale entre deux sources — FAIT (ADR-0006)** — révélé le
       2026-08-12 en branchant ZipRecruiter à côté d'Indeed. `idOffre` normalise accents et
       casse, PAS les suffixes juridiques : « EllisDon Corporation » (Indeed) et « Ellisdon »
       (ZipRecruiter) sont deux identités, donc l'offre s'affiche DEUX FOIS. Une seule source
       ne pouvait pas produire ce défaut — c'est le second connecteur qui le crée.
-      ⛔ **Ne PAS corriger `idOffre` à la légère** : cet identifiant est PERSISTÉ. Le changer
-      change l'identité de toutes les offres déjà en base, `dejaSuivies` ne matcherait plus,
-      et le prochain balayage recréerait TOUT en double — l'inverse du but. Le correctif
-      exige un ADR + une migration des identifiants existants, pas une retouche de fonction.
-      Piste sûre : canoniser une liste FERMÉE de suffixes (`inc.`, `ltée`, `corporation`,
-      `enr.`), jamais un rapprochement flou (leçon « une heuristique groupe ce qu'on REGARDE,
-      jamais ce qu'on ÉCRIT » — `apparier("Robert", "Groupe Robert")` est vrai).
+      ✅ Résolu SANS migration : `idOffre` est intact, et une SECONDE clé (`cleCanonique`,
+      liste FERMÉE de suffixes juridiques) sert uniquement à COMPARER. Les appelants versent
+      dans `dejaSuivies` la clé canonique dérivée des champs stockés. Prouvé : EllisDon /
+      Stekar / Larouche fusionnent, « Groupe Novatech » ≠ « Novatech » et « Robert » ≠
+      « Groupe Robert » restent distincts.
 - [x] **[VEILLE-07]** Volume : **ZipRecruiter branché** (MCP disponible depuis le 2026-08-12).
       Mesuré : `offset` pagine réellement (page 2 = cinq offres entièrement différentes),
       `total` annonce le gisement (15 sur « coordonnateur de projet », **51** sur « chargé de

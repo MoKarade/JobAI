@@ -86,6 +86,43 @@ function cleDoublon(entreprise: string, titre: string): string {
 }
 
 /**
+ * Les suffixes juridiques qu'une raison sociale traîne — et que deux sources n'écrivent pas
+ * pareil.
+ *
+ * Liste FERMÉE, et c'est ce qui rend le rapprochement sûr. Un suffixe juridique n'est pas une
+ * heuristique : `X inc.` et `X` sont la même entité, en droit comme en fait. Tout ce qui
+ * ressemblerait à du rapprochement flou (préfixe « Groupe », distance d'édition, sous-chaîne)
+ * en est exclu — `apparier("Robert", "Groupe Robert")` est vrai, et fusionner ces deux-là
+ * ferait entrer une offre sous le mauvais employeur, avec la mauvaise distance.
+ */
+const SUFFIXES_JURIDIQUES = [
+  "inc", "ltee", "ltd", "ltd-a", "corporation", "corp", "enr", "senc", "sencrl", "srl", "cie",
+] as const;
+
+/**
+ * Clé de comparaison INSENSIBLE aux variantes de raison sociale.
+ *
+ * ⚠️ CE N'EST PAS UN IDENTIFIANT, et la distinction est vitale. `idOffre` produit la clé
+ * PRIMAIRE des offres en base ; la toucher changerait l'identité de tout l'existant, ferait
+ * échouer le rapprochement avec `dejaSuivies`, et recréerait le suivi entier en double — en
+ * perdant au passage le lien vers les champs qui appartiennent à Marc (garde-fou n°2).
+ * Cette clé-ci ne sert QU'À COMPARER : rien ne l'écrit, rien ne la stocke. Voir ADR-0006.
+ *
+ * Née le 2026-08-12, en branchant ZipRecruiter à côté d'Indeed : le même employeur y est
+ * « EllisDon Corporation » d'un côté et « Ellisdon » de l'autre. Une seule source ne pouvait
+ * pas produire ce défaut.
+ */
+export function cleCanonique(entreprise: string, titre: string): string {
+  const mots = idOffre(entreprise, "").split("-").filter(Boolean);
+  // Uniquement EN FIN de raison sociale : « Corporation Untel » garde son premier mot, sans
+  // quoi on fusionnerait des entreprises qui n'ont en commun qu'un mot de forme juridique.
+  while (mots.length > 1 && SUFFIXES_JURIDIQUES.includes(mots[mots.length - 1] as never)) {
+    mots.pop();
+  }
+  return idOffre(mots.join(" "), titre);
+}
+
+/**
  * Met en forme, dédoublonne, note et filtre.
  *
  * @param recoltes   Ce que les sources ont rendu, dans l'ordre de priorité : la PREMIÈRE
@@ -110,13 +147,20 @@ export function trier(
   for (const brute of recoltes) {
     const entreprise = brute.entreprise.trim() || "Employeur non nommé";
     const cle = cleDoublon(entreprise, brute.titre);
+    // ⚠️ DEUX CLÉS, PAS UNE (ADR-0006). `cle` est l'identité telle qu'elle sera ÉCRITE ;
+    // `canon` ne sert qu'à reconnaître le même employeur écrit autrement par une autre
+    // source (« EllisDon Corporation » chez Indeed, « Ellisdon » chez ZipRecruiter). On
+    // écarte si l'UNE des deux est déjà connue, et on mémorise les DEUX — sans quoi deux
+    // variantes du même poste passeraient l'une après l'autre dans le même lot.
+    const canon = cleCanonique(entreprise, brute.titre);
 
-    if (vues.has(cle) || dejaSuivies.has(cle)) {
+    if (vues.has(cle) || vues.has(canon) || dejaSuivies.has(cle) || dejaSuivies.has(canon)) {
       doublons++;
       refusees.push({ entreprise, titre: brute.titre, motif: "doublon" });
       continue;
     }
     vues.add(cle);
+    vues.add(canon);
 
     // LE LIEU D'ABORD, avant même de noter. Le barème ne peut pas trancher ça : il
     // pénalise une distance INCONNUE de 10 points sur 20, ce qui laisse de quoi passer

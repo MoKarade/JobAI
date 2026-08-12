@@ -16,7 +16,7 @@
 
 import { appliquerBalayage, resumerBalayage, type JournalVeille } from "../veille";
 import type { Offre } from "../types";
-import { idOffre, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
+import { cleCanonique, idOffre, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
 import { RECHERCHES_GUICHET, sourceAts, sourceGuichet } from "./sources";
 import { sourceDepotFichier } from "./depotFichier";
 import { villeCoherente } from "./depotSchema";
@@ -142,7 +142,15 @@ export async function executerPasse(
     }
   }
 
-  const dejaSuivies = new Set(connues.map((o) => o.id));
+  // ⚠️ DEUX CLÉS PAR OFFRE CONNUE (ADR-0006). L'`id` est l'identité écrite en base ; la clé
+  // canonique reconnaît le même employeur écrit autrement par une AUTRE source. Elle se
+  // dérive des champs stockés (`entreprise`, `poste`), jamais de l'`id` — sans quoi il
+  // faudrait migrer la clé primaire de toutes les offres, et le rattachement des champs qui
+  // appartiennent à Marc (garde-fou n°2) se perdrait au premier balayage.
+  const dejaSuivies = new Set([
+    ...connues.map((o) => o.id),
+    ...connues.map((o) => cleCanonique(o.entreprise, o.poste)),
+  ]);
   const tri = trier(brutes, dejaSuivies, aujourdhui);
 
   // Ce que le balayage a VU : les nouvelles retenues, et les offres déjà suivies qu'une

@@ -5,7 +5,7 @@
 // vérifiées alors que personne ne les a lues. Les trois se testent ici.
 
 import { describe, it, expect } from "vitest";
-import {
+import { cleCanonique,
   FIT_ROLE_PLANCHER,
   idOffre,
   trier,
@@ -385,5 +385,80 @@ describe("rattraper les villes sans rien demander à personne", () => {
     // gagner une ville par ce chemin. Sans ce cas, une régression qui inventerait des
     // villes passerait inaperçue.
     expect(villesARattraper(SEED)).toEqual([]);
+  });
+});
+
+describe("variantes de raison sociale entre deux sources (ADR-0006)", () => {
+  const T = "Coordonnateur de projet";
+
+  it("reconnaît le même employeur écrit avec ou sans suffixe juridique", () => {
+    // LE CAS RÉEL qui a créé ce besoin : Indeed écrit « EllisDon Corporation »,
+    // ZipRecruiter écrit « Ellisdon ». Une seule source ne pouvait pas produire ce défaut.
+    for (const [a, b] of [
+      ["EllisDon Corporation", "Ellisdon"],
+      ["Systèmes Stekar inc.", "Systèmes Stekar"],
+      ["Larouche Raymond, Inc.", "Larouche Raymond"],
+    ] as const) {
+      expect(cleCanonique(a, T), `« ${a} » et « ${b} » sont le même employeur`).toBe(
+        cleCanonique(b, T),
+      );
+    }
+  });
+
+  it("ne fusionne PAS ce qui n'est pas un suffixe juridique", () => {
+    // ⚠️ LE VOLET QUI REND L'ÉLARGISSEMENT SÛR. Le dépôt porte déjà la leçon : une
+    // heuristique peut grouper ce qu'on REGARDE, jamais décider ce qu'on ÉCRIT.
+    // `apparier("Robert", "Groupe Robert")` est vrai — fusionner ces deux-là ferait entrer
+    // une offre sous le mauvais employeur, avec la mauvaise distance.
+    for (const [a, b] of [
+      ["Groupe Novatech Inc.", "Novatech"],
+      ["Robert", "Groupe Robert"],
+      ["Laserax", "Qualtech"],
+    ] as const) {
+      expect(cleCanonique(a, T), `« ${a} » et « ${b} » sont DEUX employeurs`).not.toBe(
+        cleCanonique(b, T),
+      );
+    }
+  });
+
+  it("n'écarte pas deux postes DIFFÉRENTS chez le même employeur", () => {
+    // La clé porte aussi le titre : sans ça, on ne garderait qu'une offre par entreprise.
+    expect(cleCanonique("Laserax", "Coordonnateur")).not.toBe(cleCanonique("Laserax", "Superviseur"));
+  });
+
+  it("laisse `idOffre` INTACT — aucune migration de clé primaire", () => {
+    // ⚠️ LA NON-RÉGRESSION QUI COMPTE LE PLUS. Si `idOffre` bougeait, l'identité de toutes
+    // les offres en base changerait, `dejaSuivies` cesserait de matcher, et le balayage
+    // suivant recréerait le suivi ENTIER en double — en perdant le rattachement des champs
+    // qui appartiennent à Marc (garde-fou n°2).
+    expect(idOffre("EllisDon Corporation", T)).toBe("ellisdon-corporation-coordonnateur-de-projet");
+    expect(idOffre("Ellisdon", T)).toBe("ellisdon-coordonnateur-de-projet");
+  });
+
+  it("écarte la variante quand l'employeur est DÉJÀ suivi sous son autre forme", () => {
+    const tri = trier(
+      [brute({ entreprise: "Ellisdon", titre: T, ville: "Québec" })],
+      new Set([cleCanonique("EllisDon Corporation", T)]),
+      "2026-08-12",
+    );
+    expect(tri.retenues).toHaveLength(0);
+    expect(tri.doublons).toBe(1);
+    expect(tri.refusees[0]?.motif).toBe("doublon");
+  });
+
+  it("écarte la variante à l'intérieur d'un MÊME lot, quel que soit l'ordre", () => {
+    // Les deux clés sont mémorisées, sinon deux variantes du même poste passeraient l'une
+    // après l'autre dans le même balayage.
+    const tri = trier(
+      [
+        brute({ entreprise: "EllisDon Corporation", titre: T, ville: "Québec" }),
+        brute({ entreprise: "Ellisdon", titre: T, ville: "Québec" }),
+      ],
+      new Set(),
+      "2026-08-12",
+    );
+    expect(tri.retenues).toHaveLength(1);
+    expect(tri.retenues[0]?.entreprise).toBe("EllisDon Corporation"); // la première gagne
+    expect(tri.doublons).toBe(1);
   });
 });

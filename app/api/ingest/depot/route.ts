@@ -30,7 +30,7 @@ import { db } from "@/lib/db";
 import { offerReasons, offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { colonnesOffre } from "@/lib/persistance";
-import { trier, villesACompleter } from "@/lib/ingest/pipeline";
+import { cleCanonique, trier, villesACompleter } from "@/lib/ingest/pipeline";
 import { LotDeposeSchema } from "@/lib/ingest/depotSchema";
 import { appliquerBalayage, type JournalVeille } from "@/lib/veille";
 
@@ -130,7 +130,15 @@ export async function POST(requete: Request) {
     }
 
     const brutes = lot.offres.map((o) => ({ ...o, refSource: o.refSource || o.lien }));
-    const dejaSuivies = new Set(connues.map((x) => x.id));
+    // ⚠️ DEUX CLÉS PAR OFFRE CONNUE (ADR-0006). L'`id` est l'identité écrite en base ; la clé
+    // canonique reconnaît le même employeur écrit autrement par une AUTRE source. Elle se
+    // dérive des champs stockés (`entreprise`, `poste`), jamais de l'`id` — sans quoi il
+    // faudrait migrer la clé primaire de toutes les offres, et le rattachement des champs qui
+    // appartiennent à Marc (garde-fou n°2) se perdrait au premier balayage.
+    const dejaSuivies = new Set([
+      ...connues.map((x) => x.id),
+      ...connues.map((x) => cleCanonique(x.entreprise, x.poste)),
+    ]);
 
     // EXACTEMENT le tri du cron : région d'abord, puis plancher d'adéquation, puis
     // dédoublonnage. Une seconde implémentation divergerait, et c'est le jeu de données
