@@ -114,6 +114,40 @@ Le volume seul empilerait des lignes à 68/100.
 - **Un LLM pour extraire l'adresse du texte.** Différé : la regex de forme civique suffit
   pour ce qu'on cherche, et un appel LLM par annonce coûterait plus que le gain mesuré.
 
+## Révision du 2026-08-12 — la mesure réfute une partie du diagnostic
+
+Les 44 annonces lues le jour même ont été passées au barème. Deux affirmations de cet ADR
+ne survivent pas à l'épreuve, et il vaut mieux l'écrire que de laisser une décision reposer
+dessus.
+
+**Réfuté — « il faut corriger les défauts d'ignorance du barème ».** Le tableau d'ouverture
+opposait le défaut `immigration` (10/10) et le défaut `seniorite` (11) à ce qu'un fait lu
+rapporte. Mesuré sur du réel, aucun des deux ne justifie de toucher au barème :
+
+- `immigration` à 10 par défaut est **empiriquement juste** : sur 49 offres, six seulement
+  portent une vraie barrière. Baisser le défaut punirait la majorité pour n'avoir rien à se
+  reprocher, ce qui est le contraire du but.
+- `seniorite` à 11 sans donnée contre 9 pour « 5 ans exigés » n'est **pas une inversion** :
+  une exigence de cinq ans EST un moins bon appariement pour trois ans d'expérience qu'une
+  offre qui n'exige rien. Le défaut est légèrement au-dessus du milieu de plage (5-15), ce
+  qui correspond à la réalité des annonces qui taisent l'exigence.
+
+**Confirmé, mais ailleurs que prévu — le défaut est de VOCABULAIRE.** Une offre demandait
+d'être « apte aux **enquêtes de sécurité** » : la même exigence fédérale que « cote de
+sécurité », déjà dans la liste, sous un autre nom. Elle obtenait la note pleine et remontait
+donc en tête. Le correctif n'est pas un seuil, c'est six mots ajoutés à `MOTS_DISQUALIFIANTS`
+— et un test qui prouve que la liste ne mord ni sur la résidence au Québec (Marc y habite)
+ni sur le vocabulaire SST, omniprésent en milieu industriel.
+
+**Réfuté — « toutes les offres notent 68 ».** C'était vrai le 11 août, sans description.
+Avec 44 descriptions sur 49, la distribution s'étale sur **treize notes distinctes**, de 48
+à 84 ; quatorze restent à 68 (les cinq non lues, et neuf dont le texte tombe là). La lecture
+des annonces a donc fait, à elle seule, l'essentiel du travail que ce chantier promettait.
+
+**Dérive documentaire relevée au passage** : le §8 de `CLAUDE.md` demande un audit « sur les
+38 offres du seed (23 actives + 15 historiques, notées à la main) ». Le seed en compte 53,
+dont **23** portent `scoreSource: "manuel"`. C'est ce jeu de 23 qui fait référence.
+
 ## Ce qu'on saura mesurer
 
 | Indicateur | Aujourd'hui | Attendu |

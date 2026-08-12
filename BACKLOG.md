@@ -698,10 +698,14 @@
 - [ ] **[VEILLE-06]** Lire l'annonce de chaque offre retenue (`get_job_details`) et en tirer
       les QUATRE champs qu'elle porte ensemble : description, salaire, adresse, séniorité.
       La description entre dans le dépôt (le schéma la porte déjà, on l'envoie vide).
-- [ ] **[VEILLE-06b]** Corriger les deux défauts de barème qui récompensent l'ignorance :
-      `immigration` note **10/10** sans avoir rien lu, `seniorite` note **11** sans donnée
-      contre **9** avec. Un défaut neutre se place au milieu de sa plage.
-      ⚠️ Barème ⇒ audit sur les 38 offres du seed avant/après (§8 de `CLAUDE.md`).
+- [x] **[VEILLE-06b]** ~~Corriger les deux défauts de barème qui récompensent l'ignorance~~
+      **RÉFUTÉ PAR LA MESURE, remplacé par un correctif de vocabulaire** (audit du 2026-08-12
+      sur 49 offres réelles, révision d'ADR-0005). Les deux « défauts » se défendent : six
+      offres sur 49 portent une vraie barrière, donc `immigration` à 10 par défaut est juste ;
+      et « 5 ans exigés » EST un moins bon appariement que « rien d'exigé », donc 9 < 11 n'est
+      pas une inversion. Le vrai défaut était un SYNONYME non couvert — « apte aux enquêtes de
+      sécurité » notait 10/10. Six mots ajoutés à `MOTS_DISQUALIFIANTS`, avec le test qui prouve
+      que la liste ne mord ni sur la résidence au Québec (Marc y habite) ni sur le vocabulaire SST.
 - [ ] **[VEILLE-06c]** File d'attente `data/veille/attente.json` (HORS `data/depot/`, donc
       jamais ingérée) : une offre non lue faute de quota n'est pas déposée, elle est reprise
       EN PREMIER le lendemain. Sans cette file, « garder pour demain » perd l'offre au

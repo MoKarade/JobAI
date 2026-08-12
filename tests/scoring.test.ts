@@ -146,6 +146,40 @@ describe("statut migratoire", () => {
   it("ne pénalise pas une offre sans exigence particulière", () => {
     expect(scoreImmigration("Poste de coordination")).toBe(PONDERATION.immigration);
   });
+
+  // ⚠️ AJOUTÉ LE 2026-08-12, APRÈS AVOIR LU 44 ANNONCES RÉELLES.
+  // Le défaut n'était pas dans le barème mais dans le VOCABULAIRE : une offre demandait
+  // d'être « apte aux enquêtes de sécurité » — la même exigence que « cote de sécurité »
+  // sous un autre nom — et obtenait la note PLEINE, donc remontait en tête de liste.
+  // Un seul synonyme non couvert suffit à faire passer une offre disqualifiante devant les
+  // autres : cette liste se relit à chaque campagne de lecture.
+  it("reconnaît les synonymes d'habilitation fédérale", () => {
+    for (const t of [
+      "Prérequis : apte aux enquêtes de sécurité.",
+      "Le candidat doit obtenir une habilitation de sécurité.",
+      "Cote de fiabilité approfondie exigée.",
+      "Doit être citoyen canadien.",
+      "Résidence permanente requise.",
+    ]) {
+      expect(scoreImmigration(t), `« ${t} » doit annuler les points`).toBe(0);
+    }
+  });
+
+  // LE VOLET QUI EMPÊCHE LE MOTIF DE MORDRE TROP LARGE.
+  // Marc HABITE la région de Québec : exiger d'y résider ne lui coûte rien, et pénaliser
+  // ces offres les ferait descendre à tort. Et une annonce industrielle parle sans cesse de
+  // « sécurité » au sens SST — confondre les deux viderait la liste de ses meilleurs postes.
+  it("ne confond pas résidence au Québec, ni sécurité au travail, avec une barrière de statut", () => {
+    for (const t of [
+      "Êtes-vous domicilié au Québec?",
+      "Requis : résidence au Québec.",
+      "Veiller au respect des normes de santé et sécurité au travail.",
+      "Participer aux enquêtes sur les incidents et à l'identification des dangers.",
+      "Assurer la sécurité des installations et la conformité SST.",
+    ]) {
+      expect(scoreImmigration(t), `« ${t} » ne doit RIEN coûter`).toBe(PONDERATION.immigration);
+    }
+  });
 });
 
 describe("note calculée", () => {

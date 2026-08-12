@@ -48,6 +48,16 @@ const MOTS_TECHNIQUE = [
 const MOTS_DISQUALIFIANTS = [
   "citoyenneté canadienne", "citoyens canadiens", "résident permanent requis",
   "secret clearance", "cote de sécurité",
+  // ⚠️ AJOUTS DU 2026-08-12, mesurés sur 44 annonces lues.
+  // Une seule offre du lot (Randstad, direction ingénierie) posait une vraie barrière de
+  // statut sans qu'aucun mot de la liste ne la voie : « apte aux ENQUÊTES DE SÉCURITÉ ».
+  // C'est la même exigence que « cote de sécurité » sous un autre nom — l'employeur demande
+  // une habilitation fédérale, qui suppose des années de résidence. Le manque n'était pas
+  // dans le barème, il était dans le VOCABULAIRE : un seul synonyme non couvert suffit à
+  // faire passer une offre disqualifiante en tête de liste.
+  "enquête de sécurité", "enquêtes de sécurité",
+  "habilitation de sécurité", "fiabilité approfondie",
+  "citoyen canadien", "résidence permanente requise",
 ];
 
 /** 40 pts — le poste combine-t-il coordination d'équipe ET contenu technique ? */
