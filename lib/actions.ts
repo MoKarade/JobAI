@@ -699,6 +699,20 @@ interface Raffinage {
    * (`planifierDistances` ne retouche jamais une distance déjà connue, cf. mesurerDistances).
    */
   entreprisesPrecisees: string[];
+  /**
+   * Les noms de celles restées introuvables cette passe — Nominatim n'a rien rendu sous
+   * AUCUN des `NB_CANDIDATS_ENTREPRISE` candidats. Sans les noms, « 6 toujours au centre »
+   * ne dit RIEN de vérifiable : ni si ce sont les mêmes 6 qu'hier, ni si ce sont des PME
+   * absentes d'OpenStreetMap ou une variante de raison sociale mal formée. Même principe
+   * que `[registre] absentes`.
+   */
+  entreprisesToujoursAuCentre: string[];
+  /**
+   * Un candidat EXISTAIT chez Nominatim mais trop loin du centre de sa ville annoncée — un
+   * homonyme ailleurs, écarté à raison (l'incident Labatt). Rare, mais le nom dit tout de
+   * suite si c'est un doublon de raison sociale ou une vraie coïncidence.
+   */
+  entreprisesHorsRayon: string[];
 }
 
 /**
@@ -742,6 +756,8 @@ async function raffinerPositions(
     horsRayon: 0,
     parAdresse: 0,
     entreprisesPrecisees: [],
+    entreprisesToujoursAuCentre: [],
+    entreprisesHorsRayon: [],
   };
   if (tentables.length === 0) return vide;
 
@@ -773,6 +789,7 @@ async function raffinerPositions(
   let horsRayon = 0;
   let parAdresse = 0;
   const entreprisesPrecisees: string[] = [];
+  const entreprisesHorsRayon: string[] = [];
   const villePar = new Map(tentables.map((t) => [t.nom, t.ville]));
 
   for (const t of r.trouvees) {
@@ -783,6 +800,7 @@ async function raffinerPositions(
     const centre = ville ? centreDe(ville) : null;
     if (!centre || distanceKm({ lat: t.lat, lon: t.lon }, centre) > RAYON_VALIDATION_KM) {
       horsRayon++;
+      entreprisesHorsRayon.push(t.nom);
       continue;
     }
 
@@ -821,6 +839,8 @@ async function raffinerPositions(
     horsRayon,
     parAdresse,
     entreprisesPrecisees,
+    entreprisesToujoursAuCentre: [...r.introuvables],
+    entreprisesHorsRayon,
   };
 }
 
@@ -1223,6 +1243,8 @@ export async function mesurerDistances(
       horsRayon: 0,
       parAdresse: 0,
       entreprisesPrecisees: [],
+      entreprisesToujoursAuCentre: [],
+      entreprisesHorsRayon: [],
     };
     try {
       const centres = new Map(
@@ -1335,6 +1357,20 @@ export async function mesurerDistances(
       // Ce garde n'a encore jamais mordu en production : s'il apparaît, c'est une mesure,
       // pas une supposition — et le seuil se rediscute sur cette base.
       console.log(`[registre] clés écartées — ${echantillon(registre.clesTropCommunes)}`);
+    }
+
+    // ⚠️ MÊME PRINCIPE POUR LE RAFFINAGE — [CARTE-03], 2026-08-12.
+    //
+    // « 6 toujours au centre » ne dit pas si c'est SIX FOIS le même employeur qu'hier (file
+    // qui ne tourne pas) ou six PME réellement absentes d'OpenStreetMap sous ce nom — deux
+    // diagnostics différents. Trouvé en répondant à Marc : le compte existait, pas les noms.
+    if (raffinage.entreprisesToujoursAuCentre.length > 0) {
+      console.log(
+        `[raffinage] toujours au centre — ${echantillon(raffinage.entreprisesToujoursAuCentre)}`,
+      );
+    }
+    if (raffinage.entreprisesHorsRayon.length > 0) {
+      console.log(`[raffinage] hors rayon — ${echantillon(raffinage.entreprisesHorsRayon)}`);
     }
 
     revalidatePath("/");
