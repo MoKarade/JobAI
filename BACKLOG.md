@@ -739,9 +739,13 @@
       `radius_miles` élargit sans multiplier les villes. Aucun quota rencontré.
       Rôles : **ZipRecruiter = LARGEUR** (pas de description), **Indeed = PROFONDEUR**
       (`get_job_details`, quota serré). Premier lot conjoint : 49 + 18 = 67 offres.
-- [ ] **[LIEU-05]** Table `employeurs_adresse` (nom, adresse, source, url, dernier essai,
-      échecs) : la recherche cible les employeurs SANS adresse et NON essayés récemment, plus
-      jamais l'offre. Le budget d'un matin va aux employeurs neufs.
+- [x] **[LIEU-05]** ~~Table `employeurs_adresse`~~ **ANNULÉ — la machinerie existait déjà**
+      (vérifié dans le code le 2026-08-12, révision d'ADR-0005). `entreprisesLieux` est clé par
+      `nom`, porte `geocodeLe`, se retente via `positionARaffiner` / `DELAI_RETENTE_POSITION_MS`
+      (7 j), se ré-arme par `EPOQUE_A_RETENTER` dès qu'une adresse est acquise, cible
+      `sansAdresse` et nomme les cas non convergents dans `insituables`. Construire la table
+      aurait dupliqué tout ça — et de deux exemplaires d'une règle, c'est le moins relu qui
+      garde la version la plus permissive.
 - [x] **[LIEU-06]** ~~Remplacer la garde de ville par celle du géocodeur~~ **FAIT, et plus
       simple que prévu** : la garde du géocodeur EXISTAIT DÉJÀ (`RAYON_VALIDATION_KM = 30`,
       `lib/geocodage.ts`). Le défaut était un PRÉ-FILTRE en amont qui rejetait avant qu'elle

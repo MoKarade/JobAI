@@ -148,6 +148,31 @@ des annonces a donc fait, à elle seule, l'essentiel du travail que ce chantier 
 38 offres du seed (23 actives + 15 historiques, notées à la main) ». Le seed en compte 53,
 dont **23** portent `scoreSource: "manuel"`. C'est ce jeu de 23 qui fait référence.
 
+### Troisième réfutation — la fiche d'employeur existait déjà
+
+Le chantier 2 de cet ADR affirmait : « Rien ne mémorise "on a déjà cherché pour Davie, sans
+succès, le 9". Le budget se redépense donc sur les mêmes échecs au lieu d'attaquer les
+employeurs neufs. » **C'est faux**, et la lecture du code le montre point par point :
+
+| Ce que l'ADR demandait | Ce qui existe déjà |
+|---|---|
+| Fiche par EMPLOYEUR, pas par offre | `entreprisesLieux`, clé primaire `nom` |
+| Date du dernier essai | colonne `geocodeLe` |
+| Ne pas retenter trop tôt | `positionARaffiner` + `DELAI_RETENTE_POSITION_MS` (7 j) |
+| Retenter quand ça vaut le coup | `EPOQUE_A_RETENTER` remet le compteur dès qu'une adresse est acquise — le délai ne survit pas à la chute de sa prémisse |
+| Cibler ceux qui n'ont PAS d'adresse | `recupererAdresses` part de `sansAdresse` |
+| Voir ce qui ne converge pas | `insituables`, remonté à l'écran par `BoutonSituer` |
+
+Une tentative qui échoue n'est d'ailleurs pas silencieuse : elle inscrit quand même une ligne
+(repli au centre-ville), donc la mémoire existe **même pour les échecs**. Le seul chemin sans
+trace est l'employeur dont la VILLE elle-même est introuvable — et il est nommé dans
+`insituables`, avec ce commentaire dans le code : « un état qui ne peut pas converger doit se
+voir, pas se déduire ».
+
+Construire la table `employeurs_adresse` aurait donc dupliqué une machinerie complète, avec
+le risque classique des deux exemplaires d'une même règle : celui qu'on relit le moins garde
+la version la plus permissive. **Chantier annulé.**
+
 ## Ce qu'on saura mesurer
 
 | Indicateur | Aujourd'hui | Attendu |

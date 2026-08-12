@@ -640,6 +640,24 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   entraient sur la carte de Québec avec une fausse distance — le critère n°1 de Marc, faux en
   silence. Corriger `ville` d'après l'annonce, jamais d'après l'en-tête de la liste.
 
+- **Un plan écrit d'après un TABLEAU de symptômes se trompe ; il se vérifie contre le CODE
+  avant d'être promis.** Le 2026-08-12, l'ADR-0005 a été rédigé à partir d'un tableau de
+  notes et d'un compte d'adresses manquantes. Trois de ses conclusions sur quatre n'ont pas
+  survécu à la lecture du code — et je les avais annoncées à Marc entre-temps :
+  (a) « toutes les offres notent 68 » — vrai sans description, faux dès qu'on lit les
+  annonces : treize notes distinctes sur 49 ;
+  (b) « le barème récompense l'ignorance » — mesuré, ses défauts sont empiriquement justes ;
+  le vrai défaut était un SYNONYME manquant dans une liste de mots (six mots, pas un seuil) ;
+  (c) « rien ne mémorise les échecs de recherche d'adresse » — la fiche par employeur, le
+  délai de retente, le ré-armement et le signalement des cas non convergents existaient tous.
+  Le point commun des trois : j'avais diagnostiqué depuis une SORTIE (une distribution de
+  notes, un compte de champs vides) au lieu de la MÉCANIQUE qui la produit. Une sortie dit
+  QU'IL Y A un problème, jamais LEQUEL. Avant d'écrire un chantier dans un ADR — et surtout
+  avant de l'annoncer — ouvrir le code qui produit le symptôme et nommer la ligne fautive.
+  Corollaire vécu : ces réfutations ont fait GAGNER du temps (une table entière non écrite,
+  un barème non touché) ; les écrire dans l'ADR vaut mieux que de les taire, sinon la
+  prochaine session refera le mauvais chantier avec le même raisonnement.
+
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 
 La note de fit est le cœur du produit : elle décide ce que Marc regarde en premier.
