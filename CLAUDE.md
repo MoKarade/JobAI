@@ -593,6 +593,19 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   pas qu'échouer : elle repousse le moment où le quota revient. Espacer, attendre le délai
   ANNONCÉ, ne jamais paralléliser. Et un travail de fond qui partage ce quota avec une
   Routine doit supposer qu'il arrive APRÈS elle, pas avant.
+  ⚠️ **Le délai annoncé est un PLANCHER, pas une promesse — et « attendre plus » n'est pas
+  une stratégie qui converge.** Mesuré le 2026-08-12 sur neuf tentatives espacées, dont une
+  après trois minutes de silence TOTAL : 14 s → 42 → 3 → 42 → 23 → 13 → 30 → 12 → 43, et
+  **zéro succès**. Le nombre annoncé oscille sans jamais s'éteindre : il dit « pas
+  maintenant », il ne dit rien sur « quand ». Respecter chaque délai n'a donc pas suffi, et
+  chaque nouvelle tentative ne faisait que confirmer la saturation à un prix. La règle
+  opératoire qui manquait : **après trois refus consécutifs malgré l'attente annoncée,
+  conclure que la fenêtre est dépensée et ARRÊTER** — le quota est partagé, quelqu'un
+  d'autre (Routine, autre session, veille de la veille) l'a consommé, et aucune patience de
+  ma part ne le rend. Corollaire pour la veille : ce jour-là il n'y a pas de lot, donc pas
+  de fichier — et surtout pas de repli par `WebFetch` sur les pages de liste d'Indeed, qui
+  serait du scraping (garde-fou n°4). Un `WebSearch` ne rend que des pages d'agrégat, sans
+  employeur ni lien par offre : de quoi fabriquer une structure, pas de quoi la remplir.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 
