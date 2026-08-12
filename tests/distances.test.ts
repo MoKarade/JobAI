@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import {
   arrondirKm,
   employeursASituer,
+  invaliderDistancesPrecisees,
   planifierDistances,
   scoreAvecDistance,
   type Position,
@@ -125,6 +126,51 @@ describe("les employeurs à situer", () => {
     // et la garde de plausibilité le rejetterait après coup. Autant ne pas demander.
     const a = employeursASituer([offre({ entreprise: "ISS" })], new Map(), () => null);
     expect(a).toEqual([]);
+  });
+});
+
+describe("invaliderDistancesPrecisees — la distance qui suit la précision", () => {
+  // Chantier #07 / [CARTE-03], 2026-08-12, mesuré en production : deux entreprises passées
+  // de « ville » (centre-ville) à « exacte » dans la même passe, `mesurees=0` — rien ne
+  // redemandait leur distance. Discriminant : SANS cette fonction, la ligne ci-dessous
+  // (`km: 12`) resterait à 12 pour toujours, quelle que soit la précision de la position.
+
+  it("efface la distance d'une offre dont l'employeur vient d'être précisé", () => {
+    const o = offre({ id: "a", entreprise: "X", km: 12 });
+    const r = invaliderDistancesPrecisees([o], ["X"]);
+    expect(r[0]!.km).toBeNull();
+  });
+
+  it("reconnaît l'employeur sous une variante — même règle que positionDe (memeEmployeur)", () => {
+    const o = offre({ id: "a", entreprise: "Laserax inc.", km: 12 });
+    const r = invaliderDistancesPrecisees([o], ["Laserax"]);
+    expect(r[0]!.km).toBeNull();
+  });
+
+  it("ne touche PAS une offre dont l'employeur n'a pas été précisé cette passe", () => {
+    const o = offre({ id: "a", entreprise: "Y", km: 12 });
+    const r = invaliderDistancesPrecisees([o], ["X"]);
+    expect(r[0]!.km).toBe(12);
+  });
+
+  it("ne touche pas une offre déjà sans distance — rien à invalider", () => {
+    const o = offre({ id: "a", entreprise: "X", km: null });
+    const r = invaliderDistancesPrecisees([o], ["X"]);
+    expect(r[0]!.km).toBeNull();
+  });
+
+  it("liste vide de précisées : rend le tableau tel quel, sans travail inutile", () => {
+    const o = offre({ id: "a", entreprise: "X", km: 12 });
+    const r = invaliderDistancesPrecisees([o], []);
+    expect(r).toEqual([o]);
+  });
+
+  it("plusieurs offres, une seule entreprise précisée : seule la sienne est effacée", () => {
+    const a = offre({ id: "a", entreprise: "X", km: 12 });
+    const b = offre({ id: "b", entreprise: "Y", km: 8 });
+    const r = invaliderDistancesPrecisees([a, b], ["X"]);
+    expect(r.find((o) => o.id === "a")!.km).toBeNull();
+    expect(r.find((o) => o.id === "b")!.km).toBe(8);
   });
 });
 

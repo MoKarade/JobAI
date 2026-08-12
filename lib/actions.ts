@@ -35,7 +35,7 @@ import {
   villeGeocodable,
 } from "./geocodage";
 import { ENTREPRISES_CIBLES } from "./reference";
-import { employeursASituer, planifierDistances } from "./distances";
+import { employeursASituer, invaliderDistancesPrecisees, planifierDistances } from "./distances";
 import { villesARattraper } from "./ingest/pipeline";
 import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
@@ -692,6 +692,13 @@ interface Raffinage {
    * forme d'adresse du registre ne parle pas à Nominatim, ce qu'aucun total ne révélerait.
    */
   parAdresse: number;
+  /**
+   * Les NOMS (`entreprisesLieux.nom`) des entreprises qui viennent de passer de « ville » à
+   * « exacte ». Sert à forcer le recalcul de la distance de leurs offres — sans cette liste,
+   * une offre déjà mesurée depuis le centre-ville garderait ce chiffre approximatif à vie
+   * (`planifierDistances` ne retouche jamais une distance déjà connue, cf. mesurerDistances).
+   */
+  entreprisesPrecisees: string[];
 }
 
 /**
@@ -734,6 +741,7 @@ async function raffinerPositions(
     toujoursAuCentre: 0,
     horsRayon: 0,
     parAdresse: 0,
+    entreprisesPrecisees: [],
   };
   if (tentables.length === 0) return vide;
 
@@ -764,6 +772,7 @@ async function raffinerPositions(
   let precisees = 0;
   let horsRayon = 0;
   let parAdresse = 0;
+  const entreprisesPrecisees: string[] = [];
   const villePar = new Map(tentables.map((t) => [t.nom, t.ville]));
 
   for (const t of r.trouvees) {
@@ -801,6 +810,7 @@ async function raffinerPositions(
 
     await db.update(entreprisesLieux).set(champs).where(eq(entreprisesLieux.nom, t.nom));
     precisees++;
+    entreprisesPrecisees.push(t.nom);
     if (venueDeLAdresse) parAdresse++;
   }
 
@@ -810,6 +820,7 @@ async function raffinerPositions(
     toujoursAuCentre: r.introuvables.length,
     horsRayon,
     parAdresse,
+    entreprisesPrecisees,
   };
 }
 
@@ -1020,6 +1031,8 @@ export async function mesurerDistances(
       placees: number;
       villesRattrapees: number;
       adressesRattrapees: number;
+      /** Repassées de « centre-ville » à leur vraie position ([CARTE-03], 2026-08-12). */
+      precisees: number;
       bornesMesurees: number;
     }
   | { ok: false; erreur: string }
@@ -1209,6 +1222,7 @@ export async function mesurerDistances(
       toujoursAuCentre: 0,
       horsRayon: 0,
       parAdresse: 0,
+      entreprisesPrecisees: [],
     };
     try {
       const centres = new Map(
@@ -1243,7 +1257,12 @@ export async function mesurerDistances(
     }
 
     // 2. Mesurer. Le domicile ne sort pas de cette closure.
-    const majs = planifierDistances(offres, positions, (p) => distanceKm(chezMoi, p));
+    //
+    // `invaliderDistancesPrecisees` efface d'abord la distance des offres dont l'employeur
+    // vient d'être précisé cette passe (« ville » → « exacte ») : sans ça, `planifierDistances`
+    // ne retoucherait jamais un `km` déjà connu, même devenu obsolète. Voir lib/distances.ts.
+    const offresAMesurer = invaliderDistancesPrecisees(offres, raffinage.entreprisesPrecisees);
+    const majs = planifierDistances(offresAMesurer, positions, (p) => distanceKm(chezMoi, p));
     for (const m of majs) {
       const valeurs: { km: number; majLe: Date; score?: number } = { km: m.km, majLe: new Date() };
       if (m.score !== null) valeurs.score = m.score;
@@ -1327,6 +1346,7 @@ export async function mesurerDistances(
       placees,
       villesRattrapees: aRattraper.length,
       adressesRattrapees: adresses.ecrites,
+      precisees: raffinage.precisees,
       bornesMesurees: bornes.mesurees,
     };
   } catch (err) {

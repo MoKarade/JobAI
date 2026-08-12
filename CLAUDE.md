@@ -687,6 +687,32 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   re-dériver ce calcul pour TOUTES les étapes qui partagent le budget — le levier sûr, qui
   n'y touche pas, est d'ajouter une PASSE (un second cron, à une autre heure) plutôt que
   d'agrandir la passe existante.
+- **Un garde « déjà connu, ne pas retoucher » doit distinguer « à jour » de « obsolète depuis
+  un événement précis » — sinon il fige une valeur périmée pour toujours.** `[CARTE-03]`,
+  2026-08-12, trouvé en vérifiant le tout premier passage réel du 2ᵉ cron (demande de Marc :
+  « check maintenant », pas dans 9 h) : les logs serveur disaient `precisees=2/8` (deux
+  entreprises venaient d'obtenir leur vraie adresse) mais le JSON rendu disait `mesurees=0` —
+  un chiffre qui semblait dire « rien ne s'est passé ». Cause : `planifierDistances` ne
+  retouche jamais une offre dont `km` est déjà connu (bon réflexe en général — sinon
+  l'affichage bougerait sans raison à chaque passe), mais ce garde ne savait pas distinguer
+  « mesurée à la bonne précision » de « mesurée depuis un repli centre-ville que le raffinage
+  vient de corriger » : la distance restait celle de la mairie, silencieusement, alors que la
+  vraie adresse était en base. Fix : une fonction dédiée (`invaliderDistancesPrecisees`,
+  lib/distances.ts) efface la distance des offres dont l'employeur vient d'être précisé
+  CETTE passe, avant que le garde ne s'applique — reconnu par la MÊME correspondance que
+  partout ailleurs (`memeEmployeur`), jamais une comparaison littérale sur le nom. Règle
+  générale : un garde anti-recalcul économise un travail, mais son EXCEPTION doit couvrir
+  chaque événement qui rend l'ancien calcul faux — ici, la précision de la position qui
+  s'améliore ; l'écrire « ne jamais retoucher » sans lister ces événements, c'est figer un
+  bug latent que rien ne signale (le chiffre existe, il n'est juste plus vrai).
+  ⚠️ **Corollaire trouvé dans le même incident : un nombre calculé en interne mais jamais
+  exposé cache un bug adjacent.** `raffinage.precisees` existait depuis toujours (calculé,
+  logué en `console.log`), mais `mesurerDistances` ne le renvoyait pas — le JSON rendu au
+  client n'avait donc AUCUN moyen de dire « le raffinage a marché ». Sans les vrais logs
+  Vercel (lus à la demande explicite de Marc), j'aurais rapporté « 0 partout » comme un échec
+  alors que la mécanique avançait. Un champ calculé qui ne sort pas de la fonction qui le
+  produit est une PROMESSE d'observabilité non tenue — l'exposer coûte une ligne, pas exposer
+  coûte un diagnostic à l'aveugle la prochaine fois que quelqu'un demande « ça a marché ? ».
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

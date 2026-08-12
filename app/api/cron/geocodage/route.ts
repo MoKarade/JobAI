@@ -66,7 +66,7 @@ export async function GET(requete: Request) {
         localisation:
           `${m.placees} placée(s) au centre-ville, ${m.villesRattrapees} ville(s) rattrapée(s), ` +
           `${m.situees} située(s), ${m.adressesRattrapees} adresse(s) récupérée(s), ` +
-          `${m.bornesMesurees} borne(s) mesurée(s), ${m.mesurees} mesurée(s)`,
+          `${m.precisees} précisée(s), ${m.bornesMesurees} borne(s) mesurée(s), ${m.mesurees} mesurée(s)`,
       },
       { headers: { "Cache-Control": "no-store" } },
     );

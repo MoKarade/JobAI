@@ -48,7 +48,7 @@ les décisions dans [`docs/adr/`](./docs/adr/).
 - **Endpoint hub** (`app/api/hub/summary/route.ts`) — jeton `x-hub-token` vérifié en temps
   constant, `Cache-Control: no-store`, summary honnêtement `building` tant qu'aucune donnée
   réelle n'existe.
-- TypeScript strict, **783 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
+- TypeScript strict, **789 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
 
 ### Ce qui n'existe PAS encore
 

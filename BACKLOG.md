@@ -849,14 +849,30 @@ git) :
       (échec de déploiement clair et sans risque si le plan Hobby le refuse — pas une panne
       silencieuse).
 
-RESTE — vérification (rien à coder, à CONSTATER après déploiement) :
-- [ ] **[V-CARTE-03]** Après quelques jours : le compte de « sans adresse » doit baisser
-      d'environ 16/jour (2 passes × 8). Un reliquat qui ne baisse PLUS après plusieurs passes
-      = ces employeurs sont introuvables sur les deux services publics — c'est une limite des
-      DONNÉES, pas du code ; le dire à Marc plutôt que de rouvrir `MAX_VILLES_PAR_PASSE`.
-- [ ] **[V-CARTE-03-CRON]** Si le déploiement Vercel refuse le second cron (plan Hobby ?),
-      basculer sur : Marc revisite `/carte` quelques fois par jour (6 par passe, 5 min de
-      cooldown, déjà en place) — accélérant manuel sans changement de code.
+- [x] **[V-CARTE-03-CRON]** Déploiement Vercel confirmé `READY` en production avec les DEUX
+      crons dans `vercel.json` (dpl_2rWYNtV6s2DL8byu8u5fjipjJ7tW). Le plan de Marc accepte un
+      2ᵉ cron — pas de repli nécessaire.
+- [x] **[FIX-DISTANCE-STALE]** Trouvé en vérifiant `/api/cron/geocodage` déclenché à la main
+      (Marc, 2026-08-12, 18:20 UTC) : logs serveur = `precisees=2/8 (2 par adresse)`, mais le
+      JSON rendu au client disait `mesurees=0` — un chiffre qui semblait dire « rien ne s'est
+      passé » alors que 2 entreprises venaient d'obtenir leur vraie adresse. Cause : la
+      distance des offres de ces 2 entreprises restait celle du CENTRE-VILLE, jamais
+      recalculée, parce que `planifierDistances` ne retouche jamais un `km` déjà connu (par
+      design, pour ne pas faire bouger l'affichage sans raison — mais ce garde-fou ne
+      distinguait pas « déjà mesurée à la bonne précision » de « mesurée depuis un repli
+      centre-ville qui vient d'être corrigé »). Fix : `invaliderDistancesPrecisees`
+      (`lib/distances.ts`, pure, testée, discriminant prouvé) efface la distance des offres
+      dont l'employeur vient d'être précisé CETTE passe, avant que `planifierDistances` ne
+      tourne — reconnu par `memeEmployeur` (variantes de raison sociale comprises), jamais
+      une comparaison littérale. `mesurerDistances` expose maintenant `precisees` dans son
+      retour, et les deux crons l'affichent dans `localisation` — l'angle mort qui a caché ce
+      bug (le nombre existait déjà en interne, jamais rendu) est fermé pour les deux.
+- [ ] **[V-CARTE-03]** Mesuré au premier déclenchement manuel du 2ᵉ cron (18:20 UTC) :
+      `precisees=2/8` — la mécanique avance vraiment, pas seulement en théorie. À raison de
+      ~2 passes/jour × 8 candidats, suivre sur quelques jours si le compte de « sans adresse »
+      baisse. Un reliquat qui ne baisse PLUS après plusieurs passes = ces employeurs sont
+      introuvables sur les deux services publics — une limite des DONNÉES, pas du code ; le
+      dire à Marc plutôt que de rouvrir `MAX_VILLES_PAR_PASSE`.
 
 ## Découvertes et dette (à trier)
 

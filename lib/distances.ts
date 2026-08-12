@@ -18,7 +18,7 @@
 // c'est lui qui décide. Fonctions PURES : la décision se teste sans base ni réseau.
 
 import { computeScore, PLAFOND_NOTE_CALCULEE } from "./scoring";
-import { positionDe } from "./employeurs";
+import { memeEmployeur, positionDe } from "./employeurs";
 import type { Offre } from "./types";
 
 /** Une position géocodée, avec ce qu'elle vaut vraiment. */
@@ -41,6 +41,35 @@ export interface MiseAJourDistance {
 /** Arrondi au dixième : afficher « 12,3 km » est honnête, « 12,3184 km » ne l'est pas. */
 export function arrondirKm(km: number): number {
   return Math.round(km * 10) / 10;
+}
+
+/**
+ * Efface la distance déjà mesurée des offres dont l'employeur vient d'être PRÉCISÉ
+ * (« ville » → « exacte »), pour que `planifierDistances` la recalcule.
+ *
+ * ⚠️ POURQUOI ÇA MANQUAIT (chantier #07 / [CARTE-03], 2026-08-12, mesuré en production) :
+ * `planifierDistances` ne retouche JAMAIS une offre dont `km` est déjà connu — à raison,
+ * sinon l'affichage bougerait sans cause à chaque passe. Mais quand le raffinage Nominatim
+ * fait passer un employeur du centre-ville à sa vraie adresse, le `km` déjà écrit reste
+ * celui du CENTRE-VILLE : honnête au moment où il a été posé, faux depuis. Mesuré : deux
+ * entreprises précisées dans une même passe, `mesurees=0` — rien ne redemandait leur
+ * distance tant que ce vide n'était pas comblé.
+ *
+ * Le nom vient d'`entreprisesLieux` (le géocodage), pas de l'offre — `memeEmployeur` fait
+ * donc le même rapprochement que `positionDe`, jamais une comparaison littérale : une
+ * entreprise ingérée sous une variante de raison sociale (ADR-0006) doit être reconnue
+ * pareil ici que partout où une position se résout.
+ */
+export function invaliderDistancesPrecisees(
+  offres: readonly Offre[],
+  entreprisesPrecisees: readonly string[],
+): Offre[] {
+  if (entreprisesPrecisees.length === 0) return [...offres];
+  return offres.map((o) =>
+    o.km !== null && entreprisesPrecisees.some((nom) => memeEmployeur(o.entreprise, nom))
+      ? { ...o, km: null }
+      : o,
+  );
 }
 
 /**
