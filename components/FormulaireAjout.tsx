@@ -11,9 +11,18 @@
 // honnêtement ce qui revient. Les erreurs par champ viennent des schémas Zod, pas d'une
 // seconde liste de messages qui dériverait de la première.
 
-import { useRef, useState, useTransition } from "react";
-import { ajouterOffre } from "@/lib/actions";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { ajouterOffre, suggererEntreprises } from "@/lib/actions";
 import type { Priorite } from "@/lib/types";
+
+/**
+ * Délai avant d'interroger Google Places pendant la frappe.
+ *
+ * [CARTE-03-PLACES], 2026-08-12. Sans lui, chaque touche facturerait une requête — un nom
+ * de dix lettres en vaudrait dix. Le seuil de trois caractères (`suggererEntreprises`)
+ * limite déjà les frappes les plus courtes ; le débounce limite les suivantes.
+ */
+const DELAI_SUGGESTION_MS = 300;
 
 const PRIORITES: readonly Priorite[] = ["Haute", "Moyenne", "Basse"];
 
@@ -48,6 +57,26 @@ export function FormulaireAjout() {
   const [succes, setSucces] = useState<string | null>(null);
   const [enCours, demarrer] = useTransition();
   const premierChamp = useRef<HTMLInputElement>(null);
+  const [suggestionsEntreprise, setSuggestionsEntreprise] = useState<string[]>([]);
+
+  // [CARTE-03-PLACES], 2026-08-12 : autocomplétion Google Places pendant la saisie du nom
+  // d'entreprise. `dernierAppel` écarte une réponse en retard : sans lui, une suggestion
+  // pour « Lase » qui revient APRÈS que Marc a tapé « Laserax » écraserait la bonne liste.
+  const dernierAppel = useRef(0);
+  useEffect(() => {
+    const texte = champs.entreprise.trim();
+    if (texte.length < 3) {
+      setSuggestionsEntreprise([]);
+      return;
+    }
+    const id = ++dernierAppel.current;
+    const minuteur = setTimeout(() => {
+      suggererEntreprises(texte).then((r) => {
+        if (dernierAppel.current === id) setSuggestionsEntreprise(r);
+      });
+    }, DELAI_SUGGESTION_MS);
+    return () => clearTimeout(minuteur);
+  }, [champs.entreprise]);
 
   function modifier(cle: keyof typeof VIDE, valeur: string) {
     setChamps((c) => ({ ...c, [cle]: valeur }));
@@ -114,9 +143,19 @@ export function FormulaireAjout() {
             value={champs.entreprise}
             disabled={enCours}
             required
+            list="ajout-suggestions-entreprise"
+            autoComplete="off"
             aria-invalid={erreursChamp.entreprise ? true : undefined}
             onChange={(e) => modifier("entreprise", e.target.value)}
           />
+          {/* Suggestions Google Places — [CARTE-03-PLACES]. Un `<datalist>` natif : Marc
+              reste libre de taper autre chose, et un lecteur d'écran l'annonce sans code
+              supplémentaire. Vide si la clé n'est pas configurée (dégradation honnête). */}
+          <datalist id="ajout-suggestions-entreprise">
+            {suggestionsEntreprise.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
           {erreursChamp.entreprise ? (
             <span className="ajout__erreur-champ">{erreursChamp.entreprise}</span>
           ) : null}

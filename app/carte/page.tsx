@@ -86,6 +86,12 @@ export default async function PageCarte() {
                     rapide: l.bornesRapide,
                     tarif: l.bornesTarif,
                   },
+            // [CARTE-03-PLACES] : `null` avant toute interrogation Google Place Details
+            // (`detailsLe` NULL) comme après une interrogation qui ne publie rien — la
+            // fiche affichera alors honnêtement l'absence, sans dire lequel des deux.
+            siteWeb: l.siteWeb,
+            telephone: l.telephone,
+            horaires: l.horairesGoogle,
           },
         ]),
       );

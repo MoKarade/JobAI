@@ -250,6 +250,23 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   comparer le SHA servi au SHA attendu (`latestDeployment` / `githubCommitSha`), jamais se
   fier au fait qu'un déploiement récent existe. Même famille que « CI verte ≠ code en
   production » : le statut d'une opération ne dit pas ce qui tourne.
+  ⚠️ **Récidive le 2026-08-12, en pire : AUCUN déploiement créé pour DEUX pushes d'affilée**
+  (pas même un déploiement qui rejoue un vieux SHA — zéro entrée dans `list_deployments`).
+  Le symptôme ne se lit donc PAS dans les build logs (rien à lire, rien n'a démarré) mais
+  dans l'ABSENCE d'entrée récente comparée à l'heure du push (`git show -s --format=%cI`
+  vs `createdAt` du dernier déploiement). Remède qui a marché : un nouveau commit RÉEL
+  poussé (pas un redeploy depuis le dashboard, qui rejoue l'ancien SHA comme ci-dessus) —
+  un nouveau push retente une livraison de webhook.
+- **Un revert de conteneur peut effacer un travail non commité EN PLUS DE la plomberie git**
+  (voir la leçon voisine sur `.git/config`) : ici, le fichier `lib/travaux.ts` entier avait
+  disparu du disque, pas seulement le HEAD local qui pointait 20 commits en arrière. Le test
+  décisif n'est pas « `git status` est-il propre » (il l'était — rien à perdre puisque tout
+  était déjà reverté) mais « `git rev-parse HEAD` correspond-il à `git ls-remote origin
+  main` ». Le correctif est le même que d'habitude (`git fetch` + `checkout -B main
+  origin/main`), mais la conséquence change : tout ce qui n'était PAS encore poussé au
+  moment du revert est perdu pour de vrai, pas juste temporairement invisible — il faut le
+  refaire, pas le récupérer. Confirme le corollaire déjà noté : committer ne protège pas,
+  seul un push protège.
 - **Le FORMAT d'une erreur dit d'où elle vient.** `{"error":"non_authentifie"}` est le
   middleware ; `{"ok":false,"erreur":"non autorisé"}` est la route. Recevoir le premier là
   où on attend le second prouve que la requête n'atteint jamais la route — donc que le code

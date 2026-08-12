@@ -46,12 +46,15 @@ les décisions dans [`docs/adr/`](./docs/adr/).
   Geocoding** (ADR-0007) complète Nominatim et le registre du Québec en troisième repli,
   seulement pour ce que les deux premiers ratent — optionnel (`GOOGLE_MAPS_API_KEY`, voir
   `.env.example`), inactif sans clé posée.
+- **Google Places** (ADR-0007, extension `[CARTE-03-PLACES]`), même clé optionnelle, deux
+  usages : autocomplétion du nom d'entreprise à l'ajout d'une offre, et fiches enrichies
+  (site, téléphone, horaires) pour les entreprises déjà résolues par Google Maps Geocoding.
 - **Migrations automatiques** (`lib/migrations.ts`) — appliquées au démarrage, mémorisées par
   processus. Aucune commande à lancer à la main après un déploiement.
 - **Endpoint hub** (`app/api/hub/summary/route.ts`) — jeton `x-hub-token` vérifié en temps
   constant, `Cache-Control: no-store`, summary honnêtement `building` tant qu'aucune donnée
   réelle n'existe.
-- TypeScript strict, **798 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
+- TypeScript strict, **813 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
 
 ### Ce qui n'existe PAS encore
 

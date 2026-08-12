@@ -11,13 +11,17 @@ import {
   DELAI_ENTRE_REQUETES_MS,
   MAX_VILLES_PAR_PASSE,
   RAYON_VALIDATION_KM,
+  chercherEntreprisesGoogle,
   deciderPrecision,
+  detailsEntrepriseGoogle,
   distanceKm,
   entete,
   geocoderEntrepriseGoogle,
   geocoderPlusieurs,
   geocoderVille,
   lireReponse,
+  lireReponseAutocomplete,
+  lireReponseDetails,
   lireReponseEntreprise,
   lireReponseGoogle,
   nomEchoDansResultat,
@@ -280,6 +284,141 @@ describe("Google Maps Geocoding — géocoder UNE entreprise", () => {
     await expect(
       geocoderEntrepriseGoogle("Laserax", "Lévis", "cle", { recuperer }),
     ).rejects.toThrow(/500/);
+  });
+
+  it("capture le `place_id` — [CARTE-03-PLACES] : c'est lui qui permettra l'enrichissement", () => {
+    expect(
+      lireReponseGoogle({
+        status: "OK",
+        results: [
+          {
+            geometry: { location: { lat: 46.75, lng: -71.29 } },
+            formatted_address: "123 rue Factice, Lévis, QC",
+            place_id: "ChIJ-exemple",
+          },
+        ],
+      }),
+    ).toMatchObject({ placeId: "ChIJ-exemple" });
+  });
+
+  it("`placeId` est `null` quand Google ne le publie pas", () => {
+    expect(
+      lireReponseGoogle({
+        status: "OK",
+        results: [
+          {
+            geometry: { location: { lat: 46.75, lng: -71.29 } },
+            formatted_address: "123 rue Factice, Lévis, QC",
+          },
+        ],
+      }),
+    ).toMatchObject({ placeId: null });
+  });
+});
+
+describe("Google Places Autocomplete — lecture de la réponse", () => {
+  it("extrait le texte de chaque suggestion", () => {
+    expect(
+      lireReponseAutocomplete({
+        suggestions: [
+          { placePrediction: { text: { text: "Laserax, Lévis, QC" } } },
+          { placePrediction: { text: { text: "Laserax inc, Lévis, QC" } } },
+        ],
+      }),
+    ).toEqual([{ texte: "Laserax, Lévis, QC" }, { texte: "Laserax inc, Lévis, QC" }]);
+  });
+
+  it("ignore les doublons et les entrées sans texte exploitable", () => {
+    expect(
+      lireReponseAutocomplete({
+        suggestions: [
+          { placePrediction: { text: { text: "Laserax, Lévis, QC" } } },
+          { placePrediction: { text: { text: "Laserax, Lévis, QC" } } },
+          { placePrediction: {} },
+          {},
+        ],
+      }),
+    ).toEqual([{ texte: "Laserax, Lévis, QC" }]);
+  });
+
+  it("une réponse sans `suggestions` (aucun résultat) rend une liste vide", () => {
+    expect(lireReponseAutocomplete({})).toEqual([]);
+    expect(lireReponseAutocomplete(null)).toEqual([]);
+  });
+});
+
+describe("Google Places Autocomplete — chercher des entreprises", () => {
+  it("porte la clé en en-tête, cadre sur le Canada et la région de Québec", async () => {
+    let capture: { url: string; init: RequestInit } | null = null;
+    const recuperer = (async (url: string, init: RequestInit) => {
+      capture = { url: String(url), init };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ suggestions: [{ placePrediction: { text: { text: "Laserax" } } }] }),
+      };
+    }) as unknown as typeof fetch;
+
+    const r = await chercherEntreprisesGoogle("Laser", "cle-de-test", { recuperer });
+
+    expect(r).toEqual([{ texte: "Laserax" }]);
+    expect(capture).not.toBeNull();
+    expect(capture!.url).toBe("https://places.googleapis.com/v1/places:autocomplete");
+    const headers = capture!.init.headers as Record<string, string>;
+    expect(headers["X-Goog-Api-Key"]).toBe("cle-de-test");
+    const corps = JSON.parse(String(capture!.init.body));
+    expect(corps.input).toBe("Laser");
+    expect(corps.includedRegionCodes).toEqual(["ca"]);
+  });
+
+  it("un HTTP non-ok est une panne", async () => {
+    const recuperer = (async () => ({ ok: false, status: 429 })) as unknown as typeof fetch;
+    await expect(chercherEntreprisesGoogle("Laser", "cle", { recuperer })).rejects.toThrow(/429/);
+  });
+});
+
+describe("Google Place Details — lecture de la réponse", () => {
+  it("lit site, téléphone et horaires quand Google les publie", () => {
+    expect(
+      lireReponseDetails({
+        websiteUri: "https://laserax.example",
+        internationalPhoneNumber: "+1 418-555-0100", // factice
+        regularOpeningHours: { weekdayDescriptions: ["lundi: 8h-17h", "mardi: 8h-17h"] },
+      }),
+    ).toEqual({
+      siteWeb: "https://laserax.example",
+      telephone: "+1 418-555-0100", // factice
+      horaires: ["lundi: 8h-17h", "mardi: 8h-17h"],
+    });
+  });
+
+  it("rend `null` par champ quand Google ne le publie pas — jamais une chaîne vide", () => {
+    expect(lireReponseDetails({})).toEqual({ siteWeb: null, telephone: null, horaires: null });
+  });
+});
+
+describe("Google Place Details — récupérer les détails d'un lieu", () => {
+  it("porte la clé en en-tête et interroge le bon `place_id`", async () => {
+    let capture: { url: string; init: RequestInit } | null = null;
+    const recuperer = (async (url: string, init: RequestInit) => {
+      capture = { url: String(url), init };
+      return { ok: true, status: 200, json: async () => ({ websiteUri: "https://ex.example" }) };
+    }) as unknown as typeof fetch;
+
+    const d = await detailsEntrepriseGoogle("ChIJ-exemple", "cle-de-test", { recuperer });
+
+    expect(d.siteWeb).toBe("https://ex.example");
+    expect(capture).not.toBeNull();
+    expect(capture!.url).toBe("https://places.googleapis.com/v1/places/ChIJ-exemple");
+    const headers = capture!.init.headers as Record<string, string>;
+    expect(headers["X-Goog-Api-Key"]).toBe("cle-de-test");
+  });
+
+  it("un HTTP non-ok est une panne", async () => {
+    const recuperer = (async () => ({ ok: false, status: 404 })) as unknown as typeof fetch;
+    await expect(
+      detailsEntrepriseGoogle("ChIJ-inconnu", "cle", { recuperer }),
+    ).rejects.toThrow(/404/);
   });
 });
 

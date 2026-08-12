@@ -14,6 +14,7 @@ import {
   DELAI_RETENTE_POSITION_MS,
   adresseARattraper,
   bornesAMesurer,
+  detailsAEnrichir,
   distanceAMesurer,
   positionARaffiner,
   resteDuTravail,
@@ -30,6 +31,10 @@ function lieu(p: Partial<LieuTravail> = {}): LieuTravail {
     adresse: "1 rue Exemple, Québec",
     bornesLe: ilYA(1000),
     geocodeLe: ilYA(DELAI_RETENTE_ADRESSE_MS * 2),
+    // Sans `placeGoogleId`, rien à enrichir : le défaut ne doit PAS faire apparaître du
+    // travail que les tests existants ne s'attendent pas à voir.
+    placeGoogleId: null,
+    detailsLe: null,
     ...p,
   };
 }
@@ -155,6 +160,30 @@ describe("bornes à mesurer", () => {
     // chaque jour à un service bénévole pour une réponse qui ne changera pas serait du
     // martèlement ; les bornes ne poussent pas du jour au lendemain.
     expect(bornesAMesurer(lieu({ bornesLe: ilYA(1) }))).toBe(false);
+  });
+});
+
+describe("détails Places à enrichir — [CARTE-03-PLACES]", () => {
+  it("oui : un `placeGoogleId` connu, jamais interrogé", () => {
+    expect(
+      detailsAEnrichir(lieu({ placeGoogleId: "ChIJ-exemple", detailsLe: null })),
+    ).toBe(true);
+  });
+
+  it("non sans `placeGoogleId` — rien à interroger (entreprise résolue par Nominatim)", () => {
+    expect(detailsAEnrichir(lieu({ placeGoogleId: null, detailsLe: null }))).toBe(false);
+  });
+
+  it("non une fois interrogé — même si Google ne publie rien", () => {
+    expect(
+      detailsAEnrichir(lieu({ placeGoogleId: "ChIJ-exemple", detailsLe: ilYA(1) })),
+    ).toBe(false);
+  });
+
+  it("reste du travail tant qu'une entreprise Google n'a pas été enrichie", () => {
+    const offres = [offre()];
+    const lieux = [lieu({ placeGoogleId: "ChIJ-exemple", detailsLe: null })];
+    expect(resteDuTravail(offres, lieux, MAINTENANT)).toBe(true);
   });
 });
 

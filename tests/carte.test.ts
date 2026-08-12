@@ -49,6 +49,9 @@ function positions(
         // fixture qui s'en affranchirait testerait un état que la base refuse.
         adresseSource: adresse ? (source ?? ("osm" as const)) : null,
         bornes: null,
+        siteWeb: null,
+        telephone: null,
+        horaires: null,
       },
     ]),
   );
@@ -525,6 +528,9 @@ describe("« je veux pas si y'a pas au moins l'adresse de l'entreprise »", () =
         adresse,
         adresseSource: adresse === null ? null : ("osm" as const),
         bornes: null,
+        siteWeb: null,
+        telephone: null,
+        horaires: null,
         lecture: "",
         offres: [],
       })),

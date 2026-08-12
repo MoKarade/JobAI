@@ -492,6 +492,15 @@ export function urlRechercheGoogle(nom: string, ville: string, cle: string): str
 }
 
 /**
+ * Une résolution Google Maps Geocoding, avec le `place_id` que Google rend gratuitement
+ * dans la même réponse. [CARTE-03-PLACES], 2026-08-12 : c'est cet identifiant qui permet
+ * ensuite d'enrichir la fiche (site, téléphone, horaires) sans repayer une recherche.
+ */
+export interface CoordonneesGoogle extends Coordonnees {
+  placeId: string | null;
+}
+
+/**
  * Lit une réponse Google Maps Geocoding, ou rend `null` (introuvable, pas une panne).
  *
  * `status` distingue ce que Nominatim exprime par la présence/absence d'un résultat :
@@ -501,7 +510,7 @@ export function urlRechercheGoogle(nom: string, ville: string, cle: string): str
  * `UNKNOWN_ERROR`) est une PANNE de plateforme — LÈVE, pour être réessayée plus tard,
  * jamais confondue avec « cette entreprise n'existe pas ».
  */
-export function lireReponseGoogle(charge: unknown): Coordonnees | null {
+export function lireReponseGoogle(charge: unknown): CoordonneesGoogle | null {
   const c = charge as { status?: unknown; results?: unknown[]; error_message?: unknown };
   if (c?.status === "ZERO_RESULTS") return null;
   if (c?.status !== "OK") {
@@ -511,7 +520,11 @@ export function lireReponseGoogle(charge: unknown): Coordonnees | null {
 
   const resultat = Array.isArray(c.results) ? c.results[0] : undefined;
   const r = resultat as
-    | { geometry?: { location?: { lat?: unknown; lng?: unknown } }; formatted_address?: unknown }
+    | {
+        geometry?: { location?: { lat?: unknown; lng?: unknown } };
+        formatted_address?: unknown;
+        place_id?: unknown;
+      }
     | undefined;
   const lat = Number(r?.geometry?.location?.lat);
   const lon = Number(r?.geometry?.location?.lng);
@@ -521,7 +534,8 @@ export function lireReponseGoogle(charge: unknown): Coordonnees | null {
   if (lon < BORNES.lonMin || lon > BORNES.lonMax) return null;
 
   const brute = typeof r?.formatted_address === "string" ? r.formatted_address.trim() : "";
-  return { lat, lon, adresse: brute === "" ? null : brute.slice(0, 300) };
+  const placeId = typeof r?.place_id === "string" && r.place_id !== "" ? r.place_id : null;
+  return { lat, lon, adresse: brute === "" ? null : brute.slice(0, 300), placeId };
 }
 
 /**
@@ -540,7 +554,7 @@ export async function geocoderEntrepriseGoogle(
   ville: string,
   cle: string,
   outils: Pick<OutilsGeocodage, "recuperer">,
-): Promise<Coordonnees | null> {
+): Promise<CoordonneesGoogle | null> {
   const reponse = await outils.recuperer(urlRechercheGoogle(nom, ville, cle), {
     signal: AbortSignal.timeout(DELAI_MAX_REQUETE_MS),
   });
@@ -555,6 +569,140 @@ export async function geocoderEntrepriseGoogle(
   if (!nomEchoDansResultat(nom, libelle)) return null;
 
   return c;
+}
+
+/**
+ * Une suggestion d'entreprise rendue par Google Places Autocomplete (New).
+ *
+ * [CARTE-03-PLACES], 2026-08-12 : demande de Marc, « utilise les autres API aussi » —
+ * clarifiée en « autocomplétion à l'ajout d'une entreprise ». Le texte suffit : c'est ce
+ * que Marc choisit dans une liste, pas une donnée qu'on stocke.
+ */
+export interface SuggestionEntreprise {
+  texte: string;
+}
+
+/**
+ * Lit une réponse Google Places Autocomplete (New).
+ *
+ * La forme diffère radicalement de Geocoding : `suggestions[].placePrediction.text.text`,
+ * pas `results[]`. Une entrée sans texte exploitable, ou en double, est ignorée plutôt que
+ * de faire échouer toute la liste — une suggestion perdue n'est pas une panne.
+ */
+export function lireReponseAutocomplete(charge: unknown): SuggestionEntreprise[] {
+  const c = charge as { suggestions?: unknown[] };
+  if (!Array.isArray(c?.suggestions)) return [];
+
+  const vues = new Set<string>();
+  const suggestions: SuggestionEntreprise[] = [];
+  for (const s of c.suggestions) {
+    const p = (s as { placePrediction?: { text?: { text?: unknown } } } | undefined)
+      ?.placePrediction;
+    const texte = typeof p?.text?.text === "string" ? p.text.text.trim() : "";
+    if (texte === "" || vues.has(texte)) continue;
+    vues.add(texte);
+    suggestions.push({ texte });
+  }
+  return suggestions;
+}
+
+/**
+ * Cherche des entreprises par préfixe via Google Places Autocomplete (New).
+ *
+ * `includedRegionCodes`/`locationBias` cadrent sur le Canada puis la grande région de
+ * Québec — même esprit que les bornes régionales du reste du fichier, pour ne pas proposer
+ * une entreprise de Vancouver pendant que Marc tape. `includedPrimaryTypes:
+ * ["establishment"]` exclut les adresses et les villes : on cherche un COMMERCE.
+ */
+export async function chercherEntreprisesGoogle(
+  saisie: string,
+  cle: string,
+  outils: Pick<OutilsGeocodage, "recuperer">,
+): Promise<SuggestionEntreprise[]> {
+  const reponse = await outils.recuperer("https://places.googleapis.com/v1/places:autocomplete", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": cle,
+      "X-Goog-FieldMask": "suggestions.placePrediction.text",
+    },
+    body: JSON.stringify({
+      input: saisie,
+      includedRegionCodes: ["ca"],
+      includedPrimaryTypes: ["establishment"],
+      locationBias: { circle: { center: { latitude: 46.8, longitude: -71.2 }, radius: 60_000 } },
+    }),
+    signal: AbortSignal.timeout(DELAI_MAX_REQUETE_MS),
+  });
+  if (!reponse.ok) {
+    throw new Error(`Google Places Autocomplete a répondu HTTP ${reponse.status}`);
+  }
+  return lireReponseAutocomplete(await reponse.json());
+}
+
+/**
+ * Ce que Google Place Details publie pour enrichir une fiche entreprise.
+ *
+ * [CARTE-03-PLACES], 2026-08-12 : demande de Marc, « enrichir les fiches entreprise ».
+ * Trois champs, tous optionnels côté Google — `null` = Google ne le publie pas, pas une
+ * absence de mesure (voir migration 0016 pour la distinction à trois états en base).
+ */
+export interface DetailsEntreprise {
+  siteWeb: string | null;
+  telephone: string | null;
+  horaires: string[] | null;
+}
+
+/** Lit une réponse Google Place Details (New). */
+export function lireReponseDetails(charge: unknown): DetailsEntreprise {
+  const c = charge as {
+    websiteUri?: unknown;
+    internationalPhoneNumber?: unknown;
+    regularOpeningHours?: { weekdayDescriptions?: unknown };
+  };
+  const horaires = Array.isArray(c?.regularOpeningHours?.weekdayDescriptions)
+    ? c.regularOpeningHours.weekdayDescriptions.filter(
+        (l): l is string => typeof l === "string" && l.trim() !== "",
+      )
+    : null;
+  return {
+    siteWeb: typeof c?.websiteUri === "string" && c.websiteUri !== "" ? c.websiteUri : null,
+    telephone:
+      typeof c?.internationalPhoneNumber === "string" && c.internationalPhoneNumber !== ""
+        ? c.internationalPhoneNumber
+        : null,
+    horaires: horaires && horaires.length > 0 ? horaires : null,
+  };
+}
+
+/**
+ * Récupère les détails d'un lieu (site, téléphone, horaires) via son `place_id`.
+ *
+ * Scopé aux entreprises déjà résolues par Google Maps Geocoding (`geocoderEntrepriseGoogle`) :
+ * c'est cette résolution qui fournit gratuitement le `place_id`, sans recherche Places
+ * séparée. Une entreprise résolue par Nominatim n'a pas de `place_id` — pas enrichie ici.
+ */
+export async function detailsEntrepriseGoogle(
+  placeId: string,
+  cle: string,
+  outils: Pick<OutilsGeocodage, "recuperer">,
+): Promise<DetailsEntreprise> {
+  const reponse = await outils.recuperer(
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+    {
+      headers: {
+        "X-Goog-Api-Key": cle,
+        "X-Goog-FieldMask": "websiteUri,internationalPhoneNumber,regularOpeningHours",
+      },
+      signal: AbortSignal.timeout(DELAI_MAX_REQUETE_MS),
+    },
+  );
+  if (!reponse.ok) {
+    throw new Error(
+      `Google Place Details a répondu HTTP ${reponse.status} pour « ${placeId} »`,
+    );
+  }
+  return lireReponseDetails(await reponse.json());
 }
 
 /**

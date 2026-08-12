@@ -18,6 +18,21 @@ import { Fait } from "./Icone";
 import { libelleBorne, libelleDistanceBorne } from "@/lib/bornes";
 import { ADRESSE_ABSENTE, mentionSource } from "@/lib/adresse";
 
+/**
+ * N'accepte un lien QUE s'il est http/https — même garde que `lienSur` (`CarteOffre.tsx`,
+ * `app/offre/[id]/page.tsx`, `CarteOffres.tsx`) : `x.siteWeb` vient de Google Place
+ * Details, pas d'une saisie de Marc, mais rien n'exige que Google ne publie jamais autre
+ * chose qu'une URL propre.
+ */
+function lienSur(brut: string): string | null {
+  try {
+    const u = new URL(brut);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
   return (
     <ul className="carte-liste">
@@ -75,6 +90,24 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                   <span className="carte-liste__bornes">{libelleBorne(x.bornes)}</span>
                 ) : null}
               </p>
+              {/* Fiche enrichie par Google Places — [CARTE-03-PLACES]. Même contenu que la
+                  fenêtre de l'épingle (`CarteOffres.tsx`) : les trois champs sont
+                  indépendants, `null` = pas de `placeGoogleId` ou pas encore interrogé. */}
+              {x.siteWeb && lienSur(x.siteWeb) ? (
+                <p className="carte-liste__site">
+                  <a href={lienSur(x.siteWeb)!} target="_blank" rel="noopener noreferrer">
+                    Site web ↗
+                  </a>
+                </p>
+              ) : null}
+              {x.telephone ? <p className="carte-liste__telephone">{x.telephone}</p> : null}
+              {x.horaires && x.horaires.length > 0 ? (
+                <ul className="carte-liste__horaires">
+                  {x.horaires.map((j) => (
+                    <li key={j}>{j}</li>
+                  ))}
+                </ul>
+              ) : null}
               {x.lecture ? <p className="carte-liste__lecture">{x.lecture}</p> : null}
               {x.offres.length > 0 ? (
                 <ul>

@@ -97,6 +97,16 @@ export interface EntrepriseSurCarte {
    * portée. Les confondre ferait passer un lieu non mesuré pour un lieu sans borne.
    */
   bornes: ProximiteBorne | null;
+  /**
+   * Fiche enrichie par Google Places — [CARTE-03-PLACES], 2026-08-12.
+   *
+   * `null` quand l'entreprise n'a pas de `placeGoogleId` (résolue par Nominatim ou le
+   * registre) OU quand Google n'a pas encore été interrogé. Une fois interrogé, chaque
+   * champ vaut ce que Google publie — `null` si Google ne le publie pas pour ce lieu.
+   */
+  siteWeb: string | null;
+  telephone: string | null;
+  horaires: string[] | null;
   lecture: string;
   offres: OffreSurCarte[];
 }
@@ -138,6 +148,10 @@ export interface PositionEntreprise {
   adresseSource: "osm" | "google" | "registre" | "offre" | "recherche" | null;
   /** `null` tant que les bornes n'ont pas été interrogées pour ce lieu. */
   bornes: ProximiteBorne | null;
+  /** Fiche Google Places — [CARTE-03-PLACES]. `null` = pas de `placeGoogleId`, ou pas encore interrogé. */
+  siteWeb: string | null;
+  telephone: string | null;
+  horaires: string[] | null;
 }
 
 /** Les offres qu'une carte de recherche d'emploi doit montrer : celles qui sont vivantes. */
@@ -180,6 +194,9 @@ export function construireVue(
       adresse: null,
       adresseSource: null,
       bornes: null,
+      siteWeb: null,
+      telephone: null,
+      horaires: null,
       lecture: c.lecture,
       offres: [],
     });
@@ -215,6 +232,9 @@ export function construireVue(
         adresse: null,
         adresseSource: null,
         bornes: null,
+        siteWeb: null,
+        telephone: null,
+        horaires: null,
         lecture: "",
         offres: [],
       };
@@ -280,6 +300,9 @@ export function construireVue(
     entreprise.adresse = position.adresse;
     entreprise.adresseSource = position.adresseSource;
     entreprise.bornes = position.bornes;
+    entreprise.siteWeb = position.siteWeb;
+    entreprise.telephone = position.telephone;
+    entreprise.horaires = position.horaires;
 
     // La meilleure note en tête : c'est elle qui teinte l'épingle.
     entreprise.offres.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));

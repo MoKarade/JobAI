@@ -1348,6 +1348,29 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   color: var(--text-soft);
 }
 
+/* La fiche enrichie par Google Places [CARTE-03-PLACES] : même registre que l'adresse et
+   les bornes — des faits de confort, pas le titre de la fiche. */
+.carte-liste__site,
+.popup-site {
+  display: block;
+  margin: 2px 0 0;
+  font-size: var(--t-s);
+}
+.carte-liste__telephone,
+.popup-telephone {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--t-s);
+  color: var(--text-soft);
+}
+.carte-liste__horaires,
+.popup-horaires {
+  margin: 2px 0 0;
+  padding: 0 0 0 1.1em;
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+}
+
 /* LARGEUR DE LECTURE — l'épure la plus efficace, et la moins visible.
    Un paragraphe qui court sur 72rem fait perdre le début de la ligne suivante à chaque
    retour. 68 caractères est la mesure confortable admise ; les listes, tableaux et la carte

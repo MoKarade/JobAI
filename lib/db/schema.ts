@@ -304,6 +304,30 @@ export const entreprisesLieux = pgTable(
     bornesTarif: text("bornes_tarif"),
     bornesLe: timestamp("bornes_le", { withTimezone: true }),
 
+    /**
+     * FICHE ENRICHIE PAR GOOGLE PLACES — même patron à trois états que les bornes.
+     *
+     * [CARTE-03-PLACES], 2026-08-12. Demande de Marc : « enrichir les fiches entreprise ».
+     * Scopé aux entreprises résolues par Google Maps Geocoding (`adresseSource: "google"`) :
+     * c'est cette résolution qui rend `place_id` gratuitement dans la même réponse. Une
+     * entreprise résolue par Nominatim ou le registre n'a pas de `placeGoogleId`, et n'est
+     * donc pas enrichie — une recherche Places séparée juste pour l'enrichissement serait un
+     * coût et un risque d'homonyme supplémentaires, hors scope ici.
+     *
+     *   · `detailsLe` NULL               → jamais interrogé.
+     *   · `detailsLe` posé, champs NULL  → interrogé, Google ne publie rien pour ce lieu.
+     *   · `detailsLe` posé, champs remplis → ce que Google publie.
+     *
+     * Confondre « jamais interrogé » et « rien à publier » ferait passer un lieu non
+     * mesuré pour un lieu sans site web — un renseignement faux avec l'aplomb d'un fait
+     * (garde-fou n°3).
+     */
+    placeGoogleId: text("place_google_id"),
+    siteWeb: text("site_web"),
+    telephone: text("telephone"),
+    horairesGoogle: text("horaires_google").array(),
+    detailsLe: timestamp("details_le", { withTimezone: true }),
+
     geocodeLe: timestamp("geocode_le", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

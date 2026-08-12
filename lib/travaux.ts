@@ -28,6 +28,8 @@ export interface LieuTravail {
   adresse: string | null;
   bornesLe: Date | null;
   geocodeLe: Date;
+  placeGoogleId: string | null;
+  detailsLe: Date | null;
 }
 
 /** Ce que la décision a besoin de savoir d'une offre. */
@@ -102,6 +104,17 @@ export function bornesAMesurer(l: LieuTravail): boolean {
   return l.bornesLe === null;
 }
 
+/**
+ * Faut-il enrichir cette fiche (site, téléphone, horaires) via Google Places ?
+ *
+ * [CARTE-03-PLACES], 2026-08-12. Même logique « une fois par lieu » que `bornesAMesurer` :
+ * un site web ne change pas d'un jour à l'autre. Scopé aux entreprises qui ONT un
+ * `placeGoogleId` — sans lui, il n'y a rien à interroger (voir migration 0016).
+ */
+export function detailsAEnrichir(l: LieuTravail): boolean {
+  return l.placeGoogleId !== null && l.detailsLe === null;
+}
+
 /** Cette offre attend-elle sa distance ? Les historiques et les périmées, non. */
 export function distanceAMesurer(o: OffreTravail): boolean {
   return !o.histo && o.perimeeLe === null && o.km === null;
@@ -122,7 +135,8 @@ export function resteDuTravail(
   if (offres.some(distanceAMesurer)) return true;
   if (lieux.some((l) => adresseARattraper(l, maintenant))) return true;
   if (lieux.some((l) => positionARaffiner(l, maintenant))) return true;
-  return lieux.some(bornesAMesurer);
+  if (lieux.some(bornesAMesurer)) return true;
+  return lieux.some(detailsAEnrichir);
 }
 
 /**

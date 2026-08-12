@@ -113,6 +113,13 @@
       "when": 1786564225382,
       "tag": "0015_adresse_google",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786573912719,
+      "tag": "0016_places_enrichissement",
+      "breakpoints": true
     }
   ]
 }

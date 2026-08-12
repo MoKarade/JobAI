@@ -914,14 +914,41 @@ registre ratent encore. Fait le 2026-08-12, gate vert :
       un angle mort.
 - [x] `.env.example` : `GOOGLE_MAPS_API_KEY`, optionnelle, marche à suivre pour l'obtenir.
 
-RESTE — geste de Marc, puis vérification (rien à coder) :
-- [ ] **[V-CARTE-03-GOOGLE-CLE]** Marc doit créer la clé Google Cloud (Geocoding API
-      seule, restreinte), la poser dans Vercel (`GOOGLE_MAPS_API_KEY`), redéployer. Sans
-      elle, le repli reste inactif — dégradation silencieuse et honnête, pas une panne.
-- [ ] **[V-CARTE-03-GOOGLE]** Une fois la clé posée : lire `[distances] … (N par Google)`
-      dans les logs d'une passe réelle. `googleTente=true` avec `parGoogle=0` sur plusieurs
-      passes = ces employeurs sont introuvables aussi chez Google — limite des données, pas
-      du code.
+- [x] **[V-CARTE-03-GOOGLE-CLE]** Marc a créé la clé Google Cloud et l'a posée dans Vercel
+      (`GOOGLE_MAPS_API_KEY`, 2026-08-12) — avec Geocoding API, Places API (New) et
+      quelques API supplémentaires activées (voir `[CARTE-03-PLACES]` ci-dessous).
+
+RESTE — à observer sur les prochaines passes (rien à coder) :
+- [ ] **[V-CARTE-03-GOOGLE]** Lire `[distances] … (N par Google)` dans les logs d'une passe
+      réelle. `googleTente=true` avec `parGoogle=0` sur plusieurs passes = ces employeurs
+      sont introuvables aussi chez Google — limite des données, pas du code.
+
+**[CARTE-03-PLACES] — autocomplétion et fiches enrichies via Places API.** ADR-0007
+(extension). Demande de Marc, « utilise les autres API aussi », clarifiée en deux usages
+choisis explicitement (voir l'ADR pour le détail des options écartées). Fait le
+2026-08-12, gate vert :
+- [x] `lib/geocodage.ts` : `chercherEntreprisesGoogle`/`lireReponseAutocomplete` (Places
+      Autocomplete New) et `detailsEntrepriseGoogle`/`lireReponseDetails` (Place Details),
+      `CoordonneesGoogle.placeId` capturé sur la résolution Geocoding — testés.
+- [x] `entreprises_lieux` : cinq colonnes (`placeGoogleId`, `siteWeb`, `telephone`,
+      `horairesGoogle`, `detailsLe`), migration `drizzle/0016_places_enrichissement.sql`,
+      même patron à trois états que les bornes de recharge.
+- [x] `lib/travaux.ts` : `detailsAEnrichir` ajouté au gate `resteDuTravail` — sans lui,
+      l'enrichissement se serait affamé comme le rattrapage d'adresses avant lui.
+- [x] `enrichirDetailsGoogle` (`lib/actions.ts`), câblé dans `mesurerDistances` après les
+      bornes ; `detailsEnrichis` exposé dans les logs `[distances]` et les réponses JSON
+      des deux crons.
+- [x] `suggererEntreprises` (Server Action) + `FormulaireAjout.tsx` : autocomplétion du
+      champ « Entreprise » via `<datalist>` natif, débounce 300 ms, seuil 3 caractères.
+- [x] `lib/carte.ts`, `CarteOffres.tsx`, `ListeCarte.tsx` : site web / téléphone / horaires
+      affichés sur la fiche, dans la fenêtre Leaflet ET l'accès clavier — les deux surfaces
+      tenues synchrones (`ListeCarte.tsx` porte tout ce que la fenêtre porte, par contrat).
+- [x] `.env.example` : section réécrite pour les trois usages de la clé.
+
+RESTE — à observer sur les prochaines passes (rien à coder) :
+- [ ] **[V-CARTE-03-PLACES]** Vérifier en production : des suggestions apparaissent bien à
+      l'ajout d'une offre, et `[distances] … details=N/M` progresse sur les entreprises déjà
+      résolues par Google.
 
 ## Découvertes et dette (à trier)
 

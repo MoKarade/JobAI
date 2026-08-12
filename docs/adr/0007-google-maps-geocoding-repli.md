@@ -99,3 +99,70 @@ la clé elle-même), documentée dans `.env.example`.
   `Raffinage.googleTente`, exposés dans les logs `[distances]` des deux crons.
 - Migration `drizzle/0015_adresse_google.sql` : la contrainte `entreprises_lieux_adresse_source_ck`
   accepte `google` en plus des quatre valeurs existantes.
+
+## Extension — Places API : autocomplétion et fiches enrichies (`[CARTE-03-PLACES]`)
+
+**Date** : 2026-08-12 · **Statut** : accepté
+
+### Contexte
+
+Marc a créé sa clé `GOOGLE_MAPS_API_KEY` avec plus que la seule Geocoding API (Places
+incluse), et a demandé explicitement : « je voudrais bien que tu utilise les autres api
+aussi ». Question posée en retour (quel usage pour quelle API, réponses multiples
+permises) — Marc a choisi, pour la **Places API (New)** :
+- **Autocomplétion à l'ajout d'une entreprise** — le champ « Entreprise » du formulaire
+  d'ajout suggère des raisons sociales pendant la frappe.
+- **Enrichir les fiches entreprise** — site web, téléphone, horaires sur la fiche d'une
+  entreprise déjà résolue par Google Maps Geocoding.
+
+Pour la **Maps Static API** et la **Geolocation API**, Marc a choisi de ne RIEN brancher
+pour l'instant (options « Rien pour l'instant » et « le domicile est déjà fixe », toutes
+deux recommandées) — leur activation dans Google Cloud reste inerte côté JobAI. La
+**Navigation SDK** est un SDK mobile natif (Android/iOS/CarPlay) : sans objet dans une app
+web Next.js, exclue sans qu'il y ait eu de choix à faire.
+
+### Décision
+
+1. **Autocomplete** (`suggererEntreprises`, `lib/actions.ts`) interroge Places Autocomplete
+   (New) à partir de trois caractères, avec un débounce de 300 ms côté client
+   (`FormulaireAjout.tsx`), rendu par un `<datalist>` natif — Marc reste libre de taper un
+   nom que Google ne connaît pas, aucune suggestion n'est jamais imposée.
+2. **Place Details** (`enrichirDetailsGoogle`, `lib/actions.ts`) enrichit UNIQUEMENT les
+   entreprises déjà résolues par Google Maps Geocoding (`placeGoogleId` non nul) : c'est
+   cette résolution qui rend l'identifiant gratuitement dans la même réponse. Une entreprise
+   résolue par Nominatim ou le registre n'est pas enrichie — une recherche Places séparée
+   juste pour l'enrichissement serait un coût et un risque d'homonyme supplémentaires, hors
+   scope ici.
+3. **Même patron à trois états que les bornes de recharge** (`bornesLe`/`bornesM`) : `detailsLe`
+   NULL = jamais interrogé, `detailsLe` posé + champs NULL = interrogé, Google ne publie
+   rien, `detailsLe` posé + champs remplis = ce que Google publie. Confondre les deux
+   premiers ferait passer un lieu non mesuré pour un lieu sans site web (garde-fou n°3).
+4. **Le gate `resteDuTravail` (`lib/travaux.ts`) couvre ce nouveau travail** — c'est la leçon
+   durable de ce fichier (voir CLAUDE.md §7) : un gate calibré sur les travaux précédents
+   aurait affamé l'enrichissement exactement comme il avait affamé le rattrapage d'adresses.
+5. **Dégradation silencieuse, comme le repli Geocoding** : clé absente ou panne Google ⇒
+   liste de suggestions vide, fiche sans site/téléphone/horaires — jamais une erreur visible.
+
+### Trade-offs assumés
+
+- **Un identifiant de plus à porter en base** (`placeGoogleId`) — mais gratuit (rendu par la
+  réponse Geocoding déjà appelée), et son absence ne bloque rien : il borne simplement le
+  périmètre de l'enrichissement aux entreprises que Google a déjà su situer.
+- **Deux surfaces de rendu à tenir synchrones** (`CarteOffres.tsx` pour la fenêtre Leaflet,
+  `ListeCarte.tsx` pour l'accès clavier/lecteur d'écran) — déjà le cas pour l'adresse et les
+  bornes ; le header de `ListeCarte.tsx` l'affirme explicitement (« porte TOUT ce que la
+  fenêtre d'une épingle porte ») et les deux ont été mis à jour ensemble.
+
+### Vérification
+
+- `lib/geocodage.ts` : `lireReponseAutocomplete`, `chercherEntreprisesGoogle`,
+  `lireReponseDetails`, `detailsEntrepriseGoogle` — fetch injecté, testés dans
+  `tests/geocodage.test.ts` (forme de requête, en-têtes, cas vide/panne).
+- `lib/travaux.ts` : `detailsAEnrichir` testé isolément et dans `resteDuTravail`
+  (`tests/travaux.test.ts`).
+- `lib/actions.ts` : `enrichirDetailsGoogle` s'exécute après les bornes dans
+  `mesurerDistances`, sous le même budget partagé ; son compte (`detailsEnrichis`) est
+  exposé dans les logs `[distances]` des deux crons et dans leur réponse JSON.
+- Migration `drizzle/0016_places_enrichissement.sql` : cinq colonnes additives sur
+  `entreprises_lieux`, aucune contrainte NOT NULL — un champ additif optionnel ne casse
+  aucune ligne existante.

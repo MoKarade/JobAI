@@ -27,7 +27,9 @@ import { MiseAJourOffreSchema } from "./types";
 import { NouvelleOffreSchema, aujourdhui, construireOffre, identifiantPour } from "./ajout";
 import {
   RAYON_VALIDATION_KM,
+  chercherEntreprisesGoogle,
   deciderPrecision,
+  detailsEntrepriseGoogle,
   distanceKm,
   geocoderEntreprises,
   geocoderEntrepriseGoogle,
@@ -46,6 +48,7 @@ import {
   EPOQUE_A_RETENTER,
   adresseARattraper,
   bornesAMesurer,
+  detailsAEnrichir,
   positionARaffiner,
 } from "./travaux";
 import {
@@ -876,17 +879,30 @@ async function raffinerPositions(
         if (c === null) continue; // introuvable chez Google aussi : reste au centre-ville.
         if (distanceKm(c, centre) > RAYON_VALIDATION_KM) continue; // même garde que Nominatim.
 
-        await db
-          .update(entreprisesLieux)
-          .set({
-            lat: c.lat,
-            lon: c.lon,
-            precision: "exacte" as const,
-            adresse: c.adresse,
-            adresseSource: c.adresse === null ? null : ("google" as const),
-            geocodeLe: maintenant,
-          })
-          .where(eq(entreprisesLieux.nom, nom));
+        // `placeGoogleId` capturé ICI, [CARTE-03-PLACES] : Google le rend gratuitement dans
+        // la même réponse que la position, et c'est lui qui permettra l'enrichissement de la
+        // fiche (site, téléphone, horaires) sans repayer une recherche. Construction
+        // explicite plutôt que `placeGoogleId: c.placeId ?? undefined` : on ne s'appuie pas
+        // sur le comportement de Drizzle face à un `undefined` littéral dans `.set()`.
+        const champs: {
+          lat: number;
+          lon: number;
+          precision: "exacte";
+          adresse: string | null;
+          adresseSource: "google" | null;
+          geocodeLe: Date;
+          placeGoogleId?: string;
+        } = {
+          lat: c.lat,
+          lon: c.lon,
+          precision: "exacte" as const,
+          adresse: c.adresse,
+          adresseSource: c.adresse === null ? null : ("google" as const),
+          geocodeLe: maintenant,
+        };
+        if (c.placeId !== null) champs.placeGoogleId = c.placeId;
+
+        await db.update(entreprisesLieux).set(champs).where(eq(entreprisesLieux.nom, nom));
 
         precisees++;
         parGoogle++;
@@ -1035,6 +1051,74 @@ async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
   return { candidates: lignes.length, mesurees, echecs: 0 };
 }
 
+interface PasseDetails {
+  /** Entreprises `placeGoogleId` connu, jamais interrogées, au début de la passe. */
+  candidates: number;
+  /** Interrogations abouties — que Google publie quelque chose ou non. */
+  enrichies: number;
+  /** Interrogations en échec (panne Google). La ligne repassera. */
+  echecs: number;
+}
+
+/**
+ * Enrichit les fiches d'entreprises résolues par Google Maps Geocoding : site, téléphone,
+ * horaires, via Google Place Details.
+ *
+ * [CARTE-03-PLACES], 2026-08-12. Demande de Marc, « utilise les autres API aussi » —
+ * clarifiée en « enrichir les fiches entreprise ». Même dégradation silencieuse que le
+ * repli Google Maps Geocoding : inactif tant que `GOOGLE_MAPS_API_KEY` n'est pas posée.
+ *
+ * Un `try`/`catch` PAR ENTREPRISE, pas un seul autour de la boucle : une panne sur une
+ * fiche ne doit pas faire perdre les autres, exactement comme `mesurerBornes` continue
+ * après une entreprise sans borne. `detailsLe` n'est posé QUE sur un appel abouti — un
+ * échec laisse la ligne éligible pour la prochaine passe (voir `detailsAEnrichir`).
+ */
+async function enrichirDetailsGoogle(
+  max: number,
+  budgetMs: number | null,
+): Promise<PasseDetails> {
+  const cleGoogle = process.env.GOOGLE_MAPS_API_KEY?.trim();
+  if (!cleGoogle) return { candidates: 0, enrichies: 0, echecs: 0 };
+
+  const maintenant = new Date();
+  const lignes = (await db.select().from(entreprisesLieux))
+    .filter(detailsAEnrichir)
+    // Les plus anciennement géocodées d'abord : ce sont celles qui attendent depuis le
+    // plus longtemps un enrichissement, même logique que le tri des autres passes.
+    .sort((a, b) => a.geocodeLe.getTime() - b.geocodeLe.getTime())
+    .slice(0, max);
+
+  if (lignes.length === 0) return { candidates: 0, enrichies: 0, echecs: 0 };
+
+  const debut = Date.now();
+  let enrichies = 0;
+  let echecs = 0;
+
+  for (const l of lignes) {
+    if (budgetMs !== null && Date.now() - debut >= budgetMs) break;
+    if (l.placeGoogleId === null) continue; // Garde de type — exclu par `detailsAEnrichir`.
+
+    try {
+      const d = await detailsEntrepriseGoogle(l.placeGoogleId, cleGoogle, { recuperer: fetch });
+      await db
+        .update(entreprisesLieux)
+        .set({
+          siteWeb: d.siteWeb,
+          telephone: d.telephone,
+          horairesGoogle: d.horaires,
+          detailsLe: maintenant,
+        })
+        .where(eq(entreprisesLieux.nom, l.nom));
+      enrichies++;
+    } catch (err) {
+      echecs++;
+      console.error(`[places] détails impossibles pour « ${l.nom} »`, err);
+    }
+  }
+
+  return { candidates: lignes.length, enrichies, echecs };
+}
+
 /**
  * Le domicile de référence, lu depuis l'environnement.
  *
@@ -1128,6 +1212,8 @@ export async function mesurerDistances(
       /** Repassées de « centre-ville » à leur vraie position ([CARTE-03], 2026-08-12). */
       precisees: number;
       bornesMesurees: number;
+      /** Fiches enrichies (site, téléphone, horaires) — [CARTE-03-PLACES], 2026-08-12. */
+      detailsEnrichis: number;
     }
   | { ok: false; erreur: string }
 > {
@@ -1354,6 +1440,14 @@ export async function mesurerDistances(
       console.error("[actions] mesure des bornes impossible", err);
     }
 
+    // 1 quater. La fiche enrichie (site, téléphone, horaires) — [CARTE-03-PLACES].
+    let details: PasseDetails = { candidates: 0, enrichies: 0, echecs: 0 };
+    try {
+      details = await enrichirDetailsGoogle(maxSituations, budgetRestant());
+    } catch (err) {
+      console.error("[actions] enrichissement Places impossible", err);
+    }
+
     // 2. Mesurer. Le domicile ne sort pas de cette closure.
     //
     // `invaliderDistancesPrecisees` efface d'abord la distance des offres dont l'employeur
@@ -1393,6 +1487,8 @@ export async function mesurerDistances(
         `${raffinage.horsRayon > 0 ? ` (${raffinage.horsRayon} hors rayon Nominatim)` : ""} ` +
         `bornes=${bornes.mesurees}/${bornes.candidates}` +
         `${bornes.echecs > 0 ? ` (${bornes.echecs} en échec)` : ""} ` +
+        `details=${details.enrichies}/${details.candidates}` +
+        `${details.echecs > 0 ? ` (${details.echecs} en échec)` : ""} ` +
         `budget restant=${restant === null ? "illimité" : `${restant} ms`}`,
     );
 
@@ -1461,6 +1557,7 @@ export async function mesurerDistances(
       adressesRattrapees: adresses.ecrites,
       precisees: raffinage.precisees,
       bornesMesurees: bornes.mesurees,
+      detailsEnrichis: details.enrichies,
     };
   } catch (err) {
     console.error("[actions] mesure des distances impossible", err);
@@ -1537,6 +1634,41 @@ async function situerLot(
 /** Les outils réseau de Nominatim — un seul endroit, pour que rien ne diverge. */
 function outilsNominatim() {
   return { recuperer: fetch, courrielContact: process.env.AUTHORIZED_EMAIL };
+}
+
+/**
+ * Suggère des entreprises via Google Places Autocomplete, pendant la saisie d'une offre.
+ *
+ * [CARTE-03-PLACES], 2026-08-12 : demande de Marc, « utilise les autres API aussi » —
+ * clarifiée en « autocomplétion à l'ajout d'une entreprise ». C'est un CONFORT de saisie,
+ * pas une source de vérité : Marc reste libre de taper un nom que Google ne connaît pas.
+ * Une panne, l'absence de session ou l'absence de clé rendent donc une liste VIDE plutôt
+ * qu'une erreur affichée dans un champ de texte — la dégradation la plus honnête pour de
+ * l'autocomplétion, symétrique de celle du repli Google Maps Geocoding (voir .env.example).
+ *
+ * Seuil de trois caractères : sous ce seuil, une requête par lettre tapée facturerait pour
+ * une liste trop large pour être utile.
+ */
+export async function suggererEntreprises(saisie: string): Promise<string[]> {
+  try {
+    await exigerSession();
+  } catch {
+    return [];
+  }
+
+  const texte = saisie.trim();
+  if (texte.length < 3) return [];
+
+  const cle = process.env.GOOGLE_MAPS_API_KEY?.trim();
+  if (!cle) return [];
+
+  try {
+    const suggestions = await chercherEntreprisesGoogle(texte, cle, { recuperer: fetch });
+    return suggestions.map((s) => s.texte);
+  } catch (err) {
+    console.error("[actions] autocomplétion Places impossible", err);
+    return [];
+  }
 }
 
 /**

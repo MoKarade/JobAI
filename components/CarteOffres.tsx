@@ -49,6 +49,21 @@ function echapper(texte: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/**
+ * N'accepte un lien QUE s'il est http/https. Même garde que `lienSur` (`CarteOffre.tsx`,
+ * `app/offre/[id]/page.tsx`) : `e.siteWeb` vient de Google Place Details, pas d'une saisie
+ * de Marc, mais rien n'exige que Google ne publie jamais autre chose qu'une URL propre — un
+ * `href` brut ne devient cliquable qu'après ce contrôle.
+ */
+function lienSur(brut: string): string | null {
+  try {
+    const u = new URL(brut);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Le contenu HTML de la fenêtre d'une entreprise. Tout texte passe par `echapper`. */
 function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string {
   const morceaux: string[] = [];
@@ -91,6 +106,22 @@ function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string 
         ? "Aucune borne de recharge trouvée alentour"
         : `Borne à ${libelleDistanceBorne(e.bornes.plusProcheM)}${detail ? ` · ${detail}` : ""}`;
   if (bornes) morceaux.push(`<span class="popup-bornes">${echapper(bornes)}</span>`);
+  // Fiche enrichie par Google Places — [CARTE-03-PLACES]. `null` = pas de `placeGoogleId`
+  // ou pas encore interrogé ; les trois champs sont indépendants, Google peut publier
+  // l'un sans l'autre.
+  const site = e.siteWeb ? lienSur(e.siteWeb) : null;
+  if (site) {
+    morceaux.push(
+      `<a class="popup-site" href="${echapper(site)}" target="_blank" rel="noopener noreferrer">Site web ↗</a>`,
+    );
+  }
+  if (e.telephone) {
+    morceaux.push(`<span class="popup-telephone">${echapper(e.telephone)}</span>`);
+  }
+  if (e.horaires && e.horaires.length > 0) {
+    const jours = e.horaires.map((j) => `<li>${echapper(j)}</li>`).join("");
+    morceaux.push(`<ul class="popup-horaires">${jours}</ul>`);
+  }
   if (e.lecture) {
     const lecture = e.lecture.length > 160 ? `${e.lecture.slice(0, 157)}…` : e.lecture;
     morceaux.push(`<span class="popup-lecture">${echapper(lecture)}</span>`);
