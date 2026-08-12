@@ -34,6 +34,13 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
    écrite dans le test** : il détecte des FORMES (adresse municipale, coordonnées, civilité,
    secret affecté), pas des noms isolés — un motif générique de patronyme est inutilisable en
    français (mesuré : il attrapait « Machines-Outils », « Saint-Damien », « garde-fou »).
+   *Second verrou, né du texte ingéré* : les annonces lues par la veille portent la **PII de
+   TIERS** (courriel nominatif, profil LinkedIn personnel, téléphone d'un recruteur — vécu le
+   2026-08-12 sur une annonce Randstad). `lib/ingest/expurger.ts` (`expurgerPII`, PURE) est
+   l'outil qui nettoie ; le test « aucune PII de tiers dans les descriptions d'un dépôt »
+   (scan des `data/depot/*.json`) est la garde qui **refuse**. Les deux sont nécessaires : un
+   outil qu'on peut oublier d'appeler ne protège rien. La boîte de rôle (`carriere@…`) SURVIT
+   — c'est l'adresse à laquelle Marc postule.
 
 2. **Le suivi appartient à Marc.** `statut`, `prio`, `dateEnvoi`, `userNote`
    (`USER_OWNED_FIELDS`) ne sont **jamais** écrasés par un rafraîchissement de seed, une
@@ -606,6 +613,32 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   de fichier — et surtout pas de repli par `WebFetch` sur les pages de liste d'Indeed, qui
   serait du scraping (garde-fou n°4). Un `WebSearch` ne rend que des pages d'agrégat, sans
   employeur ni lien par offre : de quoi fabriquer une structure, pas de quoi la remplir.
+
+- **Lire du texte écrit par un tiers, c'est l'INGÉRER — et un garde de forme ne suffit plus.**
+  Tant que la veille ne collectait que des titres, aucune PII ne pouvait entrer. Le jour où
+  elle a lu les annonces en entier (2026-08-12, 44 lues), une seule d'entre elles portait le
+  nom, le courriel et le LinkedIn PERSONNELS d'un recruteur — et aucun motif existant ne
+  l'attrapait : il a fallu que je le voie. Deux règles en découlent. (a) **Élargir ce qu'on
+  ingère élargit la surface de PII** : la question à poser en ouvrant un nouveau champ n'est
+  pas « ce champ est-il utile ? » mais « qui a écrit ce texte, et qu'y a-t-il mis ? ».
+  (b) **Un outil de nettoyage sans garde qui refuse ne protège rien** — une exécution
+  automatique oublierait de l'appeler. Le couple est indissociable : `expurgerPII` nettoie,
+  `piiGuard` refuse. Corollaire mesuré : un test qui VÉRIFIE des formes de PII en contient
+  par nature, et fait donc échouer le garde ; la bonne réponse est le marqueur d'exemple déjà
+  conventionné (`estExemple`), **jamais** d'ajouter le fichier aux exclusions — exclure est le
+  réflexe facile, et il laisse un angle mort permanent que plus rien ne signale.
+- **Un identifiant fourni par une source externe n'est pas forcément un identifiant.**
+  Le protocole de la veille disait « dédoublonner par lien ». Mesuré sur 64 offres Indeed :
+  le lien capte **zéro** doublon, l'identité (entreprise + titre + ville) en capte **quinze**.
+  Indeed forge un jeton de redirection par RÉSULTAT DE RECHERCHE — `get_job_details` rend
+  encore un autre lien pour le même `job_id`. Avant de bâtir une déduplication sur un champ,
+  vérifier qu'il est STABLE pour la même entité : le demander deux fois et comparer.
+  (L'app avait raison depuis le début : `trier()` dédoublonne par `cleDoublon`.)
+- **Une liste et son détail se contredisent : c'est le détail qui dit le lieu.** Deux offres
+  du 2026-08-12 étaient listées « Quebec City » alors que l'annonce disait « basé à Saguenay »
+  pour l'une et « territoire : grande région de Montréal » pour l'autre. Sans lecture, elles
+  entraient sur la carte de Québec avec une fausse distance — le critère n°1 de Marc, faux en
+  silence. Corriger `ville` d'après l'annonce, jamais d'après l'en-tête de la liste.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

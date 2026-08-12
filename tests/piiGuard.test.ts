@@ -196,6 +196,49 @@ describe("garde-fou n°1 — aucune donnée personnelle en clair", () => {
     expect(retirerAdressesDeDepot(`  "adresseSource": "${numero} ${voie}"`)).toMatch(motif);
   });
 
+  it("aucune PII de tiers dans les descriptions d'un dépôt", () => {
+    // ⚠️ LE VECTEUR QUE CE TEST FERME, ET POURQUOI IL EST NÉ APRÈS LES AUTRES.
+    //
+    // Le 2026-08-12, la veille a lu les annonces en entier pour la première fois. L'une
+    // d'elles (Randstad) portait le NOM, le COURRIEL et le PROFIL LINKEDIN PERSONNELS d'un
+    // recruteur. Aucun motif ci-dessus ne l'attrapait : il a fallu que je le voie. Une
+    // exécution automatique de la veille l'aurait committé sans broncher.
+    //
+    // `lib/ingest/expurger.ts` est l'OUTIL qui nettoie ; ce test est la GARDE qui refuse.
+    // Les deux sont nécessaires : un outil qu'on peut oublier d'appeler ne protège rien.
+    //
+    // PORTÉE ASSUMÉE : le scan est limité aux `data/depot/*.json`, seule surface où du texte
+    // écrit par un tiers entre dans le dépôt. Un motif de courriel appliqué à TOUT le repo
+    // signalerait `AUTHORIZED_EMAIL` dans `docs/DEPLOIEMENT.md` — l'adresse de Marc, documentée
+    // volontairement, qui n'est pas la PII d'un tiers. Un garde qui crie au loup sur une
+    // valeur légitime finit contourné ; celui-ci vise là où le risque a été MESURÉ.
+    const depots = FICHIERS.filter((f) => f.startsWith("data/depot/"));
+    const motifs: readonly { nom: string; motif: RegExp }[] = [
+      { nom: "courriel nominatif", motif: /[\p{L}][\p{L}'-]*\.[\p{L}][\p{L}'-]*@[\p{L}\d.-]+\.[a-z]{2,}/u },
+      { nom: "profil LinkedIn personnel", motif: /linkedin\.com\/in\// },
+      { nom: "téléphone", motif: /(?:\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/ },
+    ];
+    for (const { nom, motif } of motifs) {
+      expect(chercher(motif, depots), `PII de tiers (${nom}) dans un dépôt`).toEqual([]);
+    }
+  });
+
+  it("le scan des dépôts discrimine, et il a de quoi scanner", () => {
+    // Un scan qui ne voit AUCUN fichier passe à vide : protection nulle, silencieuse. Et un
+    // motif cassé passe à vide de la même façon. On prouve donc le VOLUME et la DÉTECTION.
+    const depots = FICHIERS.filter((f) => f.startsWith("data/depot/"));
+    expect(depots.length).toBeGreaterThan(0);
+
+    const courriel = /[\p{L}][\p{L}'-]*\.[\p{L}][\p{L}'-]*@[\p{L}\d.-]+\.[a-z]{2,}/u;
+    expect("Écrire à jean.dupont@exemple.ca").toMatch(courriel);
+    // La boîte de rôle — celle à laquelle Marc postule — ne doit PAS être vue comme de la PII.
+    expect("Écrire à carriere@exemple.ca").not.toMatch(courriel);
+
+    const tel = /(?:\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/;
+    expect("418 555-0142").toMatch(tel);
+    expect("Rémunération : 100 000,00 $ à 150 000,00 $").not.toMatch(tel);
+  });
+
   it("aucune coordonnée géographique en dur", () => {
     // Une latitude québécoise (46-47) suivie d'une longitude (-71) reconstituerait le
     // domicile aussi sûrement qu'une adresse.

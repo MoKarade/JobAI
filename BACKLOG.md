@@ -706,6 +706,15 @@
       jamais ingérée) : une offre non lue faute de quota n'est pas déposée, elle est reprise
       EN PREMIER le lendemain. Sans cette file, « garder pour demain » perd l'offre au
       prochain tri de la source.
+- [x] **[VEILLE-08]** Expurger la PII de tiers des annonces lues — `lib/ingest/expurger.ts`
+      (`expurgerPII`, PURE) + garde « aucune PII de tiers dans les descriptions d'un dépôt »
+      dans `piiGuard`. Né d'un cas RÉEL : une annonce Randstad portait le nom, le courriel et
+      le LinkedIn personnels d'un recruteur. La boîte de rôle (`carriere@…`) survit.
+- [ ] **[VEILLE-09]** Décaler le cron de l'app (`vercel.json`, `/api/cron/veille`) de 11:00 à
+      14:00 UTC. Aujourd'hui la Routine et le cron partent à la même heure : la Routine met
+      30-60 min à livrer, donc l'app ingère le dépôt de la VEILLE. La fenêtre de 7 jours de
+      `fichiersDansLaFenetre` évite toute perte, mais les offres arrivent avec un jour de
+      retard. Décision de Marc : c'est un changement de comportement en production.
 - [ ] **[LIEU-05]** Table `employeurs_adresse` (nom, adresse, source, url, dernier essai,
       échecs) : la recherche cible les employeurs SANS adresse et NON essayés récemment, plus
       jamais l'offre. Le budget d'un matin va aux employeurs neufs.
