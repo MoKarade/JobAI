@@ -611,6 +611,16 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   d'un accès » : avant d'élargir, VÉRIFIER OÙ SONT VRAIMENT LES MOITIÉS — ici la session
   neuve avait le réseau vers l'app (qu'elle a mesuré) et la session de développement ne
   l'a pas (re-mesuré 403 au CONNECT le 11/08), l'inverse de ce que j'avais supposé.
+  ⚠️ **MISE À JOUR 2026-08-13 — cette asymétrie n'est plus structurelle, elle était un effet
+  de la politique réseau par défaut.** Marc a élargi la politique de l'environnement
+  (`Trusted` → `Custom` + `*.hubperso.com`) : une session FRAÎCHEMENT provisionnée joint
+  `emploi.hubperso.com` sans problème (mesuré : `curl` direct, 401 propre de
+  `/api/hub/summary`, pas une redirection HTML). Mais le réglage vit au niveau de
+  l'ENVIRONNEMENT, pas de la session, et ne se relit qu'au (re)provisioning : LA SESSION DE
+  DÉVELOPPEMENT ELLE-MÊME (celle liée à la Routine, déjà active au moment du changement) est
+  restée bloquée après coup — re-testé le jour même. Donc `curl` direct est de nouveau une
+  vérification valide, mais seulement depuis une session ouverte APRÈS le changement de
+  politique ; une session ancienne reste un faux négatif jusqu'à son prochain provisioning.
 - **Un quota d'API partagé ne se mesure qu'en le heurtant, et il se referme en s'aggravant.**
   Indeed a rendu « Rate limit exceeded, try again in 26 s », puis 29, puis 51 après deux
   tentatives — le délai CROÎT à chaque appel refusé. Une boucle de retente serré ne fait donc
