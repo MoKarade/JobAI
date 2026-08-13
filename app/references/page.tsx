@@ -13,6 +13,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Cadre } from "@/components/Cadre";
 import { Panneaux } from "@/components/Panneaux";
+import { profilActif } from "@/lib/cv/depot";
+import { PROFIL_DEFAUT } from "@/lib/profil";
 
 export const metadata = { title: "Références — JobAI" };
 
@@ -22,6 +24,18 @@ export default async function References() {
   const session = await auth();
   if (!session) redirect("/connexion");
 
+  // ⚠️ LA LECTURE DU PROFIL NE DOIT PAS POUVOIR ÉTEINDRE CETTE PAGE. Elle n'a jamais eu
+  // d'écran de panne parce qu'elle ne dépendait de rien ; brancher le profil actif y
+  // introduit une dépendance à la base. Un incident effacerait alors le barème de l'écran
+  // alors qu'il est écrit dans le code — on retombe donc sur le défaut, et la page reste
+  // consultable (elle affiche la date du constat, qui dit lequel des deux on lit).
+  let profil = PROFIL_DEFAUT;
+  try {
+    profil = await profilActif();
+  } catch {
+    profil = PROFIL_DEFAUT;
+  }
+
   return (
     <Cadre actif="/references" titre="Références">
       <p className="intro-section">
@@ -30,7 +44,7 @@ export default async function References() {
         chiffre de marché sans provenance n’est plus utilisable en négociation six mois plus
         tard.
       </p>
-      <Panneaux />
+      <Panneaux profil={profil} />
     </Cadre>
   );
 }

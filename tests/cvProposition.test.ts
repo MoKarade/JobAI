@@ -112,6 +112,40 @@ describe("les écarts proposés", () => {
     expect(e.find((x) => x.cle === "recherches")).toBeUndefined();
   });
 
+  it("le SWOT s'ENRICHIT du CV, il ne se régénère pas", () => {
+    const e = calculerEcarts(
+      PROFIL_DEFAUT,
+      extraction({
+        forces: ["Mise en service d'automates Siemens sur trois sites"],
+        manques: ["Aucune certification en santé-sécurité"],
+      }),
+    );
+    const swot = e.find((x) => x.cle === "swot")?.valeur as typeof PROFIL_DEFAUT.swot;
+    const forces = swot.find((q) => q.cle === "forces")!;
+    const faiblesses = swot.find((q) => q.cle === "faiblesses")!;
+
+    // ⚠️ CE QUI A ÉTÉ PENSÉ SURVIT. « Mobilité limitée avant la résidence permanente
+    // (permis lié à l'employeur actuel) » ne sort d'aucun CV : si un téléversement pouvait
+    // l'effacer, le SWOT perdrait exactement ce qui fait sa valeur.
+    for (const q of PROFIL_DEFAUT.swot) {
+      const apres = swot.find((x) => x.cle === q.cle)!;
+      for (const p of q.points) expect(apres.points).toContain(p);
+    }
+    // Et ce qui vient du document est MARQUÉ : dans six mois, on doit pouvoir distinguer
+    // un constat pensé d'un constat lu.
+    expect(forces.points.some((p) => p.includes("Siemens") && p.endsWith("(CV)"))).toBe(true);
+    expect(faiblesses.points.some((p) => p.endsWith("(CV)"))).toBe(true);
+    // Les quadrants que le CV ne peut pas établir ne bougent pas.
+    expect(swot.find((q) => q.cle === "opportunites")?.points).toEqual(
+      PROFIL_DEFAUT.swot.find((q) => q.cle === "opportunites")?.points,
+    );
+  });
+
+  it("un CV sans force ni manque ne propose aucun écart de SWOT", () => {
+    expect(calculerEcarts(PROFIL_DEFAUT, EXTRACTION_VIDE).find((x) => x.cle === "swot"))
+      .toBeUndefined();
+  });
+
   it("les outils du CV enrichissent le vocabulaire technique, sans le remplacer", () => {
     const e = calculerEcarts(PROFIL_DEFAUT, extraction({ outils: ["TIA Portal", "SolidWorks"] }));
     const mots = e.find((x) => x.cle === "motsTechnique");

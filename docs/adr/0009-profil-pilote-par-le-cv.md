@@ -44,6 +44,25 @@ Un **profil unique et typé** (`lib/profil.ts`) devient la source de ce que l'ap
 la façon dont elle note, et de ce qu'elle affiche du positionnement de Marc. Le CV le
 **propose**, Marc le **valide**, et la validation recalcule tout.
 
+### Une réserve sur « ce que l'app cherche », mesurée après coup
+
+Le profil porte bien la liste `recherches`, et `lib/ingest/sources.ts` la lit désormais au
+lieu d'une copie en dur. Mais il faut dire où cette liste agit RÉELLEMENT aujourd'hui, sinon
+cet ADR promet plus que le code ne fait :
+
+- `RECHERCHES_GUICHET` est **vide** — le flux du Guichet-Emplois ne répond pas (constat de
+  `[INGEST-03]`). La passe quotidienne interroge donc les flux ATS d'entreprises et le point
+  de dépôt, **pas des termes de recherche**.
+- La liste sert donc au banc d'essai de la sonde, et servira la veille le jour où un flux
+  par mots-clés existera.
+- **La Routine quotidienne porte ses propres termes dans son prompt**, hors du dépôt. Un CV
+  validé ne les change pas.
+
+C'est une divergence réelle : un terme ajouté par un CV enrichit le profil sans modifier ce
+que la Routine tape le matin. La refermer suppose que la Routine LISE le profil (via un
+endpoint dédié) plutôt que de porter sa liste en dur — c'est un chantier à part, tracé au
+backlog. Le dire ici vaut mieux que laisser croire que la boucle est bouclée.
+
 Les quatre arbitrages, tels que tranchés :
 
 1. **Le fichier de CV est CONSERVÉ en base.** Il peut donc être ré-analysé sans être

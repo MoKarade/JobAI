@@ -173,7 +173,65 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
     });
   }
 
+  // ── La position ──────────────────────────────────────────────────────────
+  // Le CV nourrit les FAITS des quadrants, jamais le jugement. « Mobilité limitée avant la
+  // résidence permanente (permis lié à l'employeur actuel) » ne sort d'aucun CV : un SWOT
+  // régénéré automatiquement perdrait exactement ce qui fait sa valeur.
+  //
+  // On AJOUTE donc aux quadrants existants, on ne les remplace pas — et seulement ce que le
+  // document ÉTABLIT : des forces constatées, des manques objectifs. Chaque point ajouté
+  // porte sa marque d'origine, pour qu'on sache six mois plus tard ce qui a été pensé et ce
+  // qui a été lu.
+  const swotPropose = fusionnerSwot(courant.swot, extraction.forces, extraction.manques);
+  if (swotPropose !== null) {
+    const compte = (qs: readonly { points: readonly string[] }[]) =>
+      qs.reduce((n, q) => n + q.points.length, 0);
+    ecarts.push({
+      cle: "swot",
+      libelle: "Analyse de position",
+      nature: "consequence",
+      avant: `${compte(courant.swot)} constats`,
+      apres: `${compte(swotPropose)} constats`,
+      provenance:
+        "Ajouts tirés du CV, marqués « (CV) ». Les constats existants sont conservés — " +
+        "le jugement reste le tien.",
+      valeur: swotPropose,
+    });
+  }
+
   return ecarts;
+}
+
+/**
+ * Ajoute au SWOT ce que le CV établit, sans jamais retirer ce qui y était.
+ *
+ * Rend `null` quand il n'y a rien à ajouter — pour que l'écran ne montre pas un écart vide.
+ * Les points ajoutés sont suffixés « (CV) » : dans six mois, on doit pouvoir distinguer un
+ * constat pensé d'un constat lu, sinon les deux se valent et aucun ne vaut rien.
+ */
+function fusionnerSwot(
+  courant: Profil["swot"],
+  forces: readonly string[],
+  manques: readonly string[],
+): Profil["swot"] | null {
+  const MARQUE = " (CV)";
+  const dejaLa = (q: { points: readonly string[] }, p: string) =>
+    q.points.some((x) => x.toLowerCase().includes(p.toLowerCase().slice(0, 40)));
+
+  let change = false;
+  const fusion = courant.map((q) => {
+    const source = q.cle === "forces" ? forces : q.cle === "faiblesses" ? manques : [];
+    const ajouts = source
+      .filter((p) => !dejaLa(q, p))
+      .map((p) => `${p}${MARQUE}`)
+      // Un quadrant plafonne à 12 points (schéma) : on garde de la place pour l'existant.
+      .slice(0, Math.max(0, 12 - q.points.length));
+    if (ajouts.length === 0) return q;
+    change = true;
+    return { ...q, points: [...q.points, ...ajouts] };
+  });
+
+  return change ? fusion : null;
 }
 
 /**

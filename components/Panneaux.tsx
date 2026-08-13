@@ -10,7 +10,8 @@ import {
   PONDERATION,
   RAYON_MAX_KM,
 } from "@/lib/scoring";
-import { ENTREPRISES_CIBLES, SALAIRES_MARCHE, SWOT } from "@/lib/reference";
+import { ENTREPRISES_CIBLES, SALAIRES_MARCHE } from "@/lib/reference";
+import { PROFIL_DEFAUT, type Profil, type QuadrantSwot } from "@/lib/profil";
 
 /**
  * Explication de chaque composante du barème.
@@ -145,13 +146,25 @@ function Salaires() {
   );
 }
 
-function Swot() {
+/**
+ * L'analyse de position.
+ *
+ * ⚠️ ELLE VIENT DU PROFIL ACTIF (ADR-0009), pas d'une constante. Un CV validé peut donc
+ * l'actualiser — mais seulement pour ses FAITS. Le jugement reste écrit par Marc :
+ * « mobilité limitée avant la résidence permanente (permis lié à l'employeur actuel) » ne
+ * sort d'aucun CV, et un SWOT régénéré automatiquement perdrait exactement ce qui fait sa
+ * valeur : il a été pensé.
+ *
+ * La DATE du constat est affichée pour la même raison qu'un repère de salaire porte la
+ * sienne : une lecture de position sans date ne se relit pas, elle se croit.
+ */
+function Swot({ quadrants, etabliLe }: { quadrants: readonly QuadrantSwot[]; etabliLe: string }) {
   return (
     <details className="panneau">
       <summary>Position et stratégie</summary>
       <div className="panneau__corps">
         <div className="grille-swot">
-          {SWOT.map((q) => (
+          {quadrants.map((q) => (
             <section key={q.cle} className={`quadrant quadrant--${q.cle}`}>
               <h3>{q.titre}</h3>
               <ul>
@@ -162,18 +175,27 @@ function Swot() {
             </section>
           ))}
         </div>
+        <p className="panneau__note">Établie le {etabliLe}.</p>
       </div>
     </details>
   );
 }
 
-export function Panneaux() {
+/**
+ * `profil` est OPTIONNEL, et son défaut est celui du code.
+ *
+ * C'est ce qui permet à la page Références de s'afficher sans lire la base — elle n'a
+ * jamais eu d'écran de panne, justement parce qu'elle ne dépendait de rien. Une page qui
+ * exigerait le profil actif prendrait cette dépendance, et le premier incident de base
+ * effacerait le barème de l'écran alors qu'il est écrit dans le code.
+ */
+export function Panneaux({ profil = PROFIL_DEFAUT }: { profil?: Profil }) {
   return (
     <div className="panneaux">
       <Bareme />
       <Entreprises />
       <Salaires />
-      <Swot />
+      <Swot quadrants={profil.swot} etabliLe={profil.etabliLe} />
     </div>
   );
 }

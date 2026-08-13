@@ -499,12 +499,55 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   `manifest.background_color`/`theme_color` sont HORS du CSS — une valeur claire oubliée
   dans le manifeste fait un flash blanc au démarrage de l'app installée, et personne ne
   regarde le manifeste en revoyant une feuille de style.
+- **Une lecture de format binaire écrite à la main s'éprouve sur des fichiers TIERS, ou elle
+  ment.** J'ai écrit un lecteur de PDF (zlib + opérateurs `Tj`/`TJ`) : raisonnement
+  défendable, tests verts, et deux échecs sur les deux premiers PDF réels rencontrés. Le
+  pire n'était pas le faux négatif (« c'est un scan » sur un document plein de texte) mais
+  le faux POSITIF : **76 784 caractères de binaire d'image annoncés comme un succès**, prêts
+  à partir vers un modèle qui en aurait tiré un profil entièrement inventé. Un test écrit
+  par l'auteur du parseur valide ses propres hypothèses, pas le format. Règle : soit une
+  bibliothèque éprouvée, soit une épreuve sur des fichiers que personne n'a produits pour ce
+  test. Et l'échec d'un extracteur doit être **impossible à confondre avec un succès
+  maigre** — d'où un seuil de vraisemblance, pas seulement un `try/catch`.
+- **Un test qui EXIGE un fichier absent de la CI transforme une dépendance de machine en
+  rouge permanent.** J'avais vu le risque (« un test sauté en silence a cessé de protéger »)
+  et tranché du mauvais côté : assertion dure ⇒ CI rouge sur autre chose qu'un défaut du
+  code. Et committer les fichiers était exclu — l'un montrait du contenu réel du Drive de
+  Marc. Le bon geste : **construire les cas** (ils sont lus par une bibliothèque tierce, qui
+  refuserait une structure fantaisiste) et garder les fichiers réels en épreuve
+  SUPPLÉMENTAIRE, jamais en condition de réussite.
+- **Un garde de données personnelles fait des faux positifs, et c'est le garde qui a
+  raison.** Les coordonnées d'un rectangle dans un PDF d'épreuve (trois groupes de trois
+  chiffres) ont été lues comme un numéro d'assurance sociale. Puis le COMMENTAIRE qui citait
+  la valeur fautive a rejoué l'échec — un scan de source ne distingue pas une explication de
+  la chose expliquée. On adapte la donnée d'épreuve, jamais le motif : un garde qu'on
+  assouplit une fois « parce que c'était un faux positif » ne protège plus rien.
+- **Une bibliothèque peut DÉTACHER le tampon qu'on lui passe.** `getDocumentProxy` (pdf.js)
+  ramène le `Uint8Array` de l'appelant à 0 octet — mesuré, 124 310 → 0. Comme l'appelant
+  stockait le fichier APRÈS l'extraction, la base aurait reçu des CV vides, sans la moindre
+  erreur, invisibles jusqu'à la première ré-analyse. Réflexe : quand une fonction tierce
+  reçoit un tampon et rend un objet qui « possède » les données, **copier avant** et
+  verrouiller par un test qui compare la longueur avant/après.
 - **Un contrôle promis en prose (« il suffira de grep ») ne verrouille rien.** L'ADR-0008
   annonçait « `grep prefers-color-scheme` ne doit rien rendre ». Personne ne lance ce grep :
   le second thème se serait reformé règle par règle sans qu'aucun test ne tombe. Le verrou
   vit dans le même commit que la décision (`tests/styles.test.ts`, discrimination prouvée en
   réintroduisant une media query), et il scanne les RÈGLES en écartant les commentaires —
   sinon il échoue sur le commentaire qui explique pourquoi il existe, et on le retire.
+- **Un test « la garde couvre-t-elle X ? » se vérifie en RETIRANT la garde.** En ajoutant une
+  page, j'ai voulu confirmer que `routesGardees.test.ts` l'attrapait : il passait toujours
+  après suppression du `await auth()` de la page. Il n'était pas fautif — il éprouve la
+  décision de la MIDDLEWARE, ce qui est son périmètre. Mais chaque page porte AUSSI une
+  revérification que les commentaires appellent « défense en profondeur », promesse vérifiée
+  nulle part. L'invariant tenait partout ; il n'était simplement pas protégé, et quelqu'un
+  l'aurait un jour supprimé en le croyant décoratif. Réflexe : quand un commentaire annonce
+  une SECONDE ligne de défense, chercher le test qui la couvre — s'il n'existe pas, elle
+  n'existe qu'en intention.
+- **Ajouter un paramètre à une fonction d'un seul argument piège tous les `map(fn)`.**
+  `xs.map(scoreDistance)` passe (valeur, INDEX, tableau) : l'index atterrit dans le nouveau
+  paramètre. Ici ça LÈVE (un nombre n'a pas de `.paliersDistanceKm`), donc ça se voit ; avec
+  un défaut numérique plausible, ça noterait faux en silence. Grep les appels sans
+  parenthèses avant d'élargir une signature.
 - **Quand une passe fait PLUSIEURS travaux, son déclencheur doit couvrir CHACUN d'eux.**
   Le gate des pages était « une offre n'a pas de distance ». Il se referme au moment précis
   où toutes les distances sont mesurées — donc où les trajets se mettent à marcher — et il

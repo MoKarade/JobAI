@@ -6,6 +6,55 @@
 
 ---
 
+## Session 2026-08-13 (suite) — le CV pilote le profil (ADR-0009)
+
+### État en une page
+
+| | |
+|---|---|
+| **Gate** | `typecheck` + `test` (**907**) + `lint` (0 erreur) + `build` verts. `npm audit --omit=dev` = **0**. |
+| **La demande** | Marc : « je veux la possibilité d'uploader mon CV pour que la recherche de job se fasse par rapport à ça, et que tout s'update, les scores, les SWOT, les critères ». Il a demandé un plan et des questions d'abord — quatre posées, quatre tranchées. |
+| **Le constat qui a changé la forme du travail** | Le profil de Marc EXISTAIT déjà, éclaté dans trois fichiers qui ne savaient pas qu'ils décrivaient un profil (`scoring.ts`, `reference.ts`, `ingest/sources.ts`). Le vrai travail n'était pas « analyser un PDF ». |
+| **Ses quatre choix** | CV **conservé en base** · **rien ne s'applique sans sa validation** · **re-notation immédiate** à la validation · **chantier livré entier**. |
+| **Ce qui n'était PAS négociable** | Une note `scoreSource: "manuel"` n'est jamais écrasée par un recalcul. Pas dans la question — c'est la règle du barème. |
+
+### Ce qu'il reste à faire, côté Marc
+
+**`ANTHROPIC_API_KEY` dans l'environnement Vercel.** Sans elle, le téléversement fonctionne,
+le fichier est stocké, et l'extraction rend un échec NOMMÉ (« clé absente ») — jamais un
+profil inventé. Une fois la clé posée, « ré-analyser » suffit : pas besoin de re-téléverser.
+
+### Trois erreurs que j'ai faites, et ce qu'elles ont appris
+
+1. **J'ai écrit un lecteur de PDF à la main.** Il passait ses propres tests. Sur les deux
+   premiers PDF réels rencontrés : un faux « c'est un scan » sur un document plein de texte,
+   et — bien pire — **76 784 caractères de binaire d'image annoncés comme un SUCCÈS**, prêts
+   à produire un profil entièrement inventé. Remplacé par `unpdf`, correct sur les deux.
+2. **J'ai mis la CI au rouge** en exigeant la présence de PDF qui n'existent que sur ma
+   machine. Les committer était exclu (l'un montre du contenu réel du Drive de Marc). Les
+   cas sont désormais construits et lus par pdf.js.
+3. **Le garde PII m'a corrigé deux fois de suite** : les coordonnées d'un rectangle
+   ressemblaient à un NAS, puis le commentaire qui citait la valeur fautive a rejoué
+   l'échec. C'est la donnée d'épreuve qui s'adapte, jamais le motif.
+
+### Une garde manquante, trouvée en vérifiant
+
+`routesGardees.test.ts` ne voyait PAS la disparition du `await auth()` d'une page — il
+éprouve la middleware, ce qui est son périmètre. Mais chaque page porte une revérification
+que les commentaires appellent « défense en profondeur », et rien ne la protégeait.
+L'invariant tenait partout ; il est maintenant verrouillé.
+
+### Ce qui reste ouvert
+
+- **La Routine quotidienne porte ses termes de recherche dans son prompt**, hors du dépôt :
+  un CV validé enrichit le profil sans changer ce qu'elle tape le matin. Divergence réelle,
+  écrite dans l'ADR plutôt que laissée croire résolue (`[CV-08]`).
+- `lib/cv/actions.ts` et `lib/cv/depot.ts` (les I/O) ne sont pas testés — la logique pure
+  l'est, à 46 tests (`[CV-09]`).
+- Un PDF scanné reste illisible : l'app le dit et donne le remède (`[CV-10]`).
+- **`CLAUDE.md` fait 867 lignes pour un « plafond assumé : 150 »**, et il se charge à chaque
+  session (`[CV-11]`).
+
 ## Session 2026-08-13 — « on dirait un logiciel de gestion » : la refonte visuelle
 
 ### État en une page

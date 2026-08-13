@@ -188,10 +188,15 @@
 
 ## Chantier #03 — V3 : IA ⬜
 
-- [ ] 🧭 **`[V3-00]`** ADR-0002 : accès au CV dans Google Drive. ⚠️ Deux scopes Google
-      restreints sur la même app OAuth — la piste `drive.file` + sélecteur de fichier évite
-      le scope large.
-- [ ] 🔧 **`[V3-01]`** `promptSafety` (assainissement + balisage des données non maîtrisées).
+- [x] ~~🧭 **`[V3-00]`** ADR-0002 : accès au CV dans Google Drive~~ — **RETIRÉ** par
+      ADR-0009 (2026-08-13). Marc a choisi le téléversement direct + stockage en base : les
+      deux scopes Google restreints deviennent inutiles. C'était le blocage le plus coûteux
+      du chantier IA, et il disparaît sans être résolu — la meilleure façon de fermer un
+      ticket.
+- [x] 🔧 **`[V3-01]`** `promptSafety` (assainissement + balisage des données non maîtrisées).
+      Livré 2026-08-13 (`lib/promptSafety.ts`). Neutralise les marqueurs de STRUCTURE, pas
+      la sémantique — et le dit : « oublie ce qu'on t'a dit » en français courant passe, et
+      passera toujours. La vraie défense est que le modèle ne fait que PROPOSER.
 - [ ] 🔧 **`[V3-02]`** Notation par lecture de la description (remplace le plafond à 85).
       Passe par le protocole de précision du `CLAUDE.md` §8 : tableau avant/après sur les 38 offres.
 - [ ] 🔧 **`[V3-03]`** Tri intelligent des réponses de recruteurs.
@@ -200,6 +205,40 @@
       Jamais estimé, uniquement mesuré.
 - [ ] 🔧 **`[V3-06]`** Plafond budgétaire chiffré, non désactivable, qui suspend les
       traitements de fond mais jamais une action déclenchée par Marc.
+
+## Chantier #08 — CV et profil (ADR-0009) 🟩
+
+> Demandé par Marc le 2026-08-13 : « je veux la possibilité d'uploader mon CV pour que la
+> recherche de job se fasse par rapport à ça, et que tout s'update ». Livré le jour même,
+> lots CV-00 à CV-06.
+
+- [x] 🧭 **`[CV-00]`** ADR-0009 — le profil sort du code, le CV le remplit.
+- [x] 🔧 **`[CV-01]`** `lib/profil.ts` : FAITS (vérifiables dans un CV) séparés des
+      ARBITRAGES (le barème, qu'aucun CV ne contient). Non-régression prouvée par empreinte
+      md5 des 142 sorties du barème, avant/après.
+- [x] 🔧 **`[CV-02]`** `promptSafety` (= `[V3-01]`).
+- [x] 🔧 **`[CV-03]`** Téléversement, lecture (unpdf), extraction, stockage.
+- [x] 🔧 **`[CV-04]`** Écran de revue : rien n'est coché d'avance, la provenance est
+      affichée, son absence est dite.
+- [x] 🔧 **`[CV-05]`** Re-notation immédiate à la validation, notes manuelles préservées.
+- [x] 🔧 **`[CV-06]`** SWOT enrichi par les FAITS du CV, jugement conservé et marqué.
+
+### Ce qui reste ouvert sur ce chantier
+
+- [ ] 👤 **`[CV-07]`** Poser `ANTHROPIC_API_KEY` dans l'environnement Vercel. **Sans elle,
+      l'extraction ne tourne pas** — elle rend un échec nommé, jamais un profil inventé, et
+      le CV reste stocké pour être ré-analysé d'un clic ensuite.
+- [ ] 🔧 **`[CV-08]`** La Routine quotidienne porte ses termes de recherche dans son PROMPT,
+      hors du dépôt : un CV validé enrichit `profil.recherches` sans changer ce qu'elle tape
+      le matin. Divergence réelle, nommée dans l'ADR-0009. La fermer suppose que la Routine
+      LISE le profil (endpoint dédié, gardé comme `/api/ingest/depot`).
+- [ ] 🔧 **`[CV-09]`** Aucun test ne couvre `lib/cv/actions.ts` ni `lib/cv/depot.ts` (I/O).
+      La logique PURE l'est (46 tests) ; les actions ne le sont pas.
+- [ ] 🔧 **`[CV-10]`** Un PDF SCANNÉ reste illisible (pas de reconnaissance de caractères).
+      L'app le dit et propose le remède ; c'est une limite, pas un bug.
+- [ ] 🔧 **`[CV-11]`** `CLAUDE.md` fait 867 lignes pour un « plafond assumé : 150 ». Il se
+      charge à chaque session : le distiller vers `docs/LESSONS.md` en gardant ici les seules
+      règles qui changent la façon de coder.
 
 ## Chantier #04 — V4 : ingestion d'offres ⬜
 
