@@ -27,17 +27,18 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Le fond descend SOUS les cartes : c'est cet écart de clarté, et lui seul,
-     qui les détache. */
-  --bg: oklch(96.5% 0.003 265);
-  --surface: oklch(100% 0 0);
+  /* ⚠️ NEUTRE CHAUD (~90°), PAS BLEU-GRIS. C'est le premier geste de « Poste de
+     nuit » (ADR-0008) et le moins visible ligne à ligne : un gris neutre se lit
+     comme un défaut de fabrique, un gris légèrement tiré vers l'ambre se lit
+     comme un choix. La teinte est la même dans les deux thèmes — c'est ce qui
+     fait que le clair et le sombre sont la MÊME app, pas deux apps. */
+  --bg: oklch(96.5% 0.009 90);
+  --surface: oklch(99.4% 0.004 90);
   /* Creux : survol, pastilles neutres, fonds de faits. Entre le fond et la carte. */
-  --creux: oklch(94% 0.004 265);
-  --text: oklch(19% 0.015 265);
-  --text-soft: oklch(45% 0.014 265);
-  /* Le trait ne survit QUE dans une carte, pour séparer les éléments d'une liste.
-     Il ne dessine plus aucun contour. */
-  --border: oklch(91% 0.004 265);
+  --creux: oklch(93.5% 0.011 90);
+  --text: oklch(22% 0.018 80);
+  --text-soft: oklch(45% 0.018 85);
+  --border: oklch(89.5% 0.013 90);
   --accent: oklch(58% 0.19 275);
 
   /* Deux voix. Les variables viennent de `next/font` (app/layout.tsx) : les
@@ -57,14 +58,21 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Le sombre n'est pas une inversion : le fond descend sous les cartes,
-       exactement comme le gris descend sous le blanc en clair. */
-    --bg: oklch(15% 0.012 265);
-    --surface: oklch(20% 0.015 265);
-    --creux: oklch(25% 0.016 265);
-    --text: oklch(93% 0.008 265);
-    --text-soft: oklch(72% 0.014 265);
-    --border: oklch(28% 0.018 265);
+    /* ⚠️ C'EST ICI QUE VIT L'IDENTITÉ (ADR-0008). « Poste de nuit » est une
+       direction SOMBRE : c'est le soir qu'on regarde des offres, pas le matin.
+       Le clair ci-dessus en est le pendant fidèle, pas l'inverse.
+
+       Charbon CHAUD, jamais le bleu-noir habituel des interfaces sombres : sur
+       une teinte tiède, l'ambre publiée au hub devient lumineuse au lieu de
+       jurer. Trois niveaux qui s'éclairent en montant (fond → carte → relief) :
+       c'est cette montée, et le contour ci-dessous, qui répondent au « c'est
+       plat » — pas des marges plus grandes. */
+    --bg: oklch(18.2% 0.017 97);
+    --surface: oklch(22.2% 0.017 92);
+    --creux: oklch(26.5% 0.020 90);
+    --text: oklch(93.8% 0.021 89);
+    --text-soft: oklch(70.1% 0.033 88);
+    --border: oklch(30.2% 0.025 91);
   }
 }
 
@@ -193,7 +201,9 @@ code {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ambre: oklch(78% 0.14 75);
+    /* Sur le charbon chaud, l'ambre se pose à sa valeur PUBLIÉE (#f2a31b vaut
+       ~77 %) : c'est là qu'elle est lumineuse. L'assombrir la rendrait brune. */
+    --ambre: oklch(77.5% 0.155 73);
     --vert: oklch(72% 0.13 155);
     --bleu: oklch(72% 0.12 250);
     --rouge: oklch(68% 0.16 25);
@@ -226,8 +236,21 @@ code {
   /* Rondeur « douce et sobre » (choix de Marc) : 12 px sur les surfaces, pilule
      sur ce qui se clique, 10 px sur ce qui se saisit. */
   --r-pill: 999px;
-  --r-carte: 12px;
+  --r-carte: 16px;
   --r-champ: 10px;
+
+  /* ⚠️ LE CONTOUR REVIENT SUR LES SURFACES, ET C'EST UN REVIREMENT ASSUMÉ
+     (ADR-0008 ; le 2026-08-05 les avait tous retirés).
+
+     La règle d'alors — « une carte blanche sur un fond gris se détache déjà,
+     la lumière suffit » — est VRAIE EN CLAIR et FAUSSE EN SOMBRE. Entre un
+     fond à 18 % et une carte à 22 %, l'écart de clarté est quatre fois plus
+     faible qu'entre du gris 96 % et du blanc : sans trait, les cartes fondent
+     dans le fond et l'écran redevient le magma plat que Marc signalait.
+
+     Un seul trait, très discret, et AUCUNE ombre au repos : on ne réempile pas
+     les trois signaux de l'écran d'avant (ombre + rayon + liseré). */
+  --trait-surface: 1px solid var(--border);
 
   /* ⚠️ PLUS D'OMBRE SUR LES SURFACES. Choix de Marc : la séparation se fait par
      la lumière — une carte blanche sur un fond gris se détache déjà. Ces deux
@@ -238,10 +261,13 @@ code {
 
   /* ESPACEMENT — l'outil n°1 de l'épure. Élargi d'environ un quart : c'est le blanc
      autour d'un élément qui le fait respirer, pas la finesse de sa bordure. */
+  /* Densité 1,20 — réglée par Marc au curseur, sur maquette, le 2026-08-13.
+     Un fond sombre pèse plus lourd qu'un fond clair : il lui faut PLUS d'air,
+     pas autant. C'est l'échelle d'avant multipliée par 1,2 sur les grands pas. */
   --pas: 0.5rem;
-  --pas-2: 1.125rem;
-  --pas-3: 1.875rem;
-  --pas-4: 3rem;
+  --pas-2: 1.35rem;
+  --pas-3: 2.25rem;
+  --pas-4: 3.6rem;
 }
 
 .page {
@@ -339,11 +365,73 @@ code {
 .bord {
   display: flex;
   flex-wrap: wrap;
-  gap: 2.25rem;
+  align-items: center;
+  gap: 1.5rem 2.75rem;
   background: var(--surface);
+  border: var(--trait-surface);
   border-radius: var(--r-carte);
-  padding: 1.25rem 1.6rem;
+  padding: 1.5rem 1.8rem;
   margin: var(--pas-2) 0;
+}
+/* Le vivier, à part de l'entonnoir : ce n'est pas une ÉTAPE, c'est la qualité de ce
+   qu'on a en main. Le seul chiffre à porter l'ambre sur cet écran. */
+.bord__fort { display: flex; flex-direction: column; flex: none; }
+.bord__n {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 2.4rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--ambre);
+}
+.bord__l {
+  font-size: var(--t-s);
+  color: var(--text-soft);
+  margin-top: 0.35rem;
+  max-width: 8rem;
+}
+
+/* ── L'entonnoir ─────────────────────────────────────────────────────────
+   Quatre étages dont chacun est un sous-ensemble du précédent. La LARGEUR
+   porte la proportion — c'est elle qui rend visible « 8 CV pour 38 offres »
+   sans faire la division. Le nombre reste écrit dans la barre : la couleur
+   et la taille ne portent jamais seules l'information (WCAG 1.4.1). */
+.entonnoir {
+  flex: 1 1 22rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.etage {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  align-items: center;
+  gap: 0.9rem;
+}
+.etage__l {
+  font-size: var(--t-s);
+  color: var(--text-soft);
+  text-align: right;
+}
+.etage__piste { display: flex; align-items: center; min-width: 0; }
+.etage__barre {
+  height: 1.85rem;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 0.65rem;
+  border-radius: 7px;
+  background: var(--creux);
+  color: var(--text);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--t-s);
+}
+/* Le but de tout l'entonnoir. Il se signale, et il est le seul à le faire. */
+.etage__barre--but {
+  background: color-mix(in oklab, var(--vert) 24%, var(--creux));
+  color: var(--text);
 }
 .stat {
   padding: 0;
@@ -426,15 +514,17 @@ code {
 }
 
 /* ── Cartes d'offre ──────────────────────────────────────────────────────── */
-.liste { display: flex; flex-direction: column; gap: 0.75rem; }
-/* ⚠️ NI CONTOUR, NI OMBRE, NI LISERÉ. Les trois ensemble remplissaient l'écran
-   sans rien hiérarchiser — c'est la cause commune des quatre griefs de Marc.
-   Une carte blanche sur un fond gris se détache déjà : la lumière suffit. */
+.liste { display: flex; flex-direction: column; gap: 0.95rem; }
+/* Un CONTOUR, pas d'ombre, pas de liseré de palier (ADR-0008). Le trait rend aux
+   cartes le relief que la seule différence de clarté ne porte plus sur fond
+   sombre ; l'ombre et le liseré restent bannis — c'est leur EMPILEMENT qui avait
+   rempli l'écran sans rien hiérarchiser. Le palier se dit par le cercle de la
+   note, dont la couleur vient de `lib/couleurNote.ts`. */
 .carte {
   background: var(--surface);
-  border: 0;
+  border: var(--trait-surface);
   border-radius: var(--r-carte);
-  padding: 1.25rem 1.4rem;
+  padding: 1.5rem 1.8rem;
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
@@ -540,6 +630,27 @@ code {
   align-self: start;
 }
 .carte__km--inconnue { color: var(--text-soft); }
+
+/* ── La jauge de distance ────────────────────────────────────────────────
+   Cinq segments, un par palier du barème (`PALIERS_DISTANCE_KM`). Une offre à
+   3,5 km les allume tous, une offre à 33 km n'en allume qu'un : le critère n°1
+   de Marc devient comparable d'une ligne à l'autre sans lire les chiffres.
+   Elle DOUBLE la distance écrite juste au-dessus, elle ne la remplace pas —
+   une information portée par la seule longueur d'une barre serait perdue pour
+   qui ne la voit pas (WCAG 1.4.1), d'où l'`aria-hidden` côté composant. */
+.jauge-km {
+  display: flex;
+  gap: 2px;
+  margin-top: 0.35rem;
+  justify-content: flex-end;
+}
+.jauge-km > span {
+  width: 0.7rem;
+  height: 0.25rem;
+  border-radius: 1px;
+  background: var(--border);
+}
+.jauge-km > .jauge-km__on { background: var(--bleu); }
 
 /* Ce qui traverse toute la largeur, sous les trois colonnes. */
 .carte__notes,
@@ -866,9 +977,32 @@ code {
      entouré de vide. Le plancher garde un plan utilisable sur un portable. */
   height: clamp(28rem, calc(100vh - 22rem), 56rem);
   margin: 0;
-  border: 0;
+  border: var(--trait-surface);
   border-radius: var(--r-carte);
   background: var(--surface);
+}
+
+/* ── Les tuiles en thème sombre ──────────────────────────────────────────
+   OpenStreetMap ne sert que des tuiles CLAIRES. Posées telles quelles dans
+   « Poste de nuit », elles font un rectangle blanc éblouissant au milieu du
+   charbon — le seul endroit de l'app où le regard se fait agresser.
+
+   ⚠️ LE FILTRE VISE `.leaflet-tile-pane`, JAMAIS LE CONTENEUR. Appliqué au
+   conteneur, il inverserait AUSSI les épingles : la couleur d'une note vient
+   de `lib/couleurNote.ts` et encode une donnée (ADR-0008) — l'inverser ferait
+   lire un 92 en violet et détruirait l'échelle. Les épingles vivent dans
+   `.leaflet-overlay-pane`, les tuiles dans `.leaflet-tile-pane` : c'est cette
+   séparation qui rend le geste sûr.
+
+   Choisi contre un fournisseur de tuiles sombres (CartoDB) : celui-ci aurait
+   ajouté un domaine externe à la frontière réseau de l'app pour un gain
+   esthétique. Un filtre CSS ne coûte aucune dépendance et se retire en une
+   ligne. Le rendu est un peu moins juste qu'un vrai fond sombre — c'est le
+   prix assumé. */
+@media (prefers-color-scheme: dark) {
+  .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
+  }
 }
 .carte__compte {
   font-family: var(--mono);
@@ -1249,7 +1383,8 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   padding: 16px 18px;
   border-radius: var(--r-carte);
   background: var(--surface);
-  box-shadow: var(--ombre-1);
+  /* Le trait remplace l'ombre : aucune surface n'est soulevée au repos (ADR-0008). */
+  border: var(--trait-surface);
 }
 .relances__titre {
   margin: 0 0 4px;

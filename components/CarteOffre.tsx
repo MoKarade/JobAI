@@ -21,7 +21,7 @@
 import { useId, useState } from "react";
 import Link from "next/link";
 import type { Offre } from "@/lib/types";
-import { palier } from "@/lib/scoring";
+import { palier, PALIERS_DISTANCE_KM } from "@/lib/scoring";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { Fait } from "./Icone";
@@ -101,6 +101,22 @@ export function CarteOffre({ offre }: { offre: Offre }) {
         <Fait genre="route" discret={offre.km === null}>
           {offre.km !== null ? formaterKm(offre.km) : "—"}
         </Fait>
+        {/* La jauge REND VISIBLE ce que le barème fait déjà du kilométrage : un segment
+            allumé par palier atteint. Les seuils viennent de `PALIERS_DISTANCE_KM`, pas
+            d'une copie locale — sinon l'écran finirait par décrire un calcul périmé.
+
+            `aria-hidden` : elle ne dit rien de plus que la distance juste au-dessus, qui
+            est déjà lue. La répéter n'informerait pas, elle encombrerait. */}
+        {offre.km !== null ? (
+          <span className="jauge-km" aria-hidden="true">
+            {PALIERS_DISTANCE_KM.map((p) => (
+              <span
+                key={p.max}
+                className={offre.km !== null && offre.km <= p.max ? "jauge-km__on" : undefined}
+              />
+            ))}
+          </span>
+        ) : null}
       </p>
 
       {/* Le bloc déplié est TOUJOURS dans le DOM, simplement masqué : `hidden` le retire du

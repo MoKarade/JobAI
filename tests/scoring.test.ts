@@ -12,6 +12,7 @@ import {
   dansLeRayon,
   palier,
   scoreDistance,
+  PALIERS_DISTANCE_KM,
   scoreFitRole,
   scoreImmigration,
   scoreSalaire,
@@ -225,5 +226,39 @@ describe("paliers et rayon", () => {
     expect(dansLeRayon(null)).toBe(true);
     expect(dansLeRayon(RAYON_MAX_KM)).toBe(true);
     expect(dansLeRayon(RAYON_MAX_KM + 1)).toBe(false);
+  });
+});
+
+/**
+ * Le verrou de la jauge de distance (ADR-0008).
+ *
+ * L'interface allume un segment par palier atteint en LISANT `PALIERS_DISTANCE_KM`. Ce
+ * test prouve que cette table est bien celle que `scoreDistance` applique : sans lui,
+ * quelqu'un pourrait régler un seuil dans la fonction sans toucher la table, et l'écran
+ * décrirait un barème qui n'existe plus — sans qu'aucun test ne tombe.
+ */
+describe("paliers de distance — la table EST le barème", () => {
+  it("chaque palier rend ses points, à la borne exacte", () => {
+    for (const p of PALIERS_DISTANCE_KM) {
+      expect(scoreDistance(p.max)).toBe(p.points);
+    }
+  });
+
+  it("juste au-dessus d'une borne, on tombe dans le palier suivant", () => {
+    // Discrimination : si la fonction ignorait la table, ces deux comptes coïncideraient.
+    for (let i = 0; i < PALIERS_DISTANCE_KM.length - 1; i += 1) {
+      const ici = PALIERS_DISTANCE_KM[i]!;
+      const suivant = PALIERS_DISTANCE_KM[i + 1]!;
+      expect(scoreDistance(ici.max + 0.1)).toBe(suivant.points);
+      expect(suivant.points).toBeLessThan(ici.points);
+    }
+  });
+
+  it("la table est ordonnée et couvre le rayon utile", () => {
+    const bornes = PALIERS_DISTANCE_KM.map((p) => p.max);
+    expect(bornes).toEqual([...bornes].sort((a, b) => a - b));
+    // La jauge n'a de sens que si le dernier palier reste SOUS le rayon maximal : au-delà,
+    // l'offre est écartée et il n'y a plus rien à jauger.
+    expect(bornes[bornes.length - 1]!).toBeLessThan(RAYON_MAX_KM);
   });
 });

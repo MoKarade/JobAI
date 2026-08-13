@@ -92,17 +92,29 @@ export function scoreFitRole(titre: string, description = ""): number {
   return 8;
 }
 
+/**
+ * Les paliers de distance du barème, du plus proche au plus lointain.
+ *
+ * ⚠️ EXPORTÉ POUR QUE L'INTERFACE LES LISE AU LIEU DE LES RECOPIER. La jauge affichée sous
+ * chaque distance (`JaugeDistance`) allume un segment par palier atteint : si elle portait
+ * sa propre liste de seuils, les deux dériveraient au premier ajustement du barème et
+ * l'écran se mettrait à décrire un calcul qui n'existe plus. Une règle, un exemplaire.
+ */
+export const PALIERS_DISTANCE_KM: readonly { readonly max: number; readonly points: number }[] = [
+  { max: 5, points: 20 },
+  { max: 10, points: 18 },
+  { max: 15, points: 15 },
+  { max: 25, points: 11 },
+  { max: 35, points: 8 },
+] as const;
+
 /** 20 pts — distance depuis le domicile. */
 export function scoreDistance(km: number | null | undefined): number {
   // Distance inconnue : note NEUTRE, jamais 0. Un 0 dirait « c'est loin », or on ne sait pas.
   if (km == null) return 10;
   if (km > RAYON_MAX_KM) return 0;
-  if (km <= 5) return 20;
-  if (km <= 10) return 18;
-  if (km <= 15) return 15;
-  if (km <= 25) return 11;
-  if (km <= 35) return 8;
-  return 5;
+  // Au-delà du dernier palier mais dans le rayon : le plancher du barème.
+  return PALIERS_DISTANCE_KM.find((p) => km <= p.max)?.points ?? 5;
 }
 
 /** 15 pts — l'exigence de séniorité est-elle atteignable avec environ 3 ans d'expérience ? */

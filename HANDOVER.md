@@ -6,6 +6,38 @@
 
 ---
 
+## Session 2026-08-13 — « on dirait un logiciel de gestion » : la refonte visuelle
+
+### État en une page
+
+| | |
+|---|---|
+| **Gate** | `typecheck` + `test` (**831**, +3) + `lint` (0 erreur) + `build` verts, jugés par exit code. |
+| **Le grief** | Marc : « on dirait un logiciel de gestion tellement c'est moche et plat ». |
+| **La cause, écrite** | L'épure du 5 août n'a procédé que par SOUSTRACTION (ombres, contours, liserés, 4 tuiles sur 5, ambre « rare »). Chaque geste était juste, mais rien n'a remplacé ce qui partait : il restait des rectangles blancs sur du gris. Voir [ADR-0008](./docs/adr/0008-poste-de-nuit.md). |
+| **Ce qui est livré** | « Poste de nuit » : neutre CHAUD (~90°) dans les deux thèmes, sombre en identité, contour de retour sur les surfaces, densité 1,20, tableau de bord en ENTONNOIR, jauge de distance, tuiles de carte assombries. |
+| **Comment ça a été décidé** | Sur maquette, avant d'écrire une ligne de CSS : trois directions rendues sur les VRAIES offres, Marc en choisit une, puis règle la densité au curseur (1,20) et tranche l'échelle de couleur. |
+| **Ce qui NE change pas** | L'ambre `#f2a31b` (`app.color` publiée au hub), `lib/couleurNote.ts`, les routes, les composants, les tests. Refonte de la peau, pas du squelette — réversible par `git revert`. |
+
+### Deux pièges rencontrés, tous deux consignés en leçon
+
+1. **Ma maquette avait supprimé le dégradé de couleur par note** — sans voir que
+   `lib/couleurNote.ts` le faisait déjà, à la demande de Marc du 6 août. Il l'a lu comme une
+   nouvelle demande : c'était une RÉGRESSION que je lui faisais valider. Recenser ce que
+   l'écran fait déjà AVANT de le redessiner.
+2. **« Le contraste suffit » n'avait jamais été chiffré.** L'écart de clarté fond↔carte vaut
+   4 points en sombre et 2,9 en clair : insuffisant dans les DEUX thèmes. C'est ce qui
+   justifie le retour du contour, et c'est une mesure, pas un goût.
+
+### Ce qui reste ouvert
+
+- **Le thème clair est le parent pauvre.** Il est cohérent (même teinte, même structure,
+  même échelle) mais il ne porte pas l'identité comme le sombre. Coût annoncé et accepté.
+- **Le filtre CSS des tuiles** donne un rendu moins juste qu'un vrai fond sombre (les teintes
+  de l'eau et des parcs virent). Assumé pour ne pas ajouter de domaine externe.
+- **Non vérifié à l'écran par moi** : cette session n'a pas d'accès authentifié à l'app.
+  Le rendu réel est à confirmer par Marc après déploiement.
+
 ## Session 2026-08-11 — la Routine poussait dans le vide, et je regardais le mauvais blocage
 
 ### État en une page

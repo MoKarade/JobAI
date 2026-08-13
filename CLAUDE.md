@@ -465,6 +465,28 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   commence par `=`, `+`, `-` ou `@` est évaluée à l'ouverture par Excel, LibreOffice et
   Google Sheets. Tout champ de texte libre qui sort de l'app vers un tableur se neutralise
   au point de FORMATAGE (`lib/export.ts`), jamais dans le composant qui télécharge.
+- **Retirer ce qui est laid ne produit pas du beau : ça produit du NEUTRE.** L'épure du
+  2026-08-05 a retiré les ombres, les contours, les liserés, quatre tuiles sur cinq, et rendu
+  l'ambre « rare ». Chaque geste était juste — l'écran d'avant empilait trois signaux qui se
+  neutralisaient. Mais rien n'est venu REMPLACER ce qui partait, et le résultat (des
+  rectangles blancs sur du gris) a valu « on dirait un logiciel de gestion ». Une épure
+  libère la place, elle ne la remplit pas : elle doit être suivie d'un geste POSITIF, sinon
+  on a juste soustrait. Corollaire pour toute demande d'apparence : « c'est trop chargé » et
+  « c'est plat » sont les deux bouts du même axe, et on les traverse en une seule refonte si
+  on ne remplace rien.
+- **Une règle d'apparence vraie en CLAIR peut être fausse en SOMBRE — la vérifier sur les
+  jetons, pas au jugé.** « Une carte blanche sur un fond gris se détache déjà, la lumière
+  suffit » a servi à retirer tous les contours. Mesuré ensuite : l'écart de clarté fond↔carte
+  vaut 4 points en sombre et 2,9 en clair. C'était donc insuffisant DANS LES DEUX THÈMES, et
+  la règle avait l'air vraie parce qu'on ne l'avait jamais chiffrée. Avant de supprimer un
+  séparateur au motif que « le contraste suffit », lire les valeurs.
+- **Une maquette de refonte doit partir du code EXISTANT, pas d'une page blanche.** En
+  proposant une direction visuelle, j'ai remplacé le dégradé de couleur par note d'un binaire
+  ambre/gris — sans voir que `lib/couleurNote.ts` faisait déjà exactement ça, à la demande de
+  Marc six jours plus tôt. Il l'a lu comme une nouvelle demande ; c'était une RÉGRESSION que
+  je lui présentais. Même réflexe que « vérifier qu'une tâche n'est pas déjà faite », mais
+  appliqué au DESIGN : recenser ce que l'écran fait déjà avant de redessiner, sinon on fait
+  valider une perte.
 - **Quand une passe fait PLUSIEURS travaux, son déclencheur doit couvrir CHACUN d'eux.**
   Le gate des pages était « une offre n'a pas de distance ». Il se referme au moment précis
   où toutes les distances sont mesurées — donc où les trajets se mettent à marcher — et il

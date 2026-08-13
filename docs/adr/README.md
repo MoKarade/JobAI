@@ -21,3 +21,4 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 | [0005](./0005-precision-de-la-veille.md) | Précision de la veille | Révisé (3 conclusions sur 4 réfutées par la mesure) |
 | [0006](./0006-variantes-de-raison-sociale.md) | Dédoublonner malgré les variantes de raison sociale | Accepté |
 | [0007](./0007-google-maps-geocoding-repli.md) | Google Maps Geocoding, en repli étroit de Nominatim | Accepté |
+| [0008](./0008-poste-de-nuit.md) | « Poste de nuit » : le sombre en identité, l'épure cesse d'être une soustraction | Accepté — supersède la direction du 2026-08-05 ; ADR-0003 tient sur l'ambre |

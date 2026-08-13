@@ -1,6 +1,9 @@
 # ADR-0003 — Direction visuelle : densité FinanceAI, accent ambre conservé
 
-- **Statut** : accepté
+- **Statut** : partiellement superseded par [ADR-0008](./0008-poste-de-nuit.md)
+  — la MISE EN PAGE (onglets en routes, accueil dégagé, échelle unique) tient ;
+  la peau (couleurs, profondeur, densité) est remplacée. Le point sur l'ambre
+  `app.color` reste pleinement en vigueur.
 - **Date** : 2026-07-28
 - **Décideur** : Marc
 
