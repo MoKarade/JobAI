@@ -1,27 +1,30 @@
 // tests/cvTexte.test.ts — l'extraction de texte, éprouvée sur des PDF RÉELS.
 //
-// ⚠️ CE FICHIER N'INVENTE PAS SES PDF, ET C'EST TOUT L'INTÉRÊT.
+// LES DEUX CAS QUI COMPTENT, ET D'OÙ ILS VIENNENT
 //
-// Un PDF fabriqué par le test pour satisfaire le lecteur du test ne prouve rien : c'est
-// exactement le piège dans lequel la première version de `lib/cv/texte.ts` est tombée. Elle
-// lisait les PDF à la main, passait ses propres tests, et sur deux documents réels a rendu
-// un faux « c'est un scan » sur un PDF plein de texte, puis 76 784 caractères de binaire
-// d'image annoncés comme un SUCCÈS.
+// La première version de `lib/cv/texte.ts` lisait les PDF à la main. Elle passait ses
+// propres tests, et sur deux documents RÉELS elle a échoué deux fois : un faux « c'est un
+// scan » sur un PDF plein de texte, puis 76 784 caractères de binaire d'image annoncés
+// comme un SUCCÈS. C'est cette épreuve-là qui a décidé du passage à `unpdf` ; elle est
+// consignée dans l'en-tête du module et dans l'ADR-0009.
 //
-// On éprouve donc contre deux fichiers présents sur le disque, produits par des chaînes
-// d'outils qui ignorent tout de ce code :
+// ⚠️ MAIS UN TEST NE PEUT PAS DÉPENDRE DE CES FICHIERS. Ils vivent sur la machine de
+// développement, pas sur le serveur d'intégration — première tentative : CI ROUGE, sur un
+// test qui exigeait leur présence. Et les committer était exclu : l'un est un PDF de
+// captures d'écran d'un AUTRE projet de Marc, qui montre du contenu réel de son Drive
+// (garde-fou n°1).
 //
-//   · un PDF de présentation, riche en texte → doit RENDRE ce texte ;
-//   · un PDF de captures d'écran, sans couche de texte → doit ÉCHOUER honnêtement.
+// Les deux cas sont donc CONSTRUITS (`tests/aides/pdf.ts`), et c'est `pdf.js` qui les lit —
+// pas notre code. Si la structure produite était fantaisiste, il la refuserait. Ce qui est
+// éprouvé ici est notre CÂBLAGE ; la confrontation au monde réel a eu lieu une fois, à la
+// main, et elle est écrite.
 //
-// Ces deux fichiers n'appartiennent pas à JobAI : ils viennent d'autres dossiers de la
-// machine. S'ils disparaissent, les cas correspondants se SAUTENT en le DISANT — un test
-// silencieusement inactif est pire qu'un test absent, et c'est justement ce genre de trou
-// qui a laissé passer le bug d'origine.
+// Les fichiers réels restent éprouvés EN PLUS quand ils sont là — jamais en condition.
 
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { extraireTexte, typeReel, TAILLE_MAX_OCTETS, LONGUEUR_MIN_TEXTE } from "@/lib/cv/texte";
+import { pdfAvecTexte, pdfSansTexte } from "./aides/pdf";
 
 const PDF_AVEC_TEXTE = "/mnt/skills/examples/theme-factory/theme-showcase.pdf";
 const PDF_SANS_TEXTE = "/home/user/DriveAI/docs/captures/captures-app.pdf";
@@ -29,6 +32,14 @@ const PDF_SANS_TEXTE = "/home/user/DriveAI/docs/captures/captures-app.pdf";
 function octetsDe(chemin: string): Uint8Array | null {
   return existsSync(chemin) ? new Uint8Array(readFileSync(chemin)) : null;
 }
+
+const CV_FABRIQUE = [
+  "Coordonnateur de projets techniques",
+  "Superviseur de maintenance - Groupe Industriel (2023-2026)",
+  "Encadrement d'une equipe de 8 techniciens, planification de la maintenance.",
+  "Mise en service d'automates programmables et de robots industriels.",
+  "Master en robotique. Francais et anglais courants. DEC en electromecanique.",
+];
 
 describe("détection du type par le CONTENU", () => {
   it("un PDF se reconnaît à sa signature, pas à son nom", () => {
@@ -81,26 +92,31 @@ describe("le texte brut", () => {
   });
 });
 
-describe("les PDF réels", () => {
-  const avecTexte = octetsDe(PDF_AVEC_TEXTE);
-  const sansTexte = octetsDe(PDF_SANS_TEXTE);
-
-  it.runIf(avecTexte)("un PDF riche en texte rend son texte", async () => {
-    const r = await extraireTexte(avecTexte!);
+describe("les PDF", () => {
+  it("un PDF avec du texte rend son texte", async () => {
+    const r = await extraireTexte(pdfAvecTexte(CV_FABRIQUE));
     expect(r.ok).toBe(true);
     if (r.ok) {
-      // La première version rendait ici « aucun texte lisible, c'est un scan ». Faux :
-      // le document en porte plus de 4 000 caractères.
-      expect(r.texte.length).toBeGreaterThan(1000);
-      expect(r.texte).toContain("Ocean Depths");
+      expect(r.texte).toContain("Coordonnateur de projets techniques");
+      expect(r.texte).toContain("automates programmables");
+      // Les lignes restent séparées : un CV aplati en un bloc se lit mal, y compris
+      // par le modèle qui doit y repérer des sections.
+      expect(r.texte.split("\n").length).toBeGreaterThan(3);
     }
   });
 
-  it.runIf(sansTexte)("un PDF d'images échoue HONNÊTEMENT, sans fabriquer de contenu", async () => {
-    const r = await extraireTexte(sansTexte!);
-    // ⚠️ LE CŒUR DU FICHIER. La première version annonçait ici un SUCCÈS avec 76 784
-    // caractères de binaire d'image — du charabia qui serait parti vers le modèle, lequel
-    // en aurait tiré un profil entièrement inventé, affiché avec assurance.
+  it("les parenthèses d'un CV ne cassent pas la lecture", async () => {
+    // « (2023-2026) » est partout dans un CV, et `(` `)` délimitent une chaîne en PDF.
+    const r = await extraireTexte(pdfAvecTexte([...CV_FABRIQUE, "Stage (2020-2021) a Lyon."]));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.texte).toContain("(2020-2021)");
+  });
+
+  it("un PDF SANS couche de texte échoue HONNÊTEMENT, sans fabriquer de contenu", async () => {
+    const r = await extraireTexte(pdfSansTexte());
+    // ⚠️ LE CŒUR DU FICHIER. La première implémentation annonçait ici un SUCCÈS avec
+    // 76 784 caractères de binaire d'image — du charabia qui serait parti vers le modèle,
+    // lequel en aurait tiré un profil entièrement inventé, affiché avec assurance.
     expect(r.ok).toBe(false);
     if (!r.ok) {
       // Et le message doit dire QUOI FAIRE, pas seulement « non ».
@@ -109,24 +125,39 @@ describe("les PDF réels", () => {
     }
   });
 
-  it.runIf(avecTexte)("le tampon de l'appelant SURVIT à l'extraction", async () => {
+  it("le tampon de l'appelant SURVIT à l'extraction", async () => {
     // ⚠️ RÉGRESSION MESURÉE : `getDocumentProxy` DÉTACHE le tampon qu'on lui passe
-    // (124 310 octets → 0). L'appelant en a besoin APRÈS, pour stocker le fichier : sans
-    // la copie défensive, la base recevrait un CV VIDE, sans la moindre erreur, et
-    // personne ne le verrait avant d'essayer de le ré-analyser des semaines plus tard.
-    const octets = new Uint8Array(readFileSync(PDF_AVEC_TEXTE));
+    // (124 310 octets → 0 sur le fichier réel). L'appelant en a besoin APRÈS, pour stocker
+    // le fichier : sans la copie défensive, la base recevrait un CV VIDE, sans la moindre
+    // erreur, invisible jusqu'à la première ré-analyse des semaines plus tard.
+    const octets = pdfAvecTexte(CV_FABRIQUE);
     const avant = octets.length;
     await extraireTexte(octets);
     expect(octets.length).toBe(avant);
   });
+});
 
-  it("les fichiers d'épreuve sont bien là — sinon on le DIT", () => {
-    // Un test sauté en silence est un test qui a cessé de protéger sans prévenir.
-    // S'il échoue, ce n'est pas grave : il faut juste choisir de nouveaux fichiers réels.
-    expect(
-      [avecTexte, sansTexte].filter(Boolean).length,
-      "Les PDF de référence ont disparu de la machine : les cas PDF réels ne tournent plus.",
-    ).toBe(2);
+/**
+ * Les fichiers RÉELS, quand ils sont là. Jamais en condition de réussite : ils
+ * n'existent que sur la machine de développement, et les exiger a déjà mis la CI au rouge.
+ * Ce qu'ils apportent en plus, c'est la confrontation à des PDF que personne n'a écrits
+ * pour ce test — c'est-à-dire la seule chose qui avait démasqué l'implémentation d'origine.
+ */
+describe("les PDF réels (hors CI)", () => {
+  const avecTexte = octetsDe(PDF_AVEC_TEXTE);
+  const sansTexte = octetsDe(PDF_SANS_TEXTE);
+
+  it.runIf(avecTexte)("un PDF de présentation rend ses milliers de caractères", async () => {
+    const r = await extraireTexte(avecTexte!);
+    expect(r.ok).toBe(true);
+    // La première version rendait ici « aucun texte lisible, c'est un scan ». Faux :
+    // le document en porte plus de 4 000 caractères.
+    if (r.ok) expect(r.texte.length).toBeGreaterThan(1000);
+  });
+
+  it.runIf(sansTexte)("un PDF de captures d'écran ne fabrique pas de texte", async () => {
+    const r = await extraireTexte(sansTexte!);
+    expect(r.ok).toBe(false);
   });
 });
 

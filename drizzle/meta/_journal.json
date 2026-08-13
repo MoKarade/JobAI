@@ -120,6 +120,13 @@
       "when": 1786573912719,
       "tag": "0016_places_enrichissement",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786655412619,
+      "tag": "0017_cv_et_profil",
+      "breakpoints": true
     }
   ]
 }

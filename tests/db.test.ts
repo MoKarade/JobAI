@@ -102,12 +102,16 @@ function hash(s: string): number {
 }
 
 describe("migration", () => {
-  it("crée les sept tables attendues", async () => {
+  it("crée les huit tables attendues", async () => {
     const r = await pg.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' ORDER BY table_name`,
     );
     expect(r.rows.map((x) => x.table_name)).toEqual([
+      // Le CV téléversé et le profil qu'on en tire. La table la plus sensible du projet :
+      // le fichier y dort en entier (choix de Marc, ADR-0009), et `colonnesCv` est la
+      // projection sans blob à utiliser partout ailleurs.
+      "cvs",
       "entreprises_lieux",
       "offer_reasons",
       "offers",
