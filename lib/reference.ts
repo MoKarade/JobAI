@@ -116,53 +116,28 @@ export const ENTREPRISES_CIBLES: readonly EntrepriseCible[] = [
   { nom: "Nutriart", ville: "Québec", km: null, lecture: "Chocolaterie (propriétaire de Laura Secord). Coordination du département de maintenance, mais le taux affiché part de 20 $/h — nettement sous le marché pour la responsabilité décrite." },
 ];
 
-export interface QuadrantSwot {
-  titre: string;
-  cle: "forces" | "faiblesses" | "opportunites" | "menaces";
-  points: readonly string[];
-}
+/**
+ * ⚠️ LE SWOT A DÉMÉNAGÉ DANS `lib/profil.ts` (ADR-0009).
+ *
+ * Il décrit la POSITION de Marc — ce que ses années, ses langues et ses diplômes lui
+ * ouvrent ou lui ferment — donc il appartient au profil, au même titre que le barème. Le
+ * laisser ici en aurait fait un second exemplaire : deux analyses de position dans deux
+ * fichiers, dont une seule serait mise à jour par un téléversement de CV.
+ *
+ * Ce qui RESTE ici est ce que le CV ne peut pas établir : des relevés de marché et des
+ * entreprises repérées, avec leur date et leur source. Ce sont des constats sur le MONDE,
+ * pas sur Marc.
+ *
+ * Ré-exporté pour ne pas casser les écrans qui l'affichaient — un alias, jamais une copie.
+ *
+ * Ce ré-export sert le profil PAR DÉFAUT. Les écrans qui doivent montrer le profil ACTIF
+ * (celui qu'un CV validé a produit) le reçoivent en propriété depuis leur page, qui seule
+ * peut lire la base — un module de constantes n'a pas à faire d'I/O.
+ */
+export { type QuadrantSwot } from "./profil";
+export { PROFIL_DEFAUT as PROFIL_REFERENCE } from "./profil";
 
-/** Analyse de position, telle qu'établie le 2026-07-27. */
-export const SWOT: readonly QuadrantSwot[] = [
-  {
-    titre: "Forces",
-    cle: "forces",
-    points: [
-      "Gestion d'opérations technique éprouvée : équipe, planification, pièces.",
-      "Bilingue courant — ouvre les multinationales.",
-      "Formation robotique solide (MSIR, Erasmus, thèse).",
-      "Double casquette rare : technique et gestion.",
-      "Deux processus avancés en 2025 (Eaton jusqu'au test, entrevue Robotiq) avec un CV pourtant périmé.",
-    ],
-  },
-  {
-    titre: "Faiblesses",
-    cle: "faiblesses",
-    points: [
-      "Mobilité limitée avant la résidence permanente (permis lié à l'employeur actuel).",
-      "Environ 3 ans d'expérience contre les 5 souvent demandés.",
-      "CV pas à jour (profil étudiant).",
-      "Aucune expérience en milieu syndiqué.",
-    ],
-  },
-  {
-    titre: "Opportunités",
-    cle: "opportunites",
-    points: [
-      "Marché dense : plus de 20 offres pertinentes dans un rayon de 50 km.",
-      "Davie en croissance (244 postes, Stratégie navale nationale).",
-      "Contact RH établi chez Robotiq — relance possible.",
-      "Les postes titrés « automatisation » paient 15 à 30 k$ de plus que « coordonnateur ».",
-    ],
-  },
-  {
-    titre: "Menaces",
-    cle: "menaces",
-    points: [
-      "Concurrence de candidats au statut déjà réglé.",
-      "Offres exigeant la résidence permanente ou la citoyenneté (deux refus en 2025).",
-      "Postes « ingénieur » potentiellement soumis au permis d'un ordre professionnel.",
-      "Les offres actuelles expireront avant la résidence permanente : cette liste est un thermomètre du marché, pas une liste d'action immédiate.",
-    ],
-  },
-];
+import { PROFIL_DEFAUT } from "./profil";
+
+/** Analyse de position par défaut, telle qu'établie le 2026-07-27. */
+export const SWOT = PROFIL_DEFAUT.swot;

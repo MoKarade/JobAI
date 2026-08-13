@@ -67,7 +67,11 @@ describe("fit du rôle", () => {
 
 describe("distance", () => {
   it("décroît de façon monotone avec l'éloignement", () => {
-    const paliers = [0, 5, 10, 15, 25, 35, 45].map(scoreDistance);
+    // ⚠️ PAS `.map(scoreDistance)` : `map` passe (valeur, INDEX, tableau), et depuis
+    // ADR-0009 le 2ᵉ paramètre de ces fonctions est le PROFIL. L'index arriverait donc à
+    // la place du barème. Ici ça lève ; le jour où un paramètre ajouté aura un défaut
+    // numérique plausible, ça ne lèvera plus — ça notera faux, en silence.
+    const paliers = [0, 5, 10, 15, 25, 35, 45].map((km) => scoreDistance(km));
     for (let i = 1; i < paliers.length; i++) {
       expect(paliers[i]!).toBeLessThanOrEqual(paliers[i - 1]!);
     }
@@ -113,7 +117,7 @@ describe("séniorité", () => {
 
 describe("salaire", () => {
   it("croît avec le montant", () => {
-    const montants = [50_000, 65_000, 75_000, 85_000, 95_000].map(scoreSalaire);
+    const montants = [50_000, 65_000, 75_000, 85_000, 95_000].map((s) => scoreSalaire(s));
     for (let i = 1; i < montants.length; i++) {
       expect(montants[i]!).toBeGreaterThanOrEqual(montants[i - 1]!);
     }

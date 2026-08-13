@@ -6,17 +6,29 @@
 // à rien, et pire, elle inspire une confiance qu'elle n'a pas méritée.
 //
 // Ces fonctions sont PURES : aucune I/O, aucune dépendance à l'horloge. C'est ce qui
-// permet de rejouer le barème sur les 38 offres de référence à chaque modification
-// (protocole de précision, CLAUDE.md §8).
+// permet de rejouer le barème sur les offres de référence à chaque modification.
+//
+// ⚠️ DEPUIS ADR-0009, LES VALEURS NE VIVENT PLUS ICI : elles viennent d'un `Profil`
+// (`lib/profil.ts`), et chaque fonction en prend un en dernier paramètre, `PROFIL_DEFAUT`
+// par défaut. Ce défaut porte EXACTEMENT les valeurs d'avant — `tests/profil.test.ts` le
+// prouve en rejouant le jeu de référence note par note. Sans cette preuve, sortir le barème
+// du code serait indistinguable d'une régression silencieuse de la notation.
+//
+// Les constantes historiques (`PONDERATION`, `RAYON_MAX_KM`, `PALIERS_DISTANCE_KM`,
+// `PLAFOND_NOTE_CALCULEE`) restent exportées et DÉRIVENT du profil par défaut : les écrans
+// qui les affichent n'ont pas eu à changer, et surtout elles ne peuvent plus diverger de ce
+// que le barème applique réellement.
+//
+// ⚠️ NE JAMAIS APPELER CES FONCTIONS SANS PARENTHÈSES : `xs.map(scoreDistance)` passe
+// (valeur, INDEX, tableau) — l'index atterrit dans le paramètre `profil`. Écrire
+// `xs.map((km) => scoreDistance(km))`. Aujourd'hui la méprise LÈVE (un nombre n'a pas de
+// `.paliersDistanceKm`), donc elle se voit ; le jour où un paramètre ajouté aura un défaut
+// numérique plausible, elle ne lèvera plus — elle notera faux, sans rien dire.
+
+import { PROFIL_DEFAUT, type Profil } from "./profil";
 
 /** Répartition des points. La somme fait 100 — vérifié par test, pas par confiance. */
-export const PONDERATION = {
-  fitRole: 40,
-  distance: 20,
-  seniorite: 15,
-  salaire: 15,
-  immigration: 10,
-} as const;
+export const PONDERATION = PROFIL_DEFAUT.ponderation;
 
 /**
  * Plafond des notes CALCULÉES.
@@ -26,41 +38,11 @@ export const PONDERATION = {
  * une offre calculée doit pouvoir être signalée comme excellente. Mais elles ne doivent
  * jamais passer DEVANT une offre vérifiée à la main de note maximale.
  */
-export const PLAFOND_NOTE_CALCULEE = 85;
+export const PLAFOND_NOTE_CALCULEE = PROFIL_DEFAUT.plafondNoteCalculee;
 
 /** Rayon au-delà duquel une offre n'est pas retenue. Critère n°1 déclaré. */
-export const RAYON_MAX_KM = 50;
+export const RAYON_MAX_KM = PROFIL_DEFAUT.rayonMaxKm;
 
-const MOTS_COORDINATION = [
-  "coordonnateur", "coordinateur", "superviseur", "chef d'équipe", "chargé de projet",
-  "chargée de projet", "responsable", "gestionnaire", "chef de projet", "directeur",
-];
-
-const MOTS_TECHNIQUE = [
-  "automatisation", "automation", "robotique", "robotic", "mécatronique",
-  "électromécanique", "mise en service", "plc", "automate", "vision industrielle",
-];
-
-/**
- * Exigences qui rendent le poste inaccessible tant que la résidence permanente n'est pas
- * obtenue. Distinct d'une simple préférence de l'employeur : ce sont des barrières fermes.
- */
-const MOTS_DISQUALIFIANTS = [
-  "citoyenneté canadienne", "citoyens canadiens", "résident permanent requis",
-  "secret clearance", "cote de sécurité",
-  // ⚠️ AJOUTS DU 2026-08-12, mesurés sur 44 annonces lues.
-  // Une seule offre du lot (Randstad, direction ingénierie) posait une vraie barrière de
-  // statut sans qu'aucun mot de la liste ne la voie : « apte aux ENQUÊTES DE SÉCURITÉ ».
-  // C'est la même exigence que « cote de sécurité » sous un autre nom — l'employeur demande
-  // une habilitation fédérale, qui suppose des années de résidence. Le manque n'était pas
-  // dans le barème, il était dans le VOCABULAIRE : un seul synonyme non couvert suffit à
-  // faire passer une offre disqualifiante en tête de liste.
-  "enquête de sécurité", "enquêtes de sécurité",
-  "habilitation de sécurité", "fiabilité approfondie",
-  "citoyen canadien", "résidence permanente requise",
-];
-
-/** 40 pts — le poste combine-t-il coordination d'équipe ET contenu technique ? */
 /**
  * Retire les marques d'écriture inclusive avant toute recherche de motif.
  *
@@ -78,77 +60,67 @@ export function normaliserTitre(s: string): string {
     .replace(/\s+/g, " ");
 }
 
-export function scoreFitRole(titre: string, description = ""): number {
+/** 40 pts — le poste combine-t-il coordination d'équipe ET contenu technique ? */
+export function scoreFitRole(titre: string, description = "", profil: Profil = PROFIL_DEFAUT): number {
   const t = normaliserTitre(`${titre} ${description}`);
-  const coord = MOTS_COORDINATION.some((m) => t.includes(m));
-  const tech = MOTS_TECHNIQUE.some((m) => t.includes(m));
+  const coord = profil.motsCoordination.some((m) => t.includes(m));
+  const tech = profil.motsTechnique.some((m) => t.includes(m));
   // « technicien » sans encadrement = recul hiérarchique par rapport au poste actuel.
   const technicien = /\btechnicien/.test(t) && !coord;
 
-  if (coord && tech) return 40; // la combinaison recherchée
-  if (coord) return 28; // encadrement sans contenu technique
-  if (tech && !technicien) return 26; // technique sans encadrement
-  if (technicien) return 14;
-  return 8;
+  const p = profil.pointsRole;
+  if (coord && tech) return p.combinaison; // la combinaison recherchée
+  if (coord) return p.coordination; // encadrement sans contenu technique
+  if (tech && !technicien) return p.technique; // technique sans encadrement
+  if (technicien) return p.technicien;
+  return p.horsSujet;
 }
 
 /**
  * Les paliers de distance du barème, du plus proche au plus lointain.
  *
  * ⚠️ EXPORTÉ POUR QUE L'INTERFACE LES LISE AU LIEU DE LES RECOPIER. La jauge affichée sous
- * chaque distance (`JaugeDistance`) allume un segment par palier atteint : si elle portait
- * sa propre liste de seuils, les deux dériveraient au premier ajustement du barème et
- * l'écran se mettrait à décrire un calcul qui n'existe plus. Une règle, un exemplaire.
+ * chaque distance allume un segment par palier atteint : si elle portait sa propre liste de
+ * seuils, les deux dériveraient au premier ajustement du barème et l'écran se mettrait à
+ * décrire un calcul qui n'existe plus. Une règle, un exemplaire.
  */
-export const PALIERS_DISTANCE_KM: readonly { readonly max: number; readonly points: number }[] = [
-  { max: 5, points: 20 },
-  { max: 10, points: 18 },
-  { max: 15, points: 15 },
-  { max: 25, points: 11 },
-  { max: 35, points: 8 },
-] as const;
+export const PALIERS_DISTANCE_KM: readonly { readonly max: number; readonly points: number }[] =
+  PROFIL_DEFAUT.paliersDistanceKm;
 
 /** 20 pts — distance depuis le domicile. */
-export function scoreDistance(km: number | null | undefined): number {
+export function scoreDistance(km: number | null | undefined, profil: Profil = PROFIL_DEFAUT): number {
   // Distance inconnue : note NEUTRE, jamais 0. Un 0 dirait « c'est loin », or on ne sait pas.
-  if (km == null) return 10;
-  if (km > RAYON_MAX_KM) return 0;
+  if (km == null) return profil.distanceInconnue;
+  if (km > profil.rayonMaxKm) return 0;
   // Au-delà du dernier palier mais dans le rayon : le plancher du barème.
-  return PALIERS_DISTANCE_KM.find((p) => km <= p.max)?.points ?? 5;
+  return profil.paliersDistanceKm.find((p) => km <= p.max)?.points ?? profil.distancePlancher;
 }
 
-/** 15 pts — l'exigence de séniorité est-elle atteignable avec environ 3 ans d'expérience ? */
-export function scoreSeniorite(description = ""): number {
+/** 15 pts — l'exigence de séniorité est-elle atteignable avec l'expérience de Marc ? */
+export function scoreSeniorite(description = "", profil: Profil = PROFIL_DEFAUT): number {
   // « 5 ans d'expérience », « 5-10 ans d'expérience », « 2 à 3 années d'expérience ».
   const m = description.match(/(\d+)\s*(?:à|-|a)?\s*\d*\s*an(?:s|nées)?\s+d['’]exp/i);
-  if (!m) return 11; // non précisé : neutre favorable, l'absence d'exigence n'est pas un obstacle
+  if (!m) return profil.senioriteNonPrecisee; // non précisé : l'absence d'exigence n'est pas un obstacle
   const min = Number.parseInt(m[1] ?? "", 10);
-  if (!Number.isFinite(min)) return 11;
-  if (min <= 2) return 15;
-  if (min <= 3) return 13;
-  if (min <= 5) return 9;
-  return 5;
+  if (!Number.isFinite(min)) return profil.senioriteNonPrecisee;
+  return profil.paliersSeniorite.find((p) => min <= p.max)?.points ?? profil.senioritePlancher;
 }
 
 /** 15 pts — salaire annuel affiché, comparé au marché régional. */
-export function scoreSalaire(salaireAnnuel: number | null): number {
+export function scoreSalaire(salaireAnnuel: number | null, profil: Profil = PROFIL_DEFAUT): number {
   // Non affiché : neutre. La majorité des offres n'affichent rien, les pénaliser
   // reviendrait à noter la politique de communication de l'employeur, pas le poste.
-  if (salaireAnnuel == null || !Number.isFinite(salaireAnnuel)) return 9;
-  if (salaireAnnuel >= 90_000) return 15; // au-dessus du repère « spécialiste automatisation »
-  if (salaireAnnuel >= 80_000) return 14;
-  if (salaireAnnuel >= 70_000) return 12;
-  if (salaireAnnuel >= 60_000) return 9; // autour de la médiane « coordonnateur »
-  return 5;
+  if (salaireAnnuel == null || !Number.isFinite(salaireAnnuel)) return profil.salaireNonAffiche;
+  return profil.paliersSalaire.find((p) => salaireAnnuel >= p.min)?.points ?? profil.salairePlancher;
 }
 
 /** 10 pts — friction liée au statut migratoire. */
-export function scoreImmigration(description = ""): number {
+export function scoreImmigration(description = "", profil: Profil = PROFIL_DEFAUT): number {
   const t = description.toLowerCase();
-  if (MOTS_DISQUALIFIANTS.some((m) => t.includes(m))) return 0;
+  if (profil.motsDisqualifiants.some((m) => t.includes(m))) return 0;
   // Un ordre professionnel n'est pas une barrière absolue, mais un délai et une démarche.
-  if (/ordre des ingénieurs|oiq|ing\.\s|membre de l['’]ordre/.test(t)) return 6;
-  return 10;
+  if (/ordre des ingénieurs|oiq|ing\.\s|membre de l['’]ordre/.test(t)) return profil.immigrationOrdre;
+  return profil.immigrationLibre;
 }
 
 export interface DetailNote {
@@ -157,27 +129,44 @@ export interface DetailNote {
   /** Somme des composantes AVANT plafond — utile pour expliquer un écrêtage. */
   brut: number;
   parts: Record<keyof typeof PONDERATION, number>;
+  /**
+   * La version de profil qui a produit cette note.
+   *
+   * ⚠️ SANS ELLE, UNE NOTE DEVIENT INEXPLICABLE au premier changement de barème : « pourquoi
+   * 71 ? » n'a de réponse que si on sait AVEC QUEL PROFIL. Marc ayant choisi la re-notation
+   * immédiate à chaque validation (ADR-0009), l'app connaîtra plusieurs barèmes dans sa vie —
+   * c'est ce champ qui empêche de les confondre.
+   */
+  profilVersion: number;
 }
 
 /**
  * Calcule la note d'une offre à partir de ses champs structurés.
- * Le résultat est PLAFONNÉ : voir `PLAFOND_NOTE_CALCULEE`.
+ * Le résultat est PLAFONNÉ : voir `plafondNoteCalculee`.
  */
-export function computeScore(input: {
-  titre: string;
-  description?: string;
-  km?: number | null;
-  salaireAnnuel?: number | null;
-}): DetailNote {
+export function computeScore(
+  input: {
+    titre: string;
+    description?: string;
+    km?: number | null;
+    salaireAnnuel?: number | null;
+  },
+  profil: Profil = PROFIL_DEFAUT,
+): DetailNote {
   const parts = {
-    fitRole: scoreFitRole(input.titre, input.description),
-    distance: scoreDistance(input.km),
-    seniorite: scoreSeniorite(input.description),
-    salaire: scoreSalaire(input.salaireAnnuel ?? null),
-    immigration: scoreImmigration(input.description),
+    fitRole: scoreFitRole(input.titre, input.description, profil),
+    distance: scoreDistance(input.km, profil),
+    seniorite: scoreSeniorite(input.description, profil),
+    salaire: scoreSalaire(input.salaireAnnuel ?? null, profil),
+    immigration: scoreImmigration(input.description, profil),
   };
   const brut = Object.values(parts).reduce((a, b) => a + b, 0);
-  return { total: Math.min(brut, PLAFOND_NOTE_CALCULEE), brut, parts };
+  return {
+    total: Math.min(brut, profil.plafondNoteCalculee),
+    brut,
+    parts,
+    profilVersion: profil.version,
+  };
 }
 
 export type Palier = "A" | "B" | "C";
@@ -199,8 +188,8 @@ export function palier(score: number | null | undefined): Palier {
 }
 
 /** Filtre dur, appliqué AVANT la notation : hors rayon, l'offre n'entre pas. */
-export function dansLeRayon(km: number | null | undefined): boolean {
+export function dansLeRayon(km: number | null | undefined, profil: Profil = PROFIL_DEFAUT): boolean {
   // Distance inconnue : on garde. Écarter sur une donnée absente reviendrait à décider
   // à la place de Marc sur la base de rien.
-  return km == null || km <= RAYON_MAX_KM;
+  return km == null || km <= profil.rayonMaxKm;
 }

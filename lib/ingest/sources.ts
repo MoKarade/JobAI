@@ -18,6 +18,7 @@ import {
   analyserWorkable,
 } from "./analyseurs";
 import type { AtsEntreprise, FamilleAts, OffreBrute, Recuperateur, ResultatSource } from "./types";
+import { PROFIL_DEFAUT } from "../profil";
 
 /** Délai maximal accordé à une source. Une source lente ne doit pas geler la passe. */
 export const DELAI_MAX_MS = 8_000;
@@ -85,17 +86,15 @@ function messageErreur(err: unknown): string {
  */
 export const RECHERCHES_GUICHET: readonly string[] = [];
 
-/** Ce qu'on interrogerait si le flux répondait. Gardé pour le banc d'essai de la sonde. */
-export const RECHERCHES_GUICHET_CANDIDATES = [
-  "coordonnateur de projets",
-  "chargé de projet",
-  "superviseur maintenance",
-  "superviseur technique",
-  "technicien automatisation",
-  "amélioration continue",
-  "robotique industrielle",
-  "planification production",
-] as const;
+/**
+ * Ce qu'on interrogerait si le flux répondait. Gardé pour le banc d'essai de la sonde.
+ *
+ * ⚠️ VIENT DU PROFIL (ADR-0009), pas d'une liste écrite ici. C'est le point de la
+ * manœuvre : la veille doit chercher ce que Marc EST. Recopier ces termes en dur
+ * garantissait qu'un CV mis à jour ne changerait jamais ce qu'on interroge le matin —
+ * la moitié exacte de sa demande serait restée lettre morte.
+ */
+export const RECHERCHES_GUICHET_CANDIDATES: readonly string[] = PROFIL_DEFAUT.recherches;
 
 /** L'URL du flux RSS officiel du Guichet-Emplois pour une recherche donnée. */
 export function urlGuichet(recherche: string, lieu = "Quebec, QC"): string {
