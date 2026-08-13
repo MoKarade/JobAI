@@ -65,7 +65,12 @@ const MOTIFS_STRUCTURE: readonly { readonly motif: RegExp; readonly par: string 
   // Nos propres délimiteurs de données : un texte qui les porte pourrait fermer son bloc
   // et écrire hors de la zone qu'on lui a assignée. C'est la seule évasion vraiment
   // mécanique, donc la seule qu'on peut fermer mécaniquement.
-  { motif: /<\/?donnees(?:[ \t][^>]*)?>/gi, par: "[balise retirée]" },
+  // ⚠️ `\s`, PAS `[ \t]` — mesuré. Avec `[ \t]`, une balise coupée par un RETOUR À LA
+  // LIGNE (`</donnees\nnom="x">`) traversait le filtre intacte : le bloc se refermait et
+  // du texte s'écrivait hors de la zone qui lui était assignée. Le motif prétendait fermer
+  // « la seule évasion mécanique » et en laissait une ouverte ; le test qui le vérifiait
+  // n'éprouvait que la variante avec espace, donc il passait.
+  { motif: /<\/?donnees(?:\s[^>]*)?>/gi, par: "[balise retirée]" },
   // Étiquettes de rôle en début de ligne (« System: … », « Assistant : … »).
   {
     motif: /^[ \t]*(?:system|assistant|user|human|système|utilisateur)[ \t]*:/gim,

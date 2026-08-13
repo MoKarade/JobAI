@@ -29,11 +29,21 @@ export default async function References() {
   // introduit une dépendance à la base. Un incident effacerait alors le barème de l'écran
   // alors qu'il est écrit dans le code — on retombe donc sur le défaut, et la page reste
   // consultable (elle affiche la date du constat, qui dit lequel des deux on lit).
+  // ⚠️ LE REPLI EST VOULU, LE SILENCE NE L'ÉTAIT PAS. Cette page n'a jamais eu d'écran de
+  // panne parce qu'elle ne dépendait de rien ; lire le profil actif y introduit une
+  // dépendance à la base, et un incident ne doit pas effacer de l'écran un barème qui est
+  // écrit dans le code. On retombe donc sur le défaut — MAIS on le journalise et on le DIT
+  // à l'écran. La première version avalait l'erreur sans un mot : la page affichait le SWOT
+  // du code sous une date figée, indiscernable d'un profil validé, pendant que `/profil`
+  // (qui lit la MÊME fonction) affichait l'erreur pour la même panne.
   let profil = PROFIL_DEFAUT;
+  let profilEnPanne = false;
   try {
     profil = await profilActif();
-  } catch {
+  } catch (e) {
+    console.error("[references] profil actif illisible, repli sur le défaut", e);
     profil = PROFIL_DEFAUT;
+    profilEnPanne = true;
   }
 
   return (
@@ -44,6 +54,12 @@ export default async function References() {
         chiffre de marché sans provenance n’est plus utilisable en négociation six mois plus
         tard.
       </p>
+      {profilEnPanne ? (
+        <p className="revue__retour revue__retour--echec">
+          Le profil enregistré est illisible : ce qui suit est le barème par défaut du code,
+          pas ton profil validé. Va dans Profil pour voir le détail.
+        </p>
+      ) : null}
       <Panneaux profil={profil} />
     </Cadre>
   );

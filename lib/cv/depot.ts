@@ -84,20 +84,49 @@ export async function profilActif(): Promise<Profil> {
   return ProfilSchema.parse(JSON.parse(ligne.profilValide));
 }
 
-/** L'extraction proposée par un CV, si elle a abouti. */
-export async function propositionDe(
-  id: number,
-): Promise<{ extraction: ReponseExtraction; nomFichier: string } | null> {
+/**
+ * L'extraction proposée par un CV.
+ *
+ * ⚠️ TROIS ISSUES, ET ELLES NE SE CONFONDENT PAS. Rendre `null` dans tous les cas —
+ * ce que faisait la première version — mettait « ce CV n'a pas de proposition » et
+ * « la proposition enregistrée est devenue illisible » dans le même sac. Le second
+ * arrive pour de vrai : il suffit qu'une évolution du code resserre
+ * `ReponseExtractionSchema` (borne, champ requis de plus) pour qu'une proposition
+ * écrite hier cesse de se relire. L'écran affichait alors un CV parfaitement propre,
+ * sans erreur, qui n'avait simplement plus rien à valider — indiscernable du cas
+ * légitime, et sans la moindre trace côté serveur.
+ */
+export type Proposition =
+  | { ok: true; extraction: ReponseExtraction; nomFichier: string }
+  | { ok: false; raison: string }
+  | null;
+
+export async function propositionDe(id: number): Promise<Proposition> {
   if (!process.env.DATABASE_URL) return null;
   const [ligne] = await db
     .select({ profilPropose: cvs.profilPropose, nomFichier: cvs.nomFichier })
     .from(cvs)
     .where(eq(cvs.id, id))
     .limit(1);
+  // Absence LÉGITIME : pas de proposition à relire. C'est le seul `null` qui reste.
   if (!ligne?.profilPropose) return null;
-  const analyse = ReponseExtractionSchema.safeParse(JSON.parse(ligne.profilPropose));
-  if (!analyse.success) return null;
-  return { extraction: analyse.data, nomFichier: ligne.nomFichier };
+
+  let brut: unknown;
+  try {
+    brut = JSON.parse(ligne.profilPropose);
+  } catch (e) {
+    console.error(`[cv] proposition ${id} : JSON illisible`, e);
+    return { ok: false, raison: "La proposition enregistrée est corrompue." };
+  }
+
+  const analyse = ReponseExtractionSchema.safeParse(brut);
+  if (!analyse.success) {
+    const details = analyse.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join(" · ");
+    console.error(`[cv] proposition ${id} hors schéma : ${details}`);
+    return { ok: false, raison: `La proposition enregistrée n'est plus lisible : ${details}` };
+  }
+
+  return { ok: true, extraction: analyse.data, nomFichier: ligne.nomFichier };
 }
 
 /**
@@ -171,10 +200,28 @@ export async function majExtraction(
  */
 export async function activerProfil(id: number, profil: Profil): Promise<void> {
   await db.update(cvs).set({ actif: false }).where(eq(cvs.actif, true));
-  await db
-    .update(cvs)
-    .set({ actif: true, profilValide: JSON.stringify(profil), valideLe: new Date() })
-    .where(eq(cvs.id, id));
+  try {
+    await db
+      .update(cvs)
+      .set({ actif: true, profilValide: JSON.stringify(profil), valideLe: new Date() })
+      .where(eq(cvs.id, id));
+  } catch (e) {
+    // ⚠️ LA FENÊTRE LA PLUS DANGEREUSE DE CE FICHIER. Le premier UPDATE a réussi : plus
+    // aucun CV n'est actif. Si on laissait passer, `profilActif()` retomberait sur
+    // `PROFIL_DEFAUT` au prochain chargement — un état INDISCERNABLE de « aucun CV n'a
+    // jamais été validé ». Toutes les pages redeviendraient cohérentes entre elles, donc
+    // rien n'aurait l'air cassé, pendant qu'un profil validé depuis des semaines aurait
+    // silencieusement disparu.
+    //
+    // Le driver `neon-http` n'a pas de transaction (pas d'appel `.transaction()` dans tout
+    // le dépôt) : on ne peut donc pas annuler le premier UPDATE. Ce qu'on peut faire, et
+    // qui suffit, c'est REFUSER DE SE TAIRE.
+    console.error("[cv] activation interrompue : plus aucun CV actif", e);
+    throw new Error(
+      "L'activation du profil s'est interrompue : plus aucun CV n'est actif, et les notes " +
+        "utilisent de nouveau le barème par défaut. Relance la validation.",
+    );
+  }
 }
 
 /** Supprime un CV, fichier compris. */

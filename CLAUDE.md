@@ -528,6 +528,26 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   erreur, invisibles jusqu'à la première ré-analyse. Réflexe : quand une fonction tierce
   reçoit un tampon et rend un objet qui « possède » les données, **copier avant** et
   verrouiller par un test qui compare la longueur avant/après.
+- **Composer un objet par `{ ...brut, quelquesChamps: netto(…) }` laisse passer TOUT LE
+  RESTE.** J'ai nettoyé les coordonnées d'un CV dans un objet… que personne ne lisait, puis
+  persisté un étalement de la réponse BRUTE du modèle avec trois champs seulement ré-écrits
+  par-dessus. `langues`, `diplomes`, `outils`, `titresOccupes` et la provenance partaient
+  donc en base, dans le profil et à l'écran, pendant que le code ET l'interface promettaient
+  à Marc le contraire. **Nettoyer d'abord, composer ensuite, champ par champ** : ajouter un
+  champ au schéma sans l'ajouter à la composition casse alors le typage, au lieu de laisser
+  filer du texte brut en silence. Et le test doit viser **le champ réellement persisté**,
+  jamais celui qu'on espérait voir utilisé — c'est la confusion même qui a créé le trou.
+- **Un test qui n'éprouve qu'UNE variante d'un motif fait croire que le motif entier est
+  couvert.** Mon filtre anti-évasion acceptait `[ \t]` là où il fallait `\s` : une balise
+  coupée par un retour à la ligne traversait intacte et refermait le bloc de données. Le
+  test « un texte balisé ne peut pas sortir de son bloc » passait — il n'essayait que
+  l'espace. Pour un motif à classe de caractères, boucler sur TOUTES les variantes.
+- **Le garde PII se déclenchera sur tes FIXTURES et sur tes COMMENTAIRES, et il aura
+  raison.** Trois fois dans la même session : des coordonnées de rectangle lues comme un
+  NAS, le commentaire qui citait la valeur fautive, puis des adresses et téléphones de test.
+  Un scan de source ne distingue ni une illustration ni un faux numéro. Remède : **assembler
+  les valeurs sensibles à l'exécution** (`["514","555","1234"].join("-")`) — aucune ligne de
+  source ne porte de motif complet, la valeur est entière au runtime, le test reste réel.
 - **Un contrôle promis en prose (« il suffira de grep ») ne verrouille rien.** L'ADR-0008
   annonçait « `grep prefers-color-scheme` ne doit rien rendre ». Personne ne lance ce grep :
   le second thème se serait reformé règle par règle sans qu'aucun test ne tombe. Le verrou

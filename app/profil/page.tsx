@@ -62,7 +62,11 @@ export default async function Profil() {
   // Le CV le plus récent qui porte une proposition : c'est celui qu'on donne à relire.
   const aRelire = cvs.find((c) => c.aUneProposition && !c.actif);
   const prop = aRelire ? await propositionDe(aRelire.id) : null;
-  const ecarts = prop ? calculerEcarts(profil, prop.extraction) : [];
+  // ⚠️ TROIS CAS, ET ILS NE SE CONFONDENT PLUS. `null` = rien à relire ; `ok: false` = une
+  // proposition existe mais n'est plus lisible (schéma resserré, JSON corrompu). La
+  // première version rendait `null` dans les deux cas : le CV s'affichait propre, sans
+  // erreur, simplement « sans rien à valider » — indiscernable du cas légitime.
+  const ecarts = prop?.ok ? calculerEcarts(profil, prop.extraction) : [];
 
   return (
     <Cadre actif="/profil" titre="Profil">
@@ -125,7 +129,13 @@ export default async function Profil() {
       {prop && aRelire ? (
         <section className="carte-info">
           <h2>À valider</h2>
-          <RevueProfil cvId={aRelire.id} ecarts={ecarts} nomFichier={prop.nomFichier} />
+          {prop.ok ? (
+            <RevueProfil cvId={aRelire.id} ecarts={ecarts} nomFichier={prop.nomFichier} />
+          ) : (
+            <p className="revue__retour revue__retour--echec">
+              {prop.raison} Relance l’analyse de ce CV pour en obtenir une nouvelle.
+            </p>
+          )}
         </section>
       ) : null}
 

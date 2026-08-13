@@ -145,6 +145,8 @@ export async function validerProfil(
 
   const prop = await propositionDe(cvId);
   if (!prop) return { ok: false, erreur: "Ce CV n'a pas de proposition à valider." };
+  // Illisible ≠ absente : le premier se répare par une ré-analyse, le second non.
+  if (!prop.ok) return { ok: false, erreur: `${prop.raison} Relance l'analyse de ce CV.` };
 
   let courant;
   try {
@@ -160,17 +162,50 @@ export async function validerProfil(
   const offres = (await lireOffres()) ?? [];
   const plan = planifierRenotation(offres, nouveau);
 
-  await activerProfil(cvId, nouveau);
+  try {
+    await activerProfil(cvId, nouveau);
+  } catch (e) {
+    return { ok: false, erreur: (e as Error).message };
+  }
 
   // Les notes ensuite : si l'activation échoue, aucune note n'aura bougé. L'inverse
   // laisserait des notes calculées par un profil que la base ne connaît pas.
+  //
+  // ⚠️ CETTE BOUCLE N'EST PAS ATOMIQUE, et elle ne peut pas l'être : le driver `neon-http`
+  // n'a pas de transaction. Chaque UPDATE est un aller-retour réseau ; une coupure au
+  // quinzième laisserait un lot mi-ancien mi-nouveau. On ne peut pas l'empêcher — on peut
+  // refuser que ça passe inaperçu. D'où : chaque note porte la version de profil qui l'a
+  // produite (`scoreProfilVersion`), le compte des échecs est REMONTÉ à l'écran, et le
+  // remède est dit. Relancer la validation est sans danger : le plan est déterministe, les
+  // offres déjà à jour ressortiront simplement « inchangées ».
+  let echecs = 0;
   for (const c of plan.changements) {
-    await db.update(offers).set({ score: c.apres }).where(eq(offers.id, c.id));
+    try {
+      await db
+        .update(offers)
+        .set({ score: c.apres, scoreProfilVersion: nouveau.version })
+        .where(eq(offers.id, c.id));
+    } catch (e) {
+      echecs++;
+      console.error(`[cv] note non écrite pour ${c.id}`, e);
+    }
   }
 
   revalidatePath("/");
   revalidatePath("/profil");
   revalidatePath("/references");
+
+  if (echecs > 0) {
+    return {
+      ok: false,
+      erreur:
+        `Profil appliqué, mais ${echecs} note${echecs > 1 ? "s" : ""} sur ` +
+        `${plan.changements.length} n'${echecs > 1 ? "ont" : "a"} pas pu être recalculée${
+          echecs > 1 ? "s" : ""
+        }. Relance la validation : ce qui est déjà à jour ne sera pas retouché.`,
+    };
+  }
+
   return { ok: true, valeur: { resume: resumerPlan(plan) }, message: "Profil appliqué." };
 }
 

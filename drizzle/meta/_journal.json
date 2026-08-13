@@ -127,6 +127,13 @@
       "when": 1786655412619,
       "tag": "0017_cv_et_profil",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786657496823,
+      "tag": "0018_version_de_profil_sur_la_note",
+      "breakpoints": true
     }
   ]
 }

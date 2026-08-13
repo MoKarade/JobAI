@@ -232,27 +232,54 @@ export async function extraireFaits(
     return { ok: false, raison: `Réponse hors schéma : ${details}` };
   }
 
+  // ⚠️ ON NETTOIE D'ABORD, ON COMPOSE ENSUITE — jamais l'inverse.
+  //
+  // La première version faisait `{ ...brut, forces: netto(brut.forces), … }` : un étalement
+  // de la réponse BRUTE du modèle, avec trois champs seulement ré-écrits par-dessus.
+  // `langues`, `diplomes`, `outils`, `titresOccupes` et la provenance restaient donc tels
+  // que le modèle les avait rendus, et c'est cet objet-là qui partait en base, puis dans le
+  // profil, puis à l'écran.
+  //
+  // Le scénario n'a rien d'exotique : dans un CV dont les coordonnées sont en colonne
+  // latérale, l'extraction PDF les aplatit à côté d'un intitulé de poste — le numéro civique
+  // et le téléphone atterrissent alors dans `titresOccupes`, collés au nom du poste.
+  // (Exemple volontairement NON écrit ici : `tests/piiGuard.test.ts` scanne les fichiers
+  // versionnés et ne distingue pas une illustration d'une vraie coordonnée. Il a raison.)
+  // L'en-tête de `lib/profil.ts` promet « PAS DE DONNÉES PERSONNELLES
+  // ICI », l'écran de dépôt le promet à Marc en toutes lettres, et le code ne le tenait pas.
+  //
+  // Un objet nettoyé COMPLET, construit champ par champ, rend la classe de bug impossible :
+  // ajouter un champ à `ReponseExtractionSchema` sans l'ajouter ici casse le typage au lieu
+  // de laisser passer du texte brut en silence.
   const brut = analyse.data;
   const netto = (xs: readonly string[]) =>
     xs.map((x) => expurgerCoordonnees(sanitizePromptText(x)).trim()).filter((x) => x.length > 0);
+  const nettoUn = (s: string) => expurgerCoordonnees(sanitizePromptText(s)).trim();
 
-  const faits: Faits = FaitsSchema.parse({
+  const propre: ReponseExtraction = {
     anneesExperience: brut.anneesExperience,
+    anneesExperienceProvenance: nettoUn(brut.anneesExperienceProvenance).slice(0, 300),
     langues: netto(brut.langues),
     diplomes: netto(brut.diplomes),
     outils: netto(brut.outils),
     titresOccupes: netto(brut.titresOccupes),
+    recherchesSuggerees: netto(brut.recherchesSuggerees),
+    forces: netto(brut.forces),
+    manques: netto(brut.manques),
+  };
+
+  const faits: Faits = FaitsSchema.parse({
+    anneesExperience: propre.anneesExperience,
+    langues: propre.langues,
+    diplomes: propre.diplomes,
+    outils: propre.outils,
+    titresOccupes: propre.titresOccupes,
   });
 
   return {
     ok: true,
     faits,
-    brut: {
-      ...brut,
-      recherchesSuggerees: netto(brut.recherchesSuggerees),
-      forces: netto(brut.forces),
-      manques: netto(brut.manques),
-    },
-    provenances: { anneesExperience: brut.anneesExperienceProvenance.slice(0, 300) },
+    brut: propre,
+    provenances: { anneesExperience: propre.anneesExperienceProvenance },
   };
 }

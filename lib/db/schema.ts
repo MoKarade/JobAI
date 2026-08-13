@@ -93,6 +93,24 @@ export const offers = pgTable(
      */
     scoreSource: text("score_source", { enum: ["manuel", "calcule"] }),
 
+    /**
+     * La version de profil qui a produit cette note.
+     *
+     * ⚠️ SANS ELLE, UNE NOTE DEVIENT INEXPLICABLE dès la première re-notation : « pourquoi
+     * 71 ? » n'a de réponse que si on sait AVEC QUEL BARÈME. Marc a choisi la re-notation
+     * immédiate à chaque validation de profil (ADR-0009) — l'app connaîtra donc plusieurs
+     * barèmes dans sa vie.
+     *
+     * Elle sert aussi de DÉTECTEUR : la re-notation écrit offre par offre (le driver
+     * `neon-http` n'a pas de transaction), donc une panne réseau en cours de route peut
+     * laisser un lot mi-ancien mi-nouveau. Sans cette colonne, cet état est indétectable
+     * après coup ; avec elle, il se voit et se répare.
+     *
+     * `null` pour une note manuelle ou pour les notes d'avant ADR-0009 — dans les deux cas
+     * la question ne se pose pas.
+     */
+    scoreProfilVersion: integer("score_profil_version"),
+
     /** Note issue de la recherche (contexte, localisation). Pas éditable par l'utilisateur. */
     notes: text("notes").notNull().default(""),
 

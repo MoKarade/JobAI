@@ -44,6 +44,29 @@ profil inventé. Une fois la clé posée, « ré-analyser » suffit : pas besoin
 que les commentaires appellent « défense en profondeur », et rien ne la protégeait.
 L'invariant tenait partout ; il est maintenant verrouillé.
 
+### La revue a trouvé sept défauts, tous réels, tous corrigés
+
+Panel lancé sur le diff complet (pannes muettes + sécurité/vie privée). Aucun faux positif.
+
+**Le plus grave, et il l'était vraiment** : `extraireFaits` nettoyait les coordonnées dans un
+objet… que personne ne lisait. Ce qui partait en base était un étalement de la réponse BRUTE
+du modèle avec trois champs seulement ré-écrits par-dessus — `langues`, `diplomes`, `outils`,
+`titresOccupes` et la provenance traversaient intacts, jusqu'au profil et jusqu'à l'écran.
+L'app promet le contraire à Marc en toutes lettres sur l'écran de dépôt. Corrigé en composant
+un objet nettoyé champ par champ (ajouter un champ au schéma sans le nettoyer casse désormais
+le typage), et verrouillé par `tests/cvExtraction.test.ts` — qui éprouve **le champ
+réellement persisté**, avec discrimination prouvée sur la version fautive.
+
+**Les six autres** : le filtre anti-évasion acceptait `[ \t]` là où il fallait `\s` (une
+balise coupée par un retour à la ligne refermait le bloc de données) ; le `catch` de
+`/references` était totalement muet là où `/profil` disait la même panne ; la boucle de
+re-notation n'était pas gardée et l'écran restait vide sur rejet ; `activerProfil` pouvait
+laisser zéro CV actif sans le dire ; une proposition illisible était indiscernable de
+« pas de proposition » ; et `profilVersion` — dont mon propre commentaire disait qu'il
+« empêche de confondre les notes de plusieurs barèmes » — n'était **jamais persisté**.
+Colonne ajoutée (migration 0018), écrite à chaque re-notation : un lot mi-ancien mi-nouveau
+se voit désormais en base.
+
 ### Ce qui reste ouvert
 
 - **La Routine quotidienne porte ses termes de recherche dans son prompt**, hors du dépôt :

@@ -1,0 +1,1 @@
+ALTER TABLE "offers" ADD COLUMN "score_profil_version" integer;

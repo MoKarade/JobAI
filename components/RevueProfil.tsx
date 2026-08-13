@@ -50,12 +50,26 @@ export function RevueProfil({
 
   function valider() {
     demarrer(async () => {
-      const r = await validerProfil(cvId, [...retenus]);
-      setRetour(
-        r.ok
-          ? { ok: true, texte: `${r.message ?? "Appliqué."} ${r.valeur.resume}` }
-          : { ok: false, texte: r.erreur },
-      );
+      // ⚠️ LE `try` N'EST PAS DÉCORATIF. Sans lui, une action serveur qui REJETTE (panne
+      // réseau, exception non prévue) ne passe par aucun `setRetour` : le bandeau reste
+      // vide, le bouton se débloque à la fin de la transition, et l'écran a l'air d'avoir
+      // travaillé. Marc n'apprendrait qu'un profil a peut-être été activé à moitié qu'en
+      // rechargeant la page — ou jamais.
+      try {
+        const r = await validerProfil(cvId, [...retenus]);
+        setRetour(
+          r.ok
+            ? { ok: true, texte: `${r.message ?? "Appliqué."} ${r.valeur.resume}` }
+            : { ok: false, texte: r.erreur },
+        );
+      } catch (e) {
+        setRetour({
+          ok: false,
+          texte: `La validation n'a pas abouti : ${
+            e instanceof Error ? e.message : "erreur inconnue"
+          }. Recharge la page pour voir l'état réel du profil avant de réessayer.`,
+        });
+      }
     });
   }
 
