@@ -22,6 +22,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -461,3 +462,95 @@ export const registreNoms = pgTable(
     index("registre_noms_neq_idx").on(table.neq),
   ],
 );
+
+/**
+ * Le CV téléversé, et le profil qu'on en a tiré.
+ *
+ * ⚠️ C'EST LA TABLE LA PLUS SENSIBLE DU PROJET. Un CV porte le nom, l'adresse municipale,
+ * le téléphone, le courriel, l'historique d'employeurs et les dates — soit exactement ce
+ * que le garde-fou n°1 bannit des fichiers versionnés. Marc a choisi de CONSERVER le
+ * fichier (ADR-0009) pour pouvoir le ré-analyser sans le re-téléverser ; le risque est donc
+ * assumé, mais il se borne :
+ *
+ *   · `contenu` n'est JAMAIS sélectionné par une requête de liste. `colonnesCv` (plus bas)
+ *     est la projection à utiliser partout ailleurs — un `select()` nu ramènerait le PDF
+ *     entier de la base à chaque affichage d'écran, et finirait un jour dans un journal.
+ *   · aucune route ne sert le fichier, et `lib/export.ts` ne connaît pas cette table.
+ *   · `texte` est le texte extrait, gardé pour ré-analyser sans re-décoder le PDF ; il est
+ *     aussi sensible que le fichier et suit les mêmes règles.
+ *   · `profilPropose` est ce que le modèle a lu. Il est EXPURGÉ des coordonnées avant
+ *     d'être écrit (`lib/cv/extraction.ts`) : lui seul circule dans les écrans.
+ *
+ * Le blob VIT EN BASE et pas sur un disque : Vercel n'a pas de disque persistant, et un
+ * stockage d'objets ajouterait un service et une clé de plus pour un fichier de 200 ko.
+ */
+export const cvs = pgTable(
+  "cvs",
+  {
+    id: serial("id").primaryKey(),
+    /** Nom d'origine, affiché à l'écran. Contient souvent le nom de Marc : jamais journalisé. */
+    nomFichier: text("nom_fichier").notNull(),
+    /** `application/pdf` ou `text/plain`. Vérifié au téléversement, pas déduit du nom. */
+    typeMime: text("type_mime").notNull(),
+    tailleOctets: integer("taille_octets").notNull(),
+    /** Le fichier, en base64. Voir l'avertissement ci-dessus avant tout `select`. */
+    contenu: text("contenu").notNull(),
+    /** Le texte extrait du fichier. Aussi sensible que le fichier lui-même. */
+    texte: text("texte"),
+    /**
+     * Le profil PROPOSÉ par l'extraction, en JSON, expurgé des coordonnées.
+     *
+     * `null` tant que l'extraction n'a pas tourné ou qu'elle a échoué — et un échec reste
+     * `null`, jamais un profil vide qui se ferait passer pour un résultat (garde-fou n°3).
+     */
+    profilPropose: text("profil_propose"),
+    /** Ce qui a empêché l'extraction, le cas échéant. Dit à l'écran, pas avalé. */
+    erreurExtraction: text("erreur_extraction"),
+    /**
+     * `true` quand Marc a validé ce profil et qu'il pilote l'app.
+     *
+     * Un seul CV actif à la fois — l'unicité est posée en index partiel plutôt qu'en
+     * confiance : deux profils actifs voudrait dire deux barèmes, donc des notes
+     * incomparables sans que rien ne le signale.
+     */
+    actif: boolean("actif").notNull().default(false),
+    /** Le profil TEL QUE VALIDÉ, en JSON. C'est lui qui note, jamais `profilPropose`. */
+    profilValide: text("profil_valide"),
+    televerseLe: timestamp("televerse_le", { withTimezone: true }).notNull().defaultNow(),
+    valideLe: timestamp("valide_le", { withTimezone: true }),
+  },
+  (table) => [
+    index("cvs_televerse_idx").on(table.televerseLe),
+    // Un seul CV actif, garanti par la base et non par la discipline d'appel.
+    uniqueIndex("cvs_un_seul_actif_idx")
+      .on(table.actif)
+      .where(sql`${table.actif} = true`),
+    // Un CV actif SANS profil validé serait un barème fantôme : actif, mais vide.
+    check(
+      "cvs_actif_a_un_profil_ck",
+      sql`${table.actif} = false OR ${table.profilValide} IS NOT NULL`,
+    ),
+    check("cvs_taille_ck", sql`${table.tailleOctets} > 0`),
+  ],
+);
+
+/**
+ * Les colonnes d'un CV qu'on a le droit de lire SANS ramener le fichier.
+ *
+ * ⚠️ À UTILISER PARTOUT SAUF POUR LA RÉ-ANALYSE. `db.select().from(cvs)` ramène `contenu`
+ * et `texte` — soit le CV entier, à chaque affichage de liste. Ce n'est pas qu'une question
+ * de poids : plus une donnée personnelle circule, plus elle a d'occasions de finir dans un
+ * journal, une trace d'erreur ou une réponse d'API.
+ */
+export const colonnesCv = {
+  id: cvs.id,
+  nomFichier: cvs.nomFichier,
+  typeMime: cvs.typeMime,
+  tailleOctets: cvs.tailleOctets,
+  profilPropose: cvs.profilPropose,
+  erreurExtraction: cvs.erreurExtraction,
+  actif: cvs.actif,
+  profilValide: cvs.profilValide,
+  televerseLe: cvs.televerseLe,
+  valideLe: cvs.valideLe,
+} as const;
