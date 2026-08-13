@@ -10,7 +10,8 @@
 // qu'on n'a pas tranché son cas.
 
 import { describe, it, expect } from "vitest";
-import { readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { deciderGarde, estCheminPublic } from "../lib/garde";
 
@@ -153,5 +154,63 @@ describe("les contournements ne passent pas", () => {
     // Les routes qui affichent des données restent gardées.
     expect(estCheminPublic("/")).toBe(false);
     expect(estCheminPublic("/carte")).toBe(false);
+  });
+});
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * LA SECONDE COUCHE — chaque page REVÉRIFIE la session elle-même.
+ *
+ * Le bloc précédent éprouve la MIDDLEWARE : elle décide qu'un chemin n'est pas public et
+ * redirige un visiteur. C'est la première ligne, et c'est déjà l'essentiel.
+ *
+ * Mais chaque page de données porte AUSSI un `await auth()` + `redirect("/connexion")`, et
+ * les commentaires du dépôt appellent ça « défense en profondeur : si le matcher change un
+ * jour, cette page ne s'ouvre pas en silence ». Cette promesse-là n'était vérifiée nulle
+ * part — retirer les deux lignes d'une page laissait toute la suite au vert (constaté en
+ * ajoutant `/profil`). Une garantie annoncée dans un commentaire et absente des tests finit
+ * par être supprimée par quelqu'un qui la croit décorative.
+ *
+ * Le scan est grossier À DESSEIN : il cherche l'APPEL, pas la logique. Une page qui
+ * appellerait `auth()` sans rien en faire lui échapperait — c'est le prix d'un scan de
+ * source, et c'est dit ici plutôt que découvert.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("défense en profondeur — chaque page revérifie la session", () => {
+  /** Les `page.tsx` suivis par git, ET ceux qui ne le sont pas encore. */
+  function pages(): string[] {
+    const lister = (args: string[]) =>
+      execFileSync("git", args, { cwd: process.cwd(), encoding: "utf8" });
+    const sortie = `${lister(["ls-files", "app"])}\n${lister([
+      "ls-files",
+      "--others",
+      "--exclude-standard",
+      "app",
+    ])}`;
+    return [...new Set(sortie.split("\n"))]
+      .map((f) => f.trim())
+      .filter((f) => f.endsWith("page.tsx"));
+  }
+
+  /** La seule page qui n'a pas à se garder : celle qui SERT à se connecter. */
+  const EXEMPTES = new Set(["app/connexion/page.tsx"]);
+
+  const fichiers = pages();
+
+  it("trouve bien des pages, au lieu de passer à vide", () => {
+    // Un scan qui ne lit rien passerait au vert : protection nulle et silencieuse.
+    expect(fichiers.length).toBeGreaterThan(3);
+    expect(fichiers).toContain("app/page.tsx");
+  });
+
+  it("chaque page de données appelle auth() et redirige", () => {
+    const nues = fichiers
+      .filter((f) => !EXEMPTES.has(f))
+      .filter((f) => {
+        const source = readFileSync(resolve(process.cwd(), f), "utf8");
+        return !/await auth\(\)/.test(source) || !/redirect\(/.test(source);
+      });
+
+    expect(nues, "ces pages s'ouvriraient si la middleware cessait de les couvrir").toEqual([]);
   });
 });

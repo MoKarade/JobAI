@@ -1593,3 +1593,190 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   width: 15px;
   height: 15px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Le profil — déposer un CV, et décider écart par écart.
+
+   Toute la page est un écran de DÉCISION, pas de consultation : la hiérarchie
+   sert à distinguer ce qui se vérifie (un fait lu dans le document) de ce qui
+   se déduit (une conséquence sur le barème). Le charbon reste le fond ; c'est
+   le relief `--creux` qui porte les blocs, comme partout ailleurs (ADR-0008).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.carte-info {
+  background: var(--surface);
+  border: var(--trait-surface);
+  border-radius: var(--r-carte);
+  padding: 1.5rem 1.8rem;
+  margin-bottom: var(--pas-2);
+}
+.carte-info > h2 {
+  font-size: var(--t-l);
+  margin: 0 0 0.9rem;
+}
+
+/* Les faits du profil actif : des paires terme/valeur, alignées en colonnes. */
+.profil__faits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.9rem 1.6rem;
+  margin: 0;
+}
+.profil__faits dt {
+  font-size: var(--t-s);
+  color: var(--text-soft);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.profil__faits dd {
+  margin: 0.15rem 0 0;
+}
+
+/* ── Le dépôt ──────────────────────────────────────────────────────────── */
+.depot-cv {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+.depot-cv__champ {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: var(--t-s);
+  color: var(--text-soft);
+}
+.depot-cv__champ input[type="file"] {
+  font: inherit;
+  color: var(--text);
+  background: var(--creux);
+  border: var(--trait-surface);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  max-width: 100%;
+}
+
+/* ── La revue ──────────────────────────────────────────────────────────── */
+.revue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pas-2);
+}
+.revue__groupe > h3 {
+  font-size: var(--t-m);
+  margin: 0 0 0.25rem;
+}
+.revue__liste {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.revue__pied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+}
+.revue__retour {
+  margin: 0;
+  padding: 0.7rem 0.95rem;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--vert) 14%, var(--creux));
+  border: 1px solid color-mix(in oklab, var(--vert) 32%, var(--border));
+  font-size: var(--t-s);
+}
+.revue__retour--echec {
+  background: color-mix(in oklab, var(--rouge) 14%, var(--creux));
+  border-color: color-mix(in oklab, var(--rouge) 34%, var(--border));
+}
+
+/* ── Un écart ──────────────────────────────────────────────────────────── */
+.ecart {
+  background: var(--creux);
+  border: var(--trait-surface);
+  border-left: 3px solid var(--border);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+}
+/* Retenu : l'ambre, et elle ne sert QUE là sur cet écran — un signal qui
+   apparaît partout ne signale plus rien. */
+.ecart--retenu {
+  border-left-color: var(--ambre);
+  background: color-mix(in oklab, var(--ambre) 8%, var(--creux));
+}
+.ecart__choix {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+}
+.ecart__choix input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--ambre);
+  flex: none;
+  cursor: pointer;
+}
+.ecart__libelle {
+  font-weight: 650;
+}
+.ecart__valeurs {
+  margin: 0.45rem 0 0 1.65rem;
+  font-family: var(--mono);
+  font-size: var(--t-s);
+  line-height: 1.6;
+}
+.ecart__avant {
+  color: var(--text-soft);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklab, var(--text-soft) 55%, transparent);
+}
+.ecart__fleche {
+  color: var(--text-soft);
+}
+.ecart__apres {
+  color: var(--ambre-texte);
+}
+/* La provenance, et surtout son ABSENCE : un chiffre supposé ne doit pas
+   ressembler à un chiffre lu dans le document. */
+.ecart__source {
+  margin: 0.4rem 0 0 1.65rem;
+  font-size: var(--t-s);
+  color: var(--text-soft);
+}
+.ecart__source--suppose {
+  color: var(--ambre-texte);
+}
+
+/* ── Les CV déposés ────────────────────────────────────────────────────── */
+.liste-cv {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.cv {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  background: var(--creux);
+  border: var(--trait-surface);
+  border-radius: 10px;
+  padding: 0.7rem 0.95rem;
+}
+.cv__nom {
+  font-weight: 650;
+}
+.cv__meta {
+  font-size: var(--t-s);
+  color: var(--text-soft);
+}
+.cv__erreur {
+  font-size: var(--t-s);
+  color: var(--ambre-texte);
+}

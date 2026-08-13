@@ -19,6 +19,10 @@ export const ONGLETS: readonly Onglet[] = [
   { href: "/", libelle: "Suivi" },
   { href: "/carte", libelle: "Carte" },
   { href: "/references", libelle: "Références" },
+  // Le profil vient EN DERNIER : on l'ouvre quelques fois par an (un CV change rarement),
+  // alors que le suivi s'ouvre tous les jours. L'ordre des onglets suit la fréquence
+  // d'usage, jamais l'ordre dans lequel les pages ont été écrites.
+  { href: "/profil", libelle: "Profil" },
 ];
 
 export function Cadre({
