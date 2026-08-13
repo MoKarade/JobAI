@@ -299,7 +299,17 @@ code {
 }
 .entete__marque:focus-visible { outline: 2px solid var(--ambre); outline-offset: 3px; }
 /* Le chevron prend l'ambre, comme le souligné du mot-symbole : c'est le MÊME signe. */
-.entete__mark { width: 1.15em; height: 1.15em; color: var(--ambre); flex: none; }
+/* Le chevron de marque LUIT (maquette validée). C'est le seul endroit de l'app où
+   l'ambre rayonne au lieu de simplement colorer : c'est la signature, et elle ne se
+   répète nulle part ailleurs. En clair la lueur s'aperçoit à peine — c'est voulu,
+   c'est sur le charbon qu'elle prend son sens. */
+.entete__mark {
+  width: 1.15em;
+  height: 1.15em;
+  color: var(--ambre);
+  flex: none;
+  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--ambre) 55%, transparent));
+}
 .entete__accent { color: var(--ambre); }
 .entete__sous {
   font-size: var(--t-s);
@@ -537,9 +547,31 @@ code {
 /* Les paliers ne se disent plus par un trait à gauche mais par le cercle de la
    note, ci-dessous. Ces classes restent utilisées par le JSX ; elles ne portent
    plus de bordure. */
-.carte--A,
 .carte--B,
 .carte--C { border-left: 0; }
+
+/* ── Le palier A prend un contour ambré et une lueur ─────────────────────
+   Validé par Marc sur maquette, et absent de la première livraison — d'où
+   « il n'y a pas le orange autour des offres ».
+
+   Ce n'est PAS le liseré gauche d'avant : celui-là ajoutait un trait sur un
+   bord, EN PLUS de l'ombre et du rayon, et c'est cet empilement qui remplissait
+   l'écran. Ici, rien n'est ajouté — le contour que la carte porte déjà change
+   de teinte. Une seule carte sur dix environ le porte (4 offres sur 38 au
+   dernier compte), ce qui est exactement ce qui le rend lisible : une couleur
+   qui apparaît partout ne signale plus rien.
+
+   La lueur reste faible et sert le sombre, où l'ambre respire ; en clair elle
+   est presque invisible, et c'est le contour qui fait le travail. */
+.carte--A {
+  border-color: color-mix(in oklab, var(--ambre) 42%, var(--border));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--ambre) 14%, transparent),
+    0 10px 34px -22px color-mix(in oklab, var(--ambre) 55%, transparent);
+}
+.carte--A:hover {
+  border-color: color-mix(in oklab, var(--ambre) 58%, var(--border));
+}
 .carte--histo { opacity: 0.62; }
 .carte--histo:hover { opacity: 0.9; }
 
@@ -548,8 +580,11 @@ code {
    le reste un gris neutre : trois niveaux nettement distincts, et le même code
    que les épingles de la carte — sinon la liste et le plan ne se répondent pas. */
 .note {
-  width: 3rem;
-  height: 3rem;
+  /* 3,3 rem : la taille de la maquette validée. Le cercle est l'objet le plus
+     regardé de la liste — il grandit avec l'air ambiant plutôt que de rester
+     calé sur l'échelle d'avant. */
+  width: 3.3rem;
+  height: 3.3rem;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -610,6 +645,10 @@ code {
   transition: transform 140ms ease;
 }
 .carte--ouverte .carte__entreprise::after { transform: translateY(0.1em) rotate(-135deg); }
+/* Une offre dépliée MONTE d'un cran de surface (maquette validée) : c'est celle qu'on
+   regarde, elle se détache de la pile. Le survol utilise déjà `--creux` ; ici c'est un
+   état, pas un passage, donc il tient tant que la carte reste ouverte. */
+.carte--ouverte { background: var(--creux); }
 .carte__poste { color: var(--text-soft); font-size: var(--t-s); }
 /* L'unique signal : le salaire quand il est affiché. En mesure, donc en mono. */
 .carte__tete > .badge-perimee { align-self: flex-start; margin-top: 0.3rem; }
@@ -1004,6 +1043,48 @@ code {
     filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
   }
 }
+
+/* ── L'habillage de Leaflet suit NOS jetons ──────────────────────────────
+   `leaflet.css` habille ses bulles, ses boutons de zoom et son attribution en
+   BLANC EN DUR. Le filtre ci-dessus ne les touche pas — et il ne DOIT pas les
+   toucher, il ne vise que les tuiles : résultat, cliquer une épingle ouvrait
+   une bulle blanche éclatante au milieu du charbon (signalé par Marc).
+
+   Tout passe donc par les jetons, ce qui règle les DEUX thèmes d'un coup :
+   c'est la même règle qui donne une bulle claire en clair et sombre en sombre,
+   sans jamais coder une couleur en dur. */
+.leaflet-container { background: var(--creux); font-family: inherit; }
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 34px -14px rgb(0 0 0 / 0.45);
+}
+.leaflet-popup-content-wrapper {
+  border: var(--trait-surface);
+  border-radius: var(--r-carte);
+}
+.leaflet-popup-tip { border: 0; }
+.leaflet-popup-content { margin: 0.9rem 1.05rem; font-size: var(--t-s); line-height: 1.55; }
+.leaflet-popup-content a { color: var(--bleu-texte); }
+.leaflet-popup-close-button { color: var(--text-soft) !important; }
+.leaflet-popup-close-button:hover { color: var(--text) !important; }
+
+/* Boutons de zoom et attribution : mêmes surfaces que le reste de l'app. */
+.leaflet-bar a,
+.leaflet-bar a:hover {
+  background: var(--surface);
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+.leaflet-bar a:hover { background: var(--creux); }
+.leaflet-bar { border: var(--trait-surface); }
+.leaflet-control-attribution {
+  background: color-mix(in oklab, var(--surface) 82%, transparent);
+  color: var(--text-soft);
+}
+.leaflet-control-attribution a { color: var(--bleu-texte); }
 .carte__compte {
   font-family: var(--mono);
   font-size: var(--t-xs);
