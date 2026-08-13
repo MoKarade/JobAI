@@ -11,6 +11,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { estEmailAutorise } from "@/lib/autorisation";
+import { cookiesSessionPartagee } from "@/lib/sessionPartagee";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -22,6 +23,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   session: { strategy: "jwt" },
+  // ── CONNEXION UNIQUE ENTRE LES APPS DU HUB ───────────────────────────────────────
+  // Avec `AUTH_COOKIE_DOMAIN=.hubperso.com`, le cookie de session est déclaré sur le
+  // domaine parent : le navigateur l'envoie à TOUS les sous-domaines. Combiné à un
+  // `AUTH_SECRET` IDENTIQUE dans chaque app (le JWT est chiffré avec — sans le même
+  // secret, l'app reçoit le cookie mais n'en tire rien), se connecter à une app vaut
+  // pour toutes. Corollaire assumé : une DÉCONNEXION vaut aussi pour toutes.
+  //
+  // Variable non définie (local, préversions) ⇒ comportement natif, cookie limité à
+  // l'hôte. Voir `lib/sessionPartagee.ts`.
+  cookies: cookiesSessionPartagee(process.env.AUTH_COOKIE_DOMAIN),
   // Requis en local et en auto-hébergement (sinon `UntrustedHost`). Sans risque : les
   // redirect URIs sont verrouillés côté Google.
   trustHost: true,
@@ -29,6 +40,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     signIn({ user }) {
       return estEmailAutorise(user?.email, process.env.AUTHORIZED_EMAIL);
+    },
+    // ⚠️ REVÉRIFICATION À CHAQUE LECTURE — c'est la contrepartie du cookie partagé.
+    //
+    // `signIn` ne tourne qu'à la CONNEXION. Le cookie étant désormais lisible par tous
+    // les sous-domaines, JobAI accepterait sans broncher une session fabriquée par une
+    // autre app du hub. Aujourd'hui c'est cohérent — les apps partagent la même
+    // AUTHORIZED_EMAIL — mais ça ne l'est que par coïncidence de configuration, et
+    // JobAI est celle qui a le plus à perdre : adresse du domicile, statut migratoire,
+    // noms de tiers.
+    //
+    // `jwt` tourne à chaque lecture de session. Renvoyer `null` INVALIDE la session
+    // (Auth.js v5) — le garde redirige vers /connexion, aucune donnée n'est rendue.
+    jwt({ token, user }) {
+      // À la connexion seulement : on fixe l'adresse dans le jeton. Aux lectures
+      // suivantes, `user` est absent et c'est `token.email` qui fait foi.
+      if (user?.email) token.email = user.email;
+      if (!estEmailAutorise(token.email, process.env.AUTHORIZED_EMAIL)) return null;
+      return token;
     },
   },
 });
