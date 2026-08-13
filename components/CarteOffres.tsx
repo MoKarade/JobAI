@@ -27,7 +27,7 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import { centreDuCadrage, type Epingle, type EntrepriseSurCarte } from "@/lib/carte";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
-import { couleurNote } from "@/lib/couleurNote";
+import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { libelleBorne, libelleDistanceBorne } from "@/lib/bornes";
 import { mentionSource } from "@/lib/adresse";
 
@@ -244,8 +244,13 @@ export function CarteOffres({
             icon: L.divIcon({
               className: "",
               html:
+                // L'ENCRE VIENT DE `couleurNote.ts`, PAS DU CSS. Elle est calibrée sur la
+                // clarté FIXE des pastilles (`CLARTE`) : si cette clarté bougeait, une
+                // copie posée dans la feuille de style resterait en arrière et le nombre
+                // deviendrait illisible sur sa propre couleur. Une règle, un exemplaire.
                 `<span class="epingle${approximative ? " epingle--approx" : ""}" ` +
-                `style="background:${fond};width:${taille}px;height:${taille}px">` +
+                `style="background:${fond};color:${encreSurNote()};` +
+                `width:${taille}px;height:${taille}px">` +
                 `${echapper(libelle)}</span>`,
               iconSize: [taille, taille],
               iconAnchor: [taille / 2, taille / 2],

@@ -29,12 +29,13 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "any",
-    // Le format ne connaît pas `prefers-color-scheme` : une seule valeur possible. On
-    // aligne sur le thème CLAIR, celui par défaut de l'app (`--bg` de globals.css,
-    // converti depuis son OKLCH). La teinte de la barre système, elle, suit le thème —
-    // elle est déclarée en `viewport.themeColor` dans `app/layout.tsx`.
-    background_color: "#f2f3f5",
-    theme_color: "#f2f3f5",
+    // `--bg` de globals.css, converti depuis son OKLCH. Le manifeste ne connaît pas
+    // `prefers-color-scheme`, mais depuis ADR-0008 (révisé le 2026-08-13) l'app n'a plus
+    // qu'un thème : la question ne se pose plus. C'est cette couleur que l'écran de
+    // démarrage Android affiche AVANT que le CSS ne charge — une valeur claire ici
+    // produirait un flash blanc à chaque ouverture de l'app installée.
+    background_color: "#141209",
+    theme_color: "#141209",
     lang: "fr-CA",
     dir: "ltr",
     categories: ["productivity", "utilities"],

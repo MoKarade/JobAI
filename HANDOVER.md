@@ -12,10 +12,10 @@
 
 | | |
 |---|---|
-| **Gate** | `typecheck` + `test` (**831**, +3) + `lint` (0 erreur) + `build` verts, jugés par exit code. |
+| **Gate** | `typecheck` + `test` (**834**, +6) + `lint` (0 erreur) + `build` verts, jugés par exit code. |
 | **Le grief** | Marc : « on dirait un logiciel de gestion tellement c'est moche et plat ». |
 | **La cause, écrite** | L'épure du 5 août n'a procédé que par SOUSTRACTION (ombres, contours, liserés, 4 tuiles sur 5, ambre « rare »). Chaque geste était juste, mais rien n'a remplacé ce qui partait : il restait des rectangles blancs sur du gris. Voir [ADR-0008](./docs/adr/0008-poste-de-nuit.md). |
-| **Ce qui est livré** | « Poste de nuit » : neutre CHAUD (~90°) dans les deux thèmes, sombre en identité, contour de retour sur les surfaces, densité 1,20, tableau de bord en ENTONNOIR, jauge de distance, tuiles de carte assombries. |
+| **Ce qui est livré** | « Poste de nuit » : neutre CHAUD (~90°), **sombre imposé — le thème clair est retiré** (révision d'ADR-0008, voir plus bas), contour de retour sur les surfaces, densité 1,20, tableau de bord en ENTONNOIR, jauge de distance, tuiles de carte assombries. |
 | **Comment ça a été décidé** | Sur maquette, avant d'écrire une ligne de CSS : trois directions rendues sur les VRAIES offres, Marc en choisit une, puis règle la densité au curseur (1,20) et tranche l'échelle de couleur. |
 | **Ce qui NE change pas** | L'ambre `#f2a31b` (`app.color` publiée au hub), `lib/couleurNote.ts`, les routes, les composants, les tests. Refonte de la peau, pas du squelette — réversible par `git revert`. |
 
@@ -29,10 +29,40 @@
    4 points en sombre et 2,9 en clair : insuffisant dans les DEUX thèmes. C'est ce qui
    justifie le retour du contour, et c'est une mesure, pas un goût.
 
+### Fin de session — le thème clair est retiré
+
+Marc, devant la version déployée : « c'est pas exactement comme ton preview […] les couleurs
+sont pas les mêmes ». Cinq écarts signalés, **quatre étaient de vraies régressions** (halo
+ambre absent, bulles Leaflet blanches, lueur de la marque perdue, carte dépliée non surélevée,
+cercle de note à 3 rem au lieu de 3,3) — corrigées en `b3856f2`.
+
+**Le cinquième n'en était pas une** : son système est réglé en clair, il regardait donc le
+pendant fade pendant que la maquette validée était sombre. Question posée, réponse de Marc :
+**« Sombre imposé, point. »**
+
+L'app n'a plus qu'un thème. `:root` porte les jetons sombres, plus une seule
+`@media (prefers-color-scheme: …)` dans `app/globals.css`, `viewport.themeColor` et le
+manifeste passent à `#141209`. Le verrou est un **test**, pas une promesse de `grep` :
+`tests/styles.test.ts` → « l'app n'a qu'un thème » (discrimination prouvée — en réintroduisant
+une media query de thème, il tombe).
+
+La leçon vaut au-delà de la couleur : **un second thème jamais montré à la validation n'est
+pas une option offerte, c'est une version non validée de l'app servie au hasard du réglage
+système** — et le jour où elle s'affiche, elle se lit comme un défaut.
+
+Deux voisins réglés au passage : l'encre des épingles de la carte était une COPIE de
+`encreSurNote()` figée dans le CSS (même classe que la table des paliers de distance) — elle
+vient maintenant de `lib/couleurNote.ts`, posée en ligne avec le fond ; et le fond des `code`
+gardait la teinte bleu-gris 265° d'avant ADR-0008.
+
 ### Ce qui reste ouvert
 
-- **Le thème clair est le parent pauvre.** Il est cohérent (même teinte, même structure,
-  même échelle) mais il ne porte pas l'identité comme le sombre. Coût annoncé et accepté.
+- **Plus de thème clair du tout.** Qui travaille en plein jour n'a pas de version claire.
+  Assumé : app privée à un seul utilisateur, qui vient de choisir. Un clair reviendra le jour
+  où il sera dessiné et validé comme le sombre l'a été.
+- **La demande suivante de Marc n'est pas commencée** : téléverser son CV pour que la
+  recherche, les notes, les SWOT et les critères s'alignent dessus. Il a demandé **un plan et
+  des questions**, pas du code.
 - **Le filtre CSS des tuiles** donne un rendu moins juste qu'un vrai fond sombre (les teintes
   de l'eau et des parcs virent). Assumé pour ne pas ajouter de domaine externe.
 - **Non vérifié à l'écran par moi** : cette session n'a pas d'accès authentifié à l'app.

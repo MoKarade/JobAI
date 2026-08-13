@@ -27,19 +27,30 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ⚠️ NEUTRE CHAUD (~90°), PAS BLEU-GRIS. C'est le premier geste de « Poste de
-     nuit » (ADR-0008) et le moins visible ligne à ligne : un gris neutre se lit
-     comme un défaut de fabrique, un gris légèrement tiré vers l'ambre se lit
-     comme un choix. La teinte est la même dans les deux thèmes — c'est ce qui
-     fait que le clair et le sombre sont la MÊME app, pas deux apps. */
-  --bg: oklch(96.5% 0.009 90);
-  --surface: oklch(99.4% 0.004 90);
-  /* Creux : survol, pastilles neutres, fonds de faits. Entre le fond et la carte. */
-  --creux: oklch(93.5% 0.011 90);
-  --text: oklch(22% 0.018 80);
-  --text-soft: oklch(45% 0.018 85);
-  --border: oklch(89.5% 0.013 90);
-  --accent: oklch(58% 0.19 275);
+  /* ⚠️ L'APP EST SOMBRE, TOUJOURS (ADR-0008, révisé le 2026-08-13 — décision de
+     Marc). Il n'y a plus de thème clair, et ce n'est donc plus un « mode sombre » :
+     ce sont LES couleurs. « Poste de nuit » EST l'identité ; un système réglé en
+     clair servait un pendant fade que personne n'avait choisi, et l'écart entre ce
+     qui avait été validé sur maquette et ce qui s'affichait venait de là.
+
+     `color-scheme: dark` n'est pas décoratif : il dit au navigateur d'habiller en
+     sombre ce que le CSS ne contrôle pas — barres de défilement, contrôles de
+     formulaire natifs, sélecteurs de date. Sans lui, ces éléments restent blancs
+     et trahissent le reste.
+
+     Neutre CHAUD (~90°), jamais le bleu-noir habituel : c'est sur une teinte tiède
+     que l'ambre publiée au hub devient lumineuse au lieu de jurer. Trois niveaux
+     qui s'éclairent en montant (fond → carte → relief) : c'est cette montée, et le
+     contour, qui répondent au « c'est plat » — pas des marges plus grandes. */
+  color-scheme: dark;
+  --bg: oklch(18.2% 0.017 97);
+  --surface: oklch(22.2% 0.017 92);
+  /* Creux : survol, offre dépliée, pastilles neutres, fonds de faits. */
+  --creux: oklch(26.5% 0.020 90);
+  --text: oklch(93.8% 0.021 89);
+  --text-soft: oklch(70.1% 0.033 88);
+  --border: oklch(30.2% 0.025 91);
+  --accent: oklch(66% 0.17 275);
 
   /* Deux voix. Les variables viennent de `next/font` (app/layout.tsx) : les
      fichiers sont servis par notre domaine, jamais par un tiers. */
@@ -54,26 +65,6 @@
   --t-m: 1rem;
   --t-l: 1.25rem;
   --t-xl: 1.6rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* ⚠️ C'EST ICI QUE VIT L'IDENTITÉ (ADR-0008). « Poste de nuit » est une
-       direction SOMBRE : c'est le soir qu'on regarde des offres, pas le matin.
-       Le clair ci-dessus en est le pendant fidèle, pas l'inverse.
-
-       Charbon CHAUD, jamais le bleu-noir habituel des interfaces sombres : sur
-       une teinte tiède, l'ambre publiée au hub devient lumineuse au lieu de
-       jurer. Trois niveaux qui s'éclairent en montant (fond → carte → relief) :
-       c'est cette montée, et le contour ci-dessous, qui répondent au « c'est
-       plat » — pas des marges plus grandes. */
-    --bg: oklch(18.2% 0.017 97);
-    --surface: oklch(22.2% 0.017 92);
-    --creux: oklch(26.5% 0.020 90);
-    --text: oklch(93.8% 0.021 89);
-    --text-soft: oklch(70.1% 0.033 88);
-    --border: oklch(30.2% 0.025 91);
-  }
 }
 
 *,
@@ -143,7 +134,9 @@ h1 {
 code {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.88em;
-  background: oklch(60% 0.02 265 / 0.12);
+  /* Teinte CHAUDE (~90°) comme tous les neutres depuis ADR-0008 : un gris bleuté
+     posé au milieu du charbon se voit, et se voit comme une erreur. */
+  background: oklch(70% 0.02 90 / 0.14);
   padding: 0.1em 0.35em;
   border-radius: 5px;
 }
@@ -176,45 +169,27 @@ code {
    Le tracker.
 
    Reprend l'identité de l'artifact d'origine — accent ambre, chiffres en
-   monospace, bordure gauche colorée par palier — mais déclinée dans les DEUX
-   thèmes : le sombre n'est pas imposé, `prefers-color-scheme` décide.
+   monospace, palier dit par la couleur — et l'installe dans UN SEUL thème :
+   le sombre (ADR-0008 révisé, 2026-08-13). `prefers-color-scheme` n'est plus
+   consulté nulle part ; les accents sont donc calibrés pour le charbon, une
+   fois, sans variante.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   /* ⚠️ C'EST LA COULEUR PUBLIÉE AU HUB (`app.color` = #f2a31b), pas une teinte
-     choisie ici. À 62 % de clarté elle rendait BRUNE en aplat — mesuré à l'écran.
-     #f2a31b vaut ~75 % : c'est cette valeur-là qui identifie JobAI parmi les
-     autres widgets, et un aplat doit la porter fidèlement. */
-  --ambre: oklch(75% 0.155 72);
-  --vert: oklch(58% 0.13 155);
-  --bleu: oklch(58% 0.14 250);
-  --rouge: oklch(56% 0.19 25);
-  --violet: oklch(56% 0.16 300);
+     choisie ici. Sur le charbon chaud, elle se pose à sa valeur publiée (#f2a31b
+     vaut ~77 %) : c'est là qu'elle est lumineuse. L'assombrir la rendrait brune. */
+  --ambre: oklch(77.5% 0.155 73);
+  --vert: oklch(72% 0.13 155);
+  --bleu: oklch(72% 0.12 250);
+  --rouge: oklch(68% 0.16 25);
+  --violet: oklch(74% 0.13 300);
   /* Variantes pour du TEXTE sur fond de surface. Les teintes d'accent ci-dessus servent
-     des bordures et des pastilles (3:1 suffit) ; en TEXTE sur fond clair, l'ambre 62 %
-     donne 3,67:1 et le bleu 58 % donne 4,22:1 — MESURÉ, sous le AA de 4,5:1. Ces deux-ci
-     sont foncées jusqu'à passer : ambre 50 % = 6,0:1, bleu 48 % = 6,0:1 sur les deux fonds. */
-  --ambre-texte: oklch(50% 0.13 75);
-  --bleu-texte: oklch(48% 0.14 250);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Sur le charbon chaud, l'ambre se pose à sa valeur PUBLIÉE (#f2a31b vaut
-       ~77 %) : c'est là qu'elle est lumineuse. L'assombrir la rendrait brune. */
-    --ambre: oklch(77.5% 0.155 73);
-    --vert: oklch(72% 0.13 155);
-    --bleu: oklch(72% 0.12 250);
-    --rouge: oklch(68% 0.16 25);
-    --violet: oklch(74% 0.13 300);
-    /* Sur fond sombre, les teintes claires passent largement (ambre 8,7:1, bleu 7,2:1). */
-    --ambre-texte: oklch(78% 0.14 75);
-    /* Un noir translucide disparaît sur fond sombre : on éclaircit au lieu d'assombrir. */
-    --survol: oklch(100% 0 0 / 0.06);
-    --actif: oklch(78% 0.14 75 / 0.18);
-    --bleu-texte: oklch(72% 0.12 250);
-  }
+     des bordures et des pastilles (3:1 suffit) ; en TEXTE il faut 4,5:1. Sur le charbon,
+     ce sont les teintes CLAIRES qui passent — mesuré : ambre 8,7:1, bleu 7,2:1. */
+  --ambre-texte: oklch(78% 0.14 75);
+  --bleu-texte: oklch(72% 0.12 250);
 }
 
 /* Échelle d'espacement UNIQUE (ADR-0003). Avant, chaque bloc choisissait sa marge dans son
@@ -229,9 +204,10 @@ code {
   /* Rayons. Le pill (999px) sur tout ce qui se clique ou se remplit ; 12px sur les
      surfaces. C'est le geste le plus reconnaissable de la famille. */
   /* Teintes d'interaction. Très légères : un survol qui se voit trop fatigue, un survol
-     qu'on ne voit pas laisse douter que l'élément soit cliquable. */
-  --survol: oklch(0% 0 0 / 0.045);
-  --actif: oklch(62% 0.15 75 / 0.14);
+     qu'on ne voit pas laisse douter que l'élément soit cliquable. Sur fond sombre, un
+     noir translucide disparaît : on ÉCLAIRCIT au survol au lieu d'assombrir. */
+  --survol: oklch(100% 0 0 / 0.06);
+  --actif: oklch(78% 0.14 75 / 0.18);
 
   /* Rondeur « douce et sobre » (choix de Marc) : 12 px sur les surfaces, pilule
      sur ce qui se clique, 10 px sur ce qui se saisit. */
@@ -787,7 +763,10 @@ code {
   font-family: var(--mono);
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
-  color: oklch(0.22 0.02 265);
+  /* ⚠️ PAS DE `color` ICI : l'encre est posée en ligne depuis `encreSurNote()`
+     (`components/CarteOffres.tsx`), au même endroit que le fond. Les deux sont
+     calculées ensemble — les séparer, c'était laisser la feuille de style figer
+     une encre que `lib/couleurNote.ts` pouvait déplacer sans elle. */
   box-shadow: 0 0 0 2px var(--surface);
   cursor: pointer;
 }
@@ -1021,7 +1000,7 @@ code {
   background: var(--surface);
 }
 
-/* ── Les tuiles en thème sombre ──────────────────────────────────────────
+/* ── Les tuiles ──────────────────────────────────────────────────────────
    OpenStreetMap ne sert que des tuiles CLAIRES. Posées telles quelles dans
    « Poste de nuit », elles font un rectangle blanc éblouissant au milieu du
    charbon — le seul endroit de l'app où le regard se fait agresser.
@@ -1038,10 +1017,8 @@ code {
    esthétique. Un filtre CSS ne coûte aucune dépendance et se retire en une
    ligne. Le rendu est un peu moins juste qu'un vrai fond sombre — c'est le
    prix assumé. */
-@media (prefers-color-scheme: dark) {
-  .leaflet-tile-pane {
-    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
-  }
+.leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
 }
 
 /* ── L'habillage de Leaflet suit NOS jetons ──────────────────────────────

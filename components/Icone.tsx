@@ -12,7 +12,7 @@
 // C'est ce qui permet de couper la phrase sans couper l'information.
 //
 // Dessinées à la main plutôt qu'importées : quatre traits chacune, elles suivent
-// `currentColor` — donc la couleur du texte, dans les deux thèmes, sans fichier à charger
+// `currentColor` — donc la couleur du texte, où qu'elles soient posées, sans fichier à charger
 // ni bibliothèque à tenir à jour.
 
 type Genre = "route" | "marche" | "borne" | "lieu";

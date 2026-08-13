@@ -487,6 +487,24 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   je lui présentais. Même réflexe que « vérifier qu'une tâche n'est pas déjà faite », mais
   appliqué au DESIGN : recenser ce que l'écran fait déjà avant de redessiner, sinon on fait
   valider une perte.
+- **Un second thème jamais montré à la validation n'est pas une option, c'est une version
+  NON VALIDÉE de l'app servie au hasard du réglage système.** La refonte « Poste de nuit »
+  a été choisie sur maquette, sa densité réglée au curseur, sa couleur arbitrée écran par
+  écran — tout ça sur UNE apparence. L'autre, produite gratuitement par une
+  `@media (prefers-color-scheme: light)`, n'a été ni montrée ni réglée. Le jour du
+  déploiement Marc a signalé « les couleurs sont pas les mêmes » : son système est en clair,
+  il regardait le pendant fade. Ce n'était pas un bug de code, et pourtant c'en était un
+  d'expérience. Règle : soit un thème est dessiné, mesuré et validé comme l'autre, soit il
+  n'existe pas. Corollaire de plomberie, quand on en retire un : `viewport.themeColor` et
+  `manifest.background_color`/`theme_color` sont HORS du CSS — une valeur claire oubliée
+  dans le manifeste fait un flash blanc au démarrage de l'app installée, et personne ne
+  regarde le manifeste en revoyant une feuille de style.
+- **Un contrôle promis en prose (« il suffira de grep ») ne verrouille rien.** L'ADR-0008
+  annonçait « `grep prefers-color-scheme` ne doit rien rendre ». Personne ne lance ce grep :
+  le second thème se serait reformé règle par règle sans qu'aucun test ne tombe. Le verrou
+  vit dans le même commit que la décision (`tests/styles.test.ts`, discrimination prouvée en
+  réintroduisant une media query), et il scanne les RÈGLES en écartant les commentaires —
+  sinon il échoue sur le commentaire qui explique pourquoi il existe, et on le retire.
 - **Quand une passe fait PLUSIEURS travaux, son déclencheur doit couvrir CHACUN d'eux.**
   Le gate des pages était « une offre n'a pas de distance ». Il se referme au moment précis
   où toutes les distances sont mesurées — donc où les trajets se mettent à marcher — et il

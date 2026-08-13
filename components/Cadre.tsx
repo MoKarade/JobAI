@@ -46,8 +46,8 @@ export function Cadre({
       <header className="entete">
         <Link href="/" className="entete__marque">
           {/* Le même motif que `app/icon.svg` : l'invite `>_`. Ici il est DESSINÉ plutôt
-              qu'importé, pour suivre la couleur du texte au survol et dans les deux thèmes —
-              une image figée resterait ambre sur un fond qui change.
+              qu'importé, pour suivre la couleur du texte au survol — une image figée
+              resterait ambre là où l'encre change.
               `aria-hidden` : le texte « JOB_AI » juste à côté donne déjà le nom du lien. */}
           <svg
             className="entete__mark"

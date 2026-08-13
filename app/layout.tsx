@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "JobAI",
-    // « default » garde la barre d'état lisible dans les deux thèmes ;
+    // « default » laisse iOS choisir une barre d'état lisible sur notre charbon ;
     // « black-translucent » ferait passer le contenu SOUS l'encoche.
     statusBarStyle: "default",
   },
@@ -51,13 +51,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // Contrairement au manifeste (une seule couleur possible), la balise meta accepte des
-  // media queries : la teinte de la barre système SUIT donc le thème. Les deux valeurs
-  // sont les `--bg` de globals.css, converties depuis leur OKLCH.
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f2f3f5" },
-    { media: "(prefers-color-scheme: dark)", color: "#090b10" },
-  ],
+  // ⚠️ UNE SEULE VALEUR, SANS MEDIA QUERY (ADR-0008 révisé, 2026-08-13) : l'app n'a plus
+  // qu'un thème. Une entrée `(prefers-color-scheme: light)` ferait blanchir la barre
+  // système au-dessus d'un écran charbon chez qui règle son OS en clair — un liseré blanc
+  // collé au haut de l'app. C'est `--bg` de globals.css, converti depuis son OKLCH.
+  themeColor: "#141209",
   // Installée, l'app doit occuper l'écran jusque sous l'encoche.
   viewportFit: "cover",
 };
