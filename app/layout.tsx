@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Manrope, DM_Mono } from "next/font/google";
+import { ServiceWorker } from "@/components/ServiceWorker";
 import "./globals.css";
 
 /**
@@ -35,12 +36,39 @@ export const metadata: Metadata = {
   title: "JobAI",
   description: "Suivi et analyse de recherche d'emploi — région de Québec.",
   robots: { index: false, follow: false },
+  // Rend l'app installable (cf. app/manifest.ts). Next pose le <link rel="manifest">.
+  manifest: "/manifest.webmanifest",
+  // iOS ignore le manifeste pour l'icône d'accueil : il lui faut celle-ci, OPAQUE
+  // (Safari ne gère pas la transparence et la remplacerait par du noir).
+  appleWebApp: {
+    capable: true,
+    title: "JobAI",
+    // « default » garde la barre d'état lisible dans les deux thèmes ;
+    // « black-translucent » ferait passer le contenu SOUS l'encoche.
+    statusBarStyle: "default",
+  },
+  icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" },
+};
+
+export const viewport: Viewport = {
+  // Contrairement au manifeste (une seule couleur possible), la balise meta accepte des
+  // media queries : la teinte de la barre système SUIT donc le thème. Les deux valeurs
+  // sont les `--bg` de globals.css, converties depuis leur OKLCH.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f2f3f5" },
+    { media: "(prefers-color-scheme: dark)", color: "#090b10" },
+  ],
+  // Installée, l'app doit occuper l'écran jusque sous l'encoche.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr-CA" className={`${manrope.variable} ${dmMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <ServiceWorker />
+      </body>
     </html>
   );
 }

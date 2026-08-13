@@ -127,4 +127,31 @@ describe("les contournements ne passent pas", () => {
       "non-authentifie",
     );
   });
+  // INSTALLABILITÉ (PWA, 2026-08-12). Ces chemins DOIVENT rester accessibles sans session,
+  // sinon l'app cesse d'être installable — en silence, sans erreur nulle part. Le navigateur
+  // récupère le manifeste SANS cookies : derrière la garde, il recevrait la redirection vers
+  // /connexion. Chromium exige en plus `/sw.js` pour proposer l'installation.
+  //
+  // ⚠️ Le scan ci-dessus ne les voit PAS : il ne découvre que `page.tsx` et `route.ts`, or
+  // `/manifest.webmanifest` vient d'une route de MÉTADONNÉES (`app/manifest.ts`) et les
+  // icônes sont des fichiers statiques. D'où ce verrou écrit à la main.
+  //
+  // Aucun de ces fichiers ne porte de donnée — ni offre, ni adresse, ni statut migratoire.
+  // La règle « ne jamais ouvrir une route qui affiche des données » reste entière, et les
+  // deux assertions de fin le vérifient.
+  it("laisse passer les fichiers requis pour l'installation, et RIEN de plus", () => {
+    for (const chemin of [
+      "/manifest.webmanifest",
+      "/sw.js",
+      "/icon-192.png",
+      "/icon-512.png",
+      "/icon-maskable-512.png",
+      "/apple-touch-icon.png",
+    ]) {
+      expect(estCheminPublic(chemin), `${chemin} devrait être public`).toBe(true);
+    }
+    // Les routes qui affichent des données restent gardées.
+    expect(estCheminPublic("/")).toBe(false);
+    expect(estCheminPublic("/carte")).toBe(false);
+  });
 });
