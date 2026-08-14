@@ -6,6 +6,51 @@
 
 ---
 
+## Session 2026-08-14 (suite) — la veille ne tournait plus depuis trois jours
+
+### Ce qui a été constaté, pas supposé
+
+La Routine de veille du jour n'a pas pu chercher : **le connecteur Indeed s'est déconnecté**
+en cours de session (outils absents, confirmé deux fois ; `ListConnectors` le donne pourtant
+installé et activé — c'est son serveur MCP qui a lâché). Zéro offre trouvée, rien inventé.
+
+En vérifiant si l'app avait au moins reçu des offres par son propre canal, j'ai trouvé bien
+pire : **`/api/cron/veille` n'apparaît dans AUCUN journal Vercel les 12, 13 et 14 août**,
+pendant que `/api/cron/geocodage` y figure chaque nuit avec son compte rendu complet
+(vérifié : 03:00:29 UTC le 14, HTTP 200, journal détaillé). Les deux crons sont déclarés
+côte à côte dans le même `vercel.json`, les deux routes sont structurellement identiques.
+
+Trois jours sans veille. Rien ne le disait : les offres cessent de se rafraîchir, l'app
+affiche les anciennes, la péremption les éteint une par une.
+
+### Ce qui est corrigé
+
+Le vrai défaut n'est pas le cron : c'est qu'une action quotidienne dépendait d'un
+**déclencheur unique dont le silence est invisible**. Le géocodage et la mesure de distances
+avaient chacun leur réservation ; l'ingestion, elle, n'en avait aucune.
+
+- `lib/veilleComplete.ts` — la passe entière, appelable par n'importe quel déclencheur.
+  Déplacement **VERBATIM** depuis la route, prouvé sur le COMPTE de chaque écriture et sur
+  leur ORDRE (la garantie « les offres d'abord, le journal ensuite » tient à cet ordre).
+- `CLE_VEILLE` / `DELAI_VEILLE_MS` (20 h) — bornes **dérivées** de l'écart de 12 h entre les
+  deux crons : > 12 h sinon double passe, < 24 h sinon jour sauté. Discrimination prouvée
+  dans les deux sens.
+- Le cron de géocodage — celui dont on a la preuve qu'il tourne — reprend la passe quand elle
+  est en retard, et rend la main après (un seul travail par invocation, comme avant).
+
+Quand le cron de veille reviendra, il reprendra naturellement la main : c'est la réservation
+qui arbitre, pas l'ordre des déclencheurs.
+
+### Ce qui reste à faire
+
+- **`[VEILLE-11]`, côté Marc** : voir dans Vercel POURQUOI le cron ne part plus (Settings →
+  Cron Jobs, ou `vercel crons ls`). Illisible depuis une session Claude — pas de jeton, et le
+  MCP Vercel n'expose pas les crons. Le filet rend la panne inoffensive, il ne la corrige pas
+  à la source.
+- **`[VEILLE-12]`** : publier la fraîcheur de la dernière passe dans le résumé hub (alerte
+  au-delà de 36 h). C'est ce qui manquait le plus — trois jours ont passé faute d'un écran
+  qui dise « la veille n'a pas tourné ».
+
 ## Session 2026-08-14 — la bulle de la carte, et un revert de conteneur
 
 ### Ce que Marc a signalé

@@ -574,6 +574,27 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   valeurs retirées, à dessein). Corollaire : quand un écran « ne ressemble pas à la
   maquette », commencer par COMPARER LES JETONS aux hex de la maquette — ici les quatre
   neutres étaient identiques, ce qui a désigné tout de suite la vraie cause.
+- **Un travail périodique qui dépend d'un déclencheur UNIQUE meurt en silence.** Le cron
+  Vercel de la veille a cessé d'être appelé pendant trois jours ; celui de géocodage, déclaré
+  dans le MÊME `vercel.json`, tournait chaque nuit. Rien ne l'a signalé : les offres cessent
+  de se rafraîchir, l'app affiche les anciennes, la péremption les éteint une par une. Deux
+  règles en sortent : (1) **toute action périodique porte une RÉSERVATION** (`reserverPasse`)
+  même quand un seul chemin la déclenche — c'est elle qui rend un second chemin possible plus
+  tard sans risque de double exécution ; (2) **un second déclencheur vaut mieux qu'un seul**,
+  et le meilleur candidat est celui dont on a la PREUVE qu'il tourne. Le délai de réservation
+  se dérive de l'écart entre les déclencheurs (ici 12 h ⇒ 20 h, entre 12 et 24), jamais d'un
+  chiffre rond choisi au jugé — et le test le dérive de cet écart, pas de la valeur du jour.
+- **Un garde qui tombe pendant un refactor a raison : on met à jour sa LISTE, jamais son
+  assertion.** En déplaçant la veille vers un module partagé, `tests/persistance.test.ts` a
+  refusé le commit — sa liste de chemins d'écriture nommait encore l'ancien fichier. C'est
+  exactement son travail : empêcher un chemin d'écriture de sortir de la surveillance à la
+  faveur d'un déménagement. Retirer un chemin de cette liste, c'est cesser de le garder.
+- **Prouver qu'une extraction est VERBATIM se fait sur les EFFETS, pas sur les lignes.** Un
+  diff de 120 lignes déplacées ne se relit pas utilement. Ce qui se vérifie mécaniquement :
+  le COMPTE de chaque écriture (`insert`, `update` par table, écritures d'état) et surtout
+  leur ORDRE — ici la garantie « les offres d'abord, le journal ensuite » tient à cet ordre.
+  Attention aux appels à cheval sur deux lignes : ma première regex rendait 0 des deux côtés
+  et « validait » un champ qu'elle ne voyait pas.
 - **Un contrôle promis en prose (« il suffira de grep ») ne verrouille rien.** L'ADR-0008
   annonçait « `grep prefers-color-scheme` ne doit rien rendre ». Personne ne lance ce grep :
   le second thème se serait reformé règle par règle sans qu'aucun test ne tombe. Le verrou

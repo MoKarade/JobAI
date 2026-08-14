@@ -261,6 +261,39 @@ export const CLE_GEOCODAGE = "geocodage-auto";
  */
 export const DELAI_PASSE_AUTO_MS = 5 * 60 * 1000;
 
+/**
+ * Clé de la réservation de la PASSE DE VEILLE elle-même.
+ *
+ * ⚠️ ELLE N'EXISTAIT PAS, ET C'EST CE QUI A LAISSÉ LA VEILLE MOURIR EN SILENCE.
+ *
+ * Le géocodage et la mesure de distances avaient chacun leur réservation, parce que
+ * plusieurs chemins pouvaient les déclencher. L'ingestion, elle, n'en avait aucune : un
+ * seul déclencheur, donc rien à arbitrer. Le jour où ce déclencheur s'est tu (cron Vercel
+ * `/api/cron/veille` absent des journaux les 12, 13 et 14 août 2026, pendant que celui de
+ * géocodage tournait), il n'existait aucun second chemin pour reprendre le travail — ni
+ * aucun état disant depuis quand plus rien ne se passait.
+ *
+ * Avec cette clé, la passe devient reprenable par n'importe quel déclencheur sans risque
+ * de double exécution : c'est la RÉSERVATION qui arbitre, pas l'ordre d'arrivée.
+ */
+export const CLE_VEILLE = "veille-auto";
+
+/**
+ * Intervalle minimal entre deux passes de veille.
+ *
+ * ⚠️ 20 H, ET LA VALEUR EST CONTRAINTE DES DEUX CÔTÉS — ce n'est pas un réglage au doigt
+ * mouillé. Les deux crons sont à 12 h d'écart (veille 15:00 UTC, géocodage 03:00) :
+ *
+ *   · il faut PLUS de 12 h, sinon le cron de géocodage relancerait une passe une demi-
+ *     journée seulement après celle de la veille — deux ingestions par jour, pour rien ;
+ *   · il faut MOINS de 24 h, sinon la passe quotidienne se ferait refuser d'un cheveu et
+ *     l'app tomberait à une passe tous les deux jours.
+ *
+ * Entre les deux, 20 h laisse 4 h de marge de chaque côté — assez pour absorber le retard
+ * d'un cron (Vercel ne garantit pas la minute) sans jamais sauter un jour.
+ */
+export const DELAI_VEILLE_MS = 20 * 60 * 60 * 1000;
+
 /** Clé de la temporisation de la mesure des distances. */
 export const CLE_DISTANCES = "distances-auto";
 

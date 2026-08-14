@@ -23,7 +23,14 @@ import { db } from "@/lib/db";
 import { mesurerDistances } from "@/lib/actions";
 import { autoriserCron } from "@/lib/cronAuth";
 import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "@/lib/geocodageCron";
-import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "@/lib/synchro";
+import {
+  CLE_DISTANCES,
+  CLE_VEILLE,
+  DELAI_MESURE_AUTO_MS,
+  DELAI_VEILLE_MS,
+  reserverPasse,
+} from "@/lib/synchro";
+import { executerVeilleComplete } from "@/lib/veilleComplete";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -39,7 +46,31 @@ export async function GET(requete: Request) {
     );
   }
 
+  // ⚠️ FILET DE REPRISE DE LA VEILLE — la raison d'être de ce bloc est écrite dans
+  // `lib/veilleComplete.ts`. En deux mots : le cron de veille (15:00 UTC) a cessé d'être
+  // appelé par Vercel pendant trois jours pendant que CELUI-CI (03:00) tournait chaque
+  // nuit. Un travail quotidien ne doit pas dépendre d'un déclencheur unique dont le silence
+  // ne se voit pas.
+  //
+  // La réservation (`CLE_VEILLE`, 20 h) arbitre : si la veille a tourné dans les vingt
+  // dernières heures — donc si son propre cron fonctionne — on ne prend rien et on fait
+  // simplement notre travail habituel. Ce filet ne coûte donc rien quand tout va bien.
+  //
+  // ⚠️ ET ON REND LA MAIN APRÈS. `executerVeilleComplete` fait DÉJÀ la passe de distances
+  // à la fin : enchaîner la nôtre dans la même invocation, ce serait deux travaux sous le
+  // même mur de 60 s. Un seul travail par invocation, comme avant.
   try {
+    if (await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, new Date())) {
+      console.warn("[cron/geocodage] veille en retard — reprise depuis ce cron");
+      const v = await executerVeilleComplete("cron-geocodage-rattrapage");
+      return NextResponse.json(
+        v.ok
+          ? { ok: true, rattrapageVeille: true, declencheur: v.declencheur, ...v.compte }
+          : { ok: false, rattrapageVeille: true, erreur: v.erreur },
+        { status: v.ok ? 200 : v.statut, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
     if (!(await reserverPasse(db, CLE_DISTANCES, DELAI_MESURE_AUTO_MS, new Date()))) {
       return NextResponse.json(
         { ok: true, localisation: "sautée — une passe vient d'avoir lieu" },

@@ -206,6 +206,26 @@
 - [ ] 🔧 **`[V3-06]`** Plafond budgétaire chiffré, non désactivable, qui suspend les
       traitements de fond mais jamais une action déclenchée par Marc.
 
+## Chantier #09 — la veille muette (2026-08-14) 🟨
+
+> Constaté pendant la Routine du jour : `/api/cron/veille` (15:00 UTC) n'apparaît dans AUCUN
+> journal Vercel les 12, 13 et 14 août, pendant que `/api/cron/geocodage` (03:00) y figure
+> chaque nuit avec son compte rendu complet. Trois jours sans veille, sans que rien ne le dise.
+
+- [x] 🔧 **`[VEILLE-10]`** La passe devient reprenable : `lib/veilleComplete.ts` (déplacement
+      VERBATIM, prouvé écriture par écriture et sur leur ORDRE), réservation `CLE_VEILLE`
+      (20 h, bornes dérivées de l'écart de 12 h entre les deux crons), reprise depuis le cron
+      de géocodage. Discrimination prouvée dans les deux sens (25 h → jour sauté ; 10 h →
+      double passe).
+- [ ] 👤 **`[VEILLE-11]`** **Vérifier côté Vercel pourquoi le cron de veille ne part plus** :
+      Dashboard → projet `job-ai` → Settings → Cron Jobs (état activé/désactivé, dernière
+      exécution). Ou en CLI : `vercel crons ls`. Non lisible depuis une session Claude (pas de
+      jeton Vercel, et le MCP Vercel n'expose pas les crons). Le filet ci-dessus rend la panne
+      inoffensive, il ne la corrige pas à la source.
+- [ ] 🔧 **`[VEILLE-12]`** Rendre le silence VISIBLE : publier la fraîcheur de la dernière
+      passe dans `lib/hubSummary.ts` (alerte quand > 36 h). C'est ce qui manquait le plus —
+      trois jours ont passé parce qu'aucun écran ne disait « la veille n'a pas tourné ».
+
 ## Chantier #08 — CV et profil (ADR-0009) 🟩
 
 > Demandé par Marc le 2026-08-13 : « je veux la possibilité d'uploader mon CV pour que la

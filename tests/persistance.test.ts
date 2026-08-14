@@ -55,7 +55,13 @@ describe("une seule copie de la liste de colonnes", () => {
   // Le vrai risque n'est pas le code d'aujourd'hui : c'est la CINQUIÈME copie, écrite dans
   // six mois par quelqu'un qui recopiera le bloc d'à côté sans savoir pourquoi il existe.
   const CHEMINS = [
-    "app/api/cron/veille/route.ts",
+    // ⚠️ LA VEILLE A DÉMÉNAGÉ le 2026-08-14 : elle écrivait depuis sa route, elle écrit
+    // maintenant depuis `lib/veilleComplete.ts` — parce que DEUX crons peuvent désormais la
+    // déclencher (celui de veille s'était tu trois jours sans que rien ne le dise). Ce garde
+    // a bien fait son travail au moment du déplacement : il a refusé de laisser un chemin
+    // d'écriture sortir de sa surveillance. C'est la LISTE qu'on met à jour, jamais
+    // l'assertion — un chemin retiré d'ici est un chemin qui n'est plus gardé.
+    "lib/veilleComplete.ts",
     "app/api/ingest/depot/route.ts",
     "lib/actions.ts",
     "lib/synchro.ts",

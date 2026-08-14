@@ -18,6 +18,8 @@ import { appliquerSeed,
   PREFIXE_EN_COURS,
   empreinteSeed,
   reserverPasse,
+  CLE_VEILLE,
+  DELAI_VEILLE_MS,
 } from "../lib/synchro";
 import { SEED } from "../lib/seed";
 import type { Offre } from "../lib/types";
@@ -223,5 +225,71 @@ describe("appliquerSeed n'écrit QUE le jeu de départ (fix du 2026-08-12)", () 
     // si l'ingérée était traitée, on verrait AU MOINS une opération de plus que le seed
     // n'en justifie. Borne : ≤ 3 opérations par offre du SEED, aucune pour l'ingérée.
     expect(operations.length).toBeLessThanOrEqual(SEED.length * 3);
+  });
+});
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * LA REPRISE DE LA VEILLE — le filet posé le 2026-08-14.
+ *
+ * ⚠️ CE N'EST PAS UN TEST DE PRINCIPE : il verrouille la correction d'une panne RÉELLE.
+ * Le cron Vercel `/api/cron/veille` (15:00 UTC) a cessé d'être appelé pendant au moins
+ * trois jours — absent des journaux les 12, 13 et 14 août — pendant que celui de géocodage
+ * (03:00) tournait chaque nuit avec son compte rendu. Personne ne pouvait le savoir : les
+ * offres cessent simplement de se rafraîchir.
+ *
+ * Depuis, le cron de géocodage REPREND la passe quand elle est en retard, et c'est la
+ * réservation qui empêche les deux de la faire le même jour. Les deux tests ci-dessous
+ * couvrent les deux régimes — celui où le cron de veille marche, et celui où il est mort.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("reprise de la veille par le cron de géocodage", () => {
+  const H = 60 * 60 * 1000;
+
+  it("le délai tient entre les deux crons — ni double passe, ni jour sauté", () => {
+    // Les deux crons sont à 12 h d'écart (veille 15:00 UTC, géocodage 03:00). Le délai est
+    // contraint des DEUX côtés, et ces bornes sont la seule raison de sa valeur :
+    //   · > 12 h, sinon le géocodage relancerait une passe une demi-journée après la veille ;
+    //   · < 24 h, sinon la passe quotidienne se ferait refuser d'un cheveu.
+    // Dérivé de l'écart réel, jamais recopié depuis la valeur du jour.
+    const ECART_ENTRE_CRONS = 12 * H;
+    expect(DELAI_VEILLE_MS).toBeGreaterThan(ECART_ENTRE_CRONS);
+    expect(DELAI_VEILLE_MS).toBeLessThan(24 * H);
+  });
+
+  it("QUAND LE CRON DE VEILLE MARCHE : le géocodage ne reprend rien", async () => {
+    const veille = new Date("2026-08-14T15:00:00Z");
+    const { db } = baseSimulee({ cle: CLE_VEILLE, valeur: String(veille.getTime()) });
+
+    // Le géocodage passe 12 h plus tard. La veille a eu lieu : il ne doit PAS la refaire.
+    const geocodage = new Date(veille.getTime() + 12 * H);
+    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, geocodage)).toBe(false);
+
+    // Et le lendemain, la veille reprend la main normalement (24 h après la précédente).
+    const lendemain = new Date(veille.getTime() + 24 * H);
+    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, lendemain)).toBe(true);
+  });
+
+  it("QUAND LE CRON DE VEILLE EST MORT : le géocodage la reprend, chaque jour", async () => {
+    // Le cas vécu. Dernière passe il y a trois jours, plus rien depuis.
+    const derniere = new Date("2026-08-11T15:00:00Z");
+    const { db } = baseSimulee({ cle: CLE_VEILLE, valeur: String(derniere.getTime()) });
+
+    const nuit1 = new Date("2026-08-14T03:00:00Z");
+    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, nuit1)).toBe(true);
+
+    // Et le régime est STABLE : 24 h plus tard, il reprend encore. Un délai mal choisi
+    // (25 h par exemple) donnerait une passe tous les deux jours, sans que rien ne le dise.
+    const nuit2 = new Date(nuit1.getTime() + 24 * H);
+    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, nuit2)).toBe(true);
+  });
+
+  it("deux déclencheurs simultanés : un seul passe", async () => {
+    // Le jour où le cron de veille revient, les deux chemins existent. La réservation est
+    // conditionnelle sur la valeur lue : c'est elle, et non l'ordre d'arrivée, qui tranche.
+    const { db } = baseSimulee(null);
+    const t = new Date("2026-08-15T03:00:00Z");
+    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, t)).toBe(true);
+    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, t)).toBe(false);
   });
 });
