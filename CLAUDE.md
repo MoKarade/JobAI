@@ -584,6 +584,33 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   et le meilleur candidat est celui dont on a la PREUVE qu'il tourne. Le délai de réservation
   se dérive de l'écart entre les déclencheurs (ici 12 h ⇒ 20 h, entre 12 et 24), jamais d'un
   chiffre rond choisi au jugé — et le test le dérive de cet écart, pas de la valeur du jour.
+- **Un saut de build se décide contre `HEAD^`, en SUPPOSANT que `HEAD^` a été déployé — et
+  cette supposition tombe précisément le jour où un déploiement manque.** Troisième occurrence
+  du webhook GitHub non livré (2026-08-14, après le 07-31 et le 08-12) : aucun déploiement créé
+  pour `a30409d`, quarante minutes durant. Le piège est dans la suite : `build-necessaire.sh`
+  ne regarde que le diff `HEAD^..HEAD`, donc un commit de docs poussé ensuite serait IGNORÉ —
+  et le correctif serait resté hors ligne sans qu'aucun voyant ne change. Un mécanisme
+  d'économie qui raisonne sur le commit PRÉCÉDENT plutôt que sur le commit DÉPLOYÉ hérite de
+  toutes les livraisons manquées. Trois conséquences opératoires : (a) le remède reste un
+  nouveau PUSH (un « Redeploy » rejoue le SHA du déploiement existant, ici ANTÉRIEUR au
+  correctif) ; (b) un **commit vide** est le véhicule le plus sûr — il ne touche aucun fichier
+  et son diff vide tombe dans « aucun fichier lisible » ⇒ `exit 1` ⇒ build LANCÉ, vérifié par
+  sonde avant le push, jamais supposé ; (c) après le push, le seul signal valable est le SHA
+  du déploiement `READY` comparé au SHA attendu.
+- **`deploy_to_vercel` n'est pas « déploie ce dépôt ».** L'outil MCP téléverse un arbre de
+  fichiers qu'il faut ÉNUMÉRER (151 fichiers ici) : ce qu'on oublie n'existe pas en production
+  — la panne `outputFileTracingIncludes` du 08-12, mais provoquée à la main. Sans jeton ni CLI
+  Vercel dans la session, le canal git est le SEUL chemin de déploiement fiable ; le dire au
+  lieu de promettre un déploiement direct.
+- **Un revert de conteneur RÉCIDIVE dans la même session, et il revient au même point.**
+  Deux fois le 2026-08-14, jusqu'à `[BORNE-02]` les deux fois. Le tell de la seconde a été un
+  `No such file or directory` sur un fichier lu quinze minutes plus tôt — et le commit que je
+  venais de créer s'était posé sur la base périmée. « J'ai déjà vérifié l'arbre tout à l'heure »
+  n'est donc PAS un acquis : la vérification se refait avant chaque écriture qui compte
+  (`git ls-remote` contre `git rev-parse HEAD`), et ce qui a été fait sur l'ancienne base se
+  JETTE. Corollaire déjà noté, re-vécu : le revert casse aussi la `refspec` d'`origin` (réduite
+  à une vieille branche de travail), donc le garde d'arrêt annonce des centaines de commits non
+  poussés sur un dépôt parfaitement à jour.
 - **Un garde qui tombe pendant un refactor a raison : on met à jour sa LISTE, jamais son
   assertion.** En déplaçant la veille vers un module partagé, `tests/persistance.test.ts` a
   refusé le commit — sa liste de chemins d'écriture nommait encore l'ancien fichier. C'est
@@ -771,6 +798,12 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   restée bloquée après coup — re-testé le jour même. Donc `curl` direct est de nouveau une
   vérification valide, mais seulement depuis une session ouverte APRÈS le changement de
   politique ; une session ancienne reste un faux négatif jusqu'à son prochain provisioning.
+  ⚠️ **Re-mesuré le 2026-08-14 : la session de développement joint désormais la production**
+  (`curl https://emploi.hubperso.com/api/hub/summary` ⇒ 401 propre). Les reverts de conteneur
+  la re-provisionnent, donc elle a fini par relire la politique élargie. Ce qu'il faut retenir
+  n'est pas « c'est débloqué » — ça peut rebasculer — mais que **l'accès réseau d'une session
+  se MESURE au moment où l'on en a besoin**, jamais depuis une note écrite la veille : la §7
+  affirmait « bloquée » et c'était faux au moment de s'en servir.
 - **Un quota d'API partagé ne se mesure qu'en le heurtant, et il se referme en s'aggravant.**
   Indeed a rendu « Rate limit exceeded, try again in 26 s », puis 29, puis 51 après deux
   tentatives — le délai CROÎT à chaque appel refusé. Une boucle de retente serré ne fait donc

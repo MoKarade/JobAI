@@ -41,6 +41,29 @@ avaient chacun leur réservation ; l'ingestion, elle, n'en avait aucune.
 Quand le cron de veille reviendra, il reprendra naturellement la main : c'est la réservation
 qui arbitre, pas l'ordre des déclencheurs.
 
+### Mise en ligne — elle a demandé un second push
+
+`a30409d` (CI #178 verte) n'a produit **aucun déploiement Vercel** : pas un build raté, pas un
+vieux SHA rejoué — zéro entrée, quarante minutes durant, alors que les deux déploiements
+précédents étaient apparus en trois secondes. Troisième occurrence du webhook GitHub non
+livré (07-31, 08-12, 08-14).
+
+Deux fausses pistes écartées avant d'agir : un « Redeploy » du tableau de bord aurait rejoué
+`150e54b`, dont l'arbre est ANTÉRIEUR au correctif ; et un commit de docs poussé ensuite aurait
+été IGNORÉ par `build-necessaire.sh` (il ne compare que `HEAD^..HEAD`), laissant le correctif
+hors ligne sans qu'aucun voyant ne change.
+
+Remède appliqué : **commit vide** `ce682c7` — aucun fichier touché, donc aucun risque sur le
+code, et un diff vide sort en `exit 1` (« aucun fichier lisible ») ⇒ build LANCÉ, vérifié par
+sonde avant le push. Déploiement créé **2 s** après, `READY` en 46 s,
+`dpl_8MJ8FwFMyoSYTYM1CbUZdA1NL71v`, alias `emploi.hubperso.com`. Production vivante (401 propre
+du endpoint hub). Le premier passage utile est celui du cron de géocodage, à 03:00 UTC.
+
+⚠️ Le conteneur a reverti l'arbre **une seconde fois** pendant l'opération, au même point
+(`[BORNE-02]`) : le premier commit vide s'était posé sur la base périmée et a été JETÉ, pas
+rejoué. Le tell : `scripts/build-necessaire.sh: No such file or directory` sur un fichier lu
+quinze minutes plus tôt.
+
 ### Ce qui reste à faire
 
 - **`[VEILLE-11]`, côté Marc** : voir dans Vercel POURQUOI le cron ne part plus (Settings →
