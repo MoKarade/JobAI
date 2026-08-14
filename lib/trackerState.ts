@@ -21,6 +21,7 @@ import { db } from "./db";
 import { offers } from "./db/schema";
 import { assurerMigrations } from "./migrations";
 import { resumer } from "./suivi";
+import { aujourdhui } from "./ajout";
 import type { ResumeSuivi } from "./types";
 
 export async function getTrackerState(): Promise<ResumeSuivi | null> {
@@ -55,6 +56,7 @@ export async function getTrackerState(): Promise<ResumeSuivi | null> {
       entreprise: offers.entreprise,
       poste: offers.poste,
       perimeeLe: offers.perimeeLe,
+      dateReperage: offers.dateReperage,
     })
     .from(offers);
 
@@ -65,7 +67,10 @@ export async function getTrackerState(): Promise<ResumeSuivi | null> {
   // `Date` en base, chaîne ISO côté application — même conversion que `lireOffres`.
   // Le résumé ne teste que la nullité, mais laisser deux représentations coexister
   // finirait par produire une comparaison qui échoue silencieusement.
+  // La date est calculée DANS le fuseau de Marc, pas en UTC : sinon, passé 20 h locale,
+  // « aujourd'hui » serait déjà demain et la fenêtre des nouveautés glisserait d'un jour.
   return resumer(
     lignes.map((l) => ({ ...l, perimeeLe: l.perimeeLe ? l.perimeeLe.toISOString() : null })),
+    aujourdhui(new Date()),
   );
 }

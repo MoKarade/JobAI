@@ -116,7 +116,7 @@ describe("GET /api/hub/summary", () => {
 });
 
 describe("construction du summary", () => {
-  const resume = resumer(SEED);
+  const resume = resumer(SEED, "2026-08-14");
 
   it("produit un payload conforme au vrai schéma du contrat", () => {
     expect(() => validateSummary(construireSummary(resume, LE))).not.toThrow();
@@ -159,11 +159,16 @@ describe("construction du summary", () => {
   });
 
   it("n'invente aucune métrique quand le suivi est vide", () => {
-    const vide = resumer([]);
+    const vide = resumer([], "2026-08-14");
     const s = construireSummary(vide, LE);
     // Pas de meilleure offre : la position 0 ne doit pas être occupée par un faux héros.
-    expect(s.metrics[0]?.label).toBe("Offres suivies");
+    // C'est « Nouvelles » qui prend la tête — un compteur à zéro y est une information
+    // VRAIE (« rien n'est arrivé »), pas une métrique inventée.
+    expect(s.metrics[0]?.label).toBe("Nouvelles (7 j)");
     expect(s.metrics[0]?.value).toBe(0);
+    // ⚠️ Et la moyenne, elle, est ABSENTE : sans nouvelle à moyenner, publier un 0
+    // annoncerait des offres nulles là où il n'y a pas d'offre (garde-fou n°3).
+    expect(s.metrics.some((m) => m.label === "Note moyenne des nouvelles")).toBe(false);
     expect(s.alerts.some((a) => a.severity === "info")).toBe(true);
     expect(() => validateSummary(s)).not.toThrow();
   });
@@ -172,8 +177,47 @@ describe("construction du summary", () => {
     const s = construireSummary(resume, LE);
     const parLibelle = Object.fromEntries(s.metrics.map((m) => [m.label, m.value]));
     expect(parLibelle["Offres suivies"]).toBe(resume.actives);
-    expect(parLibelle["CV envoyés"]).toBe(resume.cvEnvoyes);
-    expect(parLibelle["Réponses"]).toBe(resume.reponses);
+    expect(parLibelle["Nouvelles (7 j)"]).toBe(resume.nouvelles);
+    // Les deux compteurs de candidature tiennent dans UN créneau — le contrat en plafonne
+    // six, et l'arbitrage est écrit dans `hubSummary.ts`. Les deux chiffres restent lisibles.
+    expect(parLibelle["CV envoyés · réponses"]).toBe(
+      `${resume.cvEnvoyes} · ${resume.reponses}`,
+    );
+  });
+
+  /**
+   * Le strict minimum que `resumer` lit — pas une `Offre` complète.
+   *
+   * Une fixture qui porte plus que ce que la fonction consulte finit par faire croire que
+   * les champs en trop comptent : ici, la forme EST la documentation de ce qui est lu.
+   */
+  function pourResume(champs: { dateReperage: string; score: number | null }) {
+    return {
+      histo: false,
+      statut: "Identifiee" as const,
+      entreprise: "Entreprise",
+      poste: "Poste",
+      perimeeLe: null,
+      ...champs,
+    };
+  }
+
+  it("publie la note moyenne des nouvelles, et jamais plus de six métriques", () => {
+    const avecNouvelles = resumer(
+      [
+        pourResume({ dateReperage: "2026-08-14", score: 82 }),
+        pourResume({ dateReperage: "2026-08-14", score: 60 }),
+      ],
+      "2026-08-14",
+    );
+    const s = construireSummary(avecNouvelles, LE);
+    const parLibelle = Object.fromEntries(s.metrics.map((m) => [m.label, m.value]));
+    expect(parLibelle["Nouvelles (7 j)"]).toBe(2);
+    expect(parLibelle["Note moyenne des nouvelles"]).toBe(71);
+    // Le plafond du contrat est une contrainte DURE : le dépasser ferait échouer la
+    // validation chez le hub, c'est-à-dire un widget cassé plutôt qu'une métrique en trop.
+    expect(s.metrics.length).toBeLessThanOrEqual(6);
+    expect(() => validateSummary(s)).not.toThrow();
   });
 
   it("horodate avec la date fournie, sans lire l'horloge", () => {

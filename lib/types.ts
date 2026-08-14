@@ -124,6 +124,21 @@ export type MiseAJourOffre = z.infer<typeof MiseAJourOffreSchema>;
 export interface ResumeSuivi {
   total: number;
   actives: number;
+  /**
+   * Offres repérées dans les `FENETRE_NOUVELLES_JOURS` derniers jours, encore actives.
+   *
+   * La fenêtre est la même que celle des dépôts (7 jours) : au-delà, une offre cesse
+   * d'être une observation, et l'appeler « nouvelle » serait faux.
+   */
+  nouvelles: number;
+  /**
+   * Note moyenne de ces nouvelles, arrondie — `null` quand aucune n'est notée.
+   *
+   * `null` n'est PAS zéro : une moyenne de zéro dirait « ces offres ne valent rien »,
+   * l'absence dit « il n'y a rien à moyenner ». Le widget doit rendre les deux
+   * différemment (garde-fou n°3).
+   */
+  noteMoyenneNouvelles: number | null;
   notees80Plus: number;
   cvEnvoyes: number;
   reponses: number;

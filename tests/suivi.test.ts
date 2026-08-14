@@ -5,7 +5,13 @@
 // en cherchant où en était une candidature.
 
 import { describe, it, expect } from "vitest";
-import { fusionner, appliquerModification, marquerEnvoi, resumer } from "../lib/suivi";
+import {
+  fusionner,
+  appliquerModification,
+  marquerEnvoi,
+  resumer,
+  FENETRE_NOUVELLES_JOURS,
+} from "../lib/suivi";
 import { CHAMPS_UTILISATEUR, type Offre } from "../lib/types";
 import { SEED } from "../lib/seed";
 
@@ -159,7 +165,7 @@ describe("date d'envoi automatique", () => {
 
 describe("résumé", () => {
   it("compte séparément le suivi total et les offres actives", () => {
-    const r = resumer(SEED);
+    const r = resumer(SEED, "2026-08-14");
     expect(r.total).toBe(53);
     expect(r.actives).toBe(38);
   });
@@ -170,26 +176,26 @@ describe("résumé", () => {
     const r = resumer([
       offre({ id: "active", score: 70, histo: false }),
       offre({ id: "vieille", score: 99, histo: true }),
-    ]);
+    ], "2026-08-14");
     expect(r.meilleure?.score).toBe(70);
   });
 
   it("rend null — et non un zéro — quand aucune offre n'est notée", () => {
-    const r = resumer([offre({ score: null })]);
+    const r = resumer([offre({ score: null })], "2026-08-14");
     expect(r.meilleure).toBeNull();
     expect(r.notees80Plus).toBe(0);
   });
 
   it("compte les candidatures sur TOUT le suivi, historique inclus", () => {
     // Ce sont des faits accomplis : la campagne 2025 compte dans « CV envoyés ».
-    const r = resumer(SEED);
+    const r = resumer(SEED, "2026-08-14");
     expect(r.cvEnvoyes).toBe(15);
     expect(r.reponses).toBe(7);
     expect(r.entrevues).toBe(1);
   });
 
   it("les compteurs sont cohérents entre eux", () => {
-    const r = resumer(SEED);
+    const r = resumer(SEED, "2026-08-14");
     expect(r.reponses).toBeLessThanOrEqual(r.cvEnvoyes);
     expect(r.entrevues).toBeLessThanOrEqual(r.reponses);
     expect(r.actives).toBeLessThanOrEqual(r.total);
@@ -197,7 +203,7 @@ describe("résumé", () => {
   });
 
   it("supporte un suivi vide sans rien inventer", () => {
-    const r = resumer([]);
+    const r = resumer([], "2026-08-14");
     expect(r).toEqual({
       total: 0,
       actives: 0,
@@ -206,6 +212,12 @@ describe("résumé", () => {
       reponses: 0,
       entrevues: 0,
       meilleure: null,
+      // Un suivi vide n'a AUCUNE nouveauté et RIEN à moyenner. Les deux zéros seraient
+      // faux différemment : `noteMoyenneNouvelles: 0` annoncerait des offres nulles là où
+      // il n'y a pas d'offre du tout. L'énumération exhaustive est volontaire — elle fait
+      // tomber ce test dès qu'un champ apparaît, ce qui force à décider de sa valeur vide.
+      nouvelles: 0,
+      noteMoyenneNouvelles: null,
     });
   });
 });
@@ -219,23 +231,23 @@ describe("offres périmées", () => {
   ];
 
   it("exclut les périmées du compte d'offres actives", () => {
-    expect(resumer(jeu).actives).toBe(1);
+    expect(resumer(jeu, "2026-08-14").actives).toBe(1);
   });
 
   it("ne choisit JAMAIS une offre périmée comme meilleure", () => {
-    const r = resumer(jeu);
+    const r = resumer(jeu, "2026-08-14");
     // 95 > 70, mais l'offre à 95 est fermée : la meilleure disponible est celle à 70.
     expect(r.meilleure?.entreprise).toBe("Ouverte");
     expect(r.meilleure?.score).toBe(70);
   });
 
   it("ne compte pas une périmée dans les offres notées 80+", () => {
-    expect(resumer(jeu).notees80Plus).toBe(0);
+    expect(resumer(jeu, "2026-08-14").notees80Plus).toBe(0);
   });
 
   it("les garde dans le total — le suivi n'efface rien", () => {
     // Une piste qui s'est fermée fait partie de l'histoire de la recherche.
-    expect(resumer(jeu).total).toBe(2);
+    expect(resumer(jeu, "2026-08-14").total).toBe(2);
   });
 
   it("les compteurs de candidature restent des faits accomplis", () => {
@@ -243,7 +255,65 @@ describe("offres périmées", () => {
     const envoye = [
       offre({ id: "c", statut: "CVenvoye", perimeeLe: "2026-07-20T00:00:00.000Z" }),
     ];
-    expect(resumer(envoye).cvEnvoyes).toBe(1);
-    expect(resumer(envoye).actives).toBe(0);
+    expect(resumer(envoye, "2026-08-14").cvEnvoyes).toBe(1);
+    expect(resumer(envoye, "2026-08-14").actives).toBe(0);
+  });
+});
+
+describe("les nouvelles offres publiées au hub", () => {
+  const JOUR = "2026-08-14";
+
+  /** Une date décalée de N jours par rapport au jour de référence. */
+  function ilYA(jours: number): string {
+    const t = Date.parse(`${JOUR}T00:00:00Z`) - jours * 86_400_000;
+    return new Date(t).toISOString().slice(0, 10);
+  }
+
+  it("compte comme nouvelle une offre repérée aujourd'hui", () => {
+    const r = resumer([offre({ id: "n", dateReperage: JOUR, histo: false })], JOUR);
+    expect(r.nouvelles).toBe(1);
+  });
+
+  // ⚠️ Les bornes sont DÉRIVÉES de la constante, jamais de sa valeur du jour : le jour où
+  // la fenêtre passera de sept à dix, ce test suivra au lieu de mentir (leçon §7).
+  it("garde une offre au dernier jour de la fenêtre, et lâche celle d'après", () => {
+    const dedans = offre({ id: "dedans", dateReperage: ilYA(FENETRE_NOUVELLES_JOURS - 1) });
+    const dehors = offre({ id: "dehors", dateReperage: ilYA(FENETRE_NOUVELLES_JOURS + 1) });
+    expect(resumer([dedans], JOUR).nouvelles).toBe(1);
+    expect(resumer([dehors], JOUR).nouvelles).toBe(0);
+  });
+
+  it("n'annonce jamais comme nouvelle une offre périmée ou historique", () => {
+    const perimee = offre({ id: "p", dateReperage: JOUR, perimeeLe: "2026-08-14" });
+    const vieille = offre({ id: "v", dateReperage: JOUR, histo: true });
+    expect(resumer([perimee, vieille], JOUR).nouvelles).toBe(0);
+  });
+
+  it("rend une moyenne NULLE — pas zéro — quand aucune nouvelle n'est notée", () => {
+    // La distinction est le garde-fou n°3 : zéro dirait « elles ne valent rien »,
+    // l'absence dit « il n'y a rien à moyenner ». Le widget les rend différemment.
+    const r = resumer([offre({ id: "sans", dateReperage: JOUR, score: null })], JOUR);
+    expect(r.nouvelles).toBe(1);
+    expect(r.noteMoyenneNouvelles).toBeNull();
+  });
+
+  it("moyenne les nouvelles NOTÉES seulement, et arrondit", () => {
+    const r = resumer(
+      [
+        offre({ id: "a", dateReperage: JOUR, score: 70 }),
+        offre({ id: "b", dateReperage: JOUR, score: 75 }),
+        offre({ id: "c", dateReperage: JOUR, score: null }),
+        // Hors fenêtre : ne doit peser sur aucun des deux chiffres.
+        offre({ id: "d", dateReperage: ilYA(FENETRE_NOUVELLES_JOURS + 3), score: 10 }),
+      ],
+      JOUR,
+    );
+    expect(r.nouvelles).toBe(3);
+    expect(r.noteMoyenneNouvelles).toBe(73);
+  });
+
+  it("ne compte pas une date de repérage illisible", () => {
+    const r = resumer([offre({ id: "x", dateReperage: "pas-une-date" })], JOUR);
+    expect(r.nouvelles).toBe(0);
   });
 });

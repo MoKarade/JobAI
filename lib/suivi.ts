@@ -91,8 +91,18 @@ export function marquerEnvoi(offre: Offre, aujourdhui: string): Offre {
  */
 export type OffrePourResume = Pick<
   Offre,
-  "histo" | "score" | "statut" | "entreprise" | "poste" | "perimeeLe"
+  "histo" | "score" | "statut" | "entreprise" | "poste" | "perimeeLe" | "dateReperage"
 >;
+
+/**
+ * Sur combien de jours une offre reste « nouvelle ».
+ *
+ * Sept, comme `FENETRE_DEPOT_JOURS` : c'est exactement la durée pendant laquelle la passe
+ * continue de RELIRE un dépôt. Aligner les deux n'est pas cosmétique — une offre cesse
+ * d'être relue et cesse d'être annoncée « nouvelle » au même moment, donc le widget ne peut
+ * pas vanter une nouveauté que le moteur a déjà cessé d'observer.
+ */
+export const FENETRE_NOUVELLES_JOURS = 7;
 
 /**
  * Le résumé du suivi. C'est lui qui alimente le widget du hub.
@@ -104,8 +114,27 @@ export type OffrePourResume = Pick<
  *
  * Elles restent dans `total` : elles ont existé, et le suivi n'efface rien.
  */
-export function resumer(offres: readonly OffrePourResume[]): ResumeSuivi {
+export function resumer(
+  offres: readonly OffrePourResume[],
+  aujourdhui: string,
+): ResumeSuivi {
   const actives = offres.filter((o) => !o.histo && o.perimeeLe === null);
+
+  // ⚠️ `aujourdhui` est un PARAMÈTRE, pas un `new Date()` caché : c'est la seule façon de
+  // tester le passage de minuit, et la date se calcule dans le fuseau de Marc chez
+  // l'appelant (leçon §7 — Vercel tourne en UTC, lui vit à UTC−4).
+  const limite = Date.parse(`${aujourdhui}T00:00:00Z`);
+  const plancher = Number.isFinite(limite)
+    ? limite - FENETRE_NOUVELLES_JOURS * 86_400_000
+    : NaN;
+  const nouvelles = actives.filter((o) => {
+    const t = Date.parse(`${o.dateReperage}T00:00:00Z`);
+    // Une date illisible n'est pas une nouveauté : dans le doute, on ne compte pas.
+    return Number.isFinite(t) && Number.isFinite(plancher) && t > plancher && t <= limite;
+  });
+  const nouvellesNotees = nouvelles.filter(
+    (o): o is OffrePourResume & { score: number } => o.score !== null,
+  );
 
   // La meilleure offre se cherche parmi les ACTIVES : une candidature de 2025 n'est pas
   // une cible, et la remonter en tête du widget serait trompeur.
@@ -120,6 +149,13 @@ export function resumer(offres: readonly OffrePourResume[]): ResumeSuivi {
   return {
     total: offres.length,
     actives: actives.length,
+    nouvelles: nouvelles.length,
+    noteMoyenneNouvelles:
+      nouvellesNotees.length === 0
+        ? null
+        : Math.round(
+            nouvellesNotees.reduce((s, o) => s + o.score, 0) / nouvellesNotees.length,
+          ),
     notees80Plus: notees.filter((o) => o.score >= 80).length,
     // Les compteurs de candidature portent sur TOUT le suivi, historique inclus : ce sont
     // des faits accomplis, pas des cibles.

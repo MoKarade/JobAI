@@ -57,11 +57,39 @@ export function construireSummary(resume: ResumeSuivi, genereLe: string): HubSum
     });
   }
 
+  // ⚠️ LE CONTRAT PLAFONNE À SIX MÉTRIQUES, ET L'ORDRE EST DONC UNE DÉCISION.
+  //
+  // Ce qui suit est trié par ce que Marc regarde en premier, pas par ancienneté du code :
+  // la meilleure offre, puis l'arrivage du jour (demande de Marc 2026-08-14 — « le nombre de
+  // nouvelles offres et leur note à peu près »), puis le stock, puis l'entonnoir de
+  // candidature. `slice(0, 6)` tranche à la fin : sans cet ordre, c'est lui qui déciderait
+  // en silence, et il ferait tomber précisément ce qui vient d'être demandé.
+  //
+  // Pour tenir dans six créneaux, « CV envoyés » et « Réponses » sont FUSIONNÉS en un seul.
+  // On n'y perd rien — les deux chiffres restent lisibles côte à côte — et ça libère la
+  // place d'une information qui, elle, n'existait pas.
+  metrics.push({ label: "Nouvelles (7 j)", value: resume.nouvelles, format: "number" });
+
+  // La moyenne ne se publie QUE s'il y a quelque chose à moyenner. Un « 0 » se lirait
+  // « ces offres ne valent rien » alors que la vérité est « aucune n'est notée » — et le
+  // compteur juste au-dessus dit déjà zéro quand il n'y a rien (garde-fou n°3).
+  if (resume.noteMoyenneNouvelles !== null) {
+    metrics.push({
+      label: "Note moyenne des nouvelles",
+      value: resume.noteMoyenneNouvelles,
+      format: "number",
+      severity: resume.noteMoyenneNouvelles >= 80 ? "ok" : undefined,
+    });
+  }
+
   metrics.push(
     { label: "Offres suivies", value: resume.actives, format: "number" },
     { label: "Notées 80+", value: resume.notees80Plus, format: "number" },
-    { label: "CV envoyés", value: resume.cvEnvoyes, format: "number" },
-    { label: "Réponses", value: resume.reponses, format: "number" },
+    {
+      label: "CV envoyés · réponses",
+      value: `${resume.cvEnvoyes} · ${resume.reponses}`,
+      format: "text",
+    },
   );
 
   // Le contrat plafonne à 6 métriques. On ajoute les entrevues seulement s'il reste de la

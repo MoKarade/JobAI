@@ -155,7 +155,7 @@ export default async function Accueil() {
             surveillance={aSurveiller(offres, aujourdhui(new Date()))}
             resume={resumerRelances(offres, aujourdhui(new Date()))}
           />
-          <TableauBord resume={resumer(offres)} />
+          <TableauBord resume={resumer(offres, aujourdhui(new Date()))} />
           <FormulaireAjout />
           <ListeOffres offres={offres} />
         </>
