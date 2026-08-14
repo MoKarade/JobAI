@@ -60,19 +60,41 @@ export const FaitSourceSchema = z.object({
  * `.finite()` sur les années : `z.number()` accepte `Infinity`, qui deviendrait `null` en
  * JSON — un « je ne sais pas » né d'un débordement, impossible à distinguer d'un vrai.
  */
+/**
+ * Les plafonds de listes, écrits UNE seule fois.
+ *
+ * ⚠️ ILS SERVENT DEUX FOIS, ET C'EST TOUT LE PROBLÈME QU'ILS RÈGLENT. Le schéma Zod
+ * ci-dessous valide la réponse du modèle ; le schéma d'outil plus bas est ce que le modèle
+ * REÇOIT. Le 2026-08-14, le second ne portait aucun `maxItems` : on demandait une liste
+ * libre, puis on rejetait TOUTE l'analyse parce qu'elle contenait neuf forces au lieu de
+ * huit. Le modèle n'avait aucun moyen de connaître la limite — la faute était de notre côté.
+ *
+ * Une même règle tenue dans deux langages diverge toujours. Ici elle n'est écrite qu'une
+ * fois, les deux schémas la lisent, et `tests/cvExtraction.test.ts` refuse qu'ils s'écartent.
+ */
+export const PLAFONDS = {
+  langues: 12,
+  diplomes: 12,
+  outils: 60,
+  titresOccupes: 30,
+  recherchesSuggerees: 20,
+  forces: 8,
+  manques: 8,
+} as const;
+
 export const ReponseExtractionSchema = z.object({
   anneesExperience: z.number().finite().min(0).max(60).nullable(),
   anneesExperienceProvenance: z.string().max(300).default(""),
-  langues: z.array(z.string().min(1).max(60)).max(12).default([]),
-  diplomes: z.array(z.string().min(1).max(200)).max(12).default([]),
-  outils: z.array(z.string().min(1).max(80)).max(60).default([]),
-  titresOccupes: z.array(z.string().min(1).max(120)).max(30).default([]),
+  langues: z.array(z.string().min(1).max(60)).max(PLAFONDS.langues).default([]),
+  diplomes: z.array(z.string().min(1).max(200)).max(PLAFONDS.diplomes).default([]),
+  outils: z.array(z.string().min(1).max(80)).max(PLAFONDS.outils).default([]),
+  titresOccupes: z.array(z.string().min(1).max(120)).max(PLAFONDS.titresOccupes).default([]),
   /** Termes de recherche que le modèle déduit des postes occupés. */
-  recherchesSuggerees: z.array(z.string().min(1).max(80)).max(20).default([]),
+  recherchesSuggerees: z.array(z.string().min(1).max(80)).max(PLAFONDS.recherchesSuggerees).default([]),
   /** Ce que le CV établit et qui joue en faveur — matière à SWOT, jamais le SWOT lui-même. */
-  forces: z.array(z.string().min(1).max(300)).max(8).default([]),
+  forces: z.array(z.string().min(1).max(300)).max(PLAFONDS.forces).default([]),
   /** Ce que le CV révèle comme manque OBJECTIF (une compétence absente, pas un jugement). */
-  manques: z.array(z.string().min(1).max(300)).max(8).default([]),
+  manques: z.array(z.string().min(1).max(300)).max(PLAFONDS.manques).default([]),
 });
 export type ReponseExtraction = z.infer<typeof ReponseExtractionSchema>;
 
@@ -131,7 +153,7 @@ const CONSIGNE = [
 ].join("\n");
 
 /** Le schéma d'outil : c'est lui qui force une sortie structurée plutôt qu'à la prière. */
-const OUTIL_EXTRACTION = {
+export const OUTIL_EXTRACTION = {
   name: "rendre_profil",
   description: "Rend les faits professionnels extraits du CV.",
   input_schema: {
@@ -145,25 +167,54 @@ const OUTIL_EXTRACTION = {
         type: "string",
         description: "Où ça se lit dans le CV. Vide si tu as supposé.",
       },
-      langues: { type: "array", items: { type: "string" } },
-      diplomes: { type: "array", items: { type: "string" } },
+      langues: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.langues },
+      diplomes: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.diplomes },
       outils: {
         type: "array",
         items: { type: "string" },
+        maxItems: PLAFONDS.outils,
         description: "Outils, technologies, méthodes, certifications.",
       },
-      titresOccupes: { type: "array", items: { type: "string" } },
+      titresOccupes: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.titresOccupes },
       recherchesSuggerees: {
         type: "array",
         items: { type: "string" },
+        maxItems: PLAFONDS.recherchesSuggerees,
         description: "Intitulés de poste à rechercher, déduits du parcours.",
       },
-      forces: { type: "array", items: { type: "string" } },
-      manques: { type: "array", items: { type: "string" } },
+      forces: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.forces },
+      manques: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.manques },
     },
     required: ["anneesExperience"],
   },
 };
+
+/**
+ * Ramène chaque liste à son plafond, et dit ce qu'elle a coupé.
+ *
+ * PURE, et volontairement TOLÉRANTE sur son entrée : elle reçoit ce que le modèle a rendu,
+ * c'est-à-dire n'importe quoi. Ce qui n'est pas un tableau passe intact — c'est le rôle du
+ * schéma Zod, juste après, de refuser une valeur du mauvais TYPE. Ici on ne corrige qu'une
+ * chose : la LONGUEUR, qui est un choix d'affichage et jamais un défaut de correction.
+ */
+export function bornerListes(brut: unknown): { valeur: unknown; tronquees: string[] } {
+  if (brut === null || typeof brut !== "object" || Array.isArray(brut)) {
+    return { valeur: brut, tronquees: [] };
+  }
+
+  const source = brut as Record<string, unknown>;
+  const sortie: Record<string, unknown> = { ...source };
+  const tronquees: string[] = [];
+
+  for (const [champ, plafond] of Object.entries(PLAFONDS)) {
+    const valeur = source[champ];
+    if (!Array.isArray(valeur) || valeur.length <= plafond) continue;
+    sortie[champ] = valeur.slice(0, plafond);
+    tronquees.push(`${champ} ${valeur.length}->${plafond}`);
+  }
+
+  return { valeur: sortie, tronquees };
+}
 
 /**
  * Extrait les faits d'un CV.
@@ -225,7 +276,24 @@ export async function extraireFaits(
     };
   }
 
-  const analyse = ReponseExtractionSchema.safeParse(bloc.input);
+  // ⚠️ TRONQUER AVANT DE VALIDER — une borne sur une liste ne se REJETTE pas.
+  //
+  // Le 2026-08-14, une analyse entière a été perdue parce que le modèle avait rendu NEUF
+  // forces au lieu de huit. Le CV était lu, les faits étaient bons, et tout est parti à la
+  // poubelle pour un élément de trop sur une liste dont le plafond est un choix
+  // d'AFFICHAGE, pas une exigence de correction. Un dépassement de liste n'est pas une
+  // réponse fausse : c'est une réponse généreuse.
+  //
+  // Le schéma d'outil annonce désormais les `maxItems`, ce qui devrait suffire — mais un
+  // modèle reste un modèle. La ceinture tronque, la bretelle informe, et rien ne se perd
+  // en silence : ce qui a été coupé est DIT (voir la règle « un filtre qui peut perdre des
+  // résultats dit quand il mord »).
+  const { valeur, tronquees } = bornerListes(bloc.input);
+  if (tronquees.length > 0) {
+    console.warn(`[cv] listes tronquées au plafond : ${tronquees.join(" · ")}`);
+  }
+
+  const analyse = ReponseExtractionSchema.safeParse(valeur);
   if (!analyse.success) {
     // Le schéma a refusé : c'est le filet qui fonctionne, pas un incident à masquer.
     const details = analyse.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join(" · ");
