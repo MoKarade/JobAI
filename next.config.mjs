@@ -60,6 +60,13 @@ const nextConfig = {
    */
   outputFileTracingIncludes: {
     "/api/cron/veille": ["./data/depot/**"],
+    // ⚠️ LE CHEMIN DE REPRISE LIT LE MÊME DOSSIER, ET IL A SON PROPRE BUNDLE.
+    // Depuis [VEILLE-10], la passe vit dans `lib/veilleComplete.ts` et ce cron-ci la reprend
+    // quand elle est en retard. Une entrée de traçage est posée PAR ROUTE : oublier celle-ci
+    // ferait tourner la reprise avec `data/depot` ABSENT de son bundle — c'est-à-dire
+    // exactement la panne du 2026-08-12, réintroduite par la porte qu'on vient d'ouvrir.
+    // Règle : tout appelant de `executerVeilleComplete` s'ajoute ICI, dans le même commit.
+    "/api/cron/geocodage": ["./data/depot/**"],
   },
   async headers() {
     return [
