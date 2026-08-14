@@ -41,6 +41,22 @@ import { mentionSource } from "@/lib/adresse";
  */
 const TEINTE_SANS_OFFRE = "#7a8194";
 
+/**
+ * La flèche « ouvre ailleurs », DESSINÉE et non écrite.
+ *
+ * La maquette la dessinait ; le code livré écrivait le caractère « ↗ ». Un caractère absent
+ * de la police se fait remplacer par un glyphe de secours — plus gros, mal aligné, d'une
+ * autre graisse — et c'est une des raisons pour lesquelles la bulle ne ressemblait pas à ce
+ * qui avait été validé. Quatre traits en SVG suivent `currentColor` et ne dépendent d'aucun
+ * fichier de police.
+ *
+ * `components/Icone.tsx` ne peut pas servir ici : Leaflet injecte ce HTML hors de React.
+ */
+const FLECHE_SORTANTE =
+  '<svg class="popup-ic" viewBox="0 0 12 12" aria-hidden="true">' +
+  '<path d="M4.2 7.8 7.8 4.2M7.8 4.2H5.1M7.8 4.2v2.7" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 function echapper(texte: string): string {
   return texte
     .replace(/&/g, "&amp;")
@@ -68,20 +84,22 @@ function lienSur(brut: string): string | null {
 function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string {
   const morceaux: string[] = [];
 
-  morceaux.push(`<strong>${echapper(e.nom)}</strong>`);
-  if (approximative) {
-    // La précision se DIT dans la fiche, pas seulement par le style du cercle : une fois la
-    // fenêtre ouverte, le cercle n'est plus visible.
-    morceaux.push(
-      `<span class="popup-approx">Position approximative — centre de ${echapper(e.ville)}</span>`,
-    );
-  }
-  // Une distance non relevée se dit ; « null km » ou un zéro seraient pires que rien.
+  morceaux.push(`<span class="popup-nom">${echapper(e.nom)}</span>`);
+
+  // UNE SEULE LIGNE DE FAITS, comme dans la maquette : « Lévis · 9,8 km · adresse exacte ».
+  // Avant, la précision vivait sur sa propre ligne en italique orange, au-dessus des faits —
+  // trois fragments empilés là où la maquette en montrait un. La précision se DIT toujours :
+  // une fois la bulle ouverte, le pointillé du cercle n'est plus visible.
+  //
+  // Une distance non relevée se dit aussi ; « null km » ou un zéro seraient pires que rien.
   const distance =
     e.km === null ? "distance non mesurée" : `${String(e.km).replace(".", ",")} km`;
-  morceaux.push(
-    `<span class="popup-faits">${echapper(e.ville)} · ${echapper(distance)}</span>`,
-  );
+  const faits = [
+    e.ville,
+    distance,
+    approximative ? `position approximative — centre de ${e.ville}` : "adresse exacte",
+  ];
+  morceaux.push(`<span class="popup-faits">${echapper(faits.join(" · "))}</span>`);
   // L'ADRESSE quand OpenStreetMap la connaît. Sur un repli au centre-ville il n'y en a pas,
   // et on ne dit rien plutôt que d'afficher celle de la mairie pour une usine.
   if (e.adresse) {
@@ -112,7 +130,7 @@ function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string 
   const site = e.siteWeb ? lienSur(e.siteWeb) : null;
   if (site) {
     morceaux.push(
-      `<a class="popup-site" href="${echapper(site)}" target="_blank" rel="noopener noreferrer">Site web ↗</a>`,
+      `<a class="popup-site" href="${echapper(site)}" target="_blank" rel="noopener noreferrer">Site web ${FLECHE_SORTANTE}</a>`,
     );
   }
   if (e.telephone) {
@@ -128,16 +146,26 @@ function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string 
   }
 
   if (e.offres.length > 0) {
+    // ⚠️ POSTE À GAUCHE, NOTE À DROITE, sur une seule ligne — la structure de la maquette.
+    // Avant : une puce de liste, le poste en lien, puis « 85/100 » en petit DESSOUS. Les
+    // notes se retrouvaient à des abscisses différentes selon la longueur du titre, donc
+    // illisibles en colonne. Alignées à droite en chiffres tabulaires, trois offres se
+    // comparent d'un coup d'œil. Le « /100 » saute : la colonne dit déjà que c'est une note.
     const lignes = e.offres
       .slice(0, 6)
       .map((o) => {
-        const note = o.score === null ? "–" : `${o.score}/100`;
-        return `<li><a href="/offre/${encodeURIComponent(o.id)}">${echapper(o.poste)}</a><br><small>${note}</small></li>`;
+        const note = o.score === null ? "–" : String(o.score);
+        return (
+          `<a class="popup-offre" href="/offre/${encodeURIComponent(o.id)}">` +
+          `<span>${echapper(o.poste)}</span><b>${echapper(note)}</b></a>`
+        );
       })
       .join("");
     const reste =
-      e.offres.length > 6 ? `<li><small>+ ${e.offres.length - 6} autres</small></li>` : "";
-    morceaux.push(`<ul class="popup-offres">${lignes}${reste}</ul>`);
+      e.offres.length > 6
+        ? `<span class="popup-offre popup-offre--reste"><span>+ ${e.offres.length - 6} autres</span></span>`
+        : "";
+    morceaux.push(`<div class="popup-offres">${lignes}${reste}</div>`);
   }
   // Il n'y a plus de branche « sans offre » : depuis le 2026-08-12, `construireVue` n'émet
   // aucune entreprise dont la liste d'offres vivantes est vide (demande de Marc). Garder un
@@ -146,7 +174,7 @@ function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string 
   const trajet = lienTrajetGoogleMaps(e.nom);
   if (trajet) {
     morceaux.push(
-      `<a class="popup-trajet" href="${echapper(trajet)}" target="_blank" rel="noopener noreferrer">Trajet dans Google Maps ↗</a>`,
+      `<a class="popup-trajet" href="${echapper(trajet)}" target="_blank" rel="noopener noreferrer">Trajet dans Google Maps ${FLECHE_SORTANTE}</a>`,
     );
   }
 

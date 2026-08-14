@@ -190,6 +190,12 @@ code {
      ce sont les teintes CLAIRES qui passent — mesuré : ambre 8,7:1, bleu 7,2:1. */
   --ambre-texte: oklch(78% 0.14 75);
   --bleu-texte: oklch(72% 0.12 250);
+  /* L'ACIER : les liens secondaires d'une surface dense (la bulle de la carte). Même
+     clarté et même chroma que `--text-soft`, mais en teinte 250 — un gris qui PENCHE vers
+     le bleu, pas un bleu. Volontairement PAS `--bleu-texte` (chroma 0,12) : un lien posé
+     au milieu de trois offres, d'une adresse et d'une borne ne doit pas crier plus fort
+     que les données qu'il accompagne. Valeur reprise de la maquette « Poste de nuit ». */
+  --acier: oklch(70.7% 0.038 250);
 }
 
 /* Échelle d'espacement UNIQUE (ADR-0003). Avant, chaque bloc choisissait sa marge dans son
@@ -1036,15 +1042,25 @@ code {
 .leaflet-popup-tip {
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 10px 34px -14px rgb(0 0 0 / 0.45);
+  /* Plus portée et plus dense que celle des cartes : la bulle DÉCOLLE du plan, elle ne
+     repose pas dessus. Valeur de la maquette. */
+  box-shadow: 0 12px 34px -12px rgb(0 0 0 / 0.7);
 }
 .leaflet-popup-content-wrapper {
   border: var(--trait-surface);
-  border-radius: var(--r-carte);
+  /* 12 px et non `--r-carte` (16 px) : la maquette donnait à la bulle un rayon PLUS SERRÉ
+     que les cartes de la liste. Une bulle est petite et flotte au-dessus du plan ; au même
+     rayon que les grandes surfaces, elle paraît molle. */
+  border-radius: 12px;
+  /* Largeur FIXE, comme la maquette : sans elle, Leaflet dimensionne au plus long titre de
+     poste et la bulle change de largeur d'une entreprise à l'autre. */
+  width: 16.5rem;
 }
 .leaflet-popup-tip { border: 0; }
-.leaflet-popup-content { margin: 0.9rem 1.05rem; font-size: var(--t-s); line-height: 1.55; }
-.leaflet-popup-content a { color: var(--bleu-texte); }
+.leaflet-popup-content { margin: 0.75rem 0.9rem; font-size: var(--t-s); line-height: 1.5; }
+/* L'acier, pas le bleu franc — voir le jeton. Les offres, elles, gardent l'encre du texte :
+   ce sont des DONNÉES d'abord, cliquables ensuite (leur règle est plus bas). */
+.leaflet-popup-content a { color: var(--acier); }
 .leaflet-popup-close-button { color: var(--text-soft) !important; }
 .leaflet-popup-close-button:hover { color: var(--text) !important; }
 
@@ -1153,20 +1169,60 @@ code {
   font-size: var(--t-2xs);
   color: var(--text-soft);
 }
-/* Les fenêtres de Leaflet sont injectées hors de React : on les habille ici. */
-.popup-offres { list-style: none; margin: 0.3rem 0 0; padding: 0; font-size: var(--t-s); }
-.popup-offres li { margin-bottom: 0.35rem; }
-.popup-approx {
+/* ── Le contenu de la bulle ────────────────────────────────────────────────
+   Leaflet injecte ce HTML hors de React : c'est ici, et nulle part ailleurs,
+   qu'il s'habille. Repris de la maquette « Poste de nuit » (demande de Marc,
+   2026-08-14 : « la bulle n'est pas celle qu'il y avait dans le preview »).
+
+   DEUX COULEURS EN DUR Y ONT SURVÉCU AU PASSAGE AU SOMBRE, et elles expliquent
+   une bonne part de l'écart signalé :
+     · `#a2540a`, un orange foncé, pour la mention de position approximative —
+       lisible sur du blanc, quasi éteint sur le charbon ;
+     · `#ccc3`, un gris clair translucide, pour le filet des groupes de villes.
+   Une couleur écrite en dur ne se plaint jamais d'un changement de thème : elle
+   se contente de devenir fausse. Toutes deux passent aux jetons. */
+.popup-nom { display: block; font-weight: 650; font-size: 0.95rem; }
+/* Ville · distance · précision, sur UNE ligne. Le ton adouci suffit à la faire reculer :
+   l'italique orange d'avant en faisait une alerte, alors que c'est un fait parmi d'autres. */
+.popup-faits {
   display: block;
-  font-size: var(--t-2xs);
-  font-style: italic;
-  color: #a2540a;
-  margin: 0.1rem 0;
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  margin-bottom: 0.45rem;
 }
-.popup-faits { display: block; font-size: var(--t-xs); opacity: 0.75; margin: 0.15rem 0; }
-.popup-lecture { display: block; font-size: var(--t-xs); margin: 0.25rem 0; }
-.popup-trajet { display: inline-block; font-size: var(--t-xs); margin-top: 0.3rem; }
-.popup-groupe { border-top: 1px solid #ccc3; padding-top: 0.4rem; margin-top: 0.4rem; }
+.popup-lecture {
+  display: block;
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  margin: 0.35rem 0;
+}
+.popup-offres { margin-top: 0.5rem; }
+/* Poste à GAUCHE, note à DROITE en chiffres tabulaires : c'est cet alignement qui permet
+   de comparer trois offres en lisant une colonne, au lieu de chercher le nombre dans
+   chaque ligne. Le filet du haut sépare sans ajouter de puce. */
+.popup-offre {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.28rem 0;
+  border-top: var(--trait-surface);
+  font-size: var(--t-s);
+  color: var(--text);
+  text-decoration: none;
+}
+.popup-offre b {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+a.popup-offre:hover { color: var(--ambre-texte); }
+.popup-offre--reste { color: var(--text-soft); font-size: var(--t-xs); }
+.popup-trajet { display: inline-flex; align-items: center; gap: 0.25rem; font-size: var(--t-xs); margin-top: 0.45rem; }
+/* La flèche « ouvre ailleurs », dessinée : le caractère ↗ dépend d'une police qui peut ne
+   pas le porter, et le glyphe de secours arrive plus gros et mal aligné. */
+.popup-ic { width: 0.85em; height: 0.85em; flex: none; }
+.popup-groupe { border-top: var(--trait-surface); padding-top: 0.55rem; margin-top: 0.55rem; }
 .carte-liste__trajet { display: inline-block; font-size: var(--t-xs); margin-top: 0.35rem; color: var(--ambre-texte); }
 
 /* ── Formulaire d'ajout manuel ────────────────────────────────────────────
@@ -1426,7 +1482,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .carte-liste__adresse {
   margin: 2px 0 6px;
   font-size: var(--t-s);
-  color: var(--texte);
+  color: var(--text);
 }
 .popup-adresse {
   display: block;
@@ -1545,7 +1601,9 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
    les bornes — des faits de confort, pas le titre de la fiche. */
 .carte-liste__site,
 .popup-site {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
   margin: 2px 0 0;
   font-size: var(--t-s);
 }
