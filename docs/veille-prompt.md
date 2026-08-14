@@ -8,6 +8,38 @@
 > à la main ne les a donc pas, et les redevine — c'est arrivé aujourd'hui. Le prompt vit
 > désormais dans le dépôt ; la Routine en est une COPIE, pas la source.
 
+## ⚠️ La règle qui prime sur tout : UNE seule passe par jour
+
+**Avant de déposer, savoir si la passe du jour a déjà eu lieu.** Ce n'est pas une précaution
+de confort : `appliquerBalayage` incrémente les absences **par PASSE**
+(`absences: precedent.absences + 1`), sans aucune garde de date. Toute offre absente du lot
+prend donc une absence à chaque balayage, et à la troisième elle est **périmée**.
+
+Conséquence, mesurée le 2026-08-14 : déposer par `POST /api/ingest/depot` alors que le cron a
+déjà tourné le même jour compte une **deuxième** absence à tout le stock. Des offres bien
+ouvertes se ferment à l'écran, non parce qu'elles ont fermé mais parce que deux passes ont eu
+lieu dans la même journée. C'est la mécanique derrière le « −2 » signalé par Marc, et derrière
+l'effondrement de stock 78 → 30 documenté dans `next.config.mjs`.
+
+| Situation | Canal |
+|---|---|
+| Aucune passe n'a encore tourné aujourd'hui | `POST /api/ingest/depot` — il dépose ET balaie, c'est ce qu'on veut |
+| Une passe a déjà tourné aujourd'hui | **fichier** `data/depot/<JOUR>.json` — il dépose SANS balayer |
+
+Comment savoir : les logs d'exécution Vercel portent la ligne `[veille] <déclencheur> —
+ingérées=…` depuis `[VEILLE-12]`. Une passe qui a tourné aujourd'hui y est visible.
+Dans le doute, prendre le canal fichier : il n'a aucun effet de bord, et la passe suivante
+ingérera le lot normalement.
+
+**Le canal fichier n'est pas un repli dégradé.** `data/depot/` et `lib/ingest/depotSchema.ts`
+existent, sont tracés dans `next.config.mjs` pour les deux crons, et c'est exactement ce que
+la passe a ingéré le 2026-08-14 à 14:24. Déposer par fichier demande un commit et un push —
+donc le gate complet — alors que le POST n'en demande aucun.
+
+Bonus du canal fichier : la fenêtre de relecture étant de sept jours, un lot déposé garde
+« vues » les offres qu'il contient à chaque passe suivante, ce qui remet leur compteur
+d'absences à zéro au lieu de le pousser.
+
 ## Les six outils, et ce que chacun a le droit de décider
 
 Mesurés le 2026-08-14, un par un. Le tableau dit surtout ce qu'ils n'ont PAS le droit de faire.
@@ -110,12 +142,20 @@ Fais la veille JobAI du jour.
    dépôt il ne peut pas importer le module, et il vivrait avec sa propre règle.
    La boîte de rôle (carriere@, rh@) SURVIT — c'est là que Marc postule.
 
-9. Dépose :
-   POST https://emploi.hubperso.com/api/ingest/depot
+9. Dépose — MAIS CHOISIS LE CANAL D'ABORD (voir « une seule passe par jour ») :
+   · aucune passe n'a tourné aujourd'hui  -> POST, il dépose ET balaie ;
+   · une passe a déjà tourné aujourd'hui  -> FICHIER, il dépose sans balayer.
+   Poster deux fois le même jour périme des offres qui n'ont pas fermé. Dans le
+   doute : fichier.
+
+   POST : https://emploi.hubperso.com/api/ingest/depot
    Authorization: Bearer <JETON_DEPOT, jamais écrit dans un fichier>
-   Si l'hôte est hors allowlist réseau : NE CONTOURNE PAS. Nomme l'hôte bloqué
-   et écris le lot dans data/depot/AAAA-MM-JJ.json — c'est le second canal
-   prévu, et le cron l'ingère.
+   Si l'hôte est hors allowlist réseau : NE CONTOURNE PAS, nomme l'hôte bloqué
+   et bascule sur le fichier.
+
+   FICHIER : fusionner dans data/depot/AAAA-MM-JJ.json (dédoublonner avec
+   `cleCanonique`, la clé de l'app), puis gate + commit + push — contrairement
+   au POST, ce canal touche le dépôt git.
 
 10. Pour les offres RETENUES dont l'employeur t'est inconnu, tu peux appeler
     get_company_data (avis, salaires, taille) — c'est du contexte pour Marc.
@@ -124,7 +164,8 @@ Fais la veille JobAI du jour.
     Pour une adresse, seule l'annonce fait foi ; à défaut, WebSearch offre par
     offre avec l'adresseUrl qui rend la trouvaille relisable.
 
-11. Gate avant commit : typecheck, test, lint, build. Si le build échoue sur
+11. Gate : SANS OBJET si tu as posté (aucun fichier modifié). Si tu as déposé
+    par FICHIER : typecheck, test, lint, build. Si le build échoue sur
    fonts.gstatic.com, c'est l'egress de la session, pas le code : dis-le, ne
    maquille pas un gate vert. Commit sur main, push, PUIS consulte la CI —
    sans PR, rien n'affiche un échec tout seul.
