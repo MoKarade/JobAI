@@ -548,6 +548,32 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   Un scan de source ne distingue ni une illustration ni un faux numéro. Remède : **assembler
   les valeurs sensibles à l'exécution** (`["514","555","1234"].join("-")`) — aucune ligne de
   source ne porte de motif complet, la valeur est entière au runtime, le test reste réel.
+- **Le conteneur peut REVERTIR l'arbre de travail en pleine tâche — `origin` est la seule
+  vérité.** Vécu le 2026-08-14 : `git log` local remonté de sept commits (jusqu'à
+  `[BORNE-02]`), `node_modules` amputé des paquets installés le jour même. Rien n'était
+  perdu — `git ls-remote origin main` donnait le bon tip — mais **j'avais commencé à éditer
+  la version périmée d'un fichier**, et cette version-là ne connaissait ni les bornes de
+  recharge, ni le site, ni le téléphone, ni les horaires : mon édition les aurait toutes
+  supprimées, sous couvert d'un « restylage ». Réflexes, dans cet ordre : (1) au moindre
+  fichier qui montre du code supprimé récemment, **suspecter le revert AVANT toute
+  hypothèse** ; (2) `git ls-remote origin main` — le serveur, jamais le ref local ;
+  (3) `git checkout -B main FETCH_HEAD` puis `npm install` ; (4) **jeter les éditions faites
+  sur l'ancienne base** au lieu de les rejouer, et refaire le travail sur la bonne.
+- **Après un revert, `refs/remotes/origin/main` peut MANQUER alors que le tracking est
+  configuré.** La refspec de ce clone ne suit qu'une branche : `git fetch` ne recrée donc pas
+  `origin/main`, `@{u}` ne résout plus, et un garde d'arrêt annonce « 173 commits non poussés,
+  pas de branche distante » sur un dépôt parfaitement à jour. Ne pas courir après un push
+  déjà fait : comparer `git rev-parse HEAD` à `git ls-remote origin main`, puis rétablir le
+  ref (`git config --add remote.origin.fetch '+refs/heads/main:refs/remotes/origin/main'`
+  puis `git fetch origin`). Un avertissement de garde se VÉRIFIE comme un finding.
+- **Une couleur écrite EN DUR ne se plaint jamais d'un changement de thème : elle devient
+  fausse, en silence.** Deux valeurs du thème clair ont survécu au passage au sombre dans la
+  bulle de la carte — un orange foncé pour une mention, un gris clair pour un filet — sur un
+  écran qu'on ne rouvre pas tous les jours. Aucun test ne les voyait. Verrou :
+  `tests/styles.test.ts` refuse tout `#rrggbb` dans une RÈGLE (les commentaires citent les
+  valeurs retirées, à dessein). Corollaire : quand un écran « ne ressemble pas à la
+  maquette », commencer par COMPARER LES JETONS aux hex de la maquette — ici les quatre
+  neutres étaient identiques, ce qui a désigné tout de suite la vraie cause.
 - **Un contrôle promis en prose (« il suffira de grep ») ne verrouille rien.** L'ADR-0008
   annonçait « `grep prefers-color-scheme` ne doit rien rendre ». Personne ne lance ce grep :
   le second thème se serait reformé règle par règle sans qu'aucun test ne tombe. Le verrou

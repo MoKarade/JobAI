@@ -6,6 +6,46 @@
 
 ---
 
+## Session 2026-08-14 — la bulle de la carte, et un revert de conteneur
+
+### Ce que Marc a signalé
+
+« Dans la carte, quand je clique sur une offre l'info-bulle n'est pas celle qu'il y avait
+dans le preview. Je veux que ce soit la même et les mêmes couleurs. »
+
+### Ce que la vérification a montré AVANT de coder
+
+Les quatre neutres de l'app et ceux de la maquette « Poste de nuit » sont **identiques au
+hex près** (`#1e1b12`, `#332e20`, `#a79e88`, `#f0eadb`). L'écart ne venait donc pas des
+jetons. Trois causes réelles :
+
+1. **Deux couleurs EN DUR du thème clair** avaient survécu dans cette bulle : `#a2540a`
+   (orange foncé, mention de position approximative — quasi éteint sur le charbon) et
+   `#ccc3` (gris clair, filet des groupes). Aucun test ne les voyait.
+2. **La structure différait** : la maquette met le poste à gauche et la note à droite en
+   monospace tabulaire sur une ligne à filet ; le code faisait une puce avec « 85/100 » en
+   dessous — donc des notes à des abscisses variables, illisibles en colonne.
+3. **Le caractère `↗`** dépendait de la police. La maquette le dessinait ; c'est le cas
+   maintenant (SVG, suit `currentColor`).
+
+Verrou posé : `tests/styles.test.ts` refuse tout `#rrggbb` dans une règle. La feuille est à
+zéro couleur en dur, donc **aucune exemption**. Discrimination prouvée.
+
+### ⚠️ Le conteneur a reverti l'arbre de travail EN PLEINE TÂCHE
+
+`git log` local remonté de sept commits (jusqu'à `[BORNE-02]`), `node_modules` amputé des
+paquets du jour. Rien de perdu — `git ls-remote` donnait le bon tip — **mais j'avais
+commencé à éditer la version périmée du fichier**, qui ne connaissait ni les bornes de
+recharge, ni le site, ni le téléphone, ni les horaires. Cette édition les aurait toutes
+supprimées sous couvert d'un restylage. Jetée, refaite sur la bonne base.
+
+Corollaire : après le revert, `refs/remotes/origin/main` MANQUAIT (la refspec de ce clone ne
+suit qu'une branche), donc `@{u}` ne résolvait plus et le garde d'arrêt annonçait « 173
+commits non poussés » sur un dépôt parfaitement à jour. Ref rétabli.
+
+**Réflexe à garder** : un fichier qui montre du code supprimé récemment = suspecter le
+revert AVANT toute autre hypothèse, et repartir du serveur.
+
 ## Session 2026-08-13 (suite) — le CV pilote le profil (ADR-0009)
 
 ### État en une page
