@@ -1,37 +1,31 @@
-// auth.ts — Auth.js (NextAuth v5), Google, un seul compte admis.
+// auth.ts — Auth.js (NextAuth v5), SANS fournisseur. JobAI lit, elle n'émet plus.
 //
-// Même patron que le hub perso et BatchChef : session JWT, secrets par l'environnement,
-// filtre d'accès en fonction pure (lib/autorisation.ts).
+// Depuis l'ADR 0001 de Hubperso, le hub est la porte d'entrée unique de l'écosystème.
+// JobAI ne parle plus à Google : elle déchiffre le cookie de session posé sur
+// `.hubperso.com` et s'en tient là. Le filtre d'accès reste une fonction pure
+// (lib/autorisation.ts).
 //
-// PAS DE SCOPE GMAIL NI DRIVE ICI. Le scan des réponses (V2) et la lecture du CV (V3) en
-// auront besoin, mais ce sont des scopes RESTREINTS chez Google : les ajouter change le
+// AUCUN SCOPE GOOGLE ICI, ET PLUS AUCUN MOYEN D'EN DEMANDER. Le scan des réponses (V2) et
+// la lecture du CV (V3) en auront besoin — ce sont des scopes RESTREINTS, qui changent le
 // régime de vérification de l'application entière. Ils feront l'objet de l'ADR-0002 du
-// chantier V2, pas d'un ajout discret aujourd'hui. Cette règle tient toujours : la portée
-// Tasks ajoutée depuis (voir plus bas) n'est PAS restreinte, et elle ne sert pas à JobAI
-// — elle est transportée pour BatchChef, à cause du cookie de session partagé.
+// chantier V2, et ils devront passer par le HUB : c'est lui qui détient désormais le
+// client OAuth, et lui seul qui peut prêter un jeton.
 
 import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
 import { estEmailAutorise } from "@/lib/autorisation";
 import { cookiesSessionPartagee } from "@/lib/sessionPartagee";
-import { PARAMS_AUTORISATION, majJetonsGoogle } from "@/lib/jetonsGoogle";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  providers: [
-    Google({
-      // Mêmes noms de variables que le hub et BatchChef : trois conventions différentes
-      // pour la même chose finiraient par coûter une soirée de débogage.
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      // ── PORTÉES IDENTIQUES DANS LES QUATRE APPS ────────────────────────────────
-      // JobAI n'appelle AUCUNE API Google (le scan Gmail est du ressort de l'ADR-0002,
-      // et ce n'est PAS ce qui se passe ici : ni Gmail ni Drive ne figurent dans ces
-      // portées). Elle demande la portée Tasks parce que le cookie de session est
-      // PARTAGÉ : c'est la dernière app où l'on s'est connecté qui décide du contenu
-      // du jeton. Voir `lib/jetonsGoogle.ts`.
-      authorization: { params: PARAMS_AUTORISATION },
-    }),
-  ],
+  // ── AUCUN FOURNISSEUR, ET C'EST LE POINT ────────────────────────────────────────
+  // JobAI ne fabrique plus de session : elle LIT celle que le hub a posée sur
+  // `.hubperso.com` (ADR 0001). Le `client_secret` Google n'existe plus dans cet
+  // environnement — une copie de moins à faire tourner le jour d'un incident.
+  //
+  // Auth.js reste indispensable pour autant : c'est lui qui déchiffre le cookie et
+  // expose `auth()` au garde. Les routes `/api/auth/*` continuent de servir la session
+  // et la DÉCONNEXION — laquelle vaut désormais pour toutes les apps, le cookie étant
+  // partagé.
+  providers: [],
   session: { strategy: "jwt" },
   // ── CONNEXION UNIQUE ENTRE LES APPS DU HUB ───────────────────────────────────────
   // Avec `AUTH_COOKIE_DOMAIN=.hubperso.com`, le cookie de session est déclaré sur le
@@ -48,30 +42,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   pages: { signIn: "/connexion", error: "/connexion" },
   callbacks: {
-    signIn({ user }) {
-      return estEmailAutorise(user?.email, process.env.AUTHORIZED_EMAIL);
-    },
-    // ⚠️ REVÉRIFICATION À CHAQUE LECTURE — c'est la contrepartie du cookie partagé.
+    // ⚠️ LE SEUL CONTRÔLE D'ACCÈS QUI RESTE, ET IL TOURNE À CHAQUE LECTURE.
     //
-    // `signIn` ne tourne qu'à la CONNEXION. Le cookie étant désormais lisible par tous
-    // les sous-domaines, JobAI accepterait sans broncher une session fabriquée par une
-    // autre app du hub. Aujourd'hui c'est cohérent — les apps partagent la même
-    // AUTHORIZED_EMAIL — mais ça ne l'est que par coïncidence de configuration, et
-    // JobAI est celle qui a le plus à perdre : adresse du domicile, statut migratoire,
-    // noms de tiers.
+    // Il n'y a plus de callback `signIn` : aucune connexion ne se fait ici, donc il ne
+    // tournerait jamais. Tout le contrôle repose maintenant sur ce `jwt`, ce qui est plus
+    // sain — il suit la DONNÉE, pas la connexion.
     //
-    // `jwt` tourne à chaque lecture de session. Renvoyer `null` INVALIDE la session
-    // (Auth.js v5) — le garde redirige vers /connexion, aucune donnée n'est rendue.
-    async jwt({ token, user, account }) {
-      // À la connexion seulement : on fixe l'adresse dans le jeton. Aux lectures
-      // suivantes, `user` est absent et c'est `token.email` qui fait foi.
+    // Sans lui, JobAI accepterait sans broncher n'importe quelle session posée sur
+    // `.hubperso.com` par une autre app. Aujourd'hui les apps partagent la même
+    // AUTHORIZED_EMAIL, mais c'est une coïncidence de configuration, pas une garantie —
+    // et JobAI est celle qui a le plus à perdre : adresse du domicile, statut migratoire,
+    // noms de personnes tierces.
+    //
+    // Renvoyer `null` INVALIDE la session (Auth.js v5) : le garde redirige vers
+    // /connexion, aucune donnée n'est rendue.
+    //
+    // ⚠️ `user` reste dans la signature bien qu'aucune connexion locale ne le fournisse :
+    // Auth.js le passe encore si une session est créée par un chemin qu'on n'a pas prévu.
+    // Le retirer ferait silencieusement perdre l'adresse dans ce cas-là.
+    jwt({ token, user }) {
       if (user?.email) token.email = user.email;
       if (!estEmailAutorise(token.email, process.env.AUTHORIZED_EMAIL)) return null;
-      // Capture des jetons Google à la connexion, renouvellement ensuite. JobAI ne
-      // s'en sert pas ; elle les transporte pour les apps qui, elles, en ont besoin.
-      // Le contrôle d'adresse passe AVANT : on ne rafraîchit pas un jeton pour une
-      // session qu'on s'apprête à refuser.
-      return await majJetonsGoogle(token, account);
+      return token;
     },
   },
 });

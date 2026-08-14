@@ -12,8 +12,6 @@ import { diagnostiquerConfiguration } from "../lib/diagnostic";
 const ENV_COMPLET = {
   AUTH_SECRET: "signature-factice-assez-longue",
   AUTHORIZED_EMAIL: "quelquun@exemple.test",
-  GOOGLE_CLIENT_ID: "123456789-abcdef.apps.googleusercontent.com",
-  GOOGLE_CLIENT_SECRET: "GOCSPX-valeurfactice",
   DATABASE_URL: "postgresql://user:motdepasse@hote/db",
   HUB_TOKEN: "jeton-factice-du-hub",
 };
@@ -66,8 +64,6 @@ describe("détection de présence", () => {
     for (const requise of [
       "AUTH_SECRET",
       "AUTHORIZED_EMAIL",
-      "GOOGLE_CLIENT_ID",
-      "GOOGLE_CLIENT_SECRET",
     ]) {
       expect(noms, `${requise} doit figurer au diagnostic`).toContain(requise);
     }

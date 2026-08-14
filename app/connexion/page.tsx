@@ -1,32 +1,34 @@
-// app/connexion/page.tsx — l'écran de connexion, seule page publique qui affiche quelque
-// chose. Elle ne révèle RIEN du suivi : ni compteur, ni nom d'entreprise, ni statut.
-// Un écran de connexion qui laisse fuir un chiffre annule l'intérêt de la porte.
+// app/connexion/page.tsx — la porte, devenue un couloir.
+//
+// JobAI ne se connecte plus à Google elle-même (ADR 0001 de Hubperso) : le hub est la
+// porte d'entrée unique. Cette page ne propose donc plus de bouton, elle REDIRIGE vers
+// `hubperso.com/login` en emportant de quoi revenir ici.
+//
+// Elle reste la seule page publique, et elle ne révèle toujours RIEN du suivi : ni
+// compteur, ni nom d'entreprise, ni statut. Un écran de connexion qui laisse fuir un
+// chiffre annule l'intérêt de la porte.
 
-import { signIn } from "@/auth";
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { URL_HUB, urlConnexionHub } from "@/lib/connexionHub";
 import { diagnostiquerConfiguration } from "@/lib/diagnostic";
+import { estAuthConfiguree } from "@/lib/autorisation";
 
 export const metadata = { title: "Connexion — JobAI" };
 
 /**
- * Les codes d'erreur d'Auth.js, traduits en quelque chose d'actionnable.
+ * L'origine de cette app, vue de la requête.
  *
- * Un « connexion refusée » générique ne dit pas s'il faut changer de compte ou corriger une
- * variable d'environnement. Ces deux situations n'ont rien à voir, et se distinguer coûte
- * une ligne. Aucun de ces messages ne révèle l'adresse autorisée : dire « ce n'est pas la
- * bonne adresse » suffit, la nommer aiderait quelqu'un qui n'a rien à faire ici.
+ * Pas une constante : JobAI répond sur son domaine ET sur les préversions Vercel. Coder
+ * `emploi.hubperso.com` en dur ferait revenir toutes les préversions en production après
+ * connexion — le genre de bogue qu'on met une soirée à croire.
  */
-const MESSAGES: Record<string, string> = {
-  // Le callback `signIn` a refusé : l'adresse Google ne correspond pas à celle admise.
-  AccessDenied:
-    "Ce compte Google n’est pas celui autorisé pour cette application. Vérifie que tu utilises la bonne adresse — et, côté serveur, que la variable AUTHORIZED_EMAIL est bien définie et correspond exactement.",
-  // Variables manquantes ou mal formées côté serveur.
-  Configuration:
-    "L’authentification est mal configurée côté serveur : il manque GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET ou AUTH_SECRET, ou l’URI de redirection n’est pas déclarée dans la console Google.",
-  OAuthCallback:
-    "Google a refusé l’échange. L’URI de redirection déclarée dans la console Google ne correspond probablement pas exactement à celle utilisée (protocole et domaine compris).",
-  Verification: "Le lien de connexion a expiré. Réessaie.",
-  Default: "La connexion n’a pas abouti. Réessaie ; si ça persiste, vérifie la configuration Google.",
-};
+async function origineDeLaRequete(): Promise<string> {
+  const h = await headers();
+  const hote = h.get("x-forwarded-host") ?? h.get("host") ?? "emploi.hubperso.com";
+  const protocole = h.get("x-forwarded-proto") ?? "https";
+  return `${protocole}://${hote}`;
+}
 
 export default async function Connexion({
   searchParams,
@@ -35,55 +37,58 @@ export default async function Connexion({
 }) {
   const { retour, error } = await searchParams;
 
+  // Chemin normal : on ne s'attarde pas, on envoie au hub.
+  //
+  // ⚠️ Sauf si l'auth n'est PAS configurée. Sans AUTH_SECRET, JobAI ne saurait pas lire la
+  // session que le hub lui rendrait : on bouclerait entre les deux domaines indéfiniment,
+  // et une boucle inter-domaines ressemble à une panne réseau — bien plus dure à
+  // diagnostiquer qu'un message. On s'arrête ici et on affiche le diagnostic.
+  if (!error && estAuthConfiguree()) {
+    redirect(urlConnexionHub(await origineDeLaRequete(), retour));
+  }
+
+  // Chemin d'échec : on s'arrête pour DIRE quelque chose. Rediriger ici produirait une
+  // boucle silencieuse entre les deux apps, et personne ne saurait pourquoi.
   return (
     <main className="shell">
       <div className="card">
         <p className="eyebrow">emploi.hubperso.com</p>
         <h1>JobAI</h1>
         <p className="lead">
-          Suivi de recherche d’emploi. L’accès est réservé à un seul compte.
+          La connexion se fait sur le hub, pas ici. Quelque chose l’a empêchée.
         </p>
 
-        {error ? (
-          <>
-            <p className="hint" role="alert">
-              {MESSAGES[error] ?? MESSAGES.Default}
-            </p>
-            {/* Affiché UNIQUEMENT après un échec : ce sont des booléens, jamais des
-                valeurs. Voir lib/diagnostic.ts pour pourquoi c'est sans risque. */}
-            <details className="diagnostic">
-              <summary>Variables configurées côté serveur</summary>
-              <ul>
-                {diagnostiquerConfiguration().map((v) => (
-                  <li key={v.nom} className={v.presente ? "ok" : "absente"}>
-                    <code>{v.nom}</code> {v.presente ? "présente" : "ABSENTE"}
-                    <span className="diagnostic__role"> — {v.role}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="diagnostic__note">
-                Aucune valeur n’est affichée, seulement leur présence. Une variable ajoutée
-                dans Vercel n’est prise en compte qu’au redéploiement suivant.
-              </p>
-            </details>
-          </>
-        ) : null}
+        <p className="hint" role="alert">
+          {/* Les erreurs d'OAuth n'arrivent plus jusqu'ici — JobAI ne parle plus à Google.
+              Ce qui reste possible : une session refusée parce que l'adresse n'est pas
+              celle admise, ou une variable manquante côté serveur. */}
+          {estAuthConfiguree()
+            ? "Session refusée. Ce compte Google n’est pas celui autorisé pour cette application."
+            : "Authentification non configurée côté serveur. La redirection vers le hub est retenue exprès : sans AUTH_SECRET, JobAI ne pourrait pas lire la session qu’il lui rendrait, et on tournerait en rond."}
+        </p>
 
-        <form
-          action={async () => {
-            "use server";
-            // On ne fait confiance qu'à un chemin interne : une URL de retour fournie par
-            // l'extérieur pourrait renvoyer ailleurs après connexion (redirection ouverte).
-            const cible = retour && retour.startsWith("/") && !retour.startsWith("//")
-              ? retour
-              : "/";
-            await signIn("google", { redirectTo: cible });
-          }}
-        >
-          <button type="submit" className="bouton">
-            Se connecter avec Google
-          </button>
-        </form>
+        {/* Des BOOLÉENS, jamais des valeurs. Voir lib/diagnostic.ts. */}
+        <details className="diagnostic">
+          <summary>Variables configurées côté serveur</summary>
+          <ul>
+            {diagnostiquerConfiguration().map((v) => (
+              <li key={v.nom} className={v.presente ? "ok" : "absente"}>
+                <code>{v.nom}</code> {v.presente ? "présente" : "ABSENTE"}
+                <span className="diagnostic__role"> — {v.role}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="diagnostic__note">
+            Aucune valeur n’est affichée, seulement leur présence. Une variable ajoutée dans
+            Vercel n’est prise en compte qu’au redéploiement suivant.
+          </p>
+        </details>
+
+        <p className="hint">
+          <a className="bouton" href={URL_HUB}>
+            Aller au hub
+          </a>
+        </p>
       </div>
     </main>
   );

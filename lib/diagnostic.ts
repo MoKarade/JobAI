@@ -7,6 +7,10 @@
 // énormément la personne qui configure.
 //
 // Ce diagnostic ne s'affiche que sur un ÉCHEC de connexion, pas en temps normal.
+//
+// GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET ont disparu de cette liste le 14/08 : JobAI ne
+// parle plus à Google (ADR 0001 de Hubperso). Les y laisser ferait chercher une variable
+// qui n'a plus à exister, et le diagnostic vaut par ce qu'il n'affirme PAS.
 
 export interface EtatVariable {
   nom: string;
@@ -33,16 +37,6 @@ export function diagnostiquerConfiguration(
       nom: "AUTHORIZED_EMAIL",
       presente: posee(env.AUTHORIZED_EMAIL),
       role: "la seule adresse admise",
-    },
-    {
-      nom: "GOOGLE_CLIENT_ID",
-      presente: posee(env.GOOGLE_CLIENT_ID),
-      role: "client OAuth Google",
-    },
-    {
-      nom: "GOOGLE_CLIENT_SECRET",
-      presente: posee(env.GOOGLE_CLIENT_SECRET),
-      role: "client OAuth Google",
     },
     {
       nom: "DATABASE_URL",
