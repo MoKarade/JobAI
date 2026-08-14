@@ -18,6 +18,16 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, dirname } from "node:path";
 
+/**
+ * Ces cas montent un VRAI dépôt git (init, add, commit) puis exécutent le script en bash.
+ * Le défaut de vitest est de 5 s, et on l'a frôlé puis dépassé (7,5 s mesurées sur une
+ * machine chargée) : un test qui lance des processus n'a pas à hériter d'un défaut pensé
+ * pour des fonctions pures. Sans borne explicite, il devient rouge selon l'humeur de la
+ * machine — et un rouge qui n'accuse pas le code est exactement ce qui apprend à ignorer
+ * la CI. La valeur est dimensionnée sur ce que le test FAIT, pas sur sa durée du jour.
+ */
+const TIMEOUT_GIT = 30_000;
+
 let atelier: string;
 
 /** Un dépôt jetable avec un premier commit, prêt à recevoir le commit à juger. */
@@ -83,13 +93,13 @@ describe("ce commit change-t-il ce que le site sert ?", () => {
     expect(jugerApres(["components/Carte.tsx"])).toBe(CONSTRUIT);
     expect(jugerApres(["package.json"])).toBe(CONSTRUIT);
     expect(jugerApres(["drizzle/0011_x.sql"])).toBe(CONSTRUIT);
-  });
+  }, TIMEOUT_GIT);
 
   it("CONSTRUIT si UN SEUL fichier de code accompagne de la documentation", () => {
     // Le piège d'un « tous les fichiers sont exemptés » mal écrit : un lot mixte est un lot
     // de code. La liste des exemptions est fermée, celle de ce qui construit est ouverte.
     expect(jugerApres(["CLAUDE.md", "docs/note.md", "lib/actions.ts"])).toBe(CONSTRUIT);
-  });
+  }, TIMEOUT_GIT);
 
   it("IGNORE un commit qui ne touche que documentation et tests", () => {
     // Le cas qui a épuisé le quota : douze déploiements en deux heures, dont plusieurs pour
@@ -98,7 +108,7 @@ describe("ce commit change-t-il ce que le site sert ?", () => {
     expect(jugerApres(["HANDOVER.md", "docs/LESSONS.md"])).toBe(IGNORE);
     expect(jugerApres(["tests/carte.test.ts", "BACKLOG.md"])).toBe(IGNORE);
     expect(jugerApres([".github/workflows/ci.yml"])).toBe(IGNORE);
-  });
+  }, TIMEOUT_GIT);
 
   it("CONSTRUIT quand il n'y a pas d'historique à comparer", () => {
     // Le clone de Vercel est superficiel : `HEAD^` peut manquer. C'est un cas NORMAL, et
@@ -119,7 +129,7 @@ describe("ce commit change-t-il ce que le site sert ?", () => {
       code = (err as { status?: number }).status ?? -1;
     }
     expect(code).toBe(CONSTRUIT);
-  });
+  }, TIMEOUT_GIT);
 });
 
 describe("le câblage", () => {

@@ -951,6 +951,49 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   plus RÉCENT (celui que `generate` vient de produire) redevient correct pour l'avenir ; ce
   sont les migrations SQL intermédiaires qu'il faut vérifier une à une.
 
+- **`node_modules` PRÉSENT ne veut pas dire PAQUETS présents.** Après un revert, le dossier
+  existe et les paquets installés le jour même ont disparu. J'ai vérifié `[ -d node_modules ]`,
+  conclu « présent », et lancé le gate : typecheck rouge et quatre tests rouges sur
+  `Cannot find module '@anthropic-ai/sdk'` / `unpdf`. Ça RESSEMBLE à un défaut du code qu'on
+  vient d'écrire — c'était un `npm install` manquant. La vérification juste porte sur un
+  paquet RÉCENT (`node -e "require.resolve('unpdf')"`), jamais sur l'existence du dossier.
+- **Une configuration indexée PAR ROUTE ne suit pas un refactor qui PARTAGE du code.**
+  `outputFileTracingIncludes` est une table route → fichiers. En sortant la veille dans
+  `lib/veilleComplete.ts` pour lui donner un second déclencheur, j'ai créé un SECOND appelant
+  (`/api/cron/geocodage`) avec son propre bundle — et sans entrée de traçage. Le chemin de
+  reprise aurait donc tourné avec `data/depot` ABSENT : la panne du 2026-08-12 rouverte par la
+  porte qu'on venait d'ouvrir, deux jours après l'avoir fermée, et invisible jusqu'au jour où
+  la reprise sert vraiment. Tout refactor « je partage ce travail entre deux routes » se
+  termine par un balayage des configs indexées par route ; ici la règle est écrite dans le
+  fichier, à côté de l'entrée.
+- **Un gate ne peut pas être vert dans une session sans egress — et ça se DIT.**
+  `next/font/google` télécharge les fontes AU BUILD : `fonts.gstatic.com` hors allowlist ⇒
+  build rouge, sans le moindre rapport avec le code. Trois façons de mal réagir : croire à une
+  régression, retirer la fonte pour « faire passer », ou annoncer « gate vert » en comptant
+  les trois autres. La bonne : annoncer exactement ce qui a tourné (« typecheck, tests et lint
+  verts ; build non exécutable ici, hôte bloqué ») et laisser la CI, qui a le réseau, trancher.
+- **Les paramètres d'une API se mesurent en les FAISANT VARIER, avant d'écrire un protocole
+  autour.** Le protocole de veille prescrivait 24 recherches Indeed (12 termes × 2 villes).
+  Mesuré : le paramètre de lieu est INERTE — « Québec » et « Lévis » rendent le même contenu,
+  seul le terme discrimine. Douze appels sur vingt-quatre brûlaient un quota partagé pour
+  rien. Même méthode, même jour, autre trouvaille : les `job_id` sont des compteurs PAR
+  RÉPONSE (`940-942`, puis `943-945` pour la MÊME recherche relancée) — d'où le dédoublonnage
+  par identité, jamais par identifiant ni par lien. Relancer avec UN paramètre changé et
+  comparer les deux réponses coûte deux appels et corrige un protocole entier.
+- **Un connecteur « activé » peut n'exposer AUCUN outil.** `ListConnectors` donnait Indeed
+  `enabledInChat: true` — donc actif en apparence — avec `installState: "unknown"` et zéro
+  outil chargé. « Activé dans ce chat » décrit une intention de configuration, pas une
+  capacité. La capacité se lit dans la liste d'outils réellement disponible ; et la distinction
+  compte, parce que l'une se répare en reconnectant (OAuth) et l'autre pas.
+- **Une donnée d'entreprise renvoie le SIÈGE SOCIAL, jamais l'établissement local.**
+  `get_company_data` (Indeed) rend `addresses: ["Charlotte, NC"]` pour une offre Honeywell à
+  Québec, et échoue carrément sur les PME (`Laserax` → « Unknown error »). La brancher sur le
+  champ `adresse` automatiserait la faute AMETEK déjà consignée — une donnée fausse qui a
+  l'air précise, à 2 500 km, et qui franchirait la validation par la distance. Cet outil sert
+  à JUGER un employeur (avis, salaires, taille), jamais à SITUER une offre. Règle générale :
+  avant de brancher un champ d'une API sur un champ du modèle, demander « de quelle ENTITÉ
+  cette valeur parle-t-elle ? » — l'entreprise et l'établissement ne sont pas la même chose.
+
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 
 La note de fit est le cœur du produit : elle décide ce que Marc regarde en premier.
