@@ -12,6 +12,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { URL_HUB, urlConnexionHub } from "@/lib/connexionHub";
 import { diagnostiquerConfiguration } from "@/lib/diagnostic";
+import { estAuthConfiguree } from "@/lib/autorisation";
 
 export const metadata = { title: "Connexion — JobAI" };
 
@@ -37,7 +38,12 @@ export default async function Connexion({
   const { retour, error } = await searchParams;
 
   // Chemin normal : on ne s'attarde pas, on envoie au hub.
-  if (!error) {
+  //
+  // ⚠️ Sauf si l'auth n'est PAS configurée. Sans AUTH_SECRET, JobAI ne saurait pas lire la
+  // session que le hub lui rendrait : on bouclerait entre les deux domaines indéfiniment,
+  // et une boucle inter-domaines ressemble à une panne réseau — bien plus dure à
+  // diagnostiquer qu'un message. On s'arrête ici et on affiche le diagnostic.
+  if (!error && estAuthConfiguree()) {
     redirect(urlConnexionHub(await origineDeLaRequete(), retour));
   }
 
@@ -56,8 +62,9 @@ export default async function Connexion({
           {/* Les erreurs d'OAuth n'arrivent plus jusqu'ici — JobAI ne parle plus à Google.
               Ce qui reste possible : une session refusée parce que l'adresse n'est pas
               celle admise, ou une variable manquante côté serveur. */}
-          Session refusée. Soit ce compte Google n’est pas celui autorisé pour cette
-          application, soit une variable manque côté serveur — la liste ci-dessous le dit.
+          {estAuthConfiguree()
+            ? "Session refusée. Ce compte Google n’est pas celui autorisé pour cette application."
+            : "Authentification non configurée côté serveur. La redirection vers le hub est retenue exprès : sans AUTH_SECRET, JobAI ne pourrait pas lire la session qu’il lui rendrait, et on tournerait en rond."}
         </p>
 
         {/* Des BOOLÉENS, jamais des valeurs. Voir lib/diagnostic.ts. */}
