@@ -18,7 +18,13 @@ Widget publié au hub perso via `GET /api/hub/summary` (contrat `@mokarade/hub-c
 
 Format : {l'interdit · l'exception nommée et bornée · le seul fichier autorisé · le verrou}.
 
-1. **Dépôt PRIVÉ, et aucune donnée personnelle en clair dans le code.**
+1. **Dépôt PUBLIC (décision Marc, 2026-08-14) — donc aucune donnée personnelle, jamais.**
+   Le dépôt était déclaré « privé » par ce document alors qu'il est public depuis le début ;
+   Marc a tranché en connaissance de cause : **il reste public**. Ce qui change n'est pas la
+   règle, c'est son filet. En privé, une PII commitée par erreur était une faute rattrapable
+   entre nous. En public, elle est **lisible du monde entier à la seconde du push**, et un
+   commit correctif ne la retire pas — l'historique, les forks et les miroirs la gardent.
+   `tests/piiGuard.test.ts` n'est donc plus une ceinture : c'est le MUR, et c'est le seul.
    Le suivi de recherche d'emploi contient l'adresse du domicile, le statut migratoire,
    l'historique de refus et des noms de personnes tierces (conseillers RH). *Interdit* : tout
    commit portant l'un de ces éléments. *Exception* : aucune. Les coordonnées du domicile

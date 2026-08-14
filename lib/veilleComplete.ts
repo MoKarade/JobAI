@@ -169,6 +169,26 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
 
     await ecrireEtat(CLE_JOURNAL, rapport.journal);
 
+    // ⚠️ CETTE LIGNE EXISTE PARCE QU'UN « −2 » A COÛTÉ UNE ENQUÊTE (2026-08-14).
+    //
+    // Tous ces nombres étaient DÉJÀ calculés — ils partaient dans la réponse JSON, que
+    // personne ne lit quand la passe est déclenchée par le planificateur ou par un bouton
+    // du tableau de bord. Marc a vu son compte d'offres BAISSER après une veille, et il a
+    // fallu remonter le code et les logs de localisation pour établir ce que la ligne
+    // ci-dessous dit en un coup d'œil : la passe INGÈRE et PÉRIME dans le même run, et
+    // seul l'écart des deux explique le solde.
+    //
+    // Elle est émise à CHAQUE passe, même vide, parce que « 0/0 » et « 0/31 » disent des
+    // choses OPPOSÉES : la première qu'il n'y avait rien à faire, la seconde que tout a
+    // été écarté. Un travail de fond qui ne journalise que ses échecs est indiagnosticable.
+    console.log(
+      `[veille] ${declencheur} — ingérées=${rapport.nouvelles.length}/${rapport.trouvees}` +
+        ` périmées=${rapport.perimees.length} revenues=${rapport.revenues.length}` +
+        ` doublons=${rapport.tri.doublons} hors-région=${rapport.tri.horsRegion}` +
+        ` sous-plancher=${rapport.tri.souslePlancher} lieu-inconnu=${rapport.tri.lieuInconnu}` +
+        ` en-sursis=${rapport.enSursis} sources=${rapport.sources.length}`,
+    );
+
     // LOCALISER ET MESURER, ICI AUSSI — sans quoi « toujours à jour » dépendrait de Marc.
     //
     // Les passes de géocodage et de mesure ne tournaient qu'APRÈS l'affichage d'une page :
