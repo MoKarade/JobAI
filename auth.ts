@@ -13,6 +13,7 @@
 
 import NextAuth from "next-auth";
 import { estEmailAutorise } from "@/lib/autorisation";
+import { aAccesHub } from "@/lib/accesHub";
 import { cookiesSessionPartagee } from "@/lib/sessionPartagee";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -54,15 +55,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // et JobAI est celle qui a le plus à perdre : adresse du domicile, statut migratoire,
     // noms de personnes tierces.
     //
+    // DEUX ÉTAGES, PAS UN SEUL. `estEmailAutorise` reste le premier : Marc (AUTHORIZED_
+    // EMAIL) entre sans jamais dépendre du hub — sinon un hub injoignable l'enfermerait
+    // dehors de sa propre app. Pour toute autre adresse, `aAccesHub` interroge la table
+    // `acces` du hub (étape 2 de l'ADR 0001) : c'est là, et seulement là, que vit
+    // désormais la liste de qui d'autre a le droit d'entrer.
+    //
     // Renvoyer `null` INVALIDE la session (Auth.js v5) : le garde redirige vers
     // /connexion, aucune donnée n'est rendue.
     //
     // ⚠️ `user` reste dans la signature bien qu'aucune connexion locale ne le fournisse :
     // Auth.js le passe encore si une session est créée par un chemin qu'on n'a pas prévu.
     // Le retirer ferait silencieusement perdre l'adresse dans ce cas-là.
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user?.email) token.email = user.email;
-      if (!estEmailAutorise(token.email, process.env.AUTHORIZED_EMAIL)) return null;
+      if (estEmailAutorise(token.email, process.env.AUTHORIZED_EMAIL)) return token;
+      if (!(await aAccesHub(token.email))) return null;
       return token;
     },
   },
