@@ -23,8 +23,21 @@ l'effondrement de stock 78 → 30 documenté dans `next.config.mjs`.
 
 | Situation | Canal |
 |---|---|
-| Aucune passe n'a encore tourné aujourd'hui | `POST /api/ingest/depot` — il dépose ET balaie, c'est ce qu'on veut |
-| Une passe a déjà tourné aujourd'hui | **fichier** `data/depot/<JOUR>.json` — il dépose SANS balayer |
+| Aucune passe n'a tourné **et** le lot re-présente tout le stock vivant | `POST` — il dépose ET balaie, c'est ce qu'on veut |
+| Une passe a déjà tourné aujourd'hui | **fichier** `data/depot/<JOUR>.json` |
+| Lot PARTIEL — les trouvailles du jour seulement | **fichier**, quoi qu'il arrive |
+
+⚠️ **La deuxième condition n'est pas une nuance, et elle m'a échappé à la première écriture
+de ce document (corrigée le 2026-08-15, preuve à l'appui).** La route POST construit ses
+« offres vues » à partir du SEUL lot reçu (`app/api/ingest/depot/route.ts` : `const vues =
+apresAjout.filter((o) => idsDeposes.has(o.id))`). Le cron, lui, balaie avec TOUTES ses
+sources, dépôts des sept derniers jours inclus. Poster un lot de huit trouvailles donne donc
+une absence aux quarante autres offres suivies — pas de péremption immédiate, mais un
+décompte enclenché que seule une passe complète peut remettre à zéro.
+
+Autrement dit : **le vrai critère n'est pas « une passe a-t-elle tourné », c'est « mon lot
+est-il exhaustif »**. Une veille quotidienne rapporte les NOUVEAUTÉS : son lot est partiel
+par nature, donc son canal est le fichier.
 
 Comment savoir : les logs d'exécution Vercel portent la ligne `[veille] <déclencheur> —
 ingérées=…` depuis `[VEILLE-12]`. Une passe qui a tourné aujourd'hui y est visible.
