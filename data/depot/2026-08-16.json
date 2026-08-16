@@ -1,0 +1,30 @@
+{
+  "source": "veille-routine",
+  "jour": "2026-08-16",
+  "offres": [
+    {
+      "titre": "Chargé(e) de projets",
+      "entreprise": "Plomberie de la Capitale 2.0 inc.",
+      "ville": "L'Ancienne-Lorette",
+      "adresse": "",
+      "adresseSource": null,
+      "adresseUrl": null,
+      "lien": "https://to.indeed.com/aawdrsx6vwhg",
+      "description": "",
+      "publieeLe": "2026-08-03",
+      "refSource": "indeed:JOBSEARCH_1032"
+    },
+    {
+      "titre": "Coordonnateur responsable de la SST",
+      "entreprise": "Filtrum Construction",
+      "ville": "Québec",
+      "adresse": "",
+      "adresseSource": null,
+      "adresseUrl": null,
+      "lien": "https://to.indeed.com/aa9slhsfxsps",
+      "description": "",
+      "publieeLe": "2026-08-14",
+      "refSource": "indeed:JOBSEARCH_1042"
+    }
+  ]
+}
