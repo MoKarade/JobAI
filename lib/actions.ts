@@ -63,9 +63,11 @@ import {
   BUDGET_PASSE_PAGE_MS,
   CLE_DECOUVERTE_MANUELLE,
   DELAI_LOT_MANUEL_MS,
+  BUDGET_SONDE_MS,
   reserverPasse,
 } from "./synchro";
 import { avancerDecouverte } from "./decouverte";
+import { sonderGuichet } from "./ingest/sondeGuichet";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -1940,5 +1942,58 @@ export async function lancerDecouverte(): Promise<ResultatDecouverte> {
     // pas un lot vide qui se lirait comme « il n'y avait rien à faire ».
     console.error("[decouverte] lot manuel en échec", err);
     return { ok: false, erreur: "La découverte a échoué. Le détail est dans le journal." };
+  }
+}
+
+/** Le compte rendu de la sonde, à plat pour traverser la frontière serveur → client. */
+export type ResultatSonde =
+  | {
+      ok: true;
+      verdicts: {
+        url: string;
+        urlFinale: string;
+        statut: number | null;
+        typeContenu: string | null;
+        octets: number;
+        offres: number;
+        apercu: string;
+        erreur?: string;
+      }[];
+      nonEssayees: string[];
+    }
+  | { ok: false; erreur: string };
+
+/**
+ * Éprouve les adresses du Guichet-Emplois DEPUIS LA PRODUCTION.
+ *
+ * ⚠️ POURQUOI DEPUIS ICI ET PAS DEPUIS UNE SESSION. La question « quelle adresse répond ? »
+ * a reçu trois réponses le 2026-08-17, aucune mesurée : à chaque fois une URL lue dans un
+ * titre de résultat de recherche. La session de Claude ne peut pas trancher — le proxy de
+ * l'environnement refuse l'hôte au tunnel CONNECT. La production, elle, joint Overpass,
+ * Nominatim et Google Maps tous les jours. C'est de là qu'il faut demander.
+ *
+ * En LECTURE SEULE : rien n'est ingéré, aucun état n'est touché. Une sonde qui écrit devient
+ * un second chemin d'ingestion, c'est-à-dire une seconde implémentation de l'ingestion.
+ */
+export async function lancerSondeGuichet(recherche: string): Promise<ResultatSonde> {
+  try {
+    await exigerSession();
+  } catch {
+    return { ok: false, erreur: "Authentification requise." };
+  }
+
+  const terme = recherche.trim();
+  if (terme === "" || terme.length > 80) {
+    return { ok: false, erreur: "Terme de recherche invalide." };
+  }
+
+  try {
+    const r = await sonderGuichet(terme, BUDGET_SONDE_MS);
+    return { ok: true, ...r };
+  } catch (err) {
+    // Une sonde qui échoue doit le DIRE : « rien trouvé » et « je n'ai pas pu chercher »
+    // sont les deux hypothèses opposées qu'elle existe justement pour départager.
+    console.error("[sonde] Guichet-Emplois", err);
+    return { ok: false, erreur: "La sonde a échoué. Le détail est dans le journal." };
   }
 }

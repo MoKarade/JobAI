@@ -17,7 +17,8 @@ import { Cadre } from "@/components/Cadre";
 import { DecouverteAts } from "@/components/DecouverteAts";
 import { etatDecouverte } from "@/lib/decouverte";
 import { aujourdhui } from "@/lib/ajout";
-import { RECHERCHES_GUICHET } from "@/lib/ingest/sources";
+import { RECHERCHES_GUICHET, RECHERCHES_GUICHET_CANDIDATES } from "@/lib/ingest/sources";
+import { SondeGuichet } from "@/components/SondeGuichet";
 import { classerPanne, type Panne } from "@/lib/panne";
 
 export const metadata = { title: "Sources — JobAI" };

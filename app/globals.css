@@ -1966,3 +1966,51 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin-top: 0.75rem;
   max-width: 68ch;
 }
+
+/* ── Sonde du Guichet-Emplois ─────────────────────────────────────────────── */
+
+.sonde { margin-bottom: var(--pas-2); }
+.sonde__message { font-size: var(--t-s); margin-top: 0.5rem; min-height: 1.2em; }
+
+.sonde__verdicts {
+  list-style: none;
+  padding: 0;
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.sonde__verdict {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--r-champ);
+  background: var(--creux);
+}
+
+/* Une adresse qui rend VRAIMENT des offres — le seul résultat qui change quelque chose. */
+.sonde__verdict--bon { background: var(--actif); }
+
+.sonde__url {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  overflow-wrap: anywhere;
+}
+
+.sonde__url--finale { color: var(--ambre-texte); }
+.sonde__etat { font-size: var(--t-xs); }
+
+/* L'aperçu est là pour l'œil humain : aucun code ne remplace la lecture du contenu. */
+.sonde__apercu {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.sonde__note {
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  margin-top: 0.6rem;
+  max-width: 68ch;
+}

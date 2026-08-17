@@ -349,3 +349,13 @@ export const CLE_DECOUVERTE_MANUELLE = "decouverte-manuelle";
  * hôte donné ne voie jamais plus d'environ une requête par seconde en moyenne.
  */
 export const DELAI_LOT_MANUEL_MS = 2_000;
+
+/**
+ * Temps accordé à la sonde du Guichet-Emplois.
+ *
+ * Huit adresses × 8 s de délai + les pauses tiendraient mal sous le mur de 60 s d'une
+ * fonction. Quarante secondes laissent le temps d'en éprouver la plupart et de RAPPORTER
+ * celles qui n'ont pas été essayées — une liste tronquée en silence se lirait comme une
+ * liste complète, ce qui est exactement l'erreur que la sonde existe pour ne plus commettre.
+ */
+export const BUDGET_SONDE_MS = 40_000;
