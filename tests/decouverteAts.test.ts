@@ -17,8 +17,11 @@ import {
   appliquerVerdict,
   DELAIS_RETENTE_JOURS,
   MAX_ESSAIS_PAR_PASSE,
+  MAX_ESSAIS_PAR_FAMILLE,
   type EssaiAts,
 } from "@/lib/ingest/decouverteAts";
+
+const FAMILLES = ["greenhouse", "lever", "recruitee", "workable", "smartrecruiters"] as const;
 
 const JOUR = "2026-08-17";
 
@@ -41,10 +44,36 @@ describe("planifierDecouverte — ce qu'on tente aujourd'hui", () => {
     expect(p).toEqual([]);
   });
 
-  it("respecte le plafond par passe", () => {
+  it("respecte le plafond par passe quand les hôtes sont assez nombreux", () => {
     const noms = Array.from({ length: 50 }, (_, i) => `Entreprise ${i}`);
-    const p = planifierDecouverte(noms, ["greenhouse", "lever"], [], [], JOUR);
+    const p = planifierDecouverte(noms, FAMILLES, [], [], JOUR);
     expect(p).toHaveLength(MAX_ESSAIS_PAR_PASSE);
+  });
+
+  // ⚠️ LE TEST QUI TIENT LA BORNE DE TEMPS. Le coût se paie par HÔTE : cinq familles
+  // s'interrogent en parallèle, mais on reste en série chez chacune. Si tout le travail en
+  // attente tombait sur une seule famille, douze essais feraient 96 s en série contre un mur
+  // de 60 s — la passe entière mourrait sans écrire son état. Le plafond par famille rend
+  // cette borne STRUCTURELLE au lieu d'accidentelle.
+  it("ne dépasse JAMAIS le plafond par famille, même si tout le travail est sur un seul hôte", () => {
+    const noms = Array.from({ length: 50 }, (_, i) => `Entreprise ${i}`);
+    const p = planifierDecouverte(noms, ["greenhouse"], [], [], JOUR);
+    expect(p).toHaveLength(MAX_ESSAIS_PAR_FAMILLE);
+    expect(p.every((e) => e.famille === "greenhouse")).toBe(true);
+  });
+
+  it("répartit entre les hôtes plutôt que d'en saturer un", () => {
+    const noms = Array.from({ length: 50 }, (_, i) => `Entreprise ${i}`);
+    const p = planifierDecouverte(noms, FAMILLES, [], [], JOUR);
+    for (const f of FAMILLES) {
+      expect(p.filter((e) => e.famille === f).length).toBeLessThanOrEqual(MAX_ESSAIS_PAR_FAMILLE);
+    }
+  });
+
+  // Le produit des deux plafonds est ce qui borne vraiment : monter l'un sans l'autre
+  // n'ajoute aucun essai.
+  it("le plafond par passe reste atteignable avec les familles réelles", () => {
+    expect(FAMILLES.length * MAX_ESSAIS_PAR_FAMILLE).toBeGreaterThanOrEqual(MAX_ESSAIS_PAR_PASSE);
   });
 
   // ⚠️ LA CONVERGENCE. Un `indecis` doit revenir vite — l'entreprise existe peut-être et
