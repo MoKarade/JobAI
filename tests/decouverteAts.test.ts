@@ -46,6 +46,38 @@ describe("planifierDecouverte — ce qu'on tente aujourd'hui", () => {
     expect(p).toEqual([]);
   });
 
+  // ⚠️ LE CAS QUE L'APPELANT PRODUIT VRAIMENT. `lib/veilleComplete.ts` concatène les cibles
+  // de Marc et les employeurs croisés en offre : le second lot est dédoublonné, jamais les
+  // deux entre eux. Et le recoupement est certain — une cible qui embauche finit par
+  // publier. Mesuré avant le correctif : dix essais planifiés pour cinq paires distinctes,
+  // donc cinq requêtes en double vers des services tiers, prises sur les douze du jour.
+  it("ne planifie JAMAIS deux fois la même paire quand un nom arrive en double", () => {
+    const p = planifierDecouverte(["Laserax", "Laserax"], FAMILLES, [], [], JOUR);
+    const cles = p.map((e) => `${e.entreprise}|${e.famille}`);
+    expect(cles).toHaveLength(FAMILLES.length);
+    expect(new Set(cles).size).toBe(cles.length);
+  });
+
+  it("ignore la casse pour reconnaître un doublon, et garde la PREMIÈRE graphie", () => {
+    const p = planifierDecouverte(["Laserax", "LASERAX inc."], ["greenhouse"], [], [], JOUR);
+    // « LASERAX inc. » est une graphie DIFFÉRENTE, donc une entreprise à part entière :
+    // seule l'égalité à la casse près est un doublon.
+    expect(p.map((e) => e.entreprise)).toEqual(["Laserax", "LASERAX inc."]);
+
+    const q = planifierDecouverte(["Laserax", "LASERAX"], ["greenhouse"], [], [], JOUR);
+    expect(q.map((e) => e.entreprise)).toEqual(["Laserax"]);
+  });
+
+  // Un doublon ne doit pas non plus VOLER la place d'un autre. Assez d'exemplaires pour
+  // saturer les plafonds : sans dédoublonnage, les douze essais du jour se partagent entre
+  // quatre copies du MÊME nom et « Opsens » n'est jamais atteinte — le budget est dépensé
+  // sans rien apprendre de nouveau.
+  it("le doublon libère sa place pour une entreprise encore jamais essayée", () => {
+    const noms = ["Laserax", "Laserax", "Laserax", "Laserax", "Opsens"];
+    const p = planifierDecouverte(noms, FAMILLES, [], [], JOUR);
+    expect(p.map((e) => e.entreprise)).toContain("Opsens");
+  });
+
   it("respecte le plafond par passe quand les hôtes sont assez nombreux", () => {
     const noms = Array.from({ length: 50 }, (_, i) => `Entreprise ${i}`);
     const p = planifierDecouverte(noms, FAMILLES, [], [], JOUR);

@@ -137,10 +137,32 @@ export function planifierDecouverte(
   const resolues = new Set(dejaResolues.map((n) => n.toLowerCase()));
   const parCle = new Map(essais.map((e) => [`${e.entreprise.toLowerCase()}|${e.famille}`, e]));
 
+  // ⚠️ LES NOMS ARRIVENT EN DOUBLE, ET UN DOUBLON COÛTE UNE REQUÊTE RÉELLE.
+  //
+  // L'appelant compose sa liste en concaténant les cibles de Marc et les employeurs croisés
+  // en offre ; le second lot est dédoublonné, mais rien ne l'est ENTRE les deux — et les
+  // deux se recoupent forcément, puisqu'une cible qui embauche finit par publier une offre.
+  // Sans cette ligne, « Laserax » présent des deux côtés planifiait dix essais pour cinq
+  // paires distinctes (mesuré) : cinq requêtes en double vers des services qui ne nous
+  // doivent rien, prises sur les douze essais du jour.
+  //
+  // Dédoublonner ICI plutôt que chez l'appelant : c'est cette fonction qui a la charge
+  // d'ORDONNER et de BORNER, elle le fait déjà contre `dejaResolues` et contre les essais
+  // connus, et le faire ici couvre tout appelant présent ou futur. La casse est ignorée,
+  // comme partout ailleurs dans ce fichier. La PREMIÈRE graphie l'emporte — donc celle des
+  // cibles, qui portent l'orthographe de référence, sur celle rapportée par une annonce.
+  const vus = new Set<string>();
+  const aExplorer = entreprises.filter((n) => {
+    const cle = n.toLowerCase();
+    if (vus.has(cle)) return false;
+    vus.add(cle);
+    return true;
+  });
+
   const neufs: EssaiAFaire[] = [];
   const retentes: { essai: EssaiAFaire; anciennete: number }[] = [];
 
-  for (const entreprise of entreprises) {
+  for (const entreprise of aExplorer) {
     // Une entreprise déjà résolue chez UNE famille n'a plus rien à donner : on ne cherche
     // pas ses éventuelles autres pages carrières, ce serait payer pour un doublon.
     if (resolues.has(entreprise.toLowerCase())) continue;

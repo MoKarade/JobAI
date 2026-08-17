@@ -211,9 +211,14 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
 
       // Les cibles de Marc d'abord, puis les employeurs déjà croisés en offre : ceux-là ont
       // prouvé qu'ils embauchent dans la région, ce qui en fait de bons candidats.
+      //
+      // L'ORDRE compte (il fixe la priorité d'exploration) ; les DOUBLONS, non — les deux
+      // lots se recoupent forcément, et c'est `planifierDecouverte` qui les écarte, pour
+      // tous ses appelants à la fois. Dédoublonner une moitié ici donnait l'illusion que
+      // le cas était traité alors que le recoupement entre les deux restait entier.
       const noms = [
         ...ENTREPRISES_CIBLES.map((e) => e.nom),
-        ...new Set(rapport.offres.map((o) => o.entreprise).filter((n) => n.trim() !== "")),
+        ...rapport.offres.map((o) => o.entreprise).filter((n) => n.trim() !== ""),
       ];
       const aFaire = planifierDecouverte(
         noms,
