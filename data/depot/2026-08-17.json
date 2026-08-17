@@ -1,0 +1,42 @@
+{
+  "source": "veille-routine",
+  "jour": "2026-08-17",
+  "offres": [
+    {
+      "titre": "Superviseur(e) de production",
+      "entreprise": "CAS PAR CAS",
+      "ville": "Lévis",
+      "adresse": "",
+      "adresseSource": null,
+      "adresseUrl": null,
+      "lien": "https://to.indeed.com/aaswwq2ky2bm",
+      "description": "",
+      "publieeLe": "2026-08-07",
+      "refSource": "indeed:JOBSEARCH_1065"
+    },
+    {
+      "titre": "Superviseur(e) de production - articles en plastique",
+      "entreprise": "Tilton Inc",
+      "ville": "Saint-Augustin-de-Desmaures",
+      "adresse": "",
+      "adresseSource": null,
+      "adresseUrl": null,
+      "lien": "https://to.indeed.com/aafg2yvjrr8q",
+      "description": "",
+      "publieeLe": "2026-07-08",
+      "refSource": "indeed:JOBSEARCH_1070"
+    },
+    {
+      "titre": "Chargé(e) de projets (construction)",
+      "entreprise": "Garoy Construction inc.",
+      "ville": "Québec",
+      "adresse": "",
+      "adresseSource": null,
+      "adresseUrl": null,
+      "lien": "https://to.indeed.com/aamf96khzdv4",
+      "description": "",
+      "publieeLe": "2026-06-18",
+      "refSource": "indeed:JOBSEARCH_1055"
+    }
+  ]
+}
