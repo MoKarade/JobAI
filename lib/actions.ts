@@ -1482,7 +1482,23 @@ export async function mesurerDistances(
         `${registre.absentes > 0 ? ` (${registre.absentes} absentes)` : ""} ` +
         `precisees=${raffinage.precisees}/${raffinage.candidates}` +
         `${raffinage.parAdresse > 0 ? ` (${raffinage.parAdresse} par adresse)` : ""}` +
-        `${raffinage.googleTente ? ` (${raffinage.parGoogle} par Google)` : " (Google non configuré)"}` +
+        // ⚠️ NE PAS DIRE « NON CONFIGURÉ » QUAND ON N'A RIEN DEMANDÉ.
+        //
+        // `googleTente` est faux dans DEUX cas opposés : la clé manque, ou il n'y avait
+        // aucune candidate à raffiner (`raffinerPositions` sort avant même de la lire).
+        // La trace affichait « (Google non configuré) » dans les deux — et le second est
+        // le cas NORMAL d'une passe qui n'a rien à faire. Vécu le 2026-08-17 : la ligne
+        // criait un défaut d'environnement inexistant sur un `precisees=0/0`, et m'a
+        // envoyé chercher une clé absente pendant que la vraie question était ailleurs.
+        // Sans candidate, la question « Google a-t-il été tenté ? » ne se pose pas : on
+        // se tait. Elle ne redevient informative qu'avec au moins une candidate.
+        `${
+          raffinage.candidates === 0
+            ? ""
+            : raffinage.googleTente
+              ? ` (${raffinage.parGoogle} par Google)`
+              : " (Google non configuré)"
+        }` +
         `${raffinage.toujoursAuCentre > 0 ? ` (${raffinage.toujoursAuCentre} toujours au centre)` : ""}` +
         `${raffinage.horsRayon > 0 ? ` (${raffinage.horsRayon} hors rayon Nominatim)` : ""} ` +
         `bornes=${bornes.mesurees}/${bornes.candidates}` +
