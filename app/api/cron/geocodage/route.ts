@@ -72,6 +72,9 @@ export async function GET(requete: Request) {
     }
 
     if (!(await reserverPasse(db, CLE_DISTANCES, DELAI_MESURE_AUTO_MS, new Date()))) {
+      // Même raison que dans le cron de veille : un refus muet rend un déclenchement manuel
+      // indéchiffrable. 200 sans trace ne dit pas si le verrou a joué ou si rien n'a démarré.
+      console.log("[cron/geocodage] sautée : une passe de localisation vient d'avoir lieu");
       return NextResponse.json(
         { ok: true, localisation: "sautée — une passe vient d'avoir lieu" },
         { headers: { "Cache-Control": "no-store" } },

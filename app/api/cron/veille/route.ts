@@ -45,6 +45,12 @@ export async function GET(requete: Request) {
   // Avec elle, le premier des deux qui arrive fait le travail et l'autre s'efface, quel que
   // soit l'ordre. Un refus n'est donc PAS une erreur : c'est le verrou qui fonctionne.
   if (!(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, new Date()))) {
+    // ⚠️ UN REFUS SE DIT, LUI AUSSI. Sans cette ligne, un déclenchement manuel rend 200 et
+    // laisse les journaux MUETS : « la passe s'est effacée » devient indiscernable de « la
+    // passe n'a jamais démarré », qui sont les deux hypothèses opposées qu'on cherche
+    // justement à départager. Vécu le 2026-08-17 : Marc lance la passe à la main, obtient
+    // deux 200, et aucune trace — le verrou fonctionnait, mais rien ne le disait.
+    console.log("[veille] cron-veille — sautée : une passe a déjà eu lieu dans les 20 h");
     return NextResponse.json(
       { ok: true, saute: "une passe de veille a déjà eu lieu récemment" },
       { headers: { "Cache-Control": "no-store" } },
