@@ -46,10 +46,17 @@ describe("le barème d'avant ADR-0009, valeur par valeur", () => {
     expect(scoreDistance(25)).toBe(11);
     expect(scoreDistance(35)).toBe(8);
     // Dans le rayon, au-delà du dernier palier : le plancher, pas zéro.
+    // ⚠️ LES BORNES SE DÉRIVENT DU RAYON, elles ne sont plus écrites en dur. Il est passé de
+    // 50 à 75 km le 2026-08-17 — élargissement VOULU et AUDITÉ : une seule offre du jeu de
+    // référence change de note (Exo-s, Saint-Damien, 51,7 km : 58 → 63), et c'est
+    // exactement le genre d'offre qu'on voulait faire entrer. Des « 50 » figés ici auraient
+    // fait tomber ce test sur un changement légitime, en donnant l'impression d'une
+    // régression du BARÈME alors que c'est le RAYON qui a bougé.
+    const R = PROFIL_DEFAUT.rayonMaxKm;
     expect(scoreDistance(36)).toBe(5);
-    expect(scoreDistance(50)).toBe(5);
+    expect(scoreDistance(R)).toBe(5);
     // Hors rayon : zéro.
-    expect(scoreDistance(50.1)).toBe(0);
+    expect(scoreDistance(R + 0.1)).toBe(0);
     // Inconnue : NEUTRE. Un zéro dirait « c'est loin » — or on ne sait pas.
     expect(scoreDistance(null)).toBe(10);
     expect(scoreDistance(undefined)).toBe(10);
@@ -131,10 +138,17 @@ describe("un profil modifié change la note", () => {
   }
 
   it("un rayon élargi fait entrer une offre qui était hors rayon", () => {
-    expect(dansLeRayon(60)).toBe(false);
-    expect(dansLeRayon(60, variante({ rayonMaxKm: 80 }))).toBe(true);
-    expect(scoreDistance(60)).toBe(0);
-    expect(scoreDistance(60, variante({ rayonMaxKm: 80 }))).toBe(5);
+    // ⚠️ LE DISCRIMINANT SE DÉRIVE DU RAYON COURANT. Écrit « 60 contre 80 », ce test serait
+    // mort SILENCIEUSEMENT le jour où le rayon de base est passé à 75 : les deux branches
+    // auraient rendu la même chose et il aurait « passé » sans plus rien éprouver. Un test
+    // qui cesse de discriminer ne le signale jamais.
+    const R = PROFIL_DEFAUT.rayonMaxKm;
+    const dehors = R + 10;
+    const large = variante({ rayonMaxKm: dehors + 10 });
+    expect(dansLeRayon(dehors)).toBe(false);
+    expect(dansLeRayon(dehors, large)).toBe(true);
+    expect(scoreDistance(dehors)).toBe(0);
+    expect(scoreDistance(dehors, large)).toBe(5);
   });
 
   it("des paliers de distance resserrés baissent la note d'une offre lointaine", () => {

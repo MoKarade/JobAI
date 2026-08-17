@@ -28,6 +28,17 @@ export type ResultatVeilleManuelle =
       enSursis: number;
       doublons: number;
       ecartees: number;
+      /**
+       * ⚠️ CES DEUX-LÀ MANQUAIENT, ET LES CHIFFRES NE S'ADDITIONNAIENT PAS.
+       *
+       * Mesuré le 2026-08-17 : « 100 trouvées · 0 nouvelle · 26 déjà connues · 0 sous le
+       * plancher ». Soixante-quatorze offres s'évaporaient de l'écran sans motif — elles
+       * étaient hors région (la source Dexterra est pancanadienne), mais le compte rendu ne
+       * portait pas ce motif. Un total dont les parties ne font pas la somme se lit comme
+       * une panne, alors que le tri faisait exactement son travail.
+       */
+      horsRegion: number;
+      lieuInconnu: number;
       /** Une ligne par source interrogée : « 0 au total » ne dit pas laquelle s'est tue. */
       sources: { id: string; ok: boolean; offres: number; erreur?: string }[];
     }
@@ -77,6 +88,8 @@ export async function lancerVeille(): Promise<ResultatVeilleManuelle> {
     enSursis: nombre(c.enSursis),
     doublons: nombre(c.doublons),
     ecartees: nombre(c.ecartees),
+    horsRegion: nombre(c.horsRegion),
+    lieuInconnu: nombre(c.lieuInconnu),
     sources,
   };
 }

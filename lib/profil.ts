@@ -167,14 +167,23 @@ export const ProfilSchema = z.object({
   plafondNoteCalculee: z.number().int().min(1).max(100),
 
   // ── Ce que la veille cherche ─────────────────────────────────────────────
-  recherches: z.array(z.string().min(1)).max(40),
+  /**
+   * Le bassin de termes interrogés, tiré en rotation.
+   *
+   * ⚠️ CE `max` N'EST PAS LA VRAIE BORNE — c'est un filet anti-absurdité. La borne qui
+   * compte est le COUPLAGE avec `termesParJour` et `SEUIL_ABSENCES_PEREMPTION` : au-delà de
+   * `termesParJour × (seuil − 2)`, un terme met plus longtemps à revenir qu'une offre à se
+   * périmer, et la rotation éteint des offres OUVERTES. C'est `tests/profil.test.ts` qui
+   * l'éprouve, parce qu'un plafond de schéma ne sait rien des deux autres nombres.
+   */
+  recherches: z.array(z.string().min(1)).max(60),
   /**
    * Termes tirés du bassin `recherches` à chaque passe, en rotation.
    *
-   * ⚠️ DÉCLARÉ DANS LE SCHÉMA, SINON ZOD LE SUPPRIME EN SILENCE. `ProfilSchema.parse` strippe
-   * les clés inconnues (comportement Zod par défaut) : un champ posé dans `PROFIL_DEFAUT`
-   * mais absent d'ici n'existerait tout simplement pas à l'exécution, sans la moindre
-   * erreur — et le test qui s'appuie dessus lirait `undefined`.
+   * ⚠️ DÉCLARÉ ICI, SINON ZOD LE SUPPRIME EN SILENCE. `ProfilSchema.parse` strippe les clés
+   * inconnues (comportement Zod par défaut) : un champ posé dans `PROFIL_DEFAUT` mais absent
+   * du schéma n'existerait tout simplement pas à l'exécution, sans la moindre erreur — et le
+   * test qui s'appuie dessus lirait `undefined`.
    */
   termesParJour: z.number().int().min(1).max(40),
 
@@ -248,7 +257,7 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
     horsSujet: 8,
   },
 
-  rayonMaxKm: 50,
+  rayonMaxKm: 75,
   paliersDistanceKm: [
     { max: 5, points: 20 },
     { max: 10, points: 18 },
@@ -353,22 +362,43 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
     "coordonnateur technique",
     "maintenance engineer",
     "production supervisor",
+
+    // ── Élargissement du 2026-08-17 (« tout ») ─────────────────────────────────────
+    // Le tirage passe à 18/jour, ce qui remonte le plafond du bassin à 54 : on s'arrête à
+    // 48 pour garder de la marge avant que le test de couplage ne morde.
+    "ingénieur mécanique",
+    "ingénieur électrique",
+    "chargé de projet construction",
+    "surintendant",
+    "contremaître",
+    "coordonnateur logistique",
+    "responsable technique",
+    "spécialiste automatisation",
+    "process engineer",
+    "mechanical engineer",
+    "operations manager",
+    "industrial engineer",
   ],
 
   /**
    * Termes tirés du bassin à chaque passe.
    *
    * ⚠️ CE NOMBRE ET LA TAILLE DU BASSIN SE COMMANDENT L'UN L'AUTRE. Le bassin est tiré en
-   * rotation : un terme ne revient qu'après `bassin / TERMES_PAR_JOUR` jours, et une offre
-   * qu'il est seul à trouver accumule des absences pendant tout ce temps. Si ce cycle
+   * rotation : un terme ne revient qu'après `bassin / termesParJour` jours, et une offre
+   * qu'il est SEUL à trouver accumule des absences pendant tout ce temps. Si ce cycle
    * dépasse `SEUIL_ABSENCES_PEREMPTION`, la rotation PÉRIME des offres ouvertes — un faux
-   * positif fabriqué par le mécanisme censé les protéger.
+   * positif fabriqué par le mécanisme censé les protéger. D'où le plafond, vérifié par
+   * `tests/profil.test.ts` : agrandir le bassin sans monter le seuil ou le tirage fait
+   * tomber le test.
    *
-   * D'où le plafond, vérifié par `tests/profil.test.ts` : agrandir le bassin sans monter le
-   * seuil (ou le tirage) fait tomber le test. Douze est calé sur le quota Indeed, qui se
-   * referme en s'aggravant — ce n'est pas ce nombre-là qu'on augmente à la légère.
+   * 12 → 18 le 2026-08-17. C'est le plus RISQUÉ des cinq leviers : le refus de quota Indeed
+   * s'aggrave à chaque tentative (mesuré : 14 s, puis 42 s, puis 51 s). Le protocole ordonne
+   * de s'ARRÊTER après trois refus malgré l'attente annoncée — la fenêtre est dépensée, et
+   * aucune patience ne la rend. Si les rapports montrent des refus répétés, c'est ce
+   * nombre-ci qu'on redescend en premier.
    */
-  termesParJour: 12,
+  termesParJour: 18,
+
 
   swot: [
     {

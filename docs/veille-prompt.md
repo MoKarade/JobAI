@@ -229,17 +229,25 @@ Fais la veille JobAI du jour.
    tous chaque jour ferait sauter le quota Indeed, qui se referme en
    s'aggravant. C'est un BASSIN, pas une liste à épuiser.
 
-   Prends DOUZE termes par jour, en TOURNANT : départ = (jour du mois × 12)
-   modulo la longueur de la liste, puis douze à la suite en repartant au
-   début quand tu atteins la fin. Déterministe, sans état à garder, et la
-   couverture fait le tour du bassin en trois jours au lieu de refaire les
-   huit mêmes recherches à l'infini.
+   Prends `PROFIL_DEFAUT.termesParJour` termes par jour (DIX-HUIT depuis le
+   2026-08-17), en TOURNANT : départ = (jour du mois × ce nombre) modulo la
+   longueur du bassin, puis autant à la suite en repartant au début quand tu
+   atteins la fin. Déterministe, sans état à garder, et la couverture fait le
+   tour du bassin de 48 termes en trois jours.
+
+   ⚠️ SI LE QUOTA INDEED REFUSE TROIS FOIS MALGRÉ L'ATTENTE ANNONCÉE, ARRÊTE.
+   La fenêtre est dépensée et aucune patience ne la rend (mesuré : neuf essais
+   espacés, zéro succès, le délai annoncé oscillant sans jamais s'éteindre).
+   Dis-le dans le rapport : c'est ce nombre-là qu'on redescendra en premier.
 
    ⚠️ DIS DANS TON RAPPORT quels termes tu as tirés. Sans ça, « 100 offres
    trouvées » ne se compare pas d'un jour à l'autre — deux tirages différents
    ne mesurent pas la même chose.
 
-   Indeed : location "Québec, QC", country_code "CA". Ne double PAS par ville —
+   Indeed : location "Québec, QC", country_code "CA". Le rayon retenu par
+   l'app est passé à 75 km le 2026-08-17 (Beauce, Lotbinière, Portneuf ouest,
+   Charlevoix, Bellechasse) : ne rejette plus une offre de ces secteurs, c'est
+   `estDansLaRegion` qui tranche, pas toi. Ne double PAS par ville —
    mesuré, le lieu n'a aucun effet sur ce connecteur, c'est le terme qui
    discrimine. Douze appels, pas vingt-quatre.
 

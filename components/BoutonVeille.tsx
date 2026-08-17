@@ -33,9 +33,19 @@ export function BoutonVeille() {
             // confondrait. Le détail PAR SOURCE est ce qui manquait le plus — un total de
             // zéro ne dit pas laquelle des sources s'est tue.
             const muettes = r.sources.filter((s) => !s.ok);
+            // ⚠️ LE COMPTE DOIT S'ADDITIONNER. Sans « hors région » ni « lieu inconnu »,
+            // 74 offres sur 100 disparaissaient de l'écran sans motif — un total dont les
+            // parties ne font pas la somme se lit comme une panne, alors que le tri
+            // travaillait très bien. Le reliquat est affiché explicitement : s'il n'est pas
+            // nul, c'est qu'un motif de rejet nous échappe encore, et il faut le voir.
+            const explique =
+              r.nouvelles + r.doublons + r.ecartees + r.horsRegion + r.lieuInconnu;
+            const reste = r.trouvees - explique;
             setMessage(
               `${r.trouvees} trouvée(s) · ${r.nouvelles} nouvelle(s) · ` +
                 `${r.doublons} déjà connue(s) · ${r.ecartees} sous le plancher · ` +
+                `${r.horsRegion} hors région · ${r.lieuInconnu} lieu inconnu · ` +
+                (reste !== 0 ? `${reste} SANS MOTIF · ` : "") +
                 `${r.perimees} périmée(s) · ${r.enSursis} en sursis. ` +
                 `Sources : ${
                   r.sources.length === 0

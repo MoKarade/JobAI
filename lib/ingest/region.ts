@@ -47,6 +47,30 @@ const MUNICIPALITES = [
   "saint-joseph-de-beauce", "l'ange-gardien", "ange-gardien", "sainte-petronille",
   "saint-pierre-de-l'ile-d'orleans", "saint-laurent-de-l'ile-d'orleans", "montmagny",
   "berthier-sur-mer", "cap-saint-ignace", "saint-vallier", "saint-michel-de-bellechasse",
+
+  // ── Élargissement du 2026-08-17, avec le rayon 50 → 75 km ────────────────────────────
+  // Ces municipalités étaient DÉJÀ dans le rayon nominal une fois celui-ci porté à 75 km,
+  // mais absentes de la liste — donc leurs offres étaient refusées « hors région » alors
+  // qu'elles sont plus proches que Montmagny, qui y figurait. Le rayon et la liste doivent
+  // décrire la MÊME aire : quand l'un bouge, l'autre le suit dans le même commit, sinon le
+  // plus restrictif des deux gagne en silence et l'élargissement ne sert à rien.
+  // Beauce (axe 73 sud) :
+  "sainte-marie-de-beauce", "saint-elzear-de-beauce", "saint-severin", "tring-jonction",
+  "saint-frederic", "saint-victor", "beauceville", "saint-odilon", "saint-jules",
+  // Lotbinière et Bécancour (rive sud, axe 20 ouest) :
+  "lotbiniere", "sainte-croix", "leclercville", "dosquet", "saint-flavien",
+  "val-alain", "saint-janvier-de-joly", "saint-edouard-de-lotbiniere",
+  // Portneuf (axe 40 ouest) :
+  "saint-basile", "saint-marc-des-carrieres", "deschambault", "grondines",
+  "saint-alban", "saint-casimir", "riviere-a-pierre", "saint-ubalde",
+  // Charlevoix et côte de Beaupré (axe 138 est) :
+  "saint-ferreol-les-neiges", "saint-tite-des-caps", "baie-saint-paul",
+  "petite-riviere-saint-francois", "saint-joachim",
+  // Bellechasse et Montmagny (axe 20 est) :
+  "saint-jean-port-joli", "l'islet", "saint-paul-de-montminy", "buckland",
+  "saint-nerée", "saint-lazare-de-bellechasse", "sainte-justine",
+  // Jacques-Cartier nord :
+  "saint-gabriel-de-valcartier", "tewkesbury", "sainte-christine",
 ] as const;
 
 /**
