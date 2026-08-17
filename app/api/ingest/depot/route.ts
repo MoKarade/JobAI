@@ -214,7 +214,11 @@ export async function POST(requete: Request) {
         titres: tri.retenues.map((o) => `${o.score} — ${o.entreprise} — ${o.poste}`),
         // Chaque refus NOMMÉ avec son motif : un compte seul ne se vérifie pas, et il
         // faut pouvoir constater que le filtre n'a pas jeté la meilleure offre du jour.
-        refusees: tri.refusees.map((r) => `${r.motif} — ${r.entreprise} — ${r.titre}`),
+        // La VILLE en fait partie : c'est le champ qui décide des deux motifs
+        // géographiques, et son absence rendait « lieu-inconnu » invérifiable.
+        refusees: tri.refusees.map(
+          (r) => `${r.motif} — ${r.entreprise} — ${r.titre} — ${r.ville || "(sans ville)"}`,
+        ),
       },
       { headers: { "Cache-Control": "no-store" } },
     );

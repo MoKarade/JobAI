@@ -10,8 +10,14 @@
 import { useState, useTransition } from "react";
 import { lancerVeille } from "@/lib/actionsVeille";
 
+/** Combien de villes distinctes on affiche par motif avant de dire « et N autres ». */
+const MAX_VILLES_AFFICHEES = 12;
+
 export function BoutonVeille() {
   const [message, setMessage] = useState<string | null>(null);
+  const [lieux, setLieux] = useState<{ motif: string; villes: { ville: string; n: number }[] }[]>(
+    [],
+  );
   const [enCours, demarrer] = useTransition();
 
   return (
@@ -22,6 +28,7 @@ export function BoutonVeille() {
         disabled={enCours}
         onClick={() => {
           setMessage(null);
+          setLieux([]);
           demarrer(async () => {
             const r = await lancerVeille();
             if (!r.ok) {
@@ -54,6 +61,14 @@ export function BoutonVeille() {
                 }` +
                 (muettes.length > 0 ? ` — ${muettes.map((s) => s.erreur ?? "?").join(" · ")}` : ""),
             );
+            setLieux([
+              ...(r.villesInconnues.length > 0
+                ? [{ motif: "Lieu inconnu", villes: r.villesInconnues }]
+                : []),
+              ...(r.villesHorsRegion.length > 0
+                ? [{ motif: "Hors région", villes: r.villesHorsRegion }]
+                : []),
+            ]);
           });
         }}
       >
@@ -63,6 +78,24 @@ export function BoutonVeille() {
       <p className="veille__message" role="status">
         {enCours ? "Veille en cours — sources, tri, péremption, distances." : message}
       </p>
+
+      {/*
+        LES VILLES REFUSÉES, NOMMÉES. « 47 lieu inconnu » ne se vérifie pas : il faut voir
+        les chaînes que les sources ont écrites pour savoir si le filtre a bien travaillé
+        ou s'il vient de jeter quarante-sept offres de la région sous un nom qu'il ignore.
+      */}
+      {lieux.map((groupe) => (
+        <p key={groupe.motif} className="veille__note">
+          {groupe.motif} —{" "}
+          {groupe.villes
+            .slice(0, MAX_VILLES_AFFICHEES)
+            .map((v) => `${v.ville} (${v.n})`)
+            .join(" · ")}
+          {groupe.villes.length > MAX_VILLES_AFFICHEES
+            ? ` · et ${groupe.villes.length - MAX_VILLES_AFFICHEES} autre(s)`
+            : ""}
+        </p>
+      ))}
 
       <p className="veille__note">
         Relançable autant de fois que tu veux : une offre absente n’est comptée absente

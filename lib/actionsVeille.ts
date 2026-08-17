@@ -39,6 +39,16 @@ export type ResultatVeilleManuelle =
        */
       horsRegion: number;
       lieuInconnu: number;
+      /**
+       * LES VILLES DERRIÈRE LES DEUX MOTIFS GÉOGRAPHIQUES, groupées et comptées.
+       *
+       * Le compte rendu du 2026-08-17 disait « 47 lieu inconnu » : un nombre sur lequel on
+       * ne peut rien décider. Selon que ces quarante-sept portent « Remote » ou des
+       * municipalités québécoises que la liste blanche ignore, le correctif est opposé —
+       * et rien à l'écran ne permettait de le savoir. Un motif se nomme AVEC son objet.
+       */
+      villesInconnues: { ville: string; n: number }[];
+      villesHorsRegion: { ville: string; n: number }[];
       /** Une ligne par source interrogée : « 0 au total » ne dit pas laquelle s'est tue. */
       sources: { id: string; ok: boolean; offres: number; erreur?: string }[];
     }
@@ -77,6 +87,12 @@ export async function lancerVeille(): Promise<ResultatVeilleManuelle> {
   const sources = Array.isArray(c.sources)
     ? (c.sources as { id: string; ok: boolean; offres: number; erreur?: string }[])
     : [];
+  // Même prudence que pour `sources` : un champ absent d'un `Record<string, unknown>` ne
+  // lève pas, il vaut `undefined` — et un `[]` par défaut le déguiserait en « aucune ville
+  // refusée », c'est-à-dire en bonne nouvelle. Ici l'absence est indiscernable du vide, on
+  // l'assume, mais elle ne doit surtout pas provoquer un plantage de rendu.
+  const villes = (v: unknown): { ville: string; n: number }[] =>
+    Array.isArray(v) ? (v as { ville: string; n: number }[]) : [];
 
   revalidatePath("/");
   revalidatePath("/sources");
@@ -90,6 +106,8 @@ export async function lancerVeille(): Promise<ResultatVeilleManuelle> {
     ecartees: nombre(c.ecartees),
     horsRegion: nombre(c.horsRegion),
     lieuInconnu: nombre(c.lieuInconnu),
+    villesInconnues: villes(c.villesInconnues),
+    villesHorsRegion: villes(c.villesHorsRegion),
     sources,
   };
 }

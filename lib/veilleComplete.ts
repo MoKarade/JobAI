@@ -33,6 +33,7 @@ import { EPOQUE_A_RETENTER } from "./travaux";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "./synchro";
 import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
 import { executerPasse } from "./ingest/passe";
+import { villesRefusees } from "./ingest/pipeline";
 import { recuperer } from "./ingest/sources";
 import type { AtsEntreprise } from "./ingest/types";
 import { MAX_ESSAIS_PAR_PASSE, BUDGET_DECOUVERTE_MS } from "./ingest/decouverteAts";
@@ -167,6 +168,24 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
         ` en-sursis=${rapport.enSursis} sources=${rapport.sources.length}`,
     );
 
+    // ⚠️ LE MOTIF SANS SON OBJET NE DIAGNOSTIQUE RIEN. « lieu-inconnu=47 » a été lu par Marc
+    // le 2026-08-17 et n'a mené nulle part : impossible de dire si `situer()` venait de jeter
+    // quarante-sept annonces « Remote » (rien à corriger) ou quarante-sept municipalités
+    // québécoises absentes de la liste blanche (tout à corriger). Les deux hypothèses
+    // appellent des remèdes opposés, et le compte seul ne permet pas de choisir.
+    //
+    // Les villes sont donc NOMMÉES, groupées et triées : une ligne suffit à trancher.
+    const inconnues = villesRefusees(rapport.tri.refusees, "lieu-inconnu");
+    const horsRegion = villesRefusees(rapport.tri.refusees, "hors-region");
+    if (inconnues.length > 0 || horsRegion.length > 0) {
+      const rendre = (l: { ville: string; n: number }[]) =>
+        l.map((v) => `${v.ville}×${v.n}`).join(" · ");
+      console.log(
+        `[veille] lieux refusés — inconnus : ${rendre(inconnues) || "aucun"}` +
+          ` — hors région : ${rendre(horsRegion) || "aucun"}`,
+      );
+    }
+
     // DÉCOUVRIR DES PAGES CARRIÈRES — ce qui remplit `veille-ats`, vide depuis toujours.
     //
     // ⚠️ ENVELOPPÉE, ET APRÈS LE FLUX VIVANT. Deux règles de la §7 se rencontrent ici :
@@ -258,6 +277,12 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
         ecartees: rapport.tri.souslePlancher,
         horsRegion: rapport.tri.horsRegion,
         lieuInconnu: rapport.tri.lieuInconnu,
+        // Les villes derrière les deux motifs géographiques, pour que le compte rendu à
+        // l'écran nomme ce qu'il refuse au lieu de le compter. Envoyées entières : il y a
+        // au plus quelques dizaines de chaînes distinctes, et c'est l'interface qui décide
+        // de ce qu'elle affiche — en disant combien elle laisse de côté.
+        villesInconnues: inconnues,
+        villesHorsRegion: horsRegion,
         doublons: rapport.tri.doublons,
         villesCompletees: rapport.villesACompleter.length,
         // Ce que la passe de localisation a fait — compté et dit : une carte qui ne se

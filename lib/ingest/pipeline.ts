@@ -11,7 +11,7 @@
 //      explication est pire qu'une liste longue.
 
 import { computeScore } from "../scoring";
-import { situer } from "./region";
+import { normaliserLieu, situer } from "./region";
 import type { Offre } from "../types";
 import type { OffreBrute } from "./types";
 
@@ -53,8 +53,45 @@ export interface Tri {
    * travaillé ou s'il vient de jeter la meilleure offre du jour. Le déposant l'a signalé
    * dès le premier vrai lot — il ne pouvait pas dire laquelle était dans quelle catégorie.
    * Chaque refus porte donc son motif, et le compte reste pour la lecture rapide.
+   *
+   * ⚠️ `ville` AJOUTÉE LE 2026-08-17, ET C'EST LE MOTIF QUI L'EXIGEAIT DEPUIS LE DÉBUT.
+   *
+   * Le compte rendu du jour disait « 47 lieu inconnu » — quarante-sept offres jetées parce
+   * que `situer()` ne reconnaît pas leur ville, sans qu'aucune trace ne dise LAQUELLE. Or
+   * c'est exactement l'information qui décide de la suite : quarante-sept fois « Remote »
+   * appelle un traitement, quarante-sept municipalités québécoises absentes de la liste
+   * blanche en appellent un autre, et rien ne permettait de trancher. Le motif était nommé,
+   * son OBJET ne l'était pas — la règle « compter un refus ne suffit pas, il faut le
+   * NOMMER » n'était donc tenue qu'à moitié pour le seul motif qui porte sur un champ.
    */
-  refusees: { entreprise: string; titre: string; motif: MotifRefus }[];
+  refusees: { entreprise: string; titre: string; ville: string; motif: MotifRefus }[];
+}
+
+/**
+ * Les villes refusées sous un motif donné, avec leur nombre, de la plus fréquente à la
+ * moins fréquente.
+ *
+ * PURE. Elle existe parce qu'une liste de quarante-sept lignes ne se lit pas, alors que
+ * « quebec city 31 · remote 9 · saguenay 4 » se lit en une seconde et DÉSIGNE le correctif.
+ * Regrouper sur la forme NORMALISÉE (celle que `situer` compare) et non sur la chaîne
+ * brute : « Québec » et « Quebec, QC » sont le même problème, et les compter à part ferait
+ * croire à deux cas rares là où il y en a un gros.
+ */
+export function villesRefusees(
+  refusees: Tri["refusees"],
+  motif: MotifRefus,
+): { ville: string; n: number }[] {
+  const par = new Map<string, number>();
+  for (const r of refusees) {
+    if (r.motif !== motif) continue;
+    // Une ville vide est une information : la source n'a rien dit. La nommer « (vide) »
+    // vaut mieux que de la fondre dans les autres — le remède n'est pas le même.
+    const cle = normaliserLieu(r.ville) || "(vide)";
+    par.set(cle, (par.get(cle) ?? 0) + 1);
+  }
+  return [...par.entries()]
+    .map(([ville, n]) => ({ ville, n }))
+    .sort((a, b) => b.n - a.n || a.ville.localeCompare(b.ville));
 }
 
 /** Pourquoi une offre n'est pas entrée. */
@@ -192,7 +229,7 @@ export function trier(
 
     if (vues.has(cle) || vues.has(canon) || dejaSuivies.has(cle) || dejaSuivies.has(canon)) {
       doublons++;
-      refusees.push({ entreprise, titre: brute.titre, motif: "doublon" });
+      refusees.push({ entreprise, titre: brute.titre, ville: brute.ville, motif: "doublon" });
       continue;
     }
     vues.add(cle);
@@ -206,12 +243,12 @@ export function trier(
     const lieu = situer(brute.ville, brute.description);
     if (lieu === "hors-region") {
       horsRegion++;
-      refusees.push({ entreprise, titre: brute.titre, motif: "hors-region" });
+      refusees.push({ entreprise, titre: brute.titre, ville: brute.ville, motif: "hors-region" });
       continue;
     }
     if (lieu === "lieu-inconnu") {
       lieuInconnu++;
-      refusees.push({ entreprise, titre: brute.titre, motif: "lieu-inconnu" });
+      refusees.push({ entreprise, titre: brute.titre, ville: brute.ville, motif: "lieu-inconnu" });
       continue;
     }
 
@@ -220,7 +257,12 @@ export function trier(
     const note = computeScore({ titre: brute.titre, description: brute.description, km: null });
     if (note.parts.fitRole < FIT_ROLE_PLANCHER) {
       souslePlancher++;
-      refusees.push({ entreprise, titre: brute.titre, motif: "sous-le-plancher" });
+      refusees.push({
+        entreprise,
+        titre: brute.titre,
+        ville: brute.ville,
+        motif: "sous-le-plancher",
+      });
       continue;
     }
 

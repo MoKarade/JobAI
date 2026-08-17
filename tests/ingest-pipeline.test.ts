@@ -12,6 +12,7 @@ import { cleCanonique, idsStockesVus,
   villeDepuisRaisons,
   villesACompleter,
   villesARattraper,
+  villesRefusees,
 } from "../lib/ingest/pipeline";
 import { OffreSchema, type Offre } from "../lib/types";
 import { SEED } from "../lib/seed";
@@ -218,6 +219,66 @@ describe("ce qui est écarté est NOMMÉ, pas seulement compté", () => {
     expect(compte("lieu-inconnu")).toBe(r.lieuInconnu);
     expect(compte("doublon")).toBe(r.doublons);
     expect(r.refusees.length + r.retenues.length).toBe(4);
+  });
+
+  it("chaque refus porte AUSSI la ville — sans elle, « lieu inconnu » est invérifiable", () => {
+    // Le compte rendu du 2026-08-17 disait « 47 lieu inconnu » et rien d'autre. On ne
+    // pouvait pas savoir si le filtre avait jeté quarante-sept annonces « Remote » ou
+    // quarante-sept municipalités québécoises absentes de la liste blanche — deux
+    // situations qui appellent des remèdes opposés. Le motif était nommé, son OBJET non.
+    const r = trier(
+      [
+        brute({ entreprise: "Ailleurs inc.", ville: "Toronto, ON" }),
+        brute({ entreprise: "Nulle part", ville: "Baie-Comeau" }),
+      ],
+      new Set(),
+      "2026-07-31",
+    );
+    const parEntreprise = Object.fromEntries(r.refusees.map((x) => [x.entreprise, x.ville]));
+    expect(parEntreprise["Ailleurs inc."]).toBe("Toronto, ON");
+    expect(parEntreprise["Nulle part"]).toBe("Baie-Comeau");
+  });
+});
+
+describe("villesRefusees — le motif nommé AVEC son objet", () => {
+  it("groupe sur la forme normalisée et trie du plus fréquent au moins fréquent", () => {
+    // « Baie-Comeau » et « BAIE-COMEAU » sont le même problème : la casse et les accents
+    // ne doivent pas fabriquer deux cas rares là où il y en a un gros, sinon la ligne
+    // désigne le mauvais remède. En revanche « Baie-Comeau, QC » reste une entrée
+    // DISTINCTE — `normaliserLieu` ne retire pas le suffixe de province, et lui faire
+    // deviner ce qu'est un suffixe serait refaire le pari de liste blanche qu'on cherche
+    // justement à mesurer. Deux lignes proches valent mieux qu'un regroupement supposé.
+    const r = trier(
+      [
+        brute({ entreprise: "A", ville: "Baie-Comeau" }),
+        brute({ entreprise: "B", ville: "BAIE-COMEAU" }),
+        brute({ entreprise: "C", ville: "Baie-Comeau, QC" }),
+        brute({ entreprise: "D", ville: "Amos" }),
+      ],
+      new Set(),
+      "2026-07-31",
+    );
+
+    expect(villesRefusees(r.refusees, "lieu-inconnu")).toEqual([
+      { ville: "baie-comeau", n: 2 },
+      { ville: "amos", n: 1 },
+      { ville: "baie-comeau qc", n: 1 },
+    ]);
+  });
+
+  it("ne mélange pas les motifs, et nomme l'absence de ville", () => {
+    const r = trier(
+      [
+        brute({ entreprise: "A", ville: "Toronto" }),
+        brute({ entreprise: "B", ville: "" }),
+      ],
+      new Set(),
+      "2026-07-31",
+    );
+    expect(villesRefusees(r.refusees, "hors-region")).toEqual([{ ville: "toronto", n: 1 }]);
+    // Une ville vide dit « la source n'a rien écrit » — le remède n'est pas le même
+    // qu'une ville écrite mais inconnue, donc elle ne se fond pas dans les autres.
+    expect(villesRefusees(r.refusees, "lieu-inconnu")).toEqual([{ ville: "(vide)", n: 1 }]);
   });
 });
 
