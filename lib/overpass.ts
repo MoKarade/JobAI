@@ -38,17 +38,23 @@ export const INSTANCES_OVERPASS: readonly string[] = [
 /**
  * Au-delà, on abandonne : une requête qui pend bloquerait toute la passe.
  *
- * ⚠️ 5 s, pas 15 : ce délai est payé PAR INSTANCE, et il y en a trois en repli — une seule
- * entreprise pouvait donc consommer 45 s. Le travail de fond d'une page dispose de 35 s en
- * tout (`BUDGET_PASSE_PAGE_MS`) : à 15 s, une entreprise injoignable mangeait le budget de
- * toutes les autres, et la page se faisait tuer avant d'écrire la moindre trace — mesuré en
- * production. 8 s laisse de la marge sans prendre le budget en otage.
+ * ⚠️ CE DÉLAI N'EST PLUS PAYÉ PAR INSTANCE (2026-08-17). Les trois instances sont désormais
+ * interrogées EN PARALLÈLE : le pire cas d'une passe est donc UN délai, pas trois. C'est ce
+ * qui permet de le rendre patient sans reprendre le budget en otage — 15 s en parallèle
+ * coûtent moins que les 24 s que la série pouvait consommer.
+ *
+ * ⚠️ ET IL DOIT EXCÉDER `DELAI_SERVEUR_S` DE PLUS D'UNE SECONDE. C'est le défaut qui a gelé
+ * la mesure du 15 au 17 août : le client abandonnait à 8 s pendant que le serveur avait
+ * droit à 7 — une seconde pour la connexion, le transfert, ET la file d'attente. Or les
+ * instances publiques Overpass FONT LA QUEUE, et `[timeout:N]` ne gouverne que l'exécution,
+ * jamais l'attente. Sous charge, les trois expiraient identiquement (« aborted due to
+ * timeout » ×2, « fetch failed » ×1) alors que la même requête rendait 68 bornes le 14.
  *
  * La boîte interrogée couvre TOUTE la région (une seule requête pour le lot entier, voir
  * `boiteEnglobante`), mais `amenity=charging_station` est un jeu minuscule : Overpass le
  * sert par son index spatial, et l'étendue pèse beaucoup moins que le nombre de requêtes.
  */
-export const DELAI_MAX_MS = 8_000;
+export const DELAI_MAX_MS = 15_000;
 
 /**
  * Le rayon d'une requête RÉGIONALE, en degrés de latitude approximatifs.
@@ -88,7 +94,7 @@ export type ResultatBornes =
  * le travail déjà fait par la première était jeté. Donner à un service plus de temps qu'on
  * n'est prêt à en attendre, c'est se garantir des échecs qui n'en sont pas.
  */
-export const DELAI_SERVEUR_S = 7;
+export const DELAI_SERVEUR_S = 12;
 
 export function requeteBornes(boite: {
   latMin: number;
@@ -320,41 +326,62 @@ export async function chercherBornesBoite(
   const corps = requeteBornes(boite);
   const echecs: string[] = [];
 
-  for (const url of instances) {
-    try {
-      const r = await recuperer(url, {
-        method: "POST",
-        body: new URLSearchParams({ data: corps }),
-        headers: {
-          // Se présenter : Overpass refuse les appelants anonymes trop insistants, et
-          // c'est la moindre des politesses envers un service bénévole.
-          "User-Agent": "JobAI/1.0 (recherche d'emploi personnelle)",
-          Accept: "application/json",
-        },
-        signal: AbortSignal.timeout(DELAI_MAX_MS),
-      });
+  // ⚠️ EN PARALLÈLE, PAS EN SÉRIE — et c'est ce qui change tout sous charge.
+  //
+  // En série, une instance saturée coûtait son délai entier AVANT qu'on essaie la suivante :
+  // trois échecs faisaient 24 s et ne rendaient rien. En parallèle, le pire cas est UN délai,
+  // ce qui permet de le rendre patient (15 s) au lieu de le rogner.
+  //
+  // C'est aussi PLUS POLI qu'il n'y paraît : dès qu'une instance répond, les autres sont
+  // ABANDONNÉES (`ctrl.abort()`), donc elles cessent de calculer pour rien. Une retente en
+  // série, elle, laissait la première instance terminer notre requête sans que personne ne
+  // lise sa réponse. Une petite requête par instance et par jour reste négligeable pour un
+  // service bénévole ; la gâcher ne l'était pas.
+  const ctrl = new AbortController();
+  const minuteur = setTimeout(() => ctrl.abort(), DELAI_MAX_MS);
 
-      if (!r.ok) {
-        // 504 mesuré en vrai : l'instance est saturée, pas en panne. On passe à la
-        // suivante plutôt que d'abandonner.
-        echecs.push(`${hote(url)} → HTTP ${r.status}`);
-        continue;
-      }
+  const tentatives = instances.map(async (url) => {
+    const r = await recuperer(url, {
+      method: "POST",
+      body: new URLSearchParams({ data: corps }),
+      headers: {
+        // Se présenter : Overpass refuse les appelants anonymes trop insistants, et
+        // c'est la moindre des politesses envers un service bénévole.
+        "User-Agent": "JobAI/1.0 (recherche d'emploi personnelle)",
+        Accept: "application/json",
+      },
+      signal: ctrl.signal,
+    });
 
-      const charge = await r.json();
+    // 504 mesuré en vrai : l'instance est saturée, pas en panne. Rejeter ici laisse la
+    // course continuer avec les autres, au lieu d'emporter tout le lot.
+    if (!r.ok) throw new Error(`${hote(url)} → HTTP ${r.status}`);
 
-      // Le corps DIT quand le service a renoncé, même sous un 200. Le confondre avec
-      // « aucune borne » gèlerait la mesure de tout le lot (voir `remarqueOverpass`).
-      const remarque = remarqueOverpass(charge);
-      if (remarque !== null) {
-        echecs.push(`${hote(url)} → ${remarque}`);
-        continue;
-      }
+    const charge = await r.json();
 
-      return { ok: true, bornes: lireBornes(charge) };
-    } catch (err) {
-      echecs.push(`${hote(url)} → ${err instanceof Error ? err.message : String(err)}`);
-    }
+    // Le corps DIT quand le service a renoncé, même sous un 200. Le confondre avec
+    // « aucune borne » gèlerait la mesure de tout le lot (voir `remarqueOverpass`).
+    const remarque = remarqueOverpass(charge);
+    if (remarque !== null) throw new Error(`${hote(url)} → ${remarque}`);
+
+    return lireBornes(charge);
+  });
+
+  try {
+    const bornes = await Promise.any(tentatives);
+    return { ok: true, bornes };
+  } catch (err) {
+    // `Promise.any` ne rejette que si TOUTES ont échoué : on rend alors chaque motif, parce
+    // que « saturé », « injoignable » et « a renoncé » appellent trois lectures différentes.
+    const causes =
+      err instanceof AggregateError
+        ? err.errors.map((e) => (e instanceof Error ? e.message : String(e)))
+        : [err instanceof Error ? err.message : String(err)];
+    echecs.push(...causes);
+  } finally {
+    // Libère les perdantes dans TOUS les cas — succès comme échec.
+    clearTimeout(minuteur);
+    ctrl.abort();
   }
 
   return { ok: false, raison: echecs.join(" · ") || "aucune instance interrogée" };
