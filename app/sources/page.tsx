@@ -127,6 +127,18 @@ export default async function Sources() {
       </section>
 
       <section className="cadre-section">
+        <h2 className="cadre-section__titre">Sonder le Guichet-Emplois</h2>
+        <p className="intro-section">
+          Quelle adresse répond vraiment ? La question a reçu trois réponses le 17 août,
+          aucune mesurée — chacune lue dans un titre de résultat de recherche. Cette sonde la
+          pose depuis la production, en lecture seule : rien n’est ingéré, rien n’est écrit.
+          Elle rapporte pour chaque adresse le code, l’URL réellement servie et un aperçu du
+          contenu.
+        </p>
+        <SondeGuichet terme={RECHERCHES_GUICHET_CANDIDATES[0] ?? "automatisation"} />
+      </section>
+
+      <section className="cadre-section">
         <h2 className="cadre-section__titre">Chercher des pages carrières</h2>
         <DecouverteAts
           faitesInitial={etat.faites}
