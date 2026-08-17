@@ -348,7 +348,14 @@ export async function executerDecouverte(
     jeton: string,
     entreprise: string,
   ) => Promise<{ verdict: "confirme" | "refute" | "indecis" | "absent"; raison?: string }>,
-  jeton: (nom: string) => string,
+  /**
+   * ⚠️ LE JETON DÉPEND AUSSI DE LA FAMILLE, pas seulement du nom. Une même entreprise peut
+   * être inscrite sous des identifiants différents selon le service — et surtout, le jeton
+   * OBSERVÉ ne se déduit pas du nom : `Chantier Davie` est `ChantierDavieCanada` chez
+   * SmartRecruiters. Une signature qui ne prend que le nom force l'appelant à deviner, ce
+   * qui est exactement ce qu'on a arrêté de faire.
+   */
+  jeton: (nom: string, famille: FamilleAts) => string,
   budgetMs: number = BUDGET_DECOUVERTE_MS,
   maintenant: () => number = Date.now,
 ): Promise<{ ats: AtsEntreprise[]; essais: EssaiAts[]; compte: CompteDecouverte }> {
@@ -368,7 +375,7 @@ export async function executerDecouverte(
         // Le budget se vérifie AVANT de lancer, jamais après : une fois la requête partie,
         // on paie son délai quoi qu'il arrive.
         if (maintenant() >= echeance) break;
-        const r = await verifier(famille, jeton(essai.entreprise), essai.entreprise);
+        const r = await verifier(famille, jeton(essai.entreprise, famille), essai.entreprise);
         sortie.push({ essai, verdict: r.verdict, raison: r.raison });
       }
       return sortie;
@@ -395,7 +402,7 @@ export async function executerDecouverte(
       ats.push({
         entreprise: essai.entreprise,
         famille: essai.famille,
-        jeton: jeton(essai.entreprise),
+        jeton: jeton(essai.entreprise, essai.famille),
       });
     } else if (v === "refute") compte.refutees += 1;
     else if (v === "indecis") compte.indecis += 1;

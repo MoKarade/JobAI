@@ -45,10 +45,31 @@ export interface CandidatAts {
 }
 
 /**
- * Les candidats vérifiés.
+ * Les candidats observés — recherche du 2026-08-17, 36 cibles passées en revue.
  *
- * VIDE — et ce vide est un RÉSULTAT, pas un travail en attente. Voir l'en-tête : la
- * recherche a montré que les cibles publient hors de ces cinq services. Remplir cette liste
- * demande une observation par entreprise, pas une règle de nommage.
+ * ⚠️ DEUX SUR TRENTE-SIX, ET C'EST LA MESURE QUI COMPTE. Greenhouse, Lever, Recruitee et
+ * Workable : AUCUNE cible. SmartRecruiters : deux. Le reste publie sur son propre portail
+ * (canam.com, robotiq.com, laserax.com, jobsearch.alstom.com, jobs.domtar.com,
+ * careers.honeywell.com), sur Workday (Labatt, via AB InBev) ou passe par Jobillico.
+ *
+ * ⚠️ ET LE JETON NE SE DÉDUIT PAS DU NOM — c'est la seconde leçon, plus importante que la
+ * première. `jetonProbable("Chantier Davie")` donne `chantierdavie` ; le vrai identifiant
+ * est `ChantierDavieCanada`. Deviner aurait manqué cette page carrières alors qu'elle
+ * existe, et l'aurait inscrite « absente » pour quatorze jours. À l'inverse `dexterra` se
+ * devinait — donc la devinette n'était pas sans espoir, seulement sans FIABILITÉ : elle
+ * rate les vraies et ne le dit pas. Une observation ne rate pas.
  */
-export const CANDIDATS_ATS: readonly CandidatAts[] = [];
+export const CANDIDATS_ATS: readonly CandidatAts[] = [
+  {
+    entreprise: "Chantier Davie",
+    famille: "smartrecruiters",
+    jeton: "ChantierDavieCanada",
+    source: "careers.smartrecruiters.com/ChantierDavieCanada/frcbleu (recherche 2026-08-17)",
+  },
+  {
+    entreprise: "Dexterra",
+    famille: "smartrecruiters",
+    jeton: "dexterra",
+    source: "careers.smartrecruiters.com/dexterra (recherche 2026-08-17)",
+  },
+];

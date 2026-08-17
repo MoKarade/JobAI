@@ -13,28 +13,39 @@
 import { describe, it, expect } from "vitest";
 import { progression } from "@/lib/decouverte";
 import { CANDIDATS_ATS } from "@/lib/ingest/atsCandidats";
+import { jetonProbable } from "@/lib/ingest/sources";
 import { FAMILLES_ATS } from "@/lib/ingest/types";
 
 type Paire = { entreprise: string; famille: string };
 const p = (entreprise: string, famille = "greenhouse"): Paire => ({ entreprise, famille });
 
 describe("la liste des candidats", () => {
-  // ⚠️ CE TEST DIT UN RÉSULTAT, PAS UN TRAVAIL EN ATTENTE. La recherche du 2026-08-17 a
-  // montré que les cibles publient sur leur propre site (canam.com/offres-demplois,
-  // robotiq.com/about/careers, laserax.com/careers), pas sur ces cinq services. Tant que la
-  // liste est vide, la découverte ne tente RIEN — mieux vaut un canal qui dit « rien à
-  // essayer » qu'un canal qui brûle des requêtes pour rapporter des échecs.
-  it("est vide tant qu'aucune page carrières n'a été OBSERVÉE", () => {
-    expect(CANDIDATS_ATS).toEqual([]);
-  });
-
-  // Le jour où on la remplira : une entrée sans provenance n'est pas vérifiable, et c'est
-  // précisément ce qui a manqué au premier jet (des identifiants devinés depuis le nom).
-  it("exige une provenance sur chaque entrée", () => {
+  // Une entrée sans provenance n'est pas vérifiable — c'est précisément ce qui manquait au
+  // premier jet, où les identifiants étaient devinés depuis le nom.
+  it("exige une provenance et une famille connue sur chaque entrée", () => {
     for (const c of CANDIDATS_ATS) {
-      expect(c.source.trim()).not.toBe("");
+      expect(c.source.trim(), `provenance manquante pour ${c.entreprise}`).not.toBe("");
+      expect(c.jeton.trim(), `jeton vide pour ${c.entreprise}`).not.toBe("");
       expect(FAMILLES_ATS).toContain(c.famille);
     }
+  });
+
+  // Deux entrées pour la même paire se contrediraient sur le jeton, et laquelle gagne
+  // dépendrait de l'ordre du tableau — c'est-à-dire du hasard.
+  it("ne contient jamais deux fois la même paire", () => {
+    const cles = CANDIDATS_ATS.map((c) => `${c.entreprise.toLowerCase()}|${c.famille}`);
+    expect(new Set(cles).size).toBe(cles.length);
+  });
+
+  // ⚠️ LE VERROU DE LA LEÇON. `jetonProbable("Chantier Davie")` rend `chantierdavie` alors
+  // que l'identifiant réel est `ChantierDavieCanada` : si un jour quelqu'un « simplifiait »
+  // en repassant par la devinette, ce test tombe. Il ne dit pas que tous les jetons
+  // diffèrent du nom normalisé — seulement qu'AU MOINS UN le fait, ce qui suffit à prouver
+  // que la liste porte des observations et non des suppositions.
+  it("porte au moins un jeton que la devinette n'aurait pas trouvé", () => {
+    if (CANDIDATS_ATS.length === 0) return;
+    const devine = CANDIDATS_ATS.filter((c) => c.jeton === jetonProbable(c.entreprise));
+    expect(devine.length).toBeLessThan(CANDIDATS_ATS.length);
   });
 });
 
