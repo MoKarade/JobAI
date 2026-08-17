@@ -65,7 +65,7 @@ describe("adressesCandidates — ce qu'on éprouve, et dans quel ordre", () => {
       const url = new URL(u);
       expect(url.protocol).toBe("https:");
       expect(url.hostname).toMatch(
-        /(jobbank|guichetemplois|jobboom|jobillico|quebecemploi|espresso-jobs|isarta|grenier|jobsquebec|quebecentete|ville\.quebec|carrieres\.gouv|ulaval|indeed|careerjet)/,
+        /(jobbank|guichetemplois|jobboom|jobillico|quebecemploi|espresso-jobs|isarta|grenier|jobsquebec|quebecentete|ville\.quebec|carrieres\.gouv|ulaval|indeed|careerjet|ziprecruiter)/,
       );
     }
   });

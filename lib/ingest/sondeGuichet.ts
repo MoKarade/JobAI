@@ -107,8 +107,26 @@ export function adressesCandidates(recherche: string): string[] {
     "https://www.ulaval.ca/notre-universite/travailler-a-ulaval",
 
     // ── Agrégateurs à flux, historiquement les plus susceptibles d'en publier ───────────
-    `https://ca.indeed.com/rss?q=${q}&l=${lieu}`,
     `https://www.careerjet.ca/search/jobs?s=${q}&l=${lieu}`,
+
+    // ── Indeed et ZipRecruiter SANS MCP — la question de Marc, posée honnêtement ────────
+    //
+    // ⚠️ CE N'EST PAS UNE TENTATIVE DE MOISSONNAGE, ET LA DISTINCTION EST TOUT.
+    // Indeed interdit le scraping par ses conditions et bloque activement (garde-fou n°4) ;
+    // on ne construira pas de contournement. Ce qu'on mesure ici est autre chose : ces deux
+    // sites ont PUBLIÉ des flux RSS par le passé, Indeed les a retirés puis, d'après les
+    // forums, remis. « D'après les forums » n'est pas une mesure — d'où ces deux adresses.
+    //
+    // Ce que l'état de l'art dit par ailleurs, vérifié le 2026-08-17 : l'API Publisher
+    // d'Indeed est fermée depuis 2024 (aucune clé émise depuis), et l'API partenaire de
+    // ZipRecruiter est une API de PUBLICATION — créer et fermer SES annonces — exactement
+    // comme Jobillico. Troisième plateforme de suite avec ce profil : elles ouvrent leurs
+    // API à ceux qui publient, jamais à ceux qui cherchent. Le connecteur MCP est le canal
+    // de lecture officiel, et c'est pour ça qu'il existe.
+    //
+    // Un 403 ici n'est donc pas un obstacle à contourner : c'est la réponse.
+    `https://ca.indeed.com/rss?q=${q}&l=${lieu}`,
+    `https://www.ziprecruiter.ca/jobs-search?search=${q}&location=${lieu}`,
   ];
 }
 
