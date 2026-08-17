@@ -17,6 +17,7 @@ import {
   analyserSmartRecruiters,
   analyserWorkable,
 } from "./analyseurs";
+import { estDansLaRegion } from "./region";
 import type { AtsEntreprise, FamilleAts, OffreBrute, Recuperateur, ResultatSource } from "./types";
 import { PROFIL_DEFAUT } from "../profil";
 
@@ -171,29 +172,71 @@ export function sourceAts(ats: AtsEntreprise) {
 }
 
 /**
- * Teste si une entreprise a bien une page carrières chez cette famille d'ATS.
+ * Le verdict d'une tentative de résolution d'entreprise chez un ATS.
+ *
+ * ⚠️ QUATRE ÉTATS, ET PAS UN BOOLÉEN — c'est tout l'objet de ce type. Un « oui/non » ne peut
+ * pas dire la différence entre « c'est bien cette entreprise » et « le jeton répond, mais
+ * c'est quelqu'un d'autre ». Or c'est exactement le piège déjà mesuré le 2026-08-05 :
+ * `recruitee/ace` et `recruitee/robert` répondent parfaitement — avec des postes à
+ * AMSTERDAM. Un identifiant deviné trouve des homonymes, et ils sont crédibles.
+ */
+export type VerdictAts =
+  /** Des offres, et au moins une dans la région : c'est bien elle. À inscrire. */
+  | { verdict: "confirme"; offres: OffreBrute[] }
+  /** Des offres, mais AUCUNE dans la région : un homonyme. Ne jamais inscrire. */
+  | { verdict: "refute"; raison: string }
+  /** Le jeton répond, sans aucune offre : indiscernable d'un homonyme au repos. */
+  | { verdict: "indecis"; raison: string }
+  /** Rien sous ce jeton : pas de page carrières chez cet ATS. */
+  | { verdict: "absent" };
+
+/**
+ * Cette entreprise a-t-elle une page carrières chez cette famille d'ATS — et est-ce BIEN elle ?
  *
  * Sert la découverte : le jeton d'une entreprise chez un ATS ne se devine pas de façon
- * fiable, il se VÉRIFIE. Une réponse qui n'est pas du JSON exploitable vaut « non » — et
- * « non » se mémorise, sinon on repaie la même recherche infructueuse chaque jour.
+ * fiable, il se VÉRIFIE. Et le vérifier, ce n'est pas constater que l'API répond : c'est
+ * confronter ce qu'elle rend à ce qu'on attend. Deux vérifications indépendantes, jamais une
+ * seule — le jeton répond ET le contenu est de la région.
  *
- * Un tableau VIDE reste un succès : une entreprise peut réellement n'avoir aucun poste
- * ouvert aujourd'hui, et le confondre avec une absence d'ATS ferait perdre la source pour
- * de bon.
+ * ⚠️ UN TABLEAU VIDE N'EST PAS UN SUCCÈS, contrairement à ce que cette fonction affirmait
+ * avant le 2026-08-17. Une entreprise peut réellement n'avoir aucun poste ouvert
+ * aujourd'hui — mais un homonyme d'Amsterdam au repos rend exactement la même chose, et
+ * rien ne les distingue. Inscrire sur cette base, c'est parier ; le verdict `indecis` dit
+ * qu'on ne sait pas, et l'appelant décide de retenter plus tard plutôt que d'inscrire faux.
  */
 export async function verifierAts(
   famille: FamilleAts,
   jeton: string,
   entreprise: string,
   rec: Recuperateur,
-): Promise<{ trouve: boolean; offres: OffreBrute[] }> {
+): Promise<VerdictAts> {
+  let offres: OffreBrute[];
   try {
     const corps = await rec(urlAts(famille, jeton));
-    const offres = analyseurAts(famille)(corps, entreprise);
-    return { trouve: true, offres };
+    offres = analyseurAts(famille)(corps, entreprise);
   } catch {
-    return { trouve: false, offres: [] };
+    return { verdict: "absent" };
   }
+
+  if (offres.length === 0) {
+    return { verdict: "indecis", raison: "le jeton répond, mais aucune offre à confronter" };
+  }
+
+  const dansLaRegion = offres.filter((o) => estDansLaRegion(o.ville, o.description));
+  if (dansLaRegion.length === 0) {
+    // On NOMME ce qu'on a vu : « refusé » sans motif ne se vérifie pas, et c'est la seule
+    // trace qui permettra de distinguer un homonyme d'un déménagement.
+    const lieux = [...new Set(offres.map((o) => o.ville.trim()).filter((v) => v !== ""))];
+    const apercu = lieux.slice(0, 3).join(", ") || "aucun lieu annoncé";
+    return {
+      verdict: "refute",
+      raison: `${offres.length} offre(s), aucune dans la région (${apercu})`,
+    };
+  }
+
+  // On rend TOUTES les offres, pas seulement celles de la région : le tri régional est le
+  // travail de `trier()`, et le refaire ici en ferait une seconde copie qui divergera.
+  return { verdict: "confirme", offres };
 }
 
 /**
