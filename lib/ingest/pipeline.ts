@@ -12,6 +12,7 @@
 
 import { computeScore } from "../scoring";
 import { normaliserLieu, situer } from "./region";
+import { aJuger, verdictsFermes, type RegistreLieux } from "./lieux";
 import type { Offre } from "../types";
 import type { OffreBrute } from "./types";
 
@@ -65,6 +66,42 @@ export interface Tri {
    * NOMMER » n'était donc tenue qu'à moitié pour le seul motif qui porte sur un champ.
    */
   refusees: { entreprise: string; titre: string; ville: string; motif: MotifRefus }[];
+}
+
+/**
+ * Les noms de lieu de ce lot sur lesquels ni la liste blanche, ni le registre mesuré n'ont
+ * quoi que ce soit à dire — c'est-à-dire la liste de travail du géocodeur.
+ *
+ * PURE, et c'est ce qui permet de la borner sans rien deviner : l'appelant en prend les
+ * `n` premiers, les fait mesurer, et le reste attend la passe suivante. Triée par
+ * FRÉQUENCE : quand le budget ne suffit pas pour tout, il doit servir au nom qui débloque
+ * le plus d'offres, pas au premier de l'ordre alphabétique.
+ *
+ * `aJuger` décide de l'inclusion, pour que la règle de retente vive à UN seul endroit
+ * (`lib/ingest/lieux.ts`) — un lieu déjà tranché ne coûte jamais une requête, un lieu
+ * introuvable en recoûte une quand son palier est écoulé.
+ */
+export function lieuxAMesurer(
+  recoltes: readonly OffreBrute[],
+  registre: RegistreLieux,
+  aujourdhui: string,
+): string[] {
+  const compte = new Map<string, number>();
+  // Calculé UNE fois : la carte des verdicts fermes ne dépend pas de l'offre courante, et
+  // la reconstruire à chaque tour ferait un balayage complet du registre par offre.
+  const fermes = verdictsFermes(registre);
+  for (const b of recoltes) {
+    // Le même filtre que `trier`, dans le même ordre : un nom que `situer` sait déjà
+    // trancher — par la liste blanche OU par un verdict ferme du registre — n'a rien à
+    // faire ici. Sans ce partage, la liste de travail et la décision divergeraient, et on
+    // paierait des requêtes pour des noms qui ne changent rien.
+    if (situer(b.ville, b.description, fermes) !== "lieu-inconnu") continue;
+    const nom = normaliserLieu(b.ville);
+    if (nom === "") continue;
+    if (!aJuger(registre[nom], aujourdhui)) continue;
+    compte.set(nom, (compte.get(nom) ?? 0) + 1);
+  }
+  return [...compte.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([n]) => n);
 }
 
 /**
@@ -208,6 +245,12 @@ export function trier(
   recoltes: readonly OffreBrute[],
   dejaSuivies: ReadonlySet<string>,
   aujourdhui: string,
+  /**
+   * Les lieux jugés PAR LA MESURE, transmis tels quels à `situer`. Voir `lib/ingest/lieux.ts` :
+   * ils remplacent le pari de liste blanche pour les noms qu'elle ne connaît pas. Défaut
+   * vide = comportement d'avant, à la ligne près.
+   */
+  lieuxResolus: ReadonlyMap<string, "dans-la-region" | "hors-region"> = new Map(),
 ): Tri {
   const retenues: Offre[] = [];
   const vues = new Set<string>();
@@ -240,7 +283,7 @@ export function trier(
     // un seuil — « inconnue » et « à 2 000 km » y sont traitées pareil. C'est ainsi
     // qu'un poste de campement minier au Manitoba est entré à 68/100 lors de la
     // première sonde sur les vraies sources.
-    const lieu = situer(brute.ville, brute.description);
+    const lieu = situer(brute.ville, brute.description, lieuxResolus);
     if (lieu === "hors-region") {
       horsRegion++;
       refusees.push({ entreprise, titre: brute.titre, ville: brute.ville, motif: "hors-region" });

@@ -6,6 +6,64 @@
 
 ---
 
+## Session 2026-08-17 (fin) — les 47 « lieu inconnu » : nommés, puis mesurés
+
+Compte rendu de Marc : `261 trouvée(s) · 1 nouvelle · 170 déjà connue(s) · 16 sous le
+plancher · 27 hors région · 47 lieu inconnu`. La somme est exacte (1+170+16+27+47 = 261) :
+le tri n'a pas de fuite. Le problème est ailleurs — **47 offres jetées parce que `situer()`
+ne reconnaissait pas leur ville**, sans que rien ne dise lesquelles.
+
+### Ce qui n'allait pas — la mécanique, pas le symptôme
+
+`situer()` tranchait par une **liste blanche** de ~130 municipalités, écrite pour un rayon de
+50 km, rallongée à la main quand le rayon est passé à 75. Un nom qui n'y figure pas est
+refusé, qu'il soit à 20 km ou à 3 000. C'est un pari, et il était invérifiable : `refusees`
+portait le motif et l'objet (entreprise, titre) mais **pas la ville** — le seul champ sur
+lequel les deux motifs géographiques se décident.
+
+### Livré, en deux temps
+
+- **[VEILLE-30] nommer.** `Tri.refusees` porte la `ville`. `villesRefusees` (PURE) la
+  regroupe et la trie par fréquence : une ligne remplace quarante-sept. Nommées dans la trace
+  serveur, dans le compte rendu du bouton, et dans la réponse du point de dépôt.
+- **[VEILLE-31] mesurer.** La question « cette ville est-elle à moins de 75 km ? » a une
+  réponse mesurable, et le géocodeur qui la donne était déjà là. `lib/ingest/lieux.ts` tient
+  un registre `nom normalisé → verdict`, alimenté par `geocoderMunicipalites` (nouvelle
+  question dans `lib/geocodage.ts` : sans suffixe de province, **sans les bornes régionales** —
+  savoir que Toronto est loin est l'information, pas un rejet) et par la distance réelle au
+  domicile. `situer()` le consulte APRÈS les deux listes ; celles-ci gardent la priorité et ne
+  coûtent aucune requête.
+
+Bornes : 6 noms par passe (sous le cap interne de 8 — verrouillé par test), budget 12 s,
+mesure AVANT le tri pour que le verdict serve au lot du jour, `try/catch` pour qu'une panne
+du géocodeur ne coûte jamais l'intake. La dépense **s'éteint** : les sources répètent les
+mêmes villes, un nom mesuré ne se redemande jamais. Un `introuvable` est retenté à des
+paliers qui s'espacent (`[3, 14, 60]` jours) — jamais condamné à vie.
+
+### Un quasi-incident de sécurité, trouvé par le build
+
+`mesurerLieuxInconnus` a d'abord été écrite dans `lib/actions.ts`. Le build a refusé
+(`Only async functions are allowed to be exported in a "use server" file` — sur la constante
+de budget). En cherchant à réutiliser `domicile()`, j'allais l'exporter du même fichier : dans
+un fichier `"use server"`, **toute fonction async exportée devient un point d'entrée HTTP
+anonyme**. Les coordonnées du domicile de Marc seraient devenues récupérables par un POST.
+Elles n'étaient protégées que par l'absence d'un mot-clé, et aucun test n'aurait bronché.
+`domicile()` vit désormais dans `lib/domicile.ts`, un module ordinaire où aucun `export` ne
+peut faire ça ; `mesurerLieuxInconnus` dans `lib/mesureLieux.ts`, même raison.
+
+### À vérifier en production
+
+- Le registre `veille-lieux` se remplit : chercher `[lieux] demandés=… jugés=…` dans les
+  journaux, et la ligne `[veille] lieux refusés — inconnus : …` qui nomme ce qui reste.
+- **Le compte de « lieu inconnu » doit BAISSER passe après passe**, et une partie doit
+  basculer en « hors région » (on sait, et c'est trop loin) plutôt que rester inconnue.
+  C'est le signal de convergence : s'il stagne, c'est que les noms ne sont pas géocodables
+  et il faudra regarder ce que les sources écrivent vraiment dans ce champ.
+- Les 16 « sous le plancher » restent **non nommées à l'écran** (elles le sont dans
+  `refusees`) — proposé à Marc, sans réponse pour l'instant.
+
+---
+
 ## Session 2026-08-17 (suite) — « sources=1 » expliqué, et la recherche mise entre les mains de Marc
 
 ### Pourquoi `sources=1` — c'était un compte exact, pas une panne

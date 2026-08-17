@@ -74,6 +74,57 @@ export function urlRecherche(ville: string): string {
 }
 
 /**
+ * L'URL pour situer une MUNICIPALITÉ dont on ne sait pas encore si elle est proche.
+ *
+ * ⚠️ CE N'EST PAS `urlRecherche`, ET LA DIFFÉRENCE EST TOUT L'INTÉRÊT. `urlRecherche` pose
+ * « où est cette ville DE LA RÉGION ? » : elle suffixe « , Québec, Canada » et son lecteur
+ * rejette tout ce qui sort des bornes régionales. Parfait pour placer une épingle, inutile
+ * ici — on demande justement « cette ville est-elle près d'ici ? », et une réponse
+ * « hors bornes » est alors une INFORMATION, pas un rejet.
+ *
+ * Le nom part donc tel que la source l'a écrit (« Trois-Rivières », « Baie-Comeau, QC »),
+ * cadré au seul Canada. Une ville d'un autre pays ne répond pas — et reste inconnue, ce qui
+ * est le défaut SÛR : on refuse une offre plutôt que d'en accepter une à 3 000 km.
+ */
+export function urlRechercheMunicipalite(nom: string): string {
+  const p = new URLSearchParams({
+    q: nom,
+    format: "json",
+    limit: "1",
+    countrycodes: "ca",
+  });
+  return `https://nominatim.openstreetmap.org/search?${p.toString()}`;
+}
+
+/**
+ * Classes Nominatim qu'une MUNICIPALITÉ peut porter.
+ *
+ * Exactement l'inverse de `CLASSES_NON_ENTREPRISE`, et pour la même raison : le champ
+ * `ville` d'une annonce contient parfois autre chose qu'une ville (« Remote », le nom d'un
+ * centre commercial, une région administrative). Sans ce filtre, « Remote » pourrait
+ * résoudre un commerce quelconque quelque part au Canada, et la mesure de distance porterait
+ * alors sur un lieu qui n'a rien à voir — une donnée fausse qui aurait l'air juste.
+ */
+const CLASSES_MUNICIPALITE = new Set(["place", "boundary"]);
+
+/**
+ * Lit une réponse de recherche de municipalité — SANS les bornes régionales.
+ *
+ * `null` = Nominatim ne connaît pas ce nom au Canada, ou ce qu'il rend n'est pas un lieu
+ * habité. Un point rendu ici n'est PAS validé : c'est à l'appelant de mesurer sa distance
+ * et d'en tirer un verdict. Cette fonction ne juge pas, elle situe.
+ */
+export function lireReponseMunicipalite(charge: unknown): Point | null {
+  if (!Array.isArray(charge) || charge.length === 0) return null;
+  const e = charge[0] as { lat?: unknown; lon?: unknown; class?: unknown };
+  const lat = Number(e?.lat);
+  const lon = Number(e?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (typeof e?.class !== "string" || !CLASSES_MUNICIPALITE.has(e.class)) return null;
+  return { lat, lon };
+}
+
+/**
  * L'URL pour chercher une ENTREPRISE. Le nom seul serait ambigu (« Labatt » existe
  * partout) : la ville et la province cadrent la recherche, les mêmes bornes régionales
  * rejettent le reste.
@@ -779,6 +830,35 @@ export function deciderPrecision(
     // cohérente à deux champs.
     adresseSource: null,
   };
+}
+
+/**
+ * Situe une série de MUNICIPALITÉS inconnues, pour juger ensuite de leur distance.
+ *
+ * Passe par `geocoderSerie` comme tout le reste : même cadence de 1,1 s, même plafond par
+ * passe, même garde-temps, même distinction introuvable/panne. Une seconde boucle écrite à
+ * côté divergerait — c'est la classe de bug qui a déjà coûté deux incidents à ce projet.
+ *
+ * `adresse` est toujours `null` ici : on ne cherche pas une adresse, on cherche un point à
+ * mesurer. La stocker serait celle de l'hôtel de ville, présentée comme autre chose.
+ */
+export async function geocoderMunicipalites(
+  noms: readonly string[],
+  outils: OutilsGeocodage,
+  budgetMs: number | null = null,
+): Promise<ResultatPasse> {
+  return geocoderSerie(
+    noms.map((nom) => ({
+      nom,
+      url: urlRechercheMunicipalite(nom),
+      lire: (charge: unknown) => {
+        const p = lireReponseMunicipalite(charge);
+        return p === null ? null : { ...p, adresse: null };
+      },
+    })),
+    outils,
+    budgetMs,
+  );
 }
 
 /** Géocode une série de VILLES. */

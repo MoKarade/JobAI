@@ -16,6 +16,8 @@ import {
   detailsEntrepriseGoogle,
   distanceKm,
   entete,
+  lireReponseMunicipalite,
+  urlRechercheMunicipalite,
   geocoderEntrepriseGoogle,
   geocoderPlusieurs,
   geocoderVille,
@@ -32,6 +34,7 @@ import {
   geocoderEntreprises,
   villeGeocodable,
 } from "../lib/geocodage";
+import { MAX_LIEUX_PAR_PASSE } from "../lib/ingest/passe";
 
 /** Un `fetch` de test qui répond ce qu'on lui dit, et compte ses appels. */
 function faussetFetch(reponses: (unknown | Error)[]) {
@@ -722,5 +725,41 @@ describe("garde-temps : la série s'arrête avant le mur de l'appelant", () => {
     const { recuperer, appels } = faussetFetch([ok(46.81, -71.21), ok(46.82, -71.22)]);
     await geocoderPlusieurs(["Québec", "Lévis"], { recuperer, attendre: async () => {} });
     expect(appels).toHaveLength(2);
+  });
+});
+
+describe("situer une MUNICIPALITÉ inconnue — la question a une autre forme", () => {
+  it("ne suffixe pas « Québec » : on demande où c'est, pas où c'est dans la région", () => {
+    // `urlRecherche` cadre sur la province parce qu'elle place une épingle connue. Ici on
+    // interroge un nom dont on ignore justement s'il est proche — lui imposer « , Québec »
+    // ferait répondre à côté pour une ville d'une autre province, et un « à côté » qui
+    // tombe dans les bornes est une donnée fausse qui a l'air juste.
+    const u = new URL(urlRechercheMunicipalite("Baie-Comeau, QC"));
+    expect(u.searchParams.get("q")).toBe("Baie-Comeau, QC");
+    expect(u.searchParams.get("countrycodes")).toBe("ca");
+  });
+
+  it("accepte un lieu HORS des bornes régionales — c'est le fait qu'on mesure", () => {
+    // `lireReponse` rejetterait ce point. Ici il doit passer : savoir que Toronto est loin
+    // est précisément l'information qui permet de trancher sans liste blanche.
+    const p = lireReponseMunicipalite([{ lat: "43.65", lon: "-79.38", class: "place" }]);
+    expect(p).toEqual({ lat: 43.65, lon: -79.38 });
+  });
+
+  it("refuse ce qui n'est pas un lieu habité", () => {
+    // Le champ `ville` d'une annonce porte parfois « Remote » ou un nom de commerce. Sans
+    // ce filtre, la distance serait mesurée sur un lieu qui n'a rien à voir.
+    expect(lireReponseMunicipalite([{ lat: "46.8", lon: "-71.2", class: "shop" }])).toBeNull();
+    expect(lireReponseMunicipalite([{ lat: "46.8", lon: "-71.2" }])).toBeNull();
+    expect(lireReponseMunicipalite([])).toBeNull();
+    expect(lireReponseMunicipalite(null)).toBeNull();
+  });
+
+  it("le plafond de la passe reste SOUS le plafond interne du géocodeur", () => {
+    // Leçon [CARTE-03] : un plafond « configurable » posé AU-DESSUS d'un cap plus profond
+    // dans la pile est un leurre — `geocoderSerie` tronque à `MAX_VILLES_PAR_PASSE` quoi
+    // qu'on lui demande. Le jour où l'on voudra mesurer plus de lieux par passe, c'est ce
+    // test qui dira où est la vraie borne.
+    expect(MAX_LIEUX_PAR_PASSE).toBeLessThanOrEqual(MAX_VILLES_PAR_PASSE);
   });
 });

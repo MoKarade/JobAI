@@ -16,7 +16,8 @@
 
 import { appliquerBalayage, resumerBalayage, type JournalVeille } from "../veille";
 import type { Offre } from "../types";
-import { cleCanonique, idsStockesVus, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
+import { cleCanonique, idsStockesVus, lieuxAMesurer, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
+import { verdictsFermes, type RegistreLieux } from "./lieux";
 import { RECHERCHES_GUICHET, sourceAts, sourceGuichet } from "./sources";
 import { sourceDepotFichier } from "./depotFichier";
 import { villeCoherente } from "./depotSchema";
@@ -24,6 +25,37 @@ import type { AtsEntreprise, OffreBrute, Recuperateur, ResultatSource, Source } 
 
 /** Sources interrogées par exécution. Au-delà, on dépasse la durée d'une fonction. */
 export const MAX_SOURCES_PAR_PASSE = 14;
+
+/**
+ * Noms de lieu MESURÉS par passe, au maximum.
+ *
+ * ⚠️ C'EST UNE DÉPENSE PRISE SUR LE MÊME MUR DE 60 s QUE L'INGESTION. Chaque nom coûte une
+ * requête Nominatim précédée de 1,1 s de cadence : six, c'est ~8 s dans le pire cas, avant
+ * le tri. Elle s'ÉTEINT d'elle-même — un nom mesuré ne se redemande jamais, et les sources
+ * répètent les mêmes villes tous les jours — donc en régime établi cette étape ne coûte
+ * rien du tout. Ce qui n'entre pas dans une passe entre dans la suivante : la liste de
+ * travail est triée par fréquence pour que le budget serve d'abord aux noms qui débloquent
+ * le plus d'offres.
+ */
+export const MAX_LIEUX_PAR_PASSE = 6;
+
+/**
+ * Ce que la passe a fait des lieux qu'elle ne savait pas situer.
+ *
+ * Comptés et rendus, même à zéro : « aucun lieu à mesurer » et « six mesurés, zéro retenu »
+ * sont deux situations opposées, et un journal qui ne parle que de ses échecs ne permet pas
+ * de les distinguer.
+ */
+export interface MesureLieux {
+  /** Noms soumis au géocodeur pendant cette passe. */
+  demandes: number;
+  /** Noms qui ont reçu un verdict ferme, dans la région ou hors d'elle. */
+  juges: number;
+  /** Noms que le géocodeur ne connaît pas — retentés plus tard, jamais condamnés. */
+  introuvables: number;
+  /** Le registre après la passe, prêt à écrire. Inchangé si rien n'a été mesuré. */
+  registre: RegistreLieux;
+}
 
 /** Le compte rendu d'une passe. Tout y est dit, y compris ce qui a échoué. */
 /** Une adresse trouvée pour un employeur, avec ce qui permet de la juger. */
@@ -71,6 +103,8 @@ export interface RapportPasse {
    * civique, pas « En présentiel ».
    */
   adresses: AdresseAnnoncee[];
+  /** Ce que la mesure des lieux inconnus a donné, et le registre à écrire. */
+  lieux: MesureLieux;
 }
 
 /**
@@ -114,6 +148,9 @@ export function selectionnerSources(
  * @param depart      Curseur de rotation des sources.
  * @param aujourdhui  Date du balayage (AAAA-MM-JJ). Paramètre, jamais l'horloge.
  * @param rec         L'accès réseau, injecté.
+ * @param lieux       Le registre des lieux déjà jugés par la mesure, et de quoi en juger
+ *                    de nouveaux. Optionnel : sans lui, la passe se comporte exactement
+ *                    comme avant — `situer` retombe sur sa seule liste blanche.
  */
 export async function executerPasse(
   connues: readonly Offre[],
@@ -122,6 +159,20 @@ export async function executerPasse(
   depart: number,
   aujourdhui: string,
   rec: Recuperateur,
+  lieux?: {
+    registre: RegistreLieux;
+    /**
+     * Mesure une poignée de noms de lieu et rend le registre à jour.
+     *
+     * INJECTÉE, pour deux raisons qui comptent autant l'une que l'autre : le domicile ne
+     * traverse pas cette frontière (garde-fou n°1 — seule la fonction qui calcule la
+     * distance le connaît), et la passe reste testable sans réseau.
+     */
+    mesurer: (
+      noms: readonly string[],
+      registre: RegistreLieux,
+    ) => Promise<{ registre: RegistreLieux; juges: number; introuvables: number }>;
+  },
 ): Promise<RapportPasse> {
   const sources = selectionnerSources(ats, depart, aujourdhui);
 
@@ -151,7 +202,48 @@ export async function executerPasse(
     ...connues.map((o) => o.id),
     ...connues.map((o) => cleCanonique(o.entreprise, o.poste)),
   ]);
-  const tri = trier(brutes, dejaSuivies, aujourdhui);
+
+  // ⚠️ MESURER LES LIEUX INCONNUS AVANT DE TRIER, ET NON APRÈS.
+  //
+  // C'est ce qui distingue une correction d'un pansement. Placée après, la mesure ne
+  // servirait qu'à la passe SUIVANTE : les offres du jour seraient quand même jetées, et
+  // celles qui disparaissent de la source en vingt-quatre heures le seraient pour de bon.
+  // Placée avant, le verdict s'applique au lot qu'on est en train de trier.
+  //
+  // La dépense est bornée (`MAX_LIEUX_PAR_PASSE`) et s'éteint : les sources répètent les
+  // mêmes villes chaque jour, et un nom mesuré ne se redemande jamais. C'est la seule
+  // raison pour laquelle cette étape peut se permettre d'être en amont de l'intake plutôt
+  // qu'en aval — si son coût grandissait avec le volume, elle devrait passer après.
+  let mesure: MesureLieux = {
+    demandes: 0,
+    juges: 0,
+    introuvables: 0,
+    registre: lieux?.registre ?? {},
+  };
+  if (lieux !== undefined) {
+    const aMesurer = lieuxAMesurer(brutes, lieux.registre, aujourdhui).slice(
+      0,
+      MAX_LIEUX_PAR_PASSE,
+    );
+    if (aMesurer.length > 0) {
+      try {
+        const r = await lieux.mesurer(aMesurer, lieux.registre);
+        mesure = {
+          demandes: aMesurer.length,
+          juges: r.juges,
+          introuvables: r.introuvables,
+          registre: r.registre,
+        };
+      } catch (err) {
+        // Une panne du géocodeur ne doit jamais coûter l'intake : le tri repart sur le
+        // registre d'avant, donc sur le comportement de liste blanche. On refuse quelques
+        // offres de plus aujourd'hui, on n'en perd aucune de celles qu'on savait déjà lire.
+        console.warn(`[lieux] mesure impossible (sans effet sur l'intake) : ${String(err)}`);
+      }
+    }
+  }
+
+  const tri = trier(brutes, dejaSuivies, aujourdhui, verdictsFermes(mesure.registre));
 
   // Ce que le balayage a VU : les nouvelles retenues, et les offres déjà suivies qu'une
   // source vient de re-publier. Les secondes sont le signal qui remet leur compteur
@@ -204,6 +296,7 @@ export async function executerPasse(
       ? "balayage suspendu : aucune source n'a répondu — compteurs d'absences inchangés"
       : `${tri.retenues.length} nouvelle${tri.retenues.length > 1 ? "s" : ""}, ${resumerBalayage(balayage)}`,
     adresses: adressesAnnoncees(brutes),
+    lieux: mesure,
   };
 }
 

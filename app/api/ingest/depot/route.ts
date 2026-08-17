@@ -31,6 +31,7 @@ import { offerReasons, offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { colonnesOffre } from "@/lib/persistance";
 import { idsStockesVus, cleCanonique, trier, villesACompleter } from "@/lib/ingest/pipeline";
+import { verdictsFermes, type RegistreLieux } from "@/lib/ingest/lieux";
 import { LotDeposeSchema } from "@/lib/ingest/depotSchema";
 import { appliquerBalayage, type JournalVeille } from "@/lib/veille";
 
@@ -38,6 +39,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const CLE_JOURNAL = "veille-journal";
+const CLE_LIEUX = "veille-lieux";
 
 /**
  * Ce qu'un déposant a le droit d'envoyer — le MÊME schéma que le dépôt par fichier.
@@ -61,6 +63,27 @@ async function lireJournal(): Promise<JournalVeille> {
   if (!ligne) return {};
   try {
     return JSON.parse(ligne.valeur) as JournalVeille;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Les lieux que la veille a déjà JUGÉS PAR LA MESURE.
+ *
+ * ⚠️ LE DÉPÔT LES LIT, IL N'EN MESURE AUCUN — et les deux moitiés de cette phrase comptent.
+ * Il les lit, parce que refuser ici une ville que la veille accepte serait exactement
+ * l'écart « assumé par un commentaire » que ce dépôt a déjà payé deux fois : deux chemins
+ * d'entrée qui appliquent deux règles, dont l'une est en retard sur l'autre. Il n'en mesure
+ * aucun, parce que le budget d'un appel entrant n'est pas celui d'un travail de fond : le
+ * dépôt profite de ce que la veille a déjà tranché, et les noms qu'elle n'a pas encore vus
+ * seront tranchés à sa prochaine passe.
+ */
+async function lireLieux(): Promise<RegistreLieux> {
+  const [ligne] = await db.select().from(syncState).where(eq(syncState.cle, CLE_LIEUX));
+  if (!ligne) return {};
+  try {
+    return JSON.parse(ligne.valeur) as RegistreLieux;
   } catch {
     return {};
   }
@@ -143,7 +166,10 @@ export async function POST(requete: Request) {
     // EXACTEMENT le tri du cron : région d'abord, puis plancher d'adéquation, puis
     // dédoublonnage. Une seconde implémentation divergerait, et c'est le jeu de données
     // qui en paierait le prix.
-    const tri = trier(brutes, dejaSuivies, lot.jour);
+    // Y COMPRIS les lieux jugés par la mesure : le cron accepterait ces villes-là, ce
+    // chemin-ci doit les accepter aussi. Deux entrées qui appliquent deux règles, c'est une
+    // règle et demie — et c'est toujours le canal le moins relu qui garde la mauvaise.
+    const tri = trier(brutes, dejaSuivies, lot.jour, verdictsFermes(await lireLieux()));
 
     for (const o of tri.retenues) {
       await db.insert(offers).values({ ...colonnesOffre(o), majLe: new Date() });

@@ -1028,6 +1028,42 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   avait l'air d'un résultat accablant ; il ne disait rien du monde. Avant de conclure d'une
   série d'échecs identiques, DISCRIMINER l'échec distant de l'empêchement local (ici : un
   `fetch` nu qui montre le code HTTP) — et le dire, plutôt que de laisser un 0/180 s'installer.
+- **Dans un fichier `"use server"`, TOUTE fonction async exportée est un point d'entrée HTTP
+  anonyme — un `export` n'y est pas un choix de portée, c'est une PUBLICATION.**
+  `domicile()` (garde-fou n°1 : les coordonnées du domicile de Marc) vivait dans
+  `lib/actions.ts`, privée. En voulant la réutiliser depuis la veille, j'allais lui ajouter
+  `export` : un POST anonyme aurait alors rendu ces coordonnées. Aucun test n'aurait bronché —
+  la fonction est correcte, c'est le FICHIER qui la publie, et rien dans la ligne qu'on écrit
+  ne le rappelle. Ce qui l'a attrapé n'est ni la revue ni un garde, mais le build refusant une
+  CONSTANTE exportée du même fichier (« Only async functions are allowed to be exported ») —
+  un signal sans rapport avec le vrai danger, arrivé par chance. Règle : tout helper qui touche
+  un secret, une coordonnée, une clé ou un service tiers à ménager vit dans un module ORDINAIRE,
+  jamais dans un fichier `"use server"` ; la frontière est alors portée par la nature du module
+  et non par la vigilance de celui qui l'édite. Et avant d'ajouter un `export` dans un tel
+  fichier : se demander « suis-je en train d'ouvrir une route ? ».
+- **Une liste blanche est un pari ; quand la question a une réponse MESURABLE, la mesurer.**
+  `situer()` acceptait une offre si sa ville figurait dans une liste de ~130 municipalités,
+  écrite pour un rayon de 50 km puis rallongée à la main quand il est passé à 75. Elle n'a
+  jamais connu que les noms qu'on avait pensé à y mettre : le 2026-08-17, quarante-sept offres
+  ont été refusées d'un coup, sans qu'on sache si elles étaient à vingt kilomètres ou à trois
+  mille. L'élargir une fois de plus aurait été le même pari, en plus gros — et il aurait fallu
+  le refaire au rayon suivant. Or « cette ville est-elle à moins de 75 km ? » se MESURE, et le
+  géocodeur qui répond était déjà là, déjà borné. Trois conditions pour que la mesure remplace
+  le pari sans coûter l'intake : elle est **bornée** (n noms par passe, budget en ms, sous le
+  cap le plus profond de la pile), elle **s'éteint** (un verdict est conservé, une même chaîne
+  n'est jamais redemandée — sinon le coût grandit avec le volume et l'étape doit passer en
+  aval), et son échec est **un aveu, pas un verdict** (« introuvable » ≠ « hors région », sans
+  quoi une panne d'une matinée condamne une ville à vie). Corollaire de dépendance : le seuil
+  se DÉRIVE de la constante qui décide déjà (`rayonMaxKm`), sinon on recrée le décalage
+  liste/rayon qu'on vient de supprimer.
+- **Nommer le refus AVANT de le corriger — et le NOMMER, c'est nommer son OBJET.** La règle
+  « compter un refus ne suffit pas » était tenue à moitié : `refusees` portait le motif,
+  l'entreprise et le titre, mais pas la VILLE — le seul champ sur lequel les motifs
+  géographiques se décident. « 47 lieu inconnu » ne permettait donc de choisir aucun remède :
+  quarante-sept « Remote » et quarante-sept municipalités québécoises appellent des corrections
+  opposées. Quand un rejet se décide sur un champ, ce champ fait partie du refus. Et un lot de
+  refus se rend GROUPÉ et trié par fréquence : une liste de quarante-sept lignes ne se lit pas,
+  trois lignes comptées désignent le correctif.
 
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)

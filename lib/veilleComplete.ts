@@ -29,6 +29,8 @@ import { entreprisesLieux, offerReasons, offers } from "./db/schema";
 import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
 import { mesurerDistances } from "./actions";
+import { mesurerLieuxInconnus } from "./mesureLieux";
+import type { RegistreLieux } from "./ingest/lieux";
 import { EPOQUE_A_RETENTER } from "./travaux";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "./synchro";
 import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
@@ -43,6 +45,17 @@ import type { JournalVeille } from "./veille";
 
 export const CLE_JOURNAL = "veille-journal";
 const CLE_CURSEUR = "veille-curseur";
+
+/**
+ * Le registre des lieux jugés par la MESURE (`lib/ingest/lieux.ts`).
+ *
+ * Il vit dans l'état partagé plutôt qu'en base : ce n'est pas une donnée du suivi, c'est la
+ * mémoire d'un travail de fond, et il grossit de quelques dizaines d'entrées puis se
+ * stabilise. Le mettre en table aurait demandé une migration et des bornes de coordonnées
+ * — or on stocke ici des lieux volontairement HORS bornes régionales, puisque c'est
+ * justement le fait qu'ils soient loin qu'on a mesuré.
+ */
+const CLE_LIEUX = "veille-lieux";
 
 /**
  * Le jour courant dans le fuseau de Marc.
@@ -77,11 +90,12 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
   }
 
   try {
-    const [connues, journal, ats, curseur] = await Promise.all([
+    const [connues, journal, ats, curseur, lieux] = await Promise.all([
       lireOffres(),
       lireEtat<JournalVeille>(CLE_JOURNAL, {}),
       lireEtat<AtsEntreprise[]>(CLE_ATS, []),
       lireEtat<number>(CLE_CURSEUR, 0),
+      lireEtat<RegistreLieux>(CLE_LIEUX, {}),
     ]);
 
     if (connues === null) {
@@ -89,7 +103,14 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
     }
 
     const jour = aujourdhuiQuebec();
-    const rapport = await executerPasse(connues, journal, ats, curseur, jour, recuperer);
+    const rapport = await executerPasse(connues, journal, ats, curseur, jour, recuperer, {
+      registre: lieux,
+      // Le domicile ne franchit pas cette frontière : `mesurerLieuxInconnus` le lit, calcule
+      // les distances chez elle, et ne rend que des verdicts. La passe ne voit jamais un
+      // point de référence — garde-fou n°1, tenu par la forme de la fonction, pas par une
+      // convention qu'on pourrait oublier.
+      mesurer: (noms, registre) => mesurerLieuxInconnus(noms, registre, jour),
+    });
 
     // Les nouvelles offres d'abord : si l'écriture du journal échoue ensuite, on aura
     // gagné des offres et rejoué une passe, pas perdu du travail.
@@ -147,6 +168,19 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
     }
 
     await ecrireEtat(CLE_JOURNAL, rapport.journal);
+
+    // Le registre des lieux n'est réécrit que si la passe a MESURÉ quelque chose : une
+    // écriture à vide coûterait un aller-retour par passe pour rien, et surtout elle
+    // masquerait la distinction entre « rien à mesurer » et « mesure impossible » — dont
+    // seule la seconde demande qu'on aille voir.
+    if (rapport.lieux.demandes > 0) {
+      await ecrireEtat(CLE_LIEUX, rapport.lieux.registre);
+      console.log(
+        `[lieux] demandés=${rapport.lieux.demandes} jugés=${rapport.lieux.juges}` +
+          ` introuvables=${rapport.lieux.introuvables}` +
+          ` registre=${Object.keys(rapport.lieux.registre).length}`,
+      );
+    }
 
     // ⚠️ CETTE LIGNE EXISTE PARCE QU'UN « −2 » A COÛTÉ UNE ENQUÊTE (2026-08-14).
     //

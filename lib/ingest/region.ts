@@ -111,7 +111,24 @@ export type VerdictRegion = "dans-la-region" | "hors-region" | "lieu-inconnu";
  * différentes, et les confondre empêcherait de voir qu'une source a cessé d'indiquer les
  * villes — un cas où la veille se tairait pour une raison qui n'a rien à voir avec le marché.
  */
-export function situer(ville: string, texteAppoint = ""): VerdictRegion {
+export function situer(
+  ville: string,
+  texteAppoint = "",
+  /**
+   * Les lieux déjà JUGÉS PAR LA MESURE, par nom normalisé (`lib/ingest/lieux.ts`).
+   *
+   * ⚠️ C'EST LA SORTIE DU PARI. Les deux listes ci-dessus ne connaissent que les noms qu'on
+   * a pensé à y écrire : le 2026-08-17, quarante-sept offres ont été jetées « lieu inconnu »
+   * en une passe, sans qu'on sache si elles étaient à vingt kilomètres ou à trois mille.
+   * Le registre porte la réponse MESURÉE — la distance réelle du centre de ce lieu au
+   * domicile — pour les noms sur lesquels les listes n'ont rien à dire.
+   *
+   * Il est consulté APRÈS elles, jamais avant : quand un nom est déjà connu, la mesure ne
+   * peut rien ajouter et coûterait une requête. Un défaut vide garde le comportement exact
+   * d'avant, ce qui laisse tous les appelants — et tous les tests — inchangés.
+   */
+  resolus: ReadonlyMap<string, "dans-la-region" | "hors-region"> = new Map(),
+): VerdictRegion {
   const lieu = normaliserLieu(ville);
   if (lieu === "") return "lieu-inconnu";
 
@@ -119,6 +136,12 @@ export function situer(ville: string, texteAppoint = ""): VerdictRegion {
   // (la province), et sans cette priorité toute offre montréalaise entrerait.
   if (HORS_PORTEE.some((h) => lieu.includes(h))) return "hors-region";
   if (MUNICIPALITES.some((m) => lieu.includes(m))) return "dans-la-region";
+
+  // Ce que la MESURE a tranché pour ce nom exact. Correspondance stricte, pas par
+  // sous-chaîne comme les listes : le registre est keyé sur la chaîne normalisée complète,
+  // et un `includes` y ferait passer « saint-georges » pour « saint-georges-de-beauce ».
+  const mesure = resolus.get(lieu);
+  if (mesure !== undefined) return mesure;
 
   // Dernier recours : la description mentionne parfois la ville quand le champ est vague
   // (« Canada », « Remote »). On ne s'en sert QUE pour accepter, jamais pour rejeter.
