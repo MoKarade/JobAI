@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { SEUIL_ABSENCES_PEREMPTION } from "@/lib/veille";
 import { executerPasse } from "../lib/ingest/passe";
 import type { Offre } from "../lib/types";
 
@@ -46,7 +47,12 @@ describe("balayage suspendu quand aucune source ne répond", () => {
     const cwd = process.cwd();
     try {
       process.chdir(tmp);
-      const journal = { [OFFRE_SUIVIE.id]: { absences: 2, derniereVue: "2026-08-09", premiereVue: "2026-08-01" } };
+      // Une absence de moins que le seuil : la passe suivante DEVRAIT la périmer. Dérivé
+      // de la constante, jamais écrit en dur — le seuil est passé de 3 à 5 le 2026-08-17
+      // pour absorber la rotation des termes, et un 2 figé aurait fait tomber ce test sur
+      // un changement légitime, en donnant l'impression d'une régression.
+      const auBord = SEUIL_ABSENCES_PEREMPTION - 1;
+      const journal = { [OFFRE_SUIVIE.id]: { absences: auBord, derniereVue: "2026-08-09", premiereVue: "2026-08-01" } };
       const rec = () => {
         throw new Error("réseau coupé");
       };
@@ -54,7 +60,7 @@ describe("balayage suspendu quand aucune source ne répond", () => {
 
       // La panne est DITE, pas rendue comme un jour vide.
       expect(r.sources.every((s) => !s.ok)).toBe(true);
-      // À absences=2, un balayage appliqué aurait PÉRIMÉ l'offre (seuil 3). Suspendu :
+      // Au bord du seuil, un balayage appliqué aurait PÉRIMÉ l'offre. Suspendu :
       // rien ne bouge — c'est le discriminant, prouvé aussi en sens inverse ci-dessous.
       expect(r.perimees).toEqual([]);
       expect(r.journal).toEqual(journal);
@@ -69,7 +75,13 @@ describe("balayage suspendu quand aucune source ne répond", () => {
     // Même montage, mais depuis le VRAI dépôt (data/depot présent, fenêtre vide à cette
     // date lointaine → source dépôt ok avec 0 offre). L'offre à absences=2 non revue DOIT
     // alors franchir le seuil : c'est la péremption honnête, intacte.
-    const journal = { [OFFRE_SUIVIE.id]: { absences: 2, derniereVue: "2027-05-01", premiereVue: "2027-04-01" } };
+    const journal = {
+      [OFFRE_SUIVIE.id]: {
+        absences: SEUIL_ABSENCES_PEREMPTION - 1,
+        derniereVue: "2027-05-01",
+        premiereVue: "2027-04-01",
+      },
+    };
     const rec = () => {
       throw new Error("réseau coupé");
     };

@@ -19,6 +19,7 @@ import {
   paliersSenioriteDepuisAnnees,
   type Profil,
 } from "@/lib/profil";
+import { SEUIL_ABSENCES_PEREMPTION } from "@/lib/veille";
 import {
   computeScore,
   scoreDistance,
@@ -222,5 +223,49 @@ describe("le jeu de référence, note par note", () => {
     expect(PROFIL_DEFAUT.faits.langues).toEqual([]);
     expect(PROFIL_DEFAUT.faits.diplomes).toEqual([]);
     expect(PROFIL_DEFAUT.origine).toBe("defaut");
+  });
+});
+
+// ⚠️ LE LIEN ENTRE LE BASSIN DE TERMES, LE TIRAGE ET LE SEUIL DE PÉREMPTION.
+//
+// Ces trois nombres ne sont pas indépendants, et c'est le genre de couplage qu'on oublie
+// six semaines plus tard en ajoutant « juste quelques termes ».
+//
+// La passe tire `termesParJour` termes du bassin, en rotation. Un terme ne revient donc
+// qu'après `bassin / termesParJour` jours. Pendant tout ce temps, une offre que ce terme est
+// SEUL à trouver est absente des lots — elle accumule des absences alors qu'elle est
+// OUVERTE. Si ce cycle atteint `SEUIL_ABSENCES_PEREMPTION`, la rotation périme des offres
+// vivantes : un faux positif fabriqué par le mécanisme censé les protéger.
+//
+// Le test échoue donc si quelqu'un agrandit le bassin sans monter le tirage ou le seuil.
+// Sans lui, l'effet serait invisible — des offres qui s'éteignent, et aucune erreur.
+describe("bassin de termes, tirage et péremption se commandent l'un l'autre", () => {
+  const bassin = PROFIL_DEFAUT.recherches.length;
+  const parJour = PROFIL_DEFAUT.termesParJour;
+
+  it("le tirage existe et tient dans le bassin", () => {
+    expect(parJour).toBeGreaterThan(0);
+    expect(parJour).toBeLessThanOrEqual(bassin);
+  });
+
+  it("un terme revient AVANT que ses offres puissent se périmer, avec de la marge", () => {
+    const cycleJours = Math.ceil(bassin / parJour);
+    // Deux jours de marge : le cycle garantit le retour du terme, la marge absorbe le bruit
+    // de source (une source muette un matin ne doit pas suffire à éteindre une offre).
+    expect(cycleJours + 2).toBeLessThanOrEqual(SEUIL_ABSENCES_PEREMPTION);
+  });
+
+  it("le bassin couvre les deux langues du marché visé", () => {
+    // Honeywell, Alstom, AMETEK, STERIS et Domtar ont des établissements dans la région et
+    // publient en anglais. Un bassin monolingue les rendait invisibles à la veille.
+    const anglais = PROFIL_DEFAUT.recherches.filter((t) =>
+      /\b(engineer|manager|supervisor|improvement|manufacturing)\b/i.test(t),
+    );
+    expect(anglais.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("aucun terme en double — un doublon consomme un tirage pour rien", () => {
+    const vus = PROFIL_DEFAUT.recherches.map((t) => t.toLowerCase().trim());
+    expect(new Set(vus).size).toBe(vus.length);
   });
 });

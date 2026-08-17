@@ -229,13 +229,17 @@ describe("relancer la veille dans la même journée", () => {
 
   it("périme après SEUIL jours distincts, pas après SEUIL passes", () => {
     const o = offre({ id: "x" });
-    const jours = ["2026-07-30", "2026-07-31", "2026-08-01"];
-    let j: JournalVeille = journal("x", 0);
-    let r = appliquerBalayage([o], [], j, jours[0]!);
+    // Les jours sont DÉRIVÉS du seuil, jamais écrits en dur : le seuil est passé de 3 à 5
+    // le 2026-08-17 pour absorber la rotation des termes, et une liste figée aurait fait
+    // tomber ce test sur un changement parfaitement légitime.
+    const jours = Array.from({ length: SEUIL_ABSENCES_PEREMPTION }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 6, 30) + i * 86_400_000);
+      return d.toISOString().slice(0, 10);
+    });
+    let r = appliquerBalayage([o], [], journal("x", 0), jours[0]!);
     for (const d of jours.slice(1)) {
-      j = r.journal;
       // Deux passes par jour : le doublon ne doit rien accélérer.
-      r = appliquerBalayage([o], [], j, d);
+      r = appliquerBalayage([o], [], r.journal, d);
       r = appliquerBalayage([o], [], r.journal, d);
     }
     expect(r.perimees).toEqual(["x"]);

@@ -24,13 +24,31 @@
 import type { Offre } from "./types";
 
 /**
- * Nombre de balayages consécutifs SANS voir une offre avant de la déclarer périmée.
+ * Nombre de JOURS consécutifs sans voir une offre avant de la déclarer périmée.
  *
- * Trois, et non un : une absence isolée est du bruit de source (voir l'en-tête). Trois
- * jours de silence consécutifs sur une offre que la même requête voyait la veille, c'est
- * un signal. Le compte est visible dans le journal, donc contestable.
+ * Pas un : une absence isolée est du bruit de source (voir l'en-tête). Plusieurs jours de
+ * silence sur une offre que la même requête voyait la veille, c'est un signal. Le compte
+ * est visible dans le journal, donc contestable.
+ *
+ * ⚠️ 3 → 5 LE 2026-08-17, ET CE N'EST PAS UN ASSOUPLISSEMENT : C'EST UNE CORRECTION.
+ *
+ * Le seuil valait trois quand la veille interrogeait les MÊMES huit termes chaque jour :
+ * l'observation quotidienne était alors comparable d'un jour à l'autre, et une offre absente
+ * trois jours de suite l'était vraiment. Le bassin de termes est passé à ~36, tirés douze
+ * par jour EN ROTATION — l'observation est devenue PARTIELLE et TOURNANTE.
+ *
+ * Conséquence que le seuil de trois n'aurait pas supportée : une offre trouvée par un terme
+ * n'est plus revue tant que ce terme n'est pas retiré, soit jusqu'à trois jours plus tard.
+ * Elle accumulait donc des absences alors qu'elle était OUVERTE, et se serait périmée pile
+ * au moment où son terme revenait. La rotation aurait fabriqué des faux positifs — le bug
+ * même que ce seuil existe pour éviter.
+ *
+ * La valeur se DÉRIVE donc du cycle de rotation : `ceil(bassin / termes par jour)` jours
+ * pour que chaque terme repasse, plus deux jours de marge pour le bruit de source. Le lien
+ * est verrouillé par `tests/profil.test.ts` — agrandir le bassin sans toucher au seuil fait
+ * tomber le test, au lieu de périmer des offres vivantes en silence.
  */
-export const SEUIL_ABSENCES_PEREMPTION = 3;
+export const SEUIL_ABSENCES_PEREMPTION = 5;
 
 /** Ce que la veille retient d'une offre, entre deux passages. */
 export interface SuiviVeille {

@@ -168,6 +168,15 @@ export const ProfilSchema = z.object({
 
   // ── Ce que la veille cherche ─────────────────────────────────────────────
   recherches: z.array(z.string().min(1)).max(40),
+  /**
+   * Termes tirés du bassin `recherches` à chaque passe, en rotation.
+   *
+   * ⚠️ DÉCLARÉ DANS LE SCHÉMA, SINON ZOD LE SUPPRIME EN SILENCE. `ProfilSchema.parse` strippe
+   * les clés inconnues (comportement Zod par défaut) : un champ posé dans `PROFIL_DEFAUT`
+   * mais absent d'ici n'existerait tout simplement pas à l'exécution, sans la moindre
+   * erreur — et le test qui s'appuie dessus lirait `undefined`.
+   */
+  termesParJour: z.number().int().min(1).max(40),
 
   // ── Positionnement ───────────────────────────────────────────────────────
   swot: z.array(QuadrantSwotSchema).max(4),
@@ -331,7 +340,35 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
     "maintenance industrielle",
     "manufacturing engineer",
     "continuous improvement",
+
+    // ── Titres voisins que le bassin ne couvrait pas ────────────────────────────────
+    // Ajoutés le 2026-08-17 (« rajoute encore plus de termes »). Le bassin est au PLAFOND
+    // après ceux-ci : voir `TERMES_PAR_JOUR` — au-delà, un terme mettrait plus longtemps à
+    // revenir que le seuil de péremption, et des offres ouvertes s'éteindraient.
+    "directeur de production",
+    "chef d'équipe production",
+    "ingénieur manufacturier",
+    "conception mécanique",
+    "gestion de projet industriel",
+    "coordonnateur technique",
+    "maintenance engineer",
+    "production supervisor",
   ],
+
+  /**
+   * Termes tirés du bassin à chaque passe.
+   *
+   * ⚠️ CE NOMBRE ET LA TAILLE DU BASSIN SE COMMANDENT L'UN L'AUTRE. Le bassin est tiré en
+   * rotation : un terme ne revient qu'après `bassin / TERMES_PAR_JOUR` jours, et une offre
+   * qu'il est seul à trouver accumule des absences pendant tout ce temps. Si ce cycle
+   * dépasse `SEUIL_ABSENCES_PEREMPTION`, la rotation PÉRIME des offres ouvertes — un faux
+   * positif fabriqué par le mécanisme censé les protéger.
+   *
+   * D'où le plafond, vérifié par `tests/profil.test.ts` : agrandir le bassin sans monter le
+   * seuil (ou le tirage) fait tomber le test. Douze est calé sur le quota Indeed, qui se
+   * referme en s'aggravant — ce n'est pas ce nombre-là qu'on augmente à la légère.
+   */
+  termesParJour: 12,
 
   swot: [
     {
