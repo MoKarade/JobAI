@@ -25,19 +25,30 @@ function memeChemin(v: Verdict): boolean {
 }
 
 function verdictCourt(v: Verdict): string {
-  if (v.erreur) return `injoignable — ${v.erreur}`;
+  if (v.erreur) return `pas de réponse en 12 s — essai SANS VERDICT, pas un refus`;
   if (v.statut === null) return "aucune réponse";
-  if (v.statut >= 400) return `HTTP ${v.statut}`;
+  if (v.statut >= 400) return `HTTP ${v.statut} — l'adresse n'existe pas`;
   // ⚠️ LE CAS QUI COMPTE : 200, mais ailleurs. Une page employeur qui redirige vers
   // l'accueil répond 200 sans porter la moindre offre — c'est ce que Marc a vu à l'écran,
   // et c'est exactement ce qu'un compte de codes HTTP aurait déclaré « fonctionnel ».
   if (!memeChemin(v)) return `HTTP ${v.statut}, mais REDIRIGÉ ailleurs`;
   if (v.offres > 0) return `HTTP ${v.statut} · ${v.offres} offre(s) lisibles`;
-  return `HTTP ${v.statut} · aucune offre lisible`;
+  // ⚠️ « AUCUNE OFFRE » NE VOULAIT PAS DIRE LA MÊME CHOSE SELON LE CONTENU, et la première
+  // version confondait les deux. Une page HTML rendue à un analyseur RSS donne zéro offre
+  // par CONSTRUCTION : ça ne juge que l'analyseur. Mesuré le 2026-08-17 — la page employeur
+  // de Laserax et la page de recherche répondaient toutes deux 200, au bon chemin, avec le
+  // bon titre, et ma conclusion annonçait « rien ne marche ».
+  if (!v.estXml) return `HTTP ${v.statut} · page HTML valide (illisible par un analyseur RSS)`;
+  return `HTTP ${v.statut} · XML, mais aucune offre dedans`;
 }
 
 function estUtilisable(v: Verdict): boolean {
   return v.statut !== null && v.statut < 400 && memeChemin(v) && v.offres > 0;
+}
+
+/** Une page qui répond au bon endroit — même si son contenu n'est pas un flux. */
+function estVivante(v: Verdict): boolean {
+  return !v.erreur && v.statut !== null && v.statut < 400 && memeChemin(v);
 }
 
 export function SondeGuichet({ terme }: { terme: string }) {
@@ -102,10 +113,22 @@ export function SondeGuichet({ terme }: { terme: string }) {
             </p>
           ) : null}
 
+          {/* Les flux que les pages DÉCLARENT elles-mêmes : la seule piste qui ne soit pas
+              une devinette. Rien à afficher si aucune page n'en annonce — et ce silence-là
+              est une réponse, pas une absence de mesure. */}
+          {resultat.verdicts.flatMap((v) => v.fluxAnnonces).length > 0 ? (
+            <p className="sonde__note">
+              Flux déclarés par les pages elles-mêmes :{" "}
+              {[...new Set(resultat.verdicts.flatMap((v) => v.fluxAnnonces))].join(" · ")}
+            </p>
+          ) : null}
+
           <p className="sonde__note">
             {resultat.verdicts.some(estUtilisable)
               ? "Au moins une adresse rend des offres lisibles : la source peut être rallumée sur celle-là."
-              : "Aucune adresse ne rend d’offres lisibles. Un « HTTP 200 » ne suffit pas — une page qui redirige vers l’accueil répond 200 sans porter une seule offre."}
+              : resultat.verdicts.some(estVivante)
+                ? "Aucun FLUX ne répond — mais des pages HTML répondent au bon endroit, avec le bon titre. Ce n’est pas « le site est mort », c’est « le flux n’existe plus ». Lire ces pages demanderait un analyseur HTML, donc une décision (garde-fou n°4)."
+                : "Aucune adresse ne répond. Ni flux, ni page : ce n’est pas une question d’analyseur."}
           </p>
         </>
       ) : null}

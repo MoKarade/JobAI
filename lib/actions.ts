@@ -1957,6 +1957,8 @@ export type ResultatSonde =
         octets: number;
         offres: number;
         apercu: string;
+        fluxAnnonces: string[];
+        estXml: boolean;
         erreur?: string;
       }[];
       nonEssayees: string[];

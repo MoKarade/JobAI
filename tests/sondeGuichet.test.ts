@@ -6,7 +6,12 @@
 // offre — exactement ce que Marc a vu à l'écran en ouvrant le premier lien proposé.
 
 import { describe, it, expect } from "vitest";
-import { adressesCandidates, sonderGuichet, DELAI_SONDE_MS } from "@/lib/ingest/sondeGuichet";
+import {
+  adressesCandidates,
+  sonderGuichet,
+  fluxDeclares,
+  DELAI_SONDE_MS,
+} from "@/lib/ingest/sondeGuichet";
 
 describe("adressesCandidates — ce qu'on éprouve, et dans quel ordre", () => {
   it("commence par des TÉMOINS de joignabilité", () => {
@@ -62,5 +67,48 @@ describe("sonderGuichet — le budget se dit, il ne se tait pas", () => {
     const r = await sonderGuichet("test", DELAI_SONDE_MS - 1, horloge([0]), async () => {});
     expect(r.verdicts).toHaveLength(0);
     expect(r.nonEssayees.length).toBe(adressesCandidates("test").length);
+  });
+});
+
+describe("fluxDeclares — demander à la page au lieu de deviner", () => {
+  const base = "https://www.guichetemplois.gc.ca/accueil";
+
+  it("trouve un flux déclaré et le rend ABSOLU", () => {
+    const html = `<head><link rel="alternate" type="application/rss+xml" href="/jobsearch/rss?x=1"></head>`;
+    expect(fluxDeclares(html, base)).toEqual([
+      "https://www.guichetemplois.gc.ca/jobsearch/rss?x=1",
+    ]);
+  });
+
+  // ⚠️ L'ORDRE DES ATTRIBUTS EST LIBRE EN HTML. Un motif qui exigerait `type` avant `href`
+  // raterait la moitié des pages — et ne le dirait pas, ce qui ferait conclure « aucun flux
+  // déclaré » d'un scan qui n'a jamais regardé au bon endroit.
+  it("lit la balise quel que soit l'ordre des attributs", () => {
+    const html = `<link href="/a.xml" rel="alternate" type="application/rss+xml">`;
+    expect(fluxDeclares(html, base)).toEqual(["https://www.guichetemplois.gc.ca/a.xml"]);
+  });
+
+  it("accepte Atom autant que RSS, et dédoublonne", () => {
+    const html =
+      `<link type="application/atom+xml" href="/a.xml">` +
+      `<link type="application/rss+xml" href="/a.xml">`;
+    expect(fluxDeclares(html, base)).toHaveLength(1);
+  });
+
+  it("ignore les feuilles de style et les icônes — seul le type compte", () => {
+    const html = `<link rel="stylesheet" href="/x.css"><link rel="icon" href="/f.ico">`;
+    expect(fluxDeclares(html, base)).toEqual([]);
+  });
+
+  // Le silence est une RÉPONSE : « la page n'annonce aucun flux » se distingue de « je n'ai
+  // pas regardé ». Sans ce cas, un tableau vide pourrait venir d'un scan cassé.
+  it("rend un tableau vide sur une page sans flux, sans lever", () => {
+    expect(fluxDeclares("<html><head><title>rien</title></head></html>", base)).toEqual([]);
+    expect(() => fluxDeclares("", base)).not.toThrow();
+  });
+
+  it("ne plante pas sur un href illisible", () => {
+    const html = `<link type="application/rss+xml" href="ht!tp://%%%">`;
+    expect(() => fluxDeclares(html, base)).not.toThrow();
   });
 });

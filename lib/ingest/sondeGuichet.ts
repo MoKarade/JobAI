@@ -40,12 +40,30 @@ export interface VerdictSonde {
   offres: number;
   /** Les premiers caractères, pour l'œil humain — aucun code ne remplace cette lecture. */
   apercu: string;
+  /**
+   * Les flux que la PAGE ELLE-MÊME annonce (`<link rel="alternate" type="…rss+xml">`).
+   *
+   * ⚠️ C'EST LA SEULE FAÇON DE TROUVER UN FLUX SANS EN DEVINER L'ADRESSE. Le 2026-08-17,
+   * quatre adresses de flux ont été supposées et trois ont rendu 404 ; la cinquième
+   * supposition n'aurait pas mieux valu. Une page qui a un flux le DÉCLARE dans son en-tête :
+   * on arrête de chercher à l'aveugle, on lit ce que le site publie de lui-même.
+   */
+  fluxAnnonces: string[];
+  /** Le contenu ressemble-t-il à du XML ? Sinon, « 0 offre » ne juge que l'analyseur. */
+  estXml: boolean;
   /** Renseigné seulement si la requête n'est jamais partie (réseau, blocage, délai). */
   erreur?: string;
 }
 
-/** Délai par adresse. Court : on en essaie plusieurs sous le mur d'une fonction. */
-export const DELAI_SONDE_MS = 8_000;
+/**
+ * Délai par adresse.
+ *
+ * Monté de 8 s à 12 s le 2026-08-17 : une adresse a EXPIRÉ au lieu de répondre, et un délai
+ * dépassé n'est pas un verdict — c'est une absence de verdict. Les quatre autres avaient
+ * tranché en moins d'une seconde ; laisser la cinquième sans réponse aurait fait conclure
+ * « rien ne marche » d'un essai qui n'a jamais abouti.
+ */
+export const DELAI_SONDE_MS = 12_000;
 
 /** Pause entre deux adresses — un service public ne se martèle pas, même pour un test. */
 export const PAUSE_SONDE_MS = 700;
@@ -77,6 +95,31 @@ export function adressesCandidates(recherche: string): string[] {
   ];
 }
 
+/**
+ * Les flux qu'une page déclare elle-même, résolus en URL absolues.
+ *
+ * PURE. C'est de l'autodécouverte, pas de la devinette : un site qui publie un flux le
+ * signale dans son `<head>`. Quatre adresses ont été SUPPOSÉES le 2026-08-17 et trois ont
+ * rendu 404 ; une cinquième supposition n'aurait rien valu de plus. On demande à la page.
+ */
+export function fluxDeclares(html: string, base: string): string[] {
+  const trouves = new Set<string>();
+  // Les attributs d'une balise `link` arrivent dans n'importe quel ordre : on repère la
+  // balise entière, puis on lit ses attributs — un motif qui exigerait `type` avant `href`
+  // raterait la moitié des pages, et ne le dirait pas.
+  for (const balise of html.match(/<link\b[^>]*>/gi) ?? []) {
+    if (!/type\s*=\s*["']application\/(rss|atom)\+xml["']/i.test(balise)) continue;
+    const href = balise.match(/href\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (!href) continue;
+    try {
+      trouves.add(new URL(href, base).toString());
+    } catch {
+      // Un href illisible n'est pas une panne de la sonde : on l'ignore et on continue.
+    }
+  }
+  return [...trouves];
+}
+
 async function sonderUne(url: string): Promise<VerdictSonde> {
   const ctrl = new AbortController();
   const minuteur = setTimeout(() => ctrl.abort(), DELAI_SONDE_MS);
@@ -91,14 +134,17 @@ async function sonderUne(url: string): Promise<VerdictSonde> {
       // question posée. On rend zéro, et l'aperçu dira ce que c'était.
       offres = 0;
     }
+    const finale = r.url || url;
     return {
       url,
-      urlFinale: r.url || url,
+      urlFinale: finale,
       statut: r.status,
       typeContenu: r.headers.get("content-type"),
       octets: corps.length,
       offres,
       apercu: corps.slice(0, 240).replace(/\s+/g, " ").trim(),
+      fluxAnnonces: fluxDeclares(corps, finale),
+      estXml: /^\s*<\?xml|<(rss|feed)\b/i.test(corps),
     };
   } catch (err) {
     return {
@@ -109,6 +155,8 @@ async function sonderUne(url: string): Promise<VerdictSonde> {
       octets: 0,
       offres: 0,
       apercu: "",
+      fluxAnnonces: [],
+      estXml: false,
       erreur: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
     };
   } finally {
