@@ -16,10 +16,14 @@
 // incrémenté au fil de l'eau qu'un rechargement remettrait à zéro. C'est ce qui permet à
 // Marc de fermer l'onglet et de revenir : la barre repart où elle en était.
 
-import { ENTREPRISES_CIBLES } from "./reference";
 import { lireEtat, ecrireEtat } from "./etat";
+import { CANDIDATS_ATS } from "./ingest/atsCandidats";
 import { jetonProbable, verifierAts, recuperer } from "./ingest/sources";
-import { FAMILLES_ATS, type AtsEntreprise, type FamilleAts } from "./ingest/types";
+import {
+  FAMILLES_ATS,
+  type AtsEntreprise,
+  type FamilleAts,
+} from "./ingest/types";
 import {
   planifierDecouverte,
   executerDecouverte,
@@ -44,7 +48,8 @@ export const CLE_ESSAIS_ATS = "veille-ats-essais";
  * plafond par hôte mord le premier) — c'est le piège du « plafond configurable » rendu
  * inopérant par un cap plus bas en aval, déjà vécu sur `MAX_SITUATIONS_CRON`.
  */
-export const MAX_ESSAIS_LOT_MANUEL = FAMILLES_ATS.length * MAX_ESSAIS_PAR_FAMILLE;
+export const MAX_ESSAIS_LOT_MANUEL =
+  FAMILLES_ATS.length * MAX_ESSAIS_PAR_FAMILLE;
 
 /**
  * Budget de temps d'un lot manuel.
@@ -70,58 +75,79 @@ export interface EtatDecouverte {
 }
 
 /**
- * Les noms à résoudre : les cibles de Marc, puis les employeurs déjà croisés en offre.
+ * Les essais du jour, pris dans la liste des candidats VÉRIFIÉS.
  *
- * PURE. L'ORDRE porte la priorité d'exploration — les cibles d'abord, parce que ce sont
- * elles que Marc veut surveiller ; les employeurs vus en offre ensuite, parce qu'ils ont au
- * moins prouvé qu'ils embauchent dans la région. Les doublons ne sont pas écartés ici :
- * c'est `planifierDecouverte` qui s'en charge, pour tous ses appelants à la fois.
+ * ⚠️ ON NE DEVINE PLUS. `planifierDecouverte` sait ordonner et borner ; ce qu'elle ne peut
+ * pas faire, c'est savoir si une entreprise a la moindre chance d'être là. Le premier lot
+ * réel a répondu : quinze essais, quinze échecs, parce que le catalogue de cinq familles ne
+ * correspond pas aux employeurs visés (voir `atsCandidats.ts`). On ne lui donne donc plus
+ * la liste complète des entreprises, mais celle des paires qu'une observation désigne — et
+ * tant qu'elle est vide, il n'y a rien à tenter, ce qui est un résultat honnête.
  */
-export function nomsACouvrir(employeurs: readonly string[]): string[] {
-  return [
-    ...ENTREPRISES_CIBLES.map((e) => e.nom),
-    ...employeurs.map((n) => n.trim()).filter((n) => n !== ""),
-  ];
+function planifierCandidats(
+  essais: readonly EssaiAts[],
+  ats: readonly AtsEntreprise[],
+  jour: string,
+  max: number,
+): { entreprise: string; famille: FamilleAts }[] {
+  const resolues = new Set(ats.map((a) => a.entreprise.toLowerCase()));
+  const parFamille = new Map<FamilleAts, string[]>();
+  for (const c of CANDIDATS_ATS) {
+    if (resolues.has(c.entreprise.toLowerCase())) continue;
+    const liste = parFamille.get(c.famille) ?? [];
+    liste.push(c.entreprise);
+    parFamille.set(c.famille, liste);
+  }
+
+  // Le planificateur reste seul juge de l'ordre, des délais de retente et des plafonds : on
+  // ne fait que restreindre l'ensemble qu'il regarde, famille par famille.
+  return [...parFamille.entries()]
+    .flatMap(([famille, noms]) =>
+      planifierDecouverte(noms, [famille], essais, [...resolues], jour, max),
+    )
+    .slice(0, max);
 }
 
 /**
  * Où en est le balayage : paires tranchées sur paires à couvrir.
  *
- * PURE, et c'est délibéré — c'est le seul calcul de cette page qui peut MENTIR sans que
- * rien ne le signale (une barre à 140 %, ou bloquée à 0 % sur un balayage bien avancé).
+ * PURE, et c'est délibéré — c'est le seul calcul de cet écran qui peut MENTIR sans que rien
+ * ne le signale (une barre à 140 %, ou bloquée à 0 % sur un balayage bien avancé).
  *
- * ⚠️ TROIS PIÈGES, TOUS DANS LE NUMÉRATEUR.
+ * ⚠️ LE DÉNOMINATEUR EST LA LISTE DES CANDIDATS, PAS LE PRODUIT ENTREPRISES × FAMILLES.
+ * C'est le changement du 2026-08-17 : on ne tente plus toutes les combinaisons, seulement
+ * les paires qu'une observation désigne. Un dénominateur resté au produit afficherait « 15
+ * / 180 » alors qu'il n'y a que quinze paires au programme — une barre qui n'atteindrait
+ * jamais 100 % sur un travail pourtant terminé.
  *
- * · Le dénominateur compte les entreprises DISTINCTES à la casse près, comme
- *   `planifierDecouverte` : sinon un nom présent dans les cibles ET dans les offres
- *   gonflerait le total de cinq paires qui ne seront jamais tentées, et la barre
- *   plafonnerait sous 100 % pour toujours.
- * · Une entreprise RÉSOLUE tranche ses cinq paires d'un coup : on ne cherche jamais ses
- *   autres pages carrières. Les compter une par une laisserait 80 % du travail « à faire »
- *   alors qu'il ne se fera pas.
- * · Un essai mémorisé pour une entreprise qui a QUITTÉ la liste (offre périmée, cible
- *   retirée) ne compte pas : il gonflerait le numérateur sans dénominateur en face.
+ * ⚠️ DEUX PIÈGES DANS LE NUMÉRATEUR.
+ * · Une entreprise RÉSOLUE tranche TOUTES ses paires d'un coup : on ne cherche jamais ses
+ *   autres pages carrières. Les compter une par une laisserait du travail « à faire » qui
+ *   ne se fera pas.
+ * · Un essai mémorisé pour une paire qui n'est plus candidate ne compte pas : il gonflerait
+ *   le numérateur sans dénominateur en face.
  */
 export function progression(
-  noms: readonly string[],
+  candidats: readonly { entreprise: string; famille: string }[],
   resolues: readonly string[],
-  essais: readonly { entreprise: string }[],
+  essais: readonly { entreprise: string; famille: string }[],
 ): { faites: number; total: number } {
-  const auProgramme = new Set(noms.map((n) => n.toLowerCase()));
   const resolu = new Set(resolues.map((n) => n.toLowerCase()));
+  const cle = (p: { entreprise: string; famille: string }) =>
+    `${p.entreprise.toLowerCase()}|${p.famille}`;
 
-  const paireResolues =
-    [...resolu].filter((n) => auProgramme.has(n)).length * FAMILLES_ATS.length;
+  const auProgramme = new Map(candidats.map((c) => [cle(c), c]));
+  const tranchees = new Set<string>();
 
-  const essayees = essais.filter((e) => {
-    const n = e.entreprise.toLowerCase();
-    return auProgramme.has(n) && !resolu.has(n);
-  }).length;
+  for (const [k, c] of auProgramme) {
+    if (resolu.has(c.entreprise.toLowerCase())) tranchees.add(k);
+  }
+  for (const e of essais) {
+    const k = cle(e);
+    if (auProgramme.has(k)) tranchees.add(k);
+  }
 
-  return {
-    faites: paireResolues + essayees,
-    total: auProgramme.size * FAMILLES_ATS.length,
-  };
+  return { faites: tranchees.size, total: auProgramme.size };
 }
 
 /**
@@ -131,39 +157,33 @@ export function progression(
  * qui a disparu de la liste (une offre périmée, une cible retirée) ne doit pas gonfler le
  * numérateur — sinon la barre dépasserait 100 % sans que rien ne le signale.
  */
-export async function etatDecouverte(
-  employeurs: readonly string[],
-  jour: string,
-): Promise<EtatDecouverte> {
+export async function etatDecouverte(jour: string): Promise<EtatDecouverte> {
   const [ats, essais] = await Promise.all([
     lireEtat<AtsEntreprise[]>(CLE_ATS, []),
     lireEtat<EssaiAts[]>(CLE_ESSAIS_ATS, []),
   ]);
 
-  const noms = nomsACouvrir(employeurs);
-  const auProgramme = new Set(noms.map((n) => n.toLowerCase()));
-  const resolues = new Set(ats.map((a) => a.entreprise.toLowerCase()));
-
-  const essaisAuProgramme = essais.filter(
-    (e) => auProgramme.has(e.entreprise.toLowerCase()) && !resolues.has(e.entreprise.toLowerCase()),
+  const candidat = new Set(
+    CANDIDATS_ATS.map((c) => `${c.entreprise.toLowerCase()}|${c.famille}`),
   );
+  const resolues = new Set(ats.map((a) => a.entreprise.toLowerCase()));
 
   return {
     ...progression(
-      noms,
+      CANDIDATS_ATS,
       ats.map((a) => a.entreprise),
       essais,
     ),
     inscrites: ats,
-    essais: essaisAuProgramme,
-    aTenter: planifierDecouverte(
-      noms,
-      FAMILLES_ATS,
-      essais,
-      ats.map((a) => a.entreprise),
-      jour,
-      MAX_ESSAIS_LOT_MANUEL,
-    ).length,
+    // Seuls les essais encore au programme : un essai laissé par une paire retirée de la
+    // liste des candidats ne dit plus rien de ce qu'on tente, il encombrerait le rapport.
+    essais: essais.filter(
+      (e) =>
+        candidat.has(`${e.entreprise.toLowerCase()}|${e.famille}`) &&
+        !resolues.has(e.entreprise.toLowerCase()),
+    ),
+    aTenter: planifierCandidats(essais, ats, jour, MAX_ESSAIS_LOT_MANUEL)
+      .length,
   };
 }
 
@@ -186,7 +206,6 @@ export interface LotDecouverte {
  * `verifier` est injecté pour que la fonction s'éprouve sans réseau.
  */
 export async function avancerDecouverte(
-  employeurs: readonly string[],
   jour: string,
   options: {
     max?: number;
@@ -195,7 +214,10 @@ export async function avancerDecouverte(
       famille: FamilleAts,
       jeton: string,
       entreprise: string,
-    ) => Promise<{ verdict: "confirme" | "refute" | "indecis" | "absent"; raison?: string }>;
+    ) => Promise<{
+      verdict: "confirme" | "refute" | "indecis" | "absent";
+      raison?: string;
+    }>;
   } = {},
 ): Promise<LotDecouverte> {
   const max = options.max ?? MAX_ESSAIS_LOT_MANUEL;
@@ -204,7 +226,9 @@ export async function avancerDecouverte(
     options.verifier ??
     (async (famille, jeton, entreprise) => {
       const r = await verifierAts(famille, jeton, entreprise, recuperer);
-      return r.verdict === "refute" ? { verdict: r.verdict, raison: r.raison } : { verdict: r.verdict };
+      return r.verdict === "refute"
+        ? { verdict: r.verdict, raison: r.raison }
+        : { verdict: r.verdict };
     });
 
   const [ats, essais] = await Promise.all([
@@ -212,26 +236,33 @@ export async function avancerDecouverte(
     lireEtat<EssaiAts[]>(CLE_ESSAIS_ATS, []),
   ]);
 
-  const noms = nomsACouvrir(employeurs);
-  const aFaire = planifierDecouverte(
-    noms,
-    FAMILLES_ATS,
-    essais,
-    ats.map((a) => a.entreprise),
-    jour,
-    max,
-  );
+  const aFaire = planifierCandidats(essais, ats, jour, max);
 
   if (aFaire.length === 0) {
     return {
-      compte: { essais: 0, confirmees: 0, refutees: 0, indecis: 0, absentes: 0, sautes: 0 },
+      compte: {
+        essais: 0,
+        confirmees: 0,
+        refutees: 0,
+        indecis: 0,
+        absentes: 0,
+        sautes: 0,
+      },
       trouvees: [],
       ecartees: [],
-      etat: await etatDecouverte(employeurs, jour),
+      etat: await etatDecouverte(jour),
     };
   }
 
-  const d = await executerDecouverte(aFaire, essais, ats, jour, verifier, jetonProbable, budgetMs);
+  const d = await executerDecouverte(
+    aFaire,
+    essais,
+    ats,
+    jour,
+    verifier,
+    jetonProbable,
+    budgetMs,
+  );
 
   // ⚠️ L'ORDRE DES DEUX ÉCRITURES COMPTE. `veille-ats` d'abord : c'est lui qui fait entrer
   // une entreprise dans la veille quotidienne. Si la coupure tombe entre les deux, on aura
@@ -240,7 +271,9 @@ export async function avancerDecouverte(
   await ecrireEtat(CLE_ATS, d.ats);
   await ecrireEtat(CLE_ESSAIS_ATS, d.essais);
 
-  const dejaLa = new Set(ats.map((a) => `${a.entreprise.toLowerCase()}|${a.famille}`));
+  const dejaLa = new Set(
+    ats.map((a) => `${a.entreprise.toLowerCase()}|${a.famille}`),
+  );
   const cle = (e: { entreprise: string; famille: FamilleAts }) =>
     `${e.entreprise.toLowerCase()}|${e.famille}`;
   const duLot = new Set(aFaire.map(cle));
@@ -249,6 +282,6 @@ export async function avancerDecouverte(
     compte: d.compte,
     trouvees: d.ats.filter((a) => !dejaLa.has(cle(a))),
     ecartees: d.essais.filter((e) => e.le === jour && duLot.has(cle(e))),
-    etat: await etatDecouverte(employeurs, jour),
+    etat: await etatDecouverte(jour),
   };
 }

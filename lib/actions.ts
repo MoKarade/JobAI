@@ -1871,7 +1871,12 @@ export type ResultatDecouverte =
       /** Reste-t-il de quoi faire un lot de plus ? C'est le signal d'arrêt de la boucle. */
       reste: boolean;
     }
-  | { ok: false; erreur: string };
+  /**
+   * `attendreMs` distingue « pas tout de suite » de « non ». La contre-pression est un
+   * refus ATTENDU : le client doit patienter puis reprendre, pas abandonner. Sans ce champ,
+   * il ne pouvait pas faire la différence — et il abandonnait au bout d'un lot.
+   */
+  | { ok: false; erreur: string; attendreMs?: number };
 
 /**
  * Un lot de découverte de pages carrières, déclenché par Marc.
@@ -1899,18 +1904,14 @@ export async function lancerDecouverte(): Promise<ResultatDecouverte> {
     return {
       ok: false,
       erreur: "Un lot vient d'être lancé. Laisse quelques secondes aux services interrogés.",
+      attendreMs: DELAI_LOT_MANUEL_MS,
     };
   }
 
   try {
-    const offres = (await lireOffres()) ?? [];
     // Le fuseau de Marc, jamais UTC : la clé d'idempotence des essais est une DATE, et un
     // lot lancé après 20 h locale serait daté de demain s'il partait de `toISOString`.
-    const jour = aujourdhui(new Date());
-    const lot = await avancerDecouverte(
-      offres.map((o) => o.entreprise),
-      jour,
-    );
+    const lot = await avancerDecouverte(aujourdhui(new Date()));
 
     return {
       ok: true,

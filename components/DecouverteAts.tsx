@@ -83,6 +83,24 @@ export function DecouverteAts({
       for (;;) {
         const r = await lancerDecouverte();
 
+        // ⚠️ LA TEMPORISATION N'EST PAS UNE ERREUR — c'est la boucle qui va trop vite.
+        //
+        // Le serveur refuse un lot lancé moins de `DELAI_LOT_MANUEL_MS` après le précédent,
+        // pour ne pas marteler cinq services tiers. Le premier jet traitait ce refus comme
+        // un échec fatal : la boucle s'arrêtait au bout d'UN lot, la barre restait figée, et
+        // ça se lisait comme un blocage. Le refus dit « pas tout de suite », pas « non » :
+        // on attend, puis on reprend. C'est la même méprise que « un HTTP 200 ne prouve
+        // rien », dans l'autre sens — un refus attendu n'est pas une panne.
+        if (!r.ok && r.attendreMs !== undefined) {
+          setMessage("Pause — on laisse respirer les services interrogés.");
+          await new Promise((suite) => setTimeout(suite, r.attendreMs));
+          if (arret.current) {
+            setMessage(`Arrêté après ${lots} lot${lots > 1 ? "s" : ""}. La progression est gardée.`);
+            break;
+          }
+          continue;
+        }
+
         if (!r.ok) {
           setMessage(r.erreur);
           break;
@@ -145,7 +163,11 @@ export function DecouverteAts({
             disabled={!reste}
             onClick={() => void balayer()}
           >
-            {reste ? "Lancer la recherche" : "Rien de nouveau à tenter"}
+            {reste
+              ? "Lancer la recherche"
+              : total === 0
+                ? "Aucune piste vérifiée à tenter"
+                : "Rien de nouveau à tenter"}
           </button>
         )}
       </div>
@@ -183,13 +205,23 @@ export function DecouverteAts({
         </div>
       ) : null}
 
-      <p className="decouverte__note">
-        La recherche devine l’adresse de la page carrières de chaque entreprise chez cinq
-        services (Greenhouse, Lever, Recruitee, Workable, SmartRecruiters), puis vérifie que
-        les postes publiés sont bien dans la région — un identifiant qui répond n’est pas un
-        identifiant qui a raison. Rien n’est inscrit sans cette vérification. Les essais sont
-        mémorisés : relancer demain ne repaie pas ce qui a déjà été tenté.
-      </p>
+      {total === 0 ? (
+        <p className="decouverte__note">
+          Aucune paire à tenter — et c’est un résultat, pas un travail en attente. La version
+          précédente devinait l’adresse d’une page carrières à partir du nom de l’entreprise,
+          chez cinq services. Premier essai réel : quinze tentatives, quinze échecs. La
+          recherche a montré pourquoi — Canam, Robotiq et Laserax publient sur leur propre
+          site, pas sur ces services-là, qui sont l’écosystème des entreprises technologiques
+          américaines. Une paire ne s’ajoute plus qu’après avoir été OBSERVÉE.
+        </p>
+      ) : (
+        <p className="decouverte__note">
+          Chaque paire vient d’une page carrières observée, jamais d’un identifiant deviné.
+          La vérification reste faite : les postes publiés doivent être dans la région — un
+          identifiant qui répond n’est pas un identifiant qui a raison. Les essais sont
+          mémorisés : relancer demain ne repaie pas ce qui a déjà été tenté.
+        </p>
+      )}
     </div>
   );
 }

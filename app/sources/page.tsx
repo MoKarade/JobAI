@@ -16,7 +16,6 @@ import { auth } from "@/auth";
 import { Cadre } from "@/components/Cadre";
 import { DecouverteAts } from "@/components/DecouverteAts";
 import { etatDecouverte } from "@/lib/decouverte";
-import { lireOffres } from "@/lib/donnees";
 import { aujourdhui } from "@/lib/ajout";
 import { RECHERCHES_GUICHET } from "@/lib/ingest/sources";
 import { classerPanne, type Panne } from "@/lib/panne";
@@ -34,11 +33,7 @@ export default async function Sources() {
   let etat: Awaited<ReturnType<typeof etatDecouverte>> | null = null;
   let panne: Panne | null = null;
   try {
-    const offres = (await lireOffres()) ?? [];
-    etat = await etatDecouverte(
-      offres.map((o) => o.entreprise),
-      aujourdhui(new Date()),
-    );
+    etat = await etatDecouverte(aujourdhui(new Date()));
   } catch (err) {
     // La classification vit dans `lib/panne.ts`, jamais réécrite ici : une page qui compare
     // les codes Postgres dans son coin finit par dire « la base n'a pas répondu » quand il

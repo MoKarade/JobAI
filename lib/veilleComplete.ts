@@ -180,8 +180,7 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
       // découverte partage son mur de 60 s avec l'ingestion, la localisation et les bornes ;
       // lancée à la main elle est seule, et peut prendre plus large. C'est la seule
       // différence entre les deux chemins — tout le reste est `lib/decouverte.ts`.
-      const employeurs = rapport.offres.map((o) => o.entreprise);
-      const lot = await avancerDecouverte(employeurs, jour, {
+      const lot = await avancerDecouverte(jour, {
         max: MAX_ESSAIS_PAR_PASSE,
         budgetMs: BUDGET_DECOUVERTE_MS,
       });
