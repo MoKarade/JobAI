@@ -122,7 +122,36 @@ Deux conséquences non négociables :
    réelle vaut mieux qu'un trou dans la carte — mais sa note n'est PAS un jugement, c'est un
    défaut de lecture, et le rapport doit le dire.
 
-## Le Guichet-Emplois — la troisième source, et ses trois pièges
+## ⛔ Le Guichet-Emplois — ÉCRIT, PUIS BLOQUÉ LE MÊME JOUR. NE PAS L'EXÉCUTER.
+
+**Mesuré le 2026-08-17, après l'écriture de cette section :**
+
+```
+curl https://www.guichetemplois.gc.ca/accueil   -> CONNECT tunnel failed, response 403
+curl https://www.jobboom.com/fr                 -> CONNECT tunnel failed, response 403
+```
+
+Le refus vient de la **politique réseau de l'environnement**, au niveau du tunnel CONNECT :
+la requête ne part jamais. Et la Routine tire dans la MÊME session que Claude
+(`persistent_session_id`), donc elle hérite exactement du même accès. **Elle ne peut pas
+joindre ce site.** Ne dépense pas ton budget à le découvrir : saute l'étape 4 bis et dis-le
+en une ligne dans ton rapport.
+
+⚠️ **Comment cette section a été écrite AVANT d'être vérifiée** — c'est la faute à retenir,
+la troisième de la même famille dans la journée. Les formes d'URL venaient de TITRES de
+résultats de recherche, jamais d'une visite. Marc a ouvert le premier lien : il tombe sur
+l'accueil du Guichet-Emplois, pas sur la page employeur. Un `curl` de trente secondes
+tranchait la question ; je l'ai écrite d'abord. **Un lien lu dans une liste de résultats
+n'est pas un lien vérifié.**
+
+**CE QUI LA DÉBLOQUERAIT** — un geste de Marc, pas une ligne de code : ajouter
+`guichetemplois.gc.ca` (et `jobboom.com`) à l'allowlist de l'environnement, comme il l'a
+fait pour `*.hubperso.com`. Tant que le `curl` ci-dessus rend 403, cette section reste morte.
+Le jour où il rend 200, la relire ENTIÈREMENT — y compris les formes d'URL, qui restent
+non vérifiées.
+
+<details>
+<summary>Le protocole rédigé, gardé pour le jour où l'accès s'ouvre</summary>
 
 Ajoutée le 2026-08-17, après la mesure qui a fermé les autres portes. Les deux connecteurs
 ne voient qu'Indeed et ZipRecruiter ; or la plupart des 36 cibles publient ailleurs — sur
@@ -165,6 +194,8 @@ Formes d'URL observées le 2026-08-17 (à confirmer par toi, pas à supposer) :
 titre + ville) — une même offre paraît souvent sur Indeed ET sur le Guichet-Emplois, et
 c'est `trier()` qui l'écarte, pas toi.
 
+</details>
+
 ## Le prompt
 
 ```
@@ -202,20 +233,13 @@ Fais la veille JobAI du jour.
    ZipRecruiter : location "Quebec City, Quebec" ET "Levis, Quebec",
    country_admin_code "CA", radius_miles 40. Là, le lieu compte.
 
-4 bis. Puis le GUICHET-EMPLOIS, avec ta recherche web (voir la section qui lui
-   est consacrée — trois pièges, lis-les avant).
-
-   a) D'ABORD la région : les mêmes termes qu'en 4, sur la Capitale-Nationale
-      et Chaudière-Appalaches. Un appel ramène aussi les employeurs qu'on ne
-      connaît pas encore.
-   b) ENSUITE, s'il reste du budget, les pages employeur des cibles absentes
-      du résultat ci-dessus. Ne FABRIQUE pas leur URL depuis leur nom :
-      cherche la page, suis le lien, et rapporte l'URL utilisée.
-   c) Tu n'atteins pas le site ? DIS-LE et passe. « Je n'ai pas pu chercher »
-      n'est pas « il n'y avait rien » — c'est la confusion qui a coûté
-      40 offres le 12 août.
-
-   `source` : "Guichet-Emplois".
+4 bis. GUICHET-EMPLOIS — ÉTAPE SUSPENDUE, ne la fais pas.
+   L'hôte est refusé par la politique réseau de l'environnement (403 au tunnel
+   CONNECT, mesuré le 2026-08-17), et ta session est CELLE de Claude : tu as le
+   même accès, donc le même refus. Une ligne dans le rapport : « Guichet-Emplois
+   sauté — hôte bloqué ». Ne cherche pas de contournement.
+   Elle se rouvre le jour où `curl https://www.guichetemplois.gc.ca/accueil`
+   rend 200 — voir la section qui lui est consacrée.
 
 5. Écarte, en NOMMANT chaque rejet et son motif (un compte seul ne se vérifie
    pas) : hors région (Chapais, Saguenay, Montréal…), hors cible (marketing,
