@@ -22,11 +22,14 @@ import { executerVeilleComplete } from "./veilleComplete";
 export type ResultatVeilleManuelle =
   | {
       ok: true;
-      resume: string;
       trouvees: number;
-      ingerees: number;
+      nouvelles: number;
       perimees: number;
-      sources: number;
+      enSursis: number;
+      doublons: number;
+      ecartees: number;
+      /** Une ligne par source interrogée : « 0 au total » ne dit pas laquelle s'est tue. */
+      sources: { id: string; ok: boolean; offres: number; erreur?: string }[];
     }
   | { ok: false; erreur: string };
 
@@ -52,17 +55,28 @@ export async function lancerVeille(): Promise<ResultatVeilleManuelle> {
   const r = await executerVeilleComplete("bouton-app");
   if (!r.ok) return { ok: false, erreur: r.erreur };
 
+  // ⚠️ LES CLÉS SE LISENT DANS `executerVeilleComplete`, PAS DE MÉMOIRE. Premier jet :
+  // `ingerees` (le compte s'appelle `nouvelles`) et `sources` traité comme un nombre alors
+  // que c'est un TABLEAU. Les deux rendaient 0 — donc « 0 ingérée sur 100 trouvées · 0
+  // source interrogée », un compte rendu qui se contredisait lui-même à l'écran et faisait
+  // croire à une panne. Un champ absent d'un `Record<string, unknown>` ne lève pas : il vaut
+  // `undefined`, et un défaut à 0 le déguise en mesure.
   const c = r.compte as Record<string, unknown>;
   const nombre = (v: unknown): number => (typeof v === "number" ? v : 0);
+  const sources = Array.isArray(c.sources)
+    ? (c.sources as { id: string; ok: boolean; offres: number; erreur?: string }[])
+    : [];
 
   revalidatePath("/");
   revalidatePath("/sources");
   return {
     ok: true,
-    resume: typeof c.resume === "string" ? c.resume : "",
     trouvees: nombre(c.trouvees),
-    ingerees: nombre(c.ingerees),
+    nouvelles: nombre(c.nouvelles),
     perimees: nombre(c.perimees),
-    sources: nombre(c.sources),
+    enSursis: nombre(c.enSursis),
+    doublons: nombre(c.doublons),
+    ecartees: nombre(c.ecartees),
+    sources,
   };
 }

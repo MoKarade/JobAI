@@ -219,12 +219,25 @@ Fais la veille JobAI du jour.
    l'attente annoncée, arrête — la fenêtre est dépensée, ce n'est pas une
    question de patience).
 
-   Termes (dérivés de PROFIL_DEFAUT, lib/profil.ts) :
-     coordonnateur automatisation · chargé de projet · automatisation ·
-     robotique · superviseur production · mise en service ·
-     automate programmable · électromécanique · mécatronique ·
-     chef d'équipe production · gestionnaire de projet industriel ·
-     technicien automatisation
+   TERMES — lis-les dans `PROFIL_DEFAUT.recherches` (lib/profil.ts). Ne les
+   recopie pas ici : la liste vivait en double, et l'exemplaire du prompt a
+   fini par diverger de celle du code (huit d'un côté, douze de l'autre).
+
+   ⚠️ N'INTERROGE PAS TOUTE LA LISTE. Elle compte ~28 termes depuis le
+   2026-08-17 (français ET anglais — Honeywell, Alstom, AMETEK et Domtar
+   publient en anglais dans la région, et Marc est bilingue). Les interroger
+   tous chaque jour ferait sauter le quota Indeed, qui se referme en
+   s'aggravant. C'est un BASSIN, pas une liste à épuiser.
+
+   Prends DOUZE termes par jour, en TOURNANT : départ = (jour du mois × 12)
+   modulo la longueur de la liste, puis douze à la suite en repartant au
+   début quand tu atteins la fin. Déterministe, sans état à garder, et la
+   couverture fait le tour du bassin en trois jours au lieu de refaire les
+   huit mêmes recherches à l'infini.
+
+   ⚠️ DIS DANS TON RAPPORT quels termes tu as tirés. Sans ça, « 100 offres
+   trouvées » ne se compare pas d'un jour à l'autre — deux tirages différents
+   ne mesurent pas la même chose.
 
    Indeed : location "Québec, QC", country_code "CA". Ne double PAS par ville —
    mesuré, le lieu n'a aucun effet sur ce connecteur, c'est le terme qui

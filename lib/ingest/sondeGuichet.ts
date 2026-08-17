@@ -87,24 +87,24 @@ export function adressesCandidates(recherche: string): string[] {
     "https://www.guichetemplois.gc.ca/parcourirlesoffresdemploi/province/QC",
 
     // ── Les gros sites d'emploi québécois ───────────────────────────────────────────────
+    // MESURÉ LE 2026-08-17, et la liste a maigri en conséquence : `jobsquebec.com` redirige
+    // vers un revendeur de domaines expirés (il est mort), `quebecentete.com/emplois` rend
+    // un 404 JSON, la page carrières d'U. Laval a changé d'adresse, et les deux chemins
+    // Jobillico essayés rendent 404. Un candidat réfuté qu'on garde coûte une requête par
+    // sondage et brouille la lecture — on le retire, on ne le commente pas.
     // Ce ne sont PAS des sources retenues : ce sont des candidats à MESURER. Aucun n'entrera
     // dans la veille sans passer par un ADR (garde-fou n°4) — la sonde dit seulement ce qui
     // répond et ce qui déclare un flux. Mesuré vaut mieux que supposé, et c'est tout l'objet.
     "https://www.jobboom.com/fr",
-    `https://www.jobboom.com/fr/emploi/${q}/_lfr`,
-    "https://www.jobillico.com/fr/emplois",
-    `https://www.jobillico.com/fr/recherche-emploi?skwd=${q}`,
+    `https://www.jobboom.com/fr/emploi/${q}/_kfr`,
     "https://www.quebecemploi.gouv.qc.ca/",
     "https://emplois.espresso-jobs.com/",
     "https://www.isarta.com/emplois/",
     "https://www.grenier.qc.ca/emplois",
-    "https://www.jobsquebec.com/",
-    "https://quebecentete.com/emplois/",
 
     // ── Emplois publics et parapublics de la région ─────────────────────────────────────
     "https://www.ville.quebec.qc.ca/apropos/emplois/",
     "https://www.carrieres.gouv.qc.ca/",
-    "https://www.ulaval.ca/notre-universite/travailler-a-ulaval",
 
     // ── Agrégateurs à flux, historiquement les plus susceptibles d'en publier ───────────
     `https://www.careerjet.ca/search/jobs?s=${q}&l=${lieu}`,

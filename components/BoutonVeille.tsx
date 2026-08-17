@@ -30,11 +30,19 @@ export function BoutonVeille() {
             }
             // Le compte rendu porte les mêmes nombres que la trace serveur : « 0 sur 0 » et
             // « 0 sur 161 » sont deux situations opposées, et un simple « c'est fait » les
-            // confondrait.
+            // confondrait. Le détail PAR SOURCE est ce qui manquait le plus — un total de
+            // zéro ne dit pas laquelle des sources s'est tue.
+            const muettes = r.sources.filter((s) => !s.ok);
             setMessage(
-              `${r.ingerees} ingérée(s) sur ${r.trouvees} trouvée(s) · ` +
-                `${r.perimees} périmée(s) · ${r.sources} source(s) interrogée(s).` +
-                (r.resume ? ` ${r.resume}` : ""),
+              `${r.trouvees} trouvée(s) · ${r.nouvelles} nouvelle(s) · ` +
+                `${r.doublons} déjà connue(s) · ${r.ecartees} sous le plancher · ` +
+                `${r.perimees} périmée(s) · ${r.enSursis} en sursis. ` +
+                `Sources : ${
+                  r.sources.length === 0
+                    ? "aucune"
+                    : r.sources.map((s) => `${s.id} ${s.ok ? s.offres : "EN ÉCHEC"}`).join(" · ")
+                }` +
+                (muettes.length > 0 ? ` — ${muettes.map((s) => s.erreur ?? "?").join(" · ")}` : ""),
             );
           });
         }}

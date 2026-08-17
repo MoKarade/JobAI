@@ -275,15 +275,62 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
 
   plafondNoteCalculee: 85,
 
+  // ⚠️ ÉLARGI LE 2026-08-17, ET C'EST UN AJUSTEMENT ASSUMÉ, PAS UN REFACTOR EN PASSANT
+  // (demande de Marc : « je veux que ce soit beaucoup plus efficace à trouver des jobs »).
+  //
+  // Deux constats mesurés le même jour :
+  //
+  // 1. LA RECHERCHE SATURE, PAS LE PIPELINE. Sur 161 offres rendues, 141 étaient déjà
+  //    connues et 3 seulement sont entrées. Ce n'est pas le tri qui est trop sévère : ce
+  //    sont les MÊMES offres qui reviennent, parce que huit termes ne couvrent qu'une part
+  //    du marché. Ajouter des sources était bloqué de partout ; ajouter des TERMES ne l'est
+  //    pas, et c'est le seul levier qui restait entièrement de notre côté.
+  //
+  // 2. LA LISTE ÉTAIT 100 % FRANÇAISE, et c'est le trou le plus large. Honeywell, Alstom,
+  //    AMETEK, STERIS et Domtar ont des établissements dans la région et publient EN
+  //    ANGLAIS — ce sont précisément les gros employeurs que la veille ne voyait jamais.
+  //    Marc est bilingue courant (c'est écrit dans ses forces) : ne chercher qu'en français
+  //    lui retirait des offres pour lesquelles il est qualifié.
+  //
+  // ⚠️ CE N'EST PAS « TOUT INTERROGER CHAQUE JOUR ». Le quota Indeed se referme en
+  // s'aggravant (mesuré : 14 s → 42 s → 51 s de refus successifs), donc tripler les appels
+  // quotidiens le ferait sauter. La liste est un BASSIN dans lequel la passe tire une
+  // douzaine de termes par jour, en tournant — voir `docs/veille-prompt.md`. La couverture
+  // s'étend sur la semaine, le coût quotidien ne bouge pas.
   recherches: [
+    // ── Gestion de projet technique — le cœur de cible ─────────────────────────────
     "coordonnateur de projets",
     "chargé de projet",
+    "gestionnaire de projet",
+    "ingénieur de projet",
+    "chargé de projet mécanique",
+    "project manager",
+    "technical project manager",
+    "project engineer",
+
+    // ── Automatisation et robotique ────────────────────────────────────────────────
+    "technicien automatisation",
+    "automatisation industrielle",
+    "robotique industrielle",
+    "intégrateur robotique",
+    "automate programmable",
+    "mécatronique",
+    "vision industrielle",
+    "automation engineer",
+    "robotics engineer",
+    "controls engineer",
+
+    // ── Production et maintenance ──────────────────────────────────────────────────
     "superviseur maintenance",
     "superviseur technique",
-    "technicien automatisation",
+    "superviseur de production",
     "amélioration continue",
-    "robotique industrielle",
     "planification production",
+    "mise en service",
+    "électromécanique",
+    "maintenance industrielle",
+    "manufacturing engineer",
+    "continuous improvement",
   ],
 
   swot: [
