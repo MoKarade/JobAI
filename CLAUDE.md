@@ -1000,6 +1000,36 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   avant de brancher un champ d'une API sur un champ du modèle, demander « de quelle ENTITÉ
   cette valeur parle-t-elle ? » — l'entreprise et l'établissement ne sont pas la même chose.
 
+- **Un verdict qui recouvre DEUX situations ne peut pas porter UN délai — il porte une
+  ÉCHELLE.** `verifierAts` rend `refute` sur une seule constatation (« des offres, aucune
+  dans la région »), et cette constatation vaut aussi bien pour un homonyme d'Amsterdam que
+  pour le board MONDIAL de la bonne entreprise, un jour sans poste régional. Le délai fixe de
+  60 jours était calibré sur la première seule : appliqué à la seconde, il mettait deux mois à
+  l'étagère les plus gros employeurs visés. C'est la leçon du « délai qui encode une prémisse »
+  d'un cran plus loin : quand la prémisse n'est vraie qu'une fois sur deux, on ne corrige pas
+  la valeur, on la fait ESCALADER — court au premier constat, long seulement quand la SÉRIE
+  l'a confirmé (et le compteur se remet à zéro dès qu'un autre verdict rompt la série, sinon
+  on atteint le palier long par accumulation d'accidents). L'arbitrage se fait sur l'ASYMÉTRIE
+  DES COÛTS : une retente inutile coûte une requête, un board mondial oublié coûte deux mois.
+- **Un travail trop long pour une fonction serverless se découpe en LOTS que le NAVIGATEUR
+  enchaîne, et sa progression se relit de l'état, jamais d'un compteur local.** 180 paires à
+  vérifier ne tiennent pas dans 60 s. Un `after()` aurait hérité de la durée de vie de la page
+  sans rien afficher ni pouvoir s'arrêter. L'onglet rappelle l'action lot par lot : chaque
+  aller-retour reste court, le bouton « Arrêter » agit immédiatement (la boucle est côté
+  client), et chaque lot renvoie `faites/total` RELUS de l'état persisté — fermer l'onglet et
+  revenir reprend au bon endroit, là où un compteur accumulé afficherait « 0 % » sur un
+  balayage à moitié fait. Deux corollaires : la boucle garde sa CONTRE-PRESSION en base (un
+  clic répété ou deux onglets martèleraient les services tiers — une variable de module ne
+  borne rien en serverless), et le calcul de progression s'extrait en fonction PURE, parce
+  qu'une barre fausse ne lève aucune erreur : elle raconte juste une histoire fausse.
+- **Une mesure faite depuis une session bloquée par le proxy ne mesure que le proxy.** 180
+  essais ATS ont rendu « 180 absent » : `verifierAts` traduit un `fetch` qui lève en `absent`,
+  et les cinq hôtes répondaient 403 par la politique réseau de l'environnement. Le chiffre
+  avait l'air d'un résultat accablant ; il ne disait rien du monde. Avant de conclure d'une
+  série d'échecs identiques, DISCRIMINER l'échec distant de l'empêchement local (ici : un
+  `fetch` nu qui montre le code HTTP) — et le dire, plutôt que de laisser un 0/180 s'installer.
+
+
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 
 La note de fit est le cœur du produit : elle décide ce que Marc regarde en premier.

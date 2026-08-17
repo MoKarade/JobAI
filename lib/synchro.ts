@@ -331,3 +331,21 @@ export const MAX_DURATION_CARTE_S = 60;
  * reste de quoi finir proprement.
  */
 export const BUDGET_PASSE_PAGE_MS = 35_000;
+
+/** Clé de la contre-pression du bouton de découverte. */
+export const CLE_DECOUVERTE_MANUELLE = "decouverte-manuelle";
+
+/**
+ * Intervalle minimal entre deux lots de découverte lancés à la main.
+ *
+ * ⚠️ CE DÉLAI PROTÈGE DES SERVICES TIERS, PAS L'APP. Un lot envoie jusqu'à trois requêtes
+ * en série à chacune des cinq familles d'ATS. Sans borne, un clic répété — ou deux onglets
+ * ouverts sur l'écran de découverte — les martèlerait, et un service gratuit BANNIT les
+ * appelants insistants : le confort coûterait la fonctionnalité, exactement comme pour
+ * Nominatim.
+ *
+ * Deux secondes : imperceptible pour Marc qui enchaîne les lots (douze lots suffisent à
+ * couvrir les cibles, soit vingt-quatre secondes d'attente cumulée), et assez pour qu'un
+ * hôte donné ne voie jamais plus d'environ une requête par seconde en moyenne.
+ */
+export const DELAI_LOT_MANUEL_MS = 2_000;

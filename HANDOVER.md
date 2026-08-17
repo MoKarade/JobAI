@@ -6,6 +6,63 @@
 
 ---
 
+## Session 2026-08-17 (suite) — « sources=1 » expliqué, et la recherche mise entre les mains de Marc
+
+### Pourquoi `sources=1` — c'était un compte exact, pas une panne
+
+`rapport.sources.length` compte les sources INTERROGÉES. Trois familles, deux vides :
+
+1. **Guichet-Emplois — zéro, par décision.** `RECHERCHES_GUICHET = []` : le flux RSS répond
+   404 sur toutes les adresses testées, désactivé avec la preuve à côté.
+2. **Pages carrières — zéro, faute de producteur.** `veille-ats` était vide depuis le premier
+   jour : les analyseurs, `sourceAts` et `jetonProbable` existaient tous, mais rien n'écrivait
+   la liste. C'est `[ATS-04]` qui l'a branché.
+3. **Dépôt de la Routine — un.** Le seul canal vivant.
+
+⚠️ **Correction d'un diagnostic donné plus tôt dans la session** : l'absence de ligne `[ats]`
+au cron de 15:00 n'avait rien à voir avec la réservation. La passe tournait sur `658f603`
+([ATS-03]), soit **un commit avant** [ATS-04], déployé 38 min plus tard.
+
+### Ce qui n'a PAS pu être mesuré, et pourquoi
+
+Le rendement réel de la découverte reste **inconnu**. Une tentative de mesure d'ici (180
+essais sur les 36 cibles) a rendu 180 « absent » — chiffre **nul et non avenu** : les cinq
+hôtes ATS répondent 403 par le proxy de la session, et `verifierAts` traduit un `fetch` qui
+lève en `absent`. La mesure ne portait que sur le blocage local. La production n'a pas ce
+proxy. Ne pas re-conclure de ce 0/180.
+
+### Livré
+
+- **[ATS-05]** — un nom présent dans les cibles ET dans les offres était planifié DEUX FOIS
+  dans la même passe (mesuré : 10 essais pour 5 paires). Dédoublonnage dans
+  `planifierDecouverte`, pour tous ses appelants.
+- **[BORNE-04]** — la trace ne dit plus « (Google non configuré) » quand il n'y avait
+  simplement rien à raffiner.
+- **[ATS-06] délai de retente escaladant** (décision Marc). `verifierAts` rend `refute` sur
+  une seule constatation qui recouvre deux situations : un homonyme (`recruitee/ace` →
+  Amsterdam) et un **board mondial légitime** sans poste régional ce jour-là (`alstom`,
+  `honeywell`, `domtar`, `labatt`, `dexterra`). Un délai fixe de 60 jours, calibré sur la
+  première seule, mettait deux mois à l'étagère les plus gros employeurs de la liste.
+  Paliers `[7, 21, 60]` selon le nombre de réfutations CONSÉCUTIVES ; le compteur se remet à
+  zéro dès qu'un autre verdict rompt la série.
+- **[ATS-07] écran `/sources`** (demande Marc). Il répond à « d'où viennent mes offres »
+  depuis l'app, et porte le bouton qui lance la recherche de pages carrières : barre de
+  progression, arrêt immédiat, journal de ce qui a été trouvé et écarté avec son motif.
+  Douze lots suffisent à couvrir les 36 cibles — au lieu de quinze jours d'attente.
+
+### État vérifié en production (2026-08-17, ~17:20 UTC)
+
+- Déploiement `c093fc5` READY ; les deux crons répondent au format de la ROUTE
+  (`{"ok":false,"erreur":"non autorisé"}`), donc le code est bien atteint.
+- [BORNE-03] **confirmé** : `[bornes] 67 borne(s) dans la boîte · 2 lieu(x) mesuré(s)` à
+  15:52, contre trois instances perdues par timeout à 15:00 sur l'ancien déploiement.
+  Réserve : `marque=0/2 vitesse=0/2 tarif=0/2` — OSM ne renseigne aucun de ces trois champs
+  pour ces deux employeurs. À surveiller quand le lot grossira.
+- Réservation de veille libre le **18/08 à 11:00 UTC** ; première ligne `[ats]` attendue au
+  cron de 15:00 UTC — sauf si Marc lance le balayage depuis `/sources` avant.
+
+---
+
 ## Session 2026-08-14 (suite) — la veille ne tournait plus depuis trois jours
 
 ### Ce qui a été constaté, pas supposé

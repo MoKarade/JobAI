@@ -25,7 +25,7 @@
 
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "./db";
-import { entreprisesLieux, offerReasons, offers, syncState } from "./db/schema";
+import { entreprisesLieux, offerReasons, offers } from "./db/schema";
 import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
 import { mesurerDistances } from "./actions";
@@ -35,19 +35,12 @@ import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
 import { executerPasse } from "./ingest/passe";
 import { recuperer } from "./ingest/sources";
 import type { AtsEntreprise } from "./ingest/types";
-import { FAMILLES_ATS } from "./ingest/types";
-import { jetonProbable, verifierAts } from "./ingest/sources";
-import {
-  planifierDecouverte,
-  executerDecouverte,
-  type EssaiAts,
-} from "./ingest/decouverteAts";
-import { ENTREPRISES_CIBLES } from "./reference";
+import { MAX_ESSAIS_PAR_PASSE, BUDGET_DECOUVERTE_MS } from "./ingest/decouverteAts";
+import { avancerDecouverte, CLE_ATS } from "./decouverte";
+import { lireEtat, ecrireEtat } from "./etat";
 import type { JournalVeille } from "./veille";
 
 export const CLE_JOURNAL = "veille-journal";
-const CLE_ATS = "veille-ats";
-const CLE_ESSAIS_ATS = "veille-ats-essais";
 const CLE_CURSEUR = "veille-curseur";
 
 /**
@@ -63,30 +56,6 @@ function aujourdhuiQuebec(): string {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-}
-
-async function lireEtat<T>(cle: string, defaut: T): Promise<T> {
-  const [ligne] = await db.select().from(syncState).where(eq(syncState.cle, cle));
-  if (!ligne) return defaut;
-  try {
-    return JSON.parse(ligne.valeur) as T;
-  } catch {
-    // Un état illisible ne doit pas bloquer la veille à vie : on repart du défaut, et la
-    // passe réécrira une valeur saine.
-    return defaut;
-  }
-}
-
-async function ecrireEtat(cle: string, valeur: unknown): Promise<void> {
-  const v = JSON.stringify(valeur);
-  const maj = await db
-    .update(syncState)
-    .set({ valeur: v, majLe: new Date() })
-    .where(eq(syncState.cle, cle))
-    .returning();
-  if (maj.length === 0) {
-    await db.insert(syncState).values({ cle, valeur: v }).onConflictDoNothing();
-  }
 }
 
 /** Le compte rendu d'une passe — ou la raison nommée de son refus. */
@@ -207,53 +176,31 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
     //
     // Elle est bornée par hôte, pas seulement par passe : voir `MAX_ESSAIS_PAR_FAMILLE`.
     try {
-      const essaisConnus = await lireEtat<EssaiAts[]>(CLE_ESSAIS_ATS, []);
+      // ⚠️ LE MÊME CODE QUE LE BOUTON, avec le plafond et le budget de la PASSE. Ici la
+      // découverte partage son mur de 60 s avec l'ingestion, la localisation et les bornes ;
+      // lancée à la main elle est seule, et peut prendre plus large. C'est la seule
+      // différence entre les deux chemins — tout le reste est `lib/decouverte.ts`.
+      const employeurs = rapport.offres.map((o) => o.entreprise);
+      const lot = await avancerDecouverte(employeurs, jour, {
+        max: MAX_ESSAIS_PAR_PASSE,
+        budgetMs: BUDGET_DECOUVERTE_MS,
+      });
 
-      // Les cibles de Marc d'abord, puis les employeurs déjà croisés en offre : ceux-là ont
-      // prouvé qu'ils embauchent dans la région, ce qui en fait de bons candidats.
-      //
-      // L'ORDRE compte (il fixe la priorité d'exploration) ; les DOUBLONS, non — les deux
-      // lots se recoupent forcément, et c'est `planifierDecouverte` qui les écarte, pour
-      // tous ses appelants à la fois. Dédoublonner une moitié ici donnait l'illusion que
-      // le cas était traité alors que le recoupement entre les deux restait entier.
-      const noms = [
-        ...ENTREPRISES_CIBLES.map((e) => e.nom),
-        ...rapport.offres.map((o) => o.entreprise).filter((n) => n.trim() !== ""),
-      ];
-      const aFaire = planifierDecouverte(
-        noms,
-        FAMILLES_ATS,
-        essaisConnus,
-        ats.map((a) => a.entreprise),
-        jour,
-      );
-
-      if (aFaire.length > 0) {
-        const d = await executerDecouverte(
-          aFaire,
-          essaisConnus,
-          ats,
-          jour,
-          async (famille, jeton, entreprise) => {
-            const r = await verifierAts(famille, jeton, entreprise, recuperer);
-            return r.verdict === "refute"
-              ? { verdict: r.verdict, raison: r.raison }
-              : { verdict: r.verdict };
-          },
-          jetonProbable,
-        );
-        await ecrireEtat(CLE_ATS, d.ats);
-        await ecrireEtat(CLE_ESSAIS_ATS, d.essais);
+      if (lot.compte.essais > 0) {
         console.log(
-          `[ats] essais=${d.compte.essais} confirmées=${d.compte.confirmees}` +
-            ` réfutées=${d.compte.refutees} indécis=${d.compte.indecis}` +
-            ` absentes=${d.compte.absentes} sautés=${d.compte.sautes}` +
-            ` inscrites=${d.ats.length}`,
+          `[ats] essais=${lot.compte.essais} confirmées=${lot.compte.confirmees}` +
+            ` réfutées=${lot.compte.refutees} indécis=${lot.compte.indecis}` +
+            ` absentes=${lot.compte.absentes} sautés=${lot.compte.sautes}` +
+            ` inscrites=${lot.etat.inscrites.length}` +
+            ` couverture=${lot.etat.faites}/${lot.etat.total}`,
         );
       } else {
         // « 0 essai » et « rien à essayer » sont deux situations opposées : la première dit
         // que le budget a été mangé ailleurs, la seconde que le balayage est à jour.
-        console.log(`[ats] rien à essayer aujourd'hui — inscrites=${ats.length}`);
+        console.log(
+          `[ats] rien à essayer aujourd'hui — inscrites=${lot.etat.inscrites.length}` +
+            ` couverture=${lot.etat.faites}/${lot.etat.total}`,
+        );
       }
     } catch (err) {
       console.warn(`[ats] découverte en échec (sans effet sur l'intake) : ${String(err)}`);

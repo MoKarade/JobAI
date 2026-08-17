@@ -59,7 +59,13 @@ import {
   motDeRecherche,
   type Etablissement,
 } from "./registre";
-import { BUDGET_PASSE_PAGE_MS } from "./synchro";
+import {
+  BUDGET_PASSE_PAGE_MS,
+  CLE_DECOUVERTE_MANUELLE,
+  DELAI_LOT_MANUEL_MS,
+  reserverPasse,
+} from "./synchro";
+import { avancerDecouverte } from "./decouverte";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -1837,5 +1843,101 @@ export async function modifierOffre(
   } catch (err) {
     console.error("[actions] modification impossible", { id, err });
     return { ok: false, erreur: "Enregistrement impossible. Réessaie." };
+  }
+}
+
+/**
+ * Ce qu'un lot de découverte rapporte à l'écran.
+ *
+ * Volontairement PLAT et sérialisable : il traverse la frontière Server Action → client,
+ * et une classe ou une Date n'y survivraient pas telles quelles.
+ */
+export type ResultatDecouverte =
+  | {
+      ok: true;
+      /** Paires tranchées / paires à couvrir. C'est la barre de progression. */
+      faites: number;
+      total: number;
+      /** Ce que ce lot vient de tenter, par verdict. */
+      essais: number;
+      confirmees: number;
+      refutees: number;
+      indecis: number;
+      absentes: number;
+      /** Les pages carrières gagnées par CE lot. */
+      trouvees: { entreprise: string; famille: string; jeton: string }[];
+      /** Ce que ce lot a écarté, avec le motif — un rejet sans motif ne se vérifie pas. */
+      ecartees: { entreprise: string; famille: string; verdict: string; raison?: string }[];
+      /** Reste-t-il de quoi faire un lot de plus ? C'est le signal d'arrêt de la boucle. */
+      reste: boolean;
+    }
+  | { ok: false; erreur: string };
+
+/**
+ * Un lot de découverte de pages carrières, déclenché par Marc.
+ *
+ * ⚠️ UN LOT, PAS LE BALAYAGE ENTIER. Cent quatre-vingts paires ne tiennent pas dans une
+ * fonction serverless : le client rappelle cette action tant que `reste` est vrai, et la
+ * barre avance d'un lot à l'autre. La progression est relue de l'ÉTAT à chaque lot, jamais
+ * accumulée côté navigateur — Marc peut fermer l'onglet et revenir, la barre repart où
+ * elle en était.
+ *
+ * ⚠️ CONTRE-PRESSION OBLIGATOIRE. Ce bouton envoie de vraies requêtes à cinq services
+ * tiers qui ne nous doivent rien. Un clic répété, ou deux onglets ouverts, doivent être
+ * bornés — et la borne passe par la BASE, pas par une variable de module : en serverless
+ * chaque instance a sa propre mémoire et ne borne rien. C'est la leçon du bouton
+ * « Situer », qui servait de limiteur de débit humain avant d'être automatisé.
+ */
+export async function lancerDecouverte(): Promise<ResultatDecouverte> {
+  try {
+    await exigerSession();
+  } catch {
+    return { ok: false, erreur: "Authentification requise." };
+  }
+
+  if (!(await reserverPasse(db, CLE_DECOUVERTE_MANUELLE, DELAI_LOT_MANUEL_MS, new Date()))) {
+    return {
+      ok: false,
+      erreur: "Un lot vient d'être lancé. Laisse quelques secondes aux services interrogés.",
+    };
+  }
+
+  try {
+    const offres = (await lireOffres()) ?? [];
+    // Le fuseau de Marc, jamais UTC : la clé d'idempotence des essais est une DATE, et un
+    // lot lancé après 20 h locale serait daté de demain s'il partait de `toISOString`.
+    const jour = aujourdhui(new Date());
+    const lot = await avancerDecouverte(
+      offres.map((o) => o.entreprise),
+      jour,
+    );
+
+    return {
+      ok: true,
+      faites: lot.etat.faites,
+      total: lot.etat.total,
+      essais: lot.compte.essais,
+      confirmees: lot.compte.confirmees,
+      refutees: lot.compte.refutees,
+      indecis: lot.compte.indecis,
+      absentes: lot.compte.absentes,
+      trouvees: lot.trouvees.map((a) => ({
+        entreprise: a.entreprise,
+        famille: a.famille,
+        jeton: a.jeton,
+      })),
+      ecartees: lot.ecartees.map((e) => ({
+        entreprise: e.entreprise,
+        famille: e.famille,
+        verdict: e.verdict,
+        ...(e.raison ? { raison: e.raison } : {}),
+      })),
+      reste: lot.etat.aTenter > 0,
+    };
+  } catch (err) {
+    // Un service tiers indisponible n'est pas une panne de l'app : on le DIT, on ne rend
+    // pas un lot vide qui se lirait comme « il n'y avait rien à faire ».
+    console.error("[decouverte] lot manuel en échec", err);
+    return { ok: false, erreur: "La découverte a échoué. Le détail est dans le journal." };
   }
 }

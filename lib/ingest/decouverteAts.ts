@@ -27,6 +27,17 @@ export interface EssaiAts {
   le: string;
   /** Ce qui a été vu. Un rejet sans motif ne se vérifie pas. */
   raison?: string;
+  /**
+   * Combien de RÉFUTATIONS d'affilée sur cette paire. Absent = une seule (ou aucune).
+   *
+   * C'est ce compteur qui fait monter le délai de retente : une réfutation isolée ne prouve
+   * pas qu'un jeton appartient à quelqu'un d'autre — voir `PALIERS_REFUTE_JOURS`. Il se
+   * remet à zéro dès qu'un autre verdict tombe, parce que la série est alors rompue.
+   *
+   * Optionnel et additif : l'état déjà en base (une liste vide, puis des essais écrits avant
+   * ce champ) se relit sans migration, et une entrée sans compteur vaut « première ».
+   */
+  refus?: number;
 }
 
 /**
@@ -45,9 +56,8 @@ export interface EssaiAts {
  *   la durée d'un balayage complet (mesuré : 180 paires à 12 essais/passe = 15 jours), donc
  *   une adoption est repérée au balayage suivant sans jamais doubler le coût.
  *
- * · `refute` — « ce jeton désigne-t-il bien cette entreprise-ci ? » La réponse ne change
- *   pas du tout : le jeton appartient à quelqu'un d'autre. On retente très rarement, et
- *   seulement parce qu'un homonyme peut libérer son identifiant.
+ * · `refute` — voir `PALIERS_REFUTE_JOURS` : ce délai-là n'est pas fixe, parce que la
+ *   question qu'il encode n'a pas une seule réponse possible.
  *
  * ⚠️ RÉDUIRE UN DÉLAI N'ACCÉLÈRE RIEN TANT QUE LA FILE DE NEUFS N'EST PAS VIDE (mesuré le
  * 2026-08-17, demande de Marc). Les retentes passent APRÈS les jamais-essayées : avec 180
@@ -57,8 +67,52 @@ export interface EssaiAts {
 export const DELAIS_RETENTE_JOURS = {
   indecis: 3,
   absent: 14,
-  refute: 60,
 } as const;
+
+/**
+ * Le délai de retente d'un RÉFUTÉ, selon le nombre de réfutations d'affilée.
+ *
+ * ⚠️ POURQUOI CE DÉLAI ESCALADE AU LIEU D'ÊTRE FIXE — décision Marc, 2026-08-17.
+ *
+ * `verifierAts` rend `refute` sur une seule constatation : « il y a des offres, aucune dans
+ * la région ». Or cette constatation recouvre DEUX situations que rien ne distingue dans la
+ * réponse elle-même :
+ *
+ * · un HOMONYME — `recruitee/ace` et `recruitee/robert` répondent avec des postes à
+ *   Amsterdam. Le jeton appartient à quelqu'un d'autre, et ça ne changera pas.
+ * · un BOARD MONDIAL LÉGITIME — `alstom`, `honeywell`, `domtar`, `labatt`, `dexterra`. Le
+ *   jeton désigne la BONNE entreprise ; elle n'affichait simplement aucun poste au Québec
+ *   ce jour-là. Elle en affichera un le mois prochain (Honeywell publie bien ici : il y en
+ *   a une dans le suivi).
+ *
+ * Un délai fixe de soixante jours était calibré sur la première situation SEULE. Appliqué à
+ * la seconde, il mettait deux mois de côté les plus gros employeurs de la liste — c'est-à-dire
+ * exactement ceux qu'on veut surveiller. La leçon de la §7 (« un délai de retente encode une
+ * PRÉMISSE : quand elle tombe, le délai doit tomber avec ») s'appliquait à une prémisse qui
+ * n'était vraie que la moitié du temps.
+ *
+ * L'asymétrie des coûts tranche : une retente inutile coûte UNE requête ; un board mondial
+ * mis à l'étagère coûte deux mois sans une cible majeure. On revient donc vite au premier
+ * refus, et on ne s'éloigne qu'à mesure que la série confirme l'hypothèse de l'homonyme.
+ *
+ * Trois réfutations d'affilée, c'est plus de deux mois d'observation (7 + 21) : à ce
+ * moment-là, « aucune offre régionale » n'est plus un hasard de calendrier.
+ */
+export const PALIERS_REFUTE_JOURS: readonly number[] = [7, 21, 60];
+
+/**
+ * Le délai avant de retenter cette paire, d'après ce qu'on a appris.
+ *
+ * PURE. Le seul endroit qui traduit un essai en délai — `planifierDecouverte` l'appelle,
+ * les tests aussi, et personne ne recopie la table.
+ */
+export function delaiRetenteJours(essai: Pick<EssaiAts, "verdict" | "refus">): number {
+  if (essai.verdict !== "refute") return DELAIS_RETENTE_JOURS[essai.verdict];
+  // Une entrée sans compteur est une PREMIÈRE réfutation : c'est le cas des essais écrits
+  // avant l'existence du champ, et celui d'un état vide. Jamais le palier le plus long.
+  const rang = Math.max(1, essai.refus ?? 1);
+  return PALIERS_REFUTE_JOURS[Math.min(rang, PALIERS_REFUTE_JOURS.length) - 1]!;
+}
 
 /**
  * Plafond d'essais par passe.
@@ -174,7 +228,7 @@ export function planifierDecouverte(
         continue;
       }
       const ecoules = joursEcoules(connu.le, aujourdhui);
-      if (ecoules >= DELAIS_RETENTE_JOURS[connu.verdict]) {
+      if (ecoules >= delaiRetenteJours(connu)) {
         retentes.push({ essai: { entreprise, famille }, anciennete: ecoules });
       }
     }
@@ -217,11 +271,31 @@ export function appliquerVerdict(
   jour: string,
   raison?: string,
 ): EssaiAts[] {
-  const autres = essais.filter(
-    (e) => !(e.entreprise.toLowerCase() === entreprise.toLowerCase() && e.famille === famille),
-  );
+  const memePaire = (e: EssaiAts) =>
+    e.entreprise.toLowerCase() === entreprise.toLowerCase() && e.famille === famille;
+  const precedent = essais.find(memePaire);
+  const autres = essais.filter((e) => !memePaire(e));
   if (verdict === "confirme") return autres;
-  return [...autres, { entreprise, famille, verdict, le: jour, ...(raison ? { raison } : {}) }];
+
+  // ⚠️ LA SÉRIE SE COMPTE, ET ELLE SE ROMPT. Le compteur ne monte que sur des réfutations
+  // CONSÉCUTIVES : si la paire a rendu autre chose entre-temps (l'entreprise a publié, le
+  // service a cessé de répondre), l'hypothèse « ce jeton est à quelqu'un d'autre » n'est
+  // plus étayée par la série et on repart du palier le plus court. Sans cette remise à
+  // zéro, une paire finirait au palier de soixante jours par accumulation d'accidents.
+  const refus =
+    verdict === "refute" ? (precedent?.verdict === "refute" ? (precedent.refus ?? 1) + 1 : 1) : 0;
+
+  return [
+    ...autres,
+    {
+      entreprise,
+      famille,
+      verdict,
+      le: jour,
+      ...(raison ? { raison } : {}),
+      ...(verdict === "refute" ? { refus } : {}),
+    },
+  ];
 }
 
 /**

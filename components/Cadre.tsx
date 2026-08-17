@@ -23,6 +23,10 @@ export const ONGLETS: readonly Onglet[] = [
   // alors que le suivi s'ouvre tous les jours. L'ordre des onglets suit la fréquence
   // d'usage, jamais l'ordre dans lequel les pages ont été écrites.
   { href: "/profil", libelle: "Profil" },
+  // Même règle, appliquée jusqu'au bout : les sources s'ouvrent encore moins souvent que le
+  // profil — quelques fois pour lancer le balayage des pages carrières, puis presque jamais.
+  // Elles sont pourtant la seule réponse à « pourquoi si peu d'offres aujourd'hui ? ».
+  { href: "/sources", libelle: "Sources" },
 ];
 
 export function Cadre({

@@ -16,6 +16,8 @@ import {
   planifierDecouverte,
   appliquerVerdict,
   DELAIS_RETENTE_JOURS,
+  PALIERS_REFUTE_JOURS,
+  delaiRetenteJours,
   MAX_ESSAIS_PAR_PASSE,
   MAX_ESSAIS_PAR_FAMILLE,
   executerDecouverte,
@@ -128,8 +130,43 @@ describe("planifierDecouverte — ce qu'on tente aujourd'hui", () => {
       { entreprise: "ACE", famille: "recruitee", verdict: "refute", le: ilYA(DELAIS_RETENTE_JOURS.indecis + 1) },
     ];
     expect(planifierDecouverte(["ACE"], ["recruitee"], essais, [], JOUR)).toEqual([]);
-    expect(DELAIS_RETENTE_JOURS.refute).toBeGreaterThan(DELAIS_RETENTE_JOURS.absent);
+    expect(PALIERS_REFUTE_JOURS[0]!).toBeGreaterThan(DELAIS_RETENTE_JOURS.indecis);
     expect(DELAIS_RETENTE_JOURS.absent).toBeGreaterThan(DELAIS_RETENTE_JOURS.indecis);
+  });
+
+  // ⚠️ LE PALIER COURT EXISTE POUR LES BOARDS MONDIAUX. Une réfutation isolée dit « aucun
+  // poste au Québec aujourd'hui », pas « ce jeton est à quelqu'un d'autre » — et pour
+  // Alstom ou Honeywell, la première lecture est la bonne. Les cas sont dérivés des paliers,
+  // jamais de leurs valeurs du jour.
+  it("revient VITE sur une première réfutation, et s'éloigne à mesure que la série tient", () => {
+    const paire = (refus: number, jours: number): EssaiAts[] => [
+      { entreprise: "Alstom", famille: "workable", verdict: "refute", refus, le: ilYA(jours) },
+    ];
+    const plan = (e: EssaiAts[]) => planifierDecouverte(["Alstom"], ["workable"], e, [], JOUR);
+
+    const court = PALIERS_REFUTE_JOURS[0]!;
+    expect(plan(paire(1, court - 1))).toEqual([]);
+    expect(plan(paire(1, court))).toHaveLength(1);
+
+    // Au deuxième refus le délai s'allonge : ce qui suffisait hier ne suffit plus.
+    expect(plan(paire(2, court))).toEqual([]);
+    expect(plan(paire(2, PALIERS_REFUTE_JOURS[1]!))).toHaveLength(1);
+
+    // Au troisième, le palier long — et il ne monte plus au-delà.
+    const long = PALIERS_REFUTE_JOURS[PALIERS_REFUTE_JOURS.length - 1]!;
+    expect(plan(paire(3, long - 1))).toEqual([]);
+    expect(plan(paire(3, long))).toHaveLength(1);
+    expect(plan(paire(99, long))).toHaveLength(1);
+  });
+
+  // Une entrée écrite AVANT l'existence du compteur ne doit pas hériter du palier long :
+  // elle n'a jamais prouvé de série. L'état déjà en base se relit sans migration.
+  it("traite un essai SANS compteur comme une première réfutation", () => {
+    const sansCompteur: EssaiAts[] = [
+      { entreprise: "Domtar", famille: "lever", verdict: "refute", le: ilYA(PALIERS_REFUTE_JOURS[0]!) },
+    ];
+    expect(planifierDecouverte(["Domtar"], ["lever"], sansCompteur, [], JOUR)).toHaveLength(1);
+    expect(delaiRetenteJours({ verdict: "refute" })).toBe(PALIERS_REFUTE_JOURS[0]);
   });
 
   // ⚠️ L'ANTI-FAMINE. Sans cette priorité, quelques indécis qui reviennent tous les trois
@@ -163,6 +200,35 @@ describe("planifierDecouverte — ce qu'on tente aujourd'hui", () => {
     // blocage définitif né d'une donnée corrompue.
     expect(() => planifierDecouverte(["X"], ["greenhouse"], essais, [], JOUR)).not.toThrow();
     expect(planifierDecouverte(["X"], ["greenhouse"], essais, [], JOUR)).toHaveLength(1);
+  });
+});
+
+describe("appliquerVerdict — le compteur de réfutations", () => {
+  const refuser = (essais: EssaiAts[]) =>
+    appliquerVerdict(essais, "Alstom", "workable", "refute", JOUR, "postes hors région");
+
+  it("compte 1 à la première réfutation, puis monte à chaque suivante", () => {
+    const un = refuser([]);
+    expect(un[0]?.refus).toBe(1);
+    expect(refuser(un)[0]?.refus).toBe(2);
+    expect(refuser(refuser(un))[0]?.refus).toBe(3);
+  });
+
+  // ⚠️ LA SÉRIE SE ROMPT. Sans remise à zéro, une paire atteindrait le palier long par
+  // ACCUMULATION D'ACCIDENTS — trois réfutations étalées sur un an, entrecoupées d'autres
+  // verdicts, ne disent rien de l'hypothèse « ce jeton est à quelqu'un d'autre ».
+  it("remet le compteur à zéro dès qu'un autre verdict rompt la série", () => {
+    const deux = refuser(refuser([]));
+    expect(deux[0]?.refus).toBe(2);
+
+    const interrompu = appliquerVerdict(deux, "Alstom", "workable", "indecis", JOUR);
+    expect(interrompu[0]?.refus).toBeUndefined();
+    expect(refuser(interrompu)[0]?.refus).toBe(1);
+  });
+
+  it("ne pose aucun compteur sur un verdict qui n'est pas une réfutation", () => {
+    const a = appliquerVerdict([], "Puribec", "greenhouse", "absent", JOUR);
+    expect(a[0]).not.toHaveProperty("refus");
   });
 });
 

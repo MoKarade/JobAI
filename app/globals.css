@@ -1838,3 +1838,131 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   font-size: var(--t-s);
   color: var(--ambre-texte);
 }
+
+/* ── Sources & découverte de pages carrières ─────────────────────────────────
+   Aucune couleur en dur : les jetons décident, sinon un thème qui change laisse
+   des valeurs fausses en silence (c'est ce que `tests/styles.test.ts` refuse). */
+
+.cadre-section { margin-block: var(--pas-3); }
+.cadre-section__titre { font-size: var(--t-l); margin-bottom: 0.5rem; }
+
+.sources__liste { list-style: none; padding: 0; display: grid; gap: 0.75rem; }
+
+.sources__canal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.15rem 0.75rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--surface);
+  border: var(--trait-surface);
+  border-radius: var(--r-carte);
+}
+
+.sources__nom { font-weight: 600; }
+
+.sources__etat {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.sources__etat--actif { color: var(--vert); }
+
+.sources__note {
+  grid-column: 1 / -1;
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  max-width: 68ch;
+}
+
+.sources__inscrites,
+.sources__essais {
+  list-style: none;
+  padding: 0;
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.3rem;
+  font-size: var(--t-s);
+}
+
+.sources__essai,
+.decouverte__ligne {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--r-champ);
+  background: var(--creux);
+}
+
+.sources__entreprise,
+.decouverte__entreprise { font-weight: 600; }
+
+.sources__famille,
+.decouverte__famille {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+}
+
+.sources__verdict,
+.decouverte__verdict { font-size: var(--t-xs); color: var(--text-soft); }
+
+.sources__date {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+}
+
+/* La ligne d'une trouvaille se distingue : c'est le seul résultat qui change quelque
+   chose au produit, tout le reste est du diagnostic. */
+.decouverte__ligne--trouvee { background: var(--actif); }
+.decouverte__ligne--trouvee .decouverte__verdict { color: var(--ambre-texte); }
+
+.decouverte { margin-bottom: var(--pas-2); }
+
+/* Le journal de session : ce que le lot vient de voir, le plus récent en tête. Il vit sous
+   les commandes plutôt qu'en colonne — sur un téléphone, une seconde colonne écraserait les
+   deux. */
+.decouverte__journal { margin-top: 1rem; }
+
+.decouverte__barre {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+/* `progress` natif plutôt qu'un div à `aria-valuenow` : la valeur est annoncée sans
+   bricolage, et la barre reste lisible si cette feuille ne charge pas. */
+.decouverte__jauge {
+  flex: 1 1 14rem;
+  height: 0.55rem;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--creux);
+  accent-color: var(--ambre);
+}
+
+.decouverte__chiffres {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.decouverte__commandes { display: flex; gap: 0.5rem; }
+.decouverte__message { font-size: var(--t-s); margin-top: 0.5rem; min-height: 1.2em; }
+.decouverte__titre { font-size: var(--t-m); margin: 1rem 0 0.4rem; }
+.decouverte__lignes { list-style: none; padding: 0; display: grid; gap: 0.3rem; }
+.decouverte__note {
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  margin-top: 0.75rem;
+  max-width: 68ch;
+}
