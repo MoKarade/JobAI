@@ -1,4 +1,4 @@
-# Prompt de la veille quotidienne — Indeed + ZipRecruiter
+# Prompt de la veille quotidienne — Indeed + ZipRecruiter + Guichet-Emplois
 
 > À coller dans la Routine. Écrit le 2026-08-14 à partir d'une exécution RÉELLE des deux
 > connecteurs, pas d'hypothèses : chaque contrainte ci-dessous a été mesurée ce jour-là.
@@ -122,6 +122,49 @@ Deux conséquences non négociables :
    réelle vaut mieux qu'un trou dans la carte — mais sa note n'est PAS un jugement, c'est un
    défaut de lecture, et le rapport doit le dire.
 
+## Le Guichet-Emplois — la troisième source, et ses trois pièges
+
+Ajoutée le 2026-08-17, après la mesure qui a fermé les autres portes. Les deux connecteurs
+ne voient qu'Indeed et ZipRecruiter ; or la plupart des 36 cibles publient ailleurs — sur
+leur propre portail (canam.com, robotiq.com, laserax.com, techsolmarine.com) et sur le
+**Guichet-Emplois**, qui leur tient une page employeur. C'est la seule source officielle,
+gratuite et sans partenariat qui les couvre : le garde-fou n°4 la nomme explicitement.
+
+*(Deux autres routes ont été essayées et fermées le même jour, pour ne pas les rouvrir :
+l'API Jobillico est une API de PUBLICATION — tout y est scopé aux « entreprises gérées par
+ce compte », donc illisible de l'extérieur ; et le flux XML du Guichet-Emplois exige un
+statut d'entreprise que Marc n'a pas.)*
+
+**Piège 1 — ne fabrique JAMAIS une URL d'employeur à partir de notre nom.** Cherche la page,
+suis le lien trouvé, et rapporte l'URL que tu as réellement utilisée. Les deux graphies
+semblent marcher (`Techsol Marine` comme `TECHSOL MARINE INC.`), mais « semble » n'est pas
+« mesuré ». Deux fois le 2026-08-17, un identifiant DEVINÉ depuis un nom a produit un faux
+négatif silencieux : `chantierdavie` au lieu de `ChantierDavieCanada`, une page carrières
+bien vivante classée « absente ». Un identifiant se constate, il ne se déduit pas.
+
+**Piège 2 — la région AVANT les employeurs.** Une recherche par terme sur la région ramène
+aussi les employeurs qu'on ne connaît pas encore, pour un seul appel ; trente-six pages
+employeur ne couvrent que trente-six employeurs, pour trente-six lectures. L'ordre est donc :
+région d'abord (le neuf), pages employeur ensuite (le ciblé), et on s'arrête au budget en
+disant où on s'est arrêté.
+
+**Piège 3 — le premier passage est une SONDE, pas une source.** On ne sait pas si ta session
+joint `guichetemplois.gc.ca` : celle de Claude ne le peut pas (proxy). Si tu ne l'atteins
+pas, DIS-LE et n'invente rien. « Je n'ai pas pu chercher » et « il n'y avait rien » sont
+deux phrases opposées, et c'est exactement la confusion qui a coûté 40 offres le 12 août.
+
+Formes d'URL observées le 2026-08-17 (à confirmer par toi, pas à supposer) :
+
+| Usage | URL |
+|---|---|
+| Province | `https://www.guichetemplois.gc.ca/parcourirlesoffresdemploi/province/QC` |
+| Recherche | `https://www.guichetemplois.gc.ca/trouverunemploi` (`searchstring`, `page`, `sort`) |
+| Employeur | `https://www.guichetemplois.gc.ca/parcourirlesoffresdemploi/employeur/<Nom>/QC` |
+
+`source` du lot : `"Guichet-Emplois"`. Le dédoublonnage reste par IDENTITÉ (entreprise +
+titre + ville) — une même offre paraît souvent sur Indeed ET sur le Guichet-Emplois, et
+c'est `trier()` qui l'écarte, pas toi.
+
 ## Le prompt
 
 ```
@@ -159,9 +202,25 @@ Fais la veille JobAI du jour.
    ZipRecruiter : location "Quebec City, Quebec" ET "Levis, Quebec",
    country_admin_code "CA", radius_miles 40. Là, le lieu compte.
 
+4 bis. Puis le GUICHET-EMPLOIS, avec ta recherche web (voir la section qui lui
+   est consacrée — trois pièges, lis-les avant).
+
+   a) D'ABORD la région : les mêmes termes qu'en 4, sur la Capitale-Nationale
+      et Chaudière-Appalaches. Un appel ramène aussi les employeurs qu'on ne
+      connaît pas encore.
+   b) ENSUITE, s'il reste du budget, les pages employeur des cibles absentes
+      du résultat ci-dessus. Ne FABRIQUE pas leur URL depuis leur nom :
+      cherche la page, suis le lien, et rapporte l'URL utilisée.
+   c) Tu n'atteins pas le site ? DIS-LE et passe. « Je n'ai pas pu chercher »
+      n'est pas « il n'y avait rien » — c'est la confusion qui a coûté
+      40 offres le 12 août.
+
+   `source` : "Guichet-Emplois".
+
 5. Écarte, en NOMMANT chaque rejet et son motif (un compte seul ne se vérifie
    pas) : hors région (Chapais, Saguenay, Montréal…), hors cible (marketing,
-   journalier, restauration, finance, stagiaire), et les doublons par identité.
+   journalier, restauration, finance, stagiaire), et les doublons par identité
+   — une même offre paraît souvent sur Indeed ET sur le Guichet-Emplois.
 
 6. Lis les annonces Indeed avec get_job_details, une retente maximum chacune.
    Si tu dois plafonner le nombre de lectures, DIS-LE dans le rapport et dis
