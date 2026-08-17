@@ -53,6 +53,31 @@ Bonus du canal fichier : la fenêtre de relecture étant de sept jours, un lot d
 « vues » les offres qu'il contient à chaque passe suivante, ce qui remet leur compteur
 d'absences à zéro au lieu de le pousser.
 
+## ⚠️ Le lot est une OBSERVATION du jour, pas une liste de nouveautés
+
+**Déposer uniquement les offres INÉDITES fait mourir les autres.** C'est la faute qui a
+produit la décroissance signalée par Marc le 2026-08-17 : « à chaque nouvelle passe j'ai
+moins d'offres ».
+
+Le mécanisme de péremption ne demande pas « quoi de neuf », il demande **« qu'as-tu vu
+aujourd'hui »**. Une offre absente du lot prend une absence, et à la troisième elle est
+périmée. Or Indeed listait encore Laserax, Systèmes Stekar, Cimota, Taveo — elles étaient
+donc bel et bien OUVERTES — mais comme elles avaient déjà été déposées les jours précédents,
+le protocole les écartait. Elles ne survivaient plus que par leur ANCIEN fichier, tant qu'il
+restait dans la fenêtre de sept jours ; passé ce délai elles s'éteignaient comme si elles
+avaient fermé.
+
+Mesuré : passe du 15 août, +3 net ; passe du 16 août, **−16** (1 ingérée, 17 périmées).
+
+**La règle** : le lot du jour contient TOUT ce que la recherche a rendu et qui est dans la
+cible — les nouveautés ET les offres déjà connues qu'on vient de revoir. Le dédoublonnage se
+fait DANS le lot du jour (deux résultats pour la même offre), jamais contre l'historique.
+« Elle était déjà connue » n'est pas une raison de ne pas dire qu'on l'a vue.
+
+Corollaire : c'est aussi ce qui rend le canal fichier supérieur au POST sur la durée. Un
+fichier est relu à chaque passe pendant sept jours ; une offre entrée par POST n'est jamais
+rejouée par personne.
+
 ## Les six outils, et ce que chacun a le droit de décider
 
 Mesurés le 2026-08-14, un par un. Le tableau dit surtout ce qu'ils n'ont PAS le droit de faire.
