@@ -15,7 +15,7 @@
 // CE QU'IL NE FAIT PAS : juger. Le verdict vient de `verifierAts`, qui confronte le contenu
 // à la région. Ici on ne fait qu'ordonner et borner.
 
-import type { FamilleAts } from "./types";
+import type { AtsEntreprise, FamilleAts } from "./types";
 
 /** Ce qu'on retient d'un essai, pour ne pas le refaire à l'aveugle. */
 export interface EssaiAts {
@@ -200,4 +200,114 @@ export function appliquerVerdict(
   );
   if (verdict === "confirme") return autres;
   return [...autres, { entreprise, famille, verdict, le: jour, ...(raison ? { raison } : {}) }];
+}
+
+/**
+ * Budget de temps de la découverte DANS la passe.
+ *
+ * ⚠️ CE N'EST PAS UNE PRÉCAUTION, C'EST UNE ADDITION. La passe partage un mur de fonction de
+ * 60 s. La localisation en réserve déjà 25 s (`BUDGET_GEOCODAGE_CRON_MS`), l'ingestion prend
+ * le sien, et le pire cas théorique de la découverte est de 24 s (3 essais × 8 s sur l'hôte
+ * le plus chargé). 24 + 25 + l'ingestion dépasse le mur : la passe mourrait sans écrire son
+ * état, et c'est l'intake de Marc qui en pâtirait, pas la découverte.
+ *
+ * Dix secondes, donc, vérifiées ENTRE les essais. En pratique un ATS répond en moins d'une
+ * seconde et le budget ne mord jamais ; il n'existe que pour le jour où l'un d'eux traîne.
+ * Et quand il mord, il le DIT (`sautes` dans le compte) — un plafond tu se lirait comme une
+ * couverture complète.
+ */
+export const BUDGET_DECOUVERTE_MS = 10_000;
+
+/** Ce qu'une passe de découverte a produit. Chaque nombre sert à un diagnostic différent. */
+export interface CompteDecouverte {
+  essais: number;
+  confirmees: number;
+  refutees: number;
+  indecis: number;
+  absentes: number;
+  /** Essais planifiés mais NON tentés, faute de budget. Zéro en régime normal. */
+  sautes: number;
+}
+
+/**
+ * Exécute les essais planifiés et rend le nouvel état.
+ *
+ * ⚠️ PARALLÈLE ENTRE FAMILLES, SÉRIE CHEZ CHACUNE. C'est ce qui rend le pire cas tenable
+ * (`MAX_ESSAIS_PAR_FAMILLE × DELAI_MAX_MS`) tout en restant poli avec chaque service : on
+ * n'ouvre jamais deux requêtes simultanées vers le même hôte. Tout mettre en parallèle
+ * serait plus rapide et impoli ; tout mettre en série tiendrait 96 s et tuerait la passe.
+ *
+ * Elle ne LÈVE jamais : un service tiers indisponible ne doit pas emporter l'ingestion.
+ * Un essai qui échoue rend `absent`, ce qui est déjà le comportement de `verifierAts`.
+ *
+ * @param verifier Injecté pour que cette fonction s'éprouve sans réseau.
+ */
+export async function executerDecouverte(
+  aFaire: readonly EssaiAFaire[],
+  essaisConnus: readonly EssaiAts[],
+  atsResolus: readonly AtsEntreprise[],
+  jour: string,
+  verifier: (
+    famille: FamilleAts,
+    jeton: string,
+    entreprise: string,
+  ) => Promise<{ verdict: "confirme" | "refute" | "indecis" | "absent"; raison?: string }>,
+  jeton: (nom: string) => string,
+  budgetMs: number = BUDGET_DECOUVERTE_MS,
+  maintenant: () => number = Date.now,
+): Promise<{ ats: AtsEntreprise[]; essais: EssaiAts[]; compte: CompteDecouverte }> {
+  const echeance = maintenant() + budgetMs;
+  const parFamille = new Map<FamilleAts, EssaiAFaire[]>();
+  for (const e of aFaire) {
+    const liste = parFamille.get(e.famille) ?? [];
+    liste.push(e);
+    parFamille.set(e.famille, liste);
+  }
+
+  const resultats = await Promise.all(
+    [...parFamille.entries()].map(async ([famille, liste]) => {
+      const sortie: { essai: EssaiAFaire; verdict: string; raison?: string }[] = [];
+      // En SÉRIE ici : une seule requête à la fois vers cet hôte.
+      for (const essai of liste) {
+        // Le budget se vérifie AVANT de lancer, jamais après : une fois la requête partie,
+        // on paie son délai quoi qu'il arrive.
+        if (maintenant() >= echeance) break;
+        const r = await verifier(famille, jeton(essai.entreprise), essai.entreprise);
+        sortie.push({ essai, verdict: r.verdict, raison: r.raison });
+      }
+      return sortie;
+    }),
+  );
+
+  let essais = [...essaisConnus];
+  const ats = [...atsResolus];
+  const compte: CompteDecouverte = {
+    essais: aFaire.length,
+    confirmees: 0,
+    refutees: 0,
+    indecis: 0,
+    absentes: 0,
+    sautes: 0,
+  };
+
+  for (const { essai, verdict, raison } of resultats.flat()) {
+    const v = verdict as "confirme" | "refute" | "indecis" | "absent";
+    essais = appliquerVerdict(essais, essai.entreprise, essai.famille, v, jour, raison);
+    if (v === "confirme") {
+      compte.confirmees += 1;
+      // L'inscription est ce qui fait entrer l'entreprise dans la veille quotidienne.
+      ats.push({
+        entreprise: essai.entreprise,
+        famille: essai.famille,
+        jeton: jeton(essai.entreprise),
+      });
+    } else if (v === "refute") compte.refutees += 1;
+    else if (v === "indecis") compte.indecis += 1;
+    else compte.absentes += 1;
+  }
+
+  compte.sautes =
+    aFaire.length - (compte.confirmees + compte.refutees + compte.indecis + compte.absentes);
+
+  return { ats, essais, compte };
 }

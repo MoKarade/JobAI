@@ -35,10 +35,19 @@ import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
 import { executerPasse } from "./ingest/passe";
 import { recuperer } from "./ingest/sources";
 import type { AtsEntreprise } from "./ingest/types";
+import { FAMILLES_ATS } from "./ingest/types";
+import { jetonProbable, verifierAts } from "./ingest/sources";
+import {
+  planifierDecouverte,
+  executerDecouverte,
+  type EssaiAts,
+} from "./ingest/decouverteAts";
+import { ENTREPRISES_CIBLES } from "./reference";
 import type { JournalVeille } from "./veille";
 
 export const CLE_JOURNAL = "veille-journal";
 const CLE_ATS = "veille-ats";
+const CLE_ESSAIS_ATS = "veille-ats-essais";
 const CLE_CURSEUR = "veille-curseur";
 
 /**
@@ -188,6 +197,62 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
         ` sous-plancher=${rapport.tri.souslePlancher} lieu-inconnu=${rapport.tri.lieuInconnu}` +
         ` en-sursis=${rapport.enSursis} sources=${rapport.sources.length}`,
     );
+
+    // DÉCOUVRIR DES PAGES CARRIÈRES — ce qui remplit `veille-ats`, vide depuis toujours.
+    //
+    // ⚠️ ENVELOPPÉE, ET APRÈS LE FLUX VIVANT. Deux règles de la §7 se rencontrent ici :
+    // une étape SECONDAIRE ne doit jamais pouvoir bloquer l'intake (d'où le try/catch —
+    // le `try` de la passe n'a qu'un `finally`, une exception non capturée gèlerait tout le
+    // pipeline), et elle passe APRÈS ce qui nourrit Marc aujourd'hui.
+    //
+    // Elle est bornée par hôte, pas seulement par passe : voir `MAX_ESSAIS_PAR_FAMILLE`.
+    try {
+      const essaisConnus = await lireEtat<EssaiAts[]>(CLE_ESSAIS_ATS, []);
+
+      // Les cibles de Marc d'abord, puis les employeurs déjà croisés en offre : ceux-là ont
+      // prouvé qu'ils embauchent dans la région, ce qui en fait de bons candidats.
+      const noms = [
+        ...ENTREPRISES_CIBLES.map((e) => e.nom),
+        ...new Set(rapport.offres.map((o) => o.entreprise).filter((n) => n.trim() !== "")),
+      ];
+      const aFaire = planifierDecouverte(
+        noms,
+        FAMILLES_ATS,
+        essaisConnus,
+        ats.map((a) => a.entreprise),
+        jour,
+      );
+
+      if (aFaire.length > 0) {
+        const d = await executerDecouverte(
+          aFaire,
+          essaisConnus,
+          ats,
+          jour,
+          async (famille, jeton, entreprise) => {
+            const r = await verifierAts(famille, jeton, entreprise, recuperer);
+            return r.verdict === "refute"
+              ? { verdict: r.verdict, raison: r.raison }
+              : { verdict: r.verdict };
+          },
+          jetonProbable,
+        );
+        await ecrireEtat(CLE_ATS, d.ats);
+        await ecrireEtat(CLE_ESSAIS_ATS, d.essais);
+        console.log(
+          `[ats] essais=${d.compte.essais} confirmées=${d.compte.confirmees}` +
+            ` réfutées=${d.compte.refutees} indécis=${d.compte.indecis}` +
+            ` absentes=${d.compte.absentes} sautés=${d.compte.sautes}` +
+            ` inscrites=${d.ats.length}`,
+        );
+      } else {
+        // « 0 essai » et « rien à essayer » sont deux situations opposées : la première dit
+        // que le budget a été mangé ailleurs, la seconde que le balayage est à jour.
+        console.log(`[ats] rien à essayer aujourd'hui — inscrites=${ats.length}`);
+      }
+    } catch (err) {
+      console.warn(`[ats] découverte en échec (sans effet sur l'intake) : ${String(err)}`);
+    }
 
     // LOCALISER ET MESURER, ICI AUSSI — sans quoi « toujours à jour » dépendrait de Marc.
     //

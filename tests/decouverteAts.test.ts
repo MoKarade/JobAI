@@ -18,6 +18,8 @@ import {
   DELAIS_RETENTE_JOURS,
   MAX_ESSAIS_PAR_PASSE,
   MAX_ESSAIS_PAR_FAMILLE,
+  executerDecouverte,
+  BUDGET_DECOUVERTE_MS,
   type EssaiAts,
 } from "@/lib/ingest/decouverteAts";
 
@@ -164,5 +166,144 @@ describe("appliquerVerdict — ce qu'on retient", () => {
     ];
     const apres = appliquerVerdict(avant, "Laserax", "greenhouse", "absent", JOUR);
     expect(apres).toHaveLength(2);
+  });
+});
+
+describe("executerDecouverte — ce qu'une passe produit vraiment", () => {
+  const jeton = (n: string) => n.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  it("inscrit une entreprise CONFIRMÉE et la retire de la mémoire d'échecs", async () => {
+    const avant: EssaiAts[] = [
+      { entreprise: "Laserax", famille: "greenhouse", verdict: "indecis", le: ilYA(5) },
+    ];
+    const r = await executerDecouverte(
+      [{ entreprise: "Laserax", famille: "greenhouse" }],
+      avant,
+      [],
+      JOUR,
+      async () => ({ verdict: "confirme" as const }),
+      jeton,
+    );
+    expect(r.ats).toHaveLength(1);
+    expect(r.ats[0]?.jeton).toBe("laserax");
+    expect(r.essais).toEqual([]);
+    expect(r.compte.confirmees).toBe(1);
+  });
+
+  it("n'inscrit JAMAIS un réfuté, et garde son motif", async () => {
+    const r = await executerDecouverte(
+      [{ entreprise: "ACE", famille: "recruitee" }],
+      [],
+      [],
+      JOUR,
+      async () => ({ verdict: "refute" as const, raison: "postes à Amsterdam" }),
+      jeton,
+    );
+    expect(r.ats).toEqual([]);
+    expect(r.compte.refutees).toBe(1);
+    expect(r.essais[0]?.raison).toContain("Amsterdam");
+  });
+
+  // ⚠️ LA POLITESSE, ET LA BORNE DE TEMPS. Deux requêtes simultanées vers le MÊME hôte
+  // seraient impolies ; tout en série tiendrait 96 s et tuerait la passe. On vérifie donc
+  // les deux : jamais deux en vol chez une famille, et les familles avancent ensemble.
+  it("reste en SÉRIE chez un hôte et en PARALLÈLE entre hôtes", async () => {
+    const enVol = new Map<string, number>();
+    let maxSimultaneParHote = 0;
+    let maxSimultaneTotal = 0;
+    let total = 0;
+
+    const r = await executerDecouverte(
+      [
+        { entreprise: "A", famille: "greenhouse" },
+        { entreprise: "B", famille: "greenhouse" },
+        { entreprise: "C", famille: "lever" },
+        { entreprise: "D", famille: "lever" },
+      ],
+      [],
+      [],
+      JOUR,
+      async (famille) => {
+        const n = (enVol.get(famille) ?? 0) + 1;
+        enVol.set(famille, n);
+        total += 1;
+        maxSimultaneParHote = Math.max(maxSimultaneParHote, n);
+        maxSimultaneTotal = Math.max(maxSimultaneTotal, total);
+        await new Promise((res) => setTimeout(res, 5));
+        enVol.set(famille, n - 1);
+        total -= 1;
+        return { verdict: "absent" as const };
+      },
+      jeton,
+    );
+
+    expect(maxSimultaneParHote).toBe(1);
+    expect(maxSimultaneTotal).toBeGreaterThan(1);
+    expect(r.compte.absentes).toBe(4);
+  });
+
+  it("compte chaque verdict séparément — quatre situations, quatre chiffres", async () => {
+    const verdicts = ["confirme", "refute", "indecis", "absent"] as const;
+    let i = 0;
+    const r = await executerDecouverte(
+      verdicts.map((_, n) => ({ entreprise: `E${n}`, famille: "greenhouse" as const })),
+      [],
+      [],
+      JOUR,
+      async () => ({ verdict: verdicts[i++]! }),
+      jeton,
+    );
+    expect(r.compte).toMatchObject({
+      essais: 4,
+      confirmees: 1,
+      refutees: 1,
+      indecis: 1,
+      absentes: 1,
+    });
+  });
+});
+
+describe("le budget de la découverte", () => {
+  const jeton = (n: string) => n.toLowerCase();
+
+  // ⚠️ CE TEST EXISTE PARCE QUE L'ADDITION NE TENAIT PAS. La passe partage un mur de 60 s :
+  // la localisation en réserve 25, l'ingestion prend le sien, et le pire cas théorique de la
+  // découverte était de 24. Sans budget propre, la passe entière mourrait sans écrire son
+  // état — et c'est l'intake qui en pâtirait, pas la découverte.
+  it("s'arrête quand le budget est épuisé, et DIT combien il a sauté", async () => {
+    let horloge = 0;
+    const r = await executerDecouverte(
+      Array.from({ length: 3 }, (_, i) => ({ entreprise: `E${i}`, famille: "greenhouse" as const })),
+      [],
+      [],
+      JOUR,
+      async () => {
+        horloge += 6_000; // chaque essai « coûte » six secondes
+        return { verdict: "absent" as const };
+      },
+      jeton,
+      10_000,
+      () => horloge,
+    );
+    // Deux essais tiennent dans dix secondes, le troisième non.
+    expect(r.compte.absentes).toBe(2);
+    expect(r.compte.sautes).toBe(1);
+  });
+
+  it("ne saute rien quand tout tient dans le budget", async () => {
+    const r = await executerDecouverte(
+      [{ entreprise: "A", famille: "greenhouse" }],
+      [],
+      [],
+      JOUR,
+      async () => ({ verdict: "absent" as const }),
+      jeton,
+    );
+    expect(r.compte.sautes).toBe(0);
+  });
+
+  // Le budget doit laisser de la place à la localisation (25 s) sous le mur de 60 s.
+  it("laisse la place aux autres étapes de la passe", () => {
+    expect(BUDGET_DECOUVERTE_MS + 25_000).toBeLessThan(60_000);
   });
 });
