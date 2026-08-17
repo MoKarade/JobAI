@@ -79,19 +79,36 @@ export function adressesCandidates(recherche: string): string[] {
   const q = encodeURIComponent(recherche);
   const lieu = encodeURIComponent("Québec, QC");
   return [
-    // Témoins de joignabilité — la question « l'hôte répond-il ? » avant « quelle page ? ».
+    // ── Guichet-Emplois : témoins, puis flux ────────────────────────────────────────────
+    // Les deux premiers répondent à « l'hôte répond-il ? » avant « quelle page ? ».
     "https://www.jobbank.gc.ca/home",
-    "https://www.guichetemplois.gc.ca/accueil",
-    // L'adresse historique, celle qui rendait 404 et a fait éteindre la source.
     `https://www.jobbank.gc.ca/jobsearch/rss?searchstring=${q}&locationstring=${lieu}&sort=M`,
-    // Variantes de flux plausibles, côté français et côté anglais.
-    `https://www.guichetemplois.gc.ca/trouverunemploi/rss?searchstring=${q}&locationstring=${lieu}`,
-    `https://www.jobbank.gc.ca/jobsearch/rss?searchstring=${q}`,
-    // Les pages HTML : elles ne donnent pas de flux, mais leur URL FINALE dit si le chemin
-    // existe encore ou s'il redirige vers l'accueil — ce que Marc a constaté à l'écran.
     `https://www.jobbank.gc.ca/jobsearch/jobsearch?searchstring=${q}&locationstring=${lieu}`,
     "https://www.guichetemplois.gc.ca/parcourirlesoffresdemploi/province/QC",
-    "https://www.guichetemplois.gc.ca/parcourirlesoffresdemploi/employeur/Laserax/QC",
+
+    // ── Les gros sites d'emploi québécois ───────────────────────────────────────────────
+    // Ce ne sont PAS des sources retenues : ce sont des candidats à MESURER. Aucun n'entrera
+    // dans la veille sans passer par un ADR (garde-fou n°4) — la sonde dit seulement ce qui
+    // répond et ce qui déclare un flux. Mesuré vaut mieux que supposé, et c'est tout l'objet.
+    "https://www.jobboom.com/fr",
+    `https://www.jobboom.com/fr/emploi/${q}/_lfr`,
+    "https://www.jobillico.com/fr/emplois",
+    `https://www.jobillico.com/fr/recherche-emploi?skwd=${q}`,
+    "https://www.quebecemploi.gouv.qc.ca/",
+    "https://emplois.espresso-jobs.com/",
+    "https://www.isarta.com/emplois/",
+    "https://www.grenier.qc.ca/emplois",
+    "https://www.jobsquebec.com/",
+    "https://quebecentete.com/emplois/",
+
+    // ── Emplois publics et parapublics de la région ─────────────────────────────────────
+    "https://www.ville.quebec.qc.ca/apropos/emplois/",
+    "https://www.carrieres.gouv.qc.ca/",
+    "https://www.ulaval.ca/notre-universite/travailler-a-ulaval",
+
+    // ── Agrégateurs à flux, historiquement les plus susceptibles d'en publier ───────────
+    `https://ca.indeed.com/rss?q=${q}&l=${lieu}`,
+    `https://www.careerjet.ca/search/jobs?s=${q}&l=${lieu}`,
   ];
 }
 
@@ -180,16 +197,53 @@ export async function sonderGuichet(
 ): Promise<{ verdicts: VerdictSonde[]; nonEssayees: string[] }> {
   const echeance = maintenant() + budgetMs;
   const adresses = adressesCandidates(recherche);
-  const verdicts: VerdictSonde[] = [];
 
-  for (const [i, url] of adresses.entries()) {
-    // Vérifié AVANT de lancer : une requête partie se paie quoi qu'il arrive.
-    if (maintenant() + DELAI_SONDE_MS > echeance) {
-      return { verdicts, nonEssayees: adresses.slice(i) };
+  // ⚠️ PARALLÈLE ENTRE HÔTES, SÉRIE CHEZ CHACUN — et c'est un CALCUL, pas un goût.
+  //
+  // Dix-huit adresses en série coûteraient au pire 18 × 12 s, très au-delà du mur de 60 s de
+  // la fonction : la sonde mourrait sans rien rapporter, ce qui se lirait comme « le site ne
+  // répond pas ». Tout mettre en parallèle serait rapide et impoli — plusieurs requêtes
+  // simultanées vers le même service, dont des services publics gratuits.
+  //
+  // La politesse se doit par HÔTE, pas globalement : on n'ouvre jamais deux requêtes vers le
+  // même domaine, mais rien n'oblige à faire attendre `jobboom.com` pendant qu'on interroge
+  // `jobbank.gc.ca`. Le pire cas devient donc « la file du domaine le plus chargé », soit
+  // deux ou trois adresses — largement sous le mur. Même patron que la découverte d'ATS.
+  const parHote = new Map<string, string[]>();
+  for (const url of adresses) {
+    let hote: string;
+    try {
+      hote = new URL(url).hostname;
+    } catch {
+      hote = url; // Une URL illisible reste seule dans sa file : elle rendra son erreur.
     }
-    verdicts.push(await sonderUne(url));
-    if (i < adresses.length - 1) await dormir(PAUSE_SONDE_MS);
+    const file = parHote.get(hote) ?? [];
+    file.push(url);
+    parHote.set(hote, file);
   }
 
-  return { verdicts, nonEssayees: [] };
+  const nonEssayees: string[] = [];
+  const lots = await Promise.all(
+    [...parHote.values()].map(async (file) => {
+      const rendus: VerdictSonde[] = [];
+      for (const [i, url] of file.entries()) {
+        // Vérifié AVANT de lancer : une requête partie se paie quoi qu'il arrive.
+        if (maintenant() + DELAI_SONDE_MS > echeance) {
+          nonEssayees.push(...file.slice(i));
+          break;
+        }
+        rendus.push(await sonderUne(url));
+        if (i < file.length - 1) await dormir(PAUSE_SONDE_MS);
+      }
+      return rendus;
+    }),
+  );
+
+  // L'ordre d'origine est rétabli : la liste a été écrite du plus prometteur au plus
+  // douteux, et la rendre dans l'ordre d'arrivée des réseaux la trierait par hasard.
+  const parUrl = new Map(lots.flat().map((v) => [v.url, v]));
+  return {
+    verdicts: adresses.map((u) => parUrl.get(u)).filter((v): v is VerdictSonde => v !== undefined),
+    nonEssayees: adresses.filter((u) => nonEssayees.includes(u)),
+  };
 }

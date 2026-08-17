@@ -2014,3 +2014,14 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin-top: 0.6rem;
   max-width: 68ch;
 }
+
+/* ── Lancement manuel de la veille ────────────────────────────────────────── */
+
+.veille { margin-bottom: var(--pas-2); }
+.veille__message { font-size: var(--t-s); margin-top: 0.5rem; min-height: 1.2em; }
+.veille__note {
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  margin-top: 0.4rem;
+  max-width: 68ch;
+}

@@ -246,28 +246,43 @@ describe("appliquerSeed n'écrit QUE le jeu de départ (fix du 2026-08-12)", () 
 describe("reprise de la veille par le cron de géocodage", () => {
   const H = 60 * 60 * 1000;
 
-  it("le délai tient entre les deux crons — ni double passe, ni jour sauté", () => {
-    // Les deux crons sont à 12 h d'écart (veille 15:00 UTC, géocodage 03:00). Le délai est
-    // contraint des DEUX côtés, et ces bornes sont la seule raison de sa valeur :
-    //   · > 12 h, sinon le géocodage relancerait une passe une demi-journée après la veille ;
-    //   · < 24 h, sinon la passe quotidienne se ferait refuser d'un cheveu.
-    // Dérivé de l'écart réel, jamais recopié depuis la valeur du jour.
-    const ECART_ENTRE_CRONS = 12 * H;
-    expect(DELAI_VEILLE_MS).toBeGreaterThan(ECART_ENTRE_CRONS);
-    expect(DELAI_VEILLE_MS).toBeLessThan(24 * H);
+  // ⚠️ CES DEUX TESTS ONT CHANGÉ D'OBJET LE 2026-08-17, ET C'EST UNE DÉCISION, PAS UNE
+  // CONCESSION. Ils encodaient une politique — « les deux crons ne doivent pas tous les deux
+  // lancer la passe » — dont la seule justification était que `appliquerBalayage` comptait
+  // les absences PAR PASSE : deux passes par jour vieillissaient le stock deux fois.
+  //
+  // Le compteur compte désormais des JOURS (`SuiviVeille.derniereAbsence`, verrouillé par
+  // tests/veille.test.ts). Une deuxième passe le même jour ne vieillit plus rien : elle est
+  // au pire inutile, jamais nuisible. La politique n'a donc plus de raison d'être, et le
+  // délai de vingt heures n'avait plus qu'un effet observable — empêcher Marc de relancer sa
+  // propre veille depuis l'app.
+  //
+  // Ce qui RESTE à protéger est plus étroit et n'a pas bougé : deux invocations SIMULTANÉES
+  // écriraient les mêmes offres en même temps. C'est ce que les tests ci-dessous éprouvent.
+  it("le délai couvre une passe entière, sans jamais se faire sentir à l'usage", () => {
+    // Une passe dure quelques secondes (mesuré). Le délai doit la couvrir largement pour
+    // qu'une seconde invocation tombe pendant la première, et rester assez court pour qu'un
+    // clic volontaire de Marc ne soit jamais refusé. Bornes dérivées de ces deux exigences,
+    // jamais recopiées depuis la valeur du jour.
+    const DUREE_PASSE_OBSERVEE = 10 * 1000;
+    expect(DELAI_VEILLE_MS).toBeGreaterThan(DUREE_PASSE_OBSERVEE);
+    expect(DELAI_VEILLE_MS).toBeLessThan(2 * 60 * 1000);
   });
 
-  it("QUAND LE CRON DE VEILLE MARCHE : le géocodage ne reprend rien", async () => {
-    const veille = new Date("2026-08-14T15:00:00Z");
-    const { db } = baseSimulee({ cle: CLE_VEILLE, valeur: String(veille.getTime()) });
+  it("RELANÇABLE À VOLONTÉ : une passe d'il y a une minute ne bloque plus rien", async () => {
+    const passe = new Date("2026-08-14T15:00:00Z");
+    const { db } = baseSimulee({ cle: CLE_VEILLE, valeur: String(passe.getTime()) });
 
-    // Le géocodage passe 12 h plus tard. La veille a eu lieu : il ne doit PAS la refaire.
-    const geocodage = new Date(veille.getTime() + 12 * H);
-    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, geocodage)).toBe(false);
+    // Le geste que le verrou de vingt heures refusait : Marc relance sa veille peu après.
+    const relance = new Date(passe.getTime() + 60 * 1000);
+    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, relance)).toBe(true);
+  });
 
-    // Et le lendemain, la veille reprend la main normalement (24 h après la précédente).
-    const lendemain = new Date(veille.getTime() + 24 * H);
-    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, lendemain)).toBe(true);
+  it("mais deux invocations dans la même seconde ne passent pas toutes les deux", async () => {
+    const passe = new Date("2026-08-14T15:00:00Z");
+    const { db } = baseSimulee({ cle: CLE_VEILLE, valeur: String(passe.getTime()) });
+    const aussitot = new Date(passe.getTime() + 1000);
+    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, aussitot)).toBe(false);
   });
 
   it("QUAND LE CRON DE VEILLE EST MORT : le géocodage la reprend, chaque jour", async () => {
@@ -278,8 +293,9 @@ describe("reprise de la veille par le cron de géocodage", () => {
     const nuit1 = new Date("2026-08-14T03:00:00Z");
     expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, nuit1)).toBe(true);
 
-    // Et le régime est STABLE : 24 h plus tard, il reprend encore. Un délai mal choisi
-    // (25 h par exemple) donnerait une passe tous les deux jours, sans que rien ne le dise.
+    // Et le régime est STABLE : 24 h plus tard, il reprend encore. Depuis que le délai est
+    // court, ce test ne vérifie plus un arbitrage entre crons — il vérifie que la reprise
+    // n'est jamais refusée, ce qui reste exactement ce qu'on attend d'elle.
     const nuit2 = new Date(nuit1.getTime() + 24 * H);
     expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, nuit2)).toBe(true);
   });

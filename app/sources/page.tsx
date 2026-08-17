@@ -19,6 +19,7 @@ import { etatDecouverte } from "@/lib/decouverte";
 import { aujourdhui } from "@/lib/ajout";
 import { RECHERCHES_GUICHET, RECHERCHES_GUICHET_CANDIDATES } from "@/lib/ingest/sources";
 import { SondeGuichet } from "@/components/SondeGuichet";
+import { BoutonVeille } from "@/components/BoutonVeille";
 import { classerPanne, type Panne } from "@/lib/panne";
 
 export const metadata = { title: "Sources — JobAI" };
@@ -124,6 +125,11 @@ export default async function Sources() {
             ))}
           </ul>
         ) : null}
+      </section>
+
+      <section className="cadre-section">
+        <h2 className="cadre-section__titre">Lancer la veille</h2>
+        <BoutonVeille />
       </section>
 
       <section className="cadre-section">

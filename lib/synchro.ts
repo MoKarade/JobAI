@@ -281,18 +281,25 @@ export const CLE_VEILLE = "veille-auto";
 /**
  * Intervalle minimal entre deux passes de veille.
  *
- * ⚠️ 20 H, ET LA VALEUR EST CONTRAINTE DES DEUX CÔTÉS — ce n'est pas un réglage au doigt
- * mouillé. Les deux crons sont à 12 h d'écart (veille 15:00 UTC, géocodage 03:00) :
+ * ⚠️ 20 H → 45 S, LE 2026-08-17, PARCE QUE CE QUE CE DÉLAI PROTÉGEAIT N'EXISTE PLUS.
  *
- *   · il faut PLUS de 12 h, sinon le cron de géocodage relancerait une passe une demi-
- *     journée seulement après celle de la veille — deux ingestions par jour, pour rien ;
- *   · il faut MOINS de 24 h, sinon la passe quotidienne se ferait refuser d'un cheveu et
- *     l'app tomberait à une passe tous les deux jours.
+ * Il valait vingt heures pour une seule raison : `appliquerBalayage` comptait les absences
+ * PAR PASSE, sans garde de date. Deux passes le même jour vieillissaient donc le stock de
+ * deux crans, et trois le périmaient en une journée. Le verrou n'était pas une politique de
+ * fraîcheur, c'était un pansement sur un compteur qui comptait la mauvaise chose.
  *
- * Entre les deux, 20 h laisse 4 h de marge de chaque côté — assez pour absorber le retard
- * d'un cron (Vercel ne garantit pas la minute) sans jamais sauter un jour.
+ * Le compteur compte désormais des JOURS (voir `SuiviVeille.derniereAbsence`) : relancer la
+ * veille dix fois dans la journée ne vieillit plus rien. Le pansement peut tomber — et il
+ * DOIT tomber, parce que son seul effet visible était d'empêcher Marc de relancer sa propre
+ * veille depuis son app (« je veux que tout marche depuis l'app aussi souvent que je veux,
+ * sans blocage »).
+ *
+ * Ce qui RESTE à protéger, et pourquoi il reste un délai plutôt que rien : deux invocations
+ * SIMULTANÉES écriraient les mêmes offres en même temps. Quarante-cinq secondes couvrent
+ * largement une passe (mesuré : quelques secondes) sans jamais se faire sentir à l'usage —
+ * on ne reclique pas un bouton dans la seconde en espérant un résultat différent.
  */
-export const DELAI_VEILLE_MS = 20 * 60 * 60 * 1000;
+export const DELAI_VEILLE_MS = 45 * 1000;
 
 /** Clé de la temporisation de la mesure des distances. */
 export const CLE_DISTANCES = "distances-auto";

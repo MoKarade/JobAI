@@ -1,0 +1,56 @@
+"use client";
+
+// components/BoutonVeille.tsx — relancer la veille, autant de fois qu'on veut.
+//
+// Ce bouton aurait été un DÉFAUT il y a une heure. Le compteur d'absences montait à chaque
+// passe : trois clics périmaient tout le stock. Il n'est devenu possible qu'une fois les
+// absences comptées par JOUR — le balayage est idempotent dans la journée, donc relancer ne
+// coûte que du temps, jamais des offres.
+
+import { useState, useTransition } from "react";
+import { lancerVeille } from "@/lib/actionsVeille";
+
+export function BoutonVeille() {
+  const [message, setMessage] = useState<string | null>(null);
+  const [enCours, demarrer] = useTransition();
+
+  return (
+    <div className="veille">
+      <button
+        type="button"
+        className="bouton"
+        disabled={enCours}
+        onClick={() => {
+          setMessage(null);
+          demarrer(async () => {
+            const r = await lancerVeille();
+            if (!r.ok) {
+              setMessage(r.erreur);
+              return;
+            }
+            // Le compte rendu porte les mêmes nombres que la trace serveur : « 0 sur 0 » et
+            // « 0 sur 161 » sont deux situations opposées, et un simple « c'est fait » les
+            // confondrait.
+            setMessage(
+              `${r.ingerees} ingérée(s) sur ${r.trouvees} trouvée(s) · ` +
+                `${r.perimees} périmée(s) · ${r.sources} source(s) interrogée(s).` +
+                (r.resume ? ` ${r.resume}` : ""),
+            );
+          });
+        }}
+      >
+        {enCours ? "Veille en cours…" : "Lancer la veille maintenant"}
+      </button>
+
+      <p className="veille__message" role="status">
+        {enCours ? "Veille en cours — sources, tri, péremption, distances." : message}
+      </p>
+
+      <p className="veille__note">
+        Relançable autant de fois que tu veux : une offre absente n’est comptée absente
+        qu’une fois par jour, jamais une fois par passe. Rien ne vieillit parce que tu
+        recliques.
+      </p>
+    </div>
+  );
+}

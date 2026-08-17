@@ -179,3 +179,87 @@ describe("compte rendu", () => {
     expect(resumerBalayage(r)).toBe("1 nouvelle, 1 périmée, 1 revenue, 1 en sursis");
   });
 });
+
+// ⚠️ LE TEST QUI REND L'APP RELANÇABLE À VOLONTÉ (demande de Marc, 2026-08-17 : « je veux
+// que tout marche depuis l'app aussi souvent que je veux, sans blocage »).
+//
+// Le compteur d'absences montait à CHAQUE passe, sans garde de date. Trois passes le même
+// jour périmaient donc tout le stock d'un coup — c'est la mécanique derrière le « −16 » du
+// 16 août. C'est aussi ce qui a forcé le verrou de vingt heures, un verrou dont le seul
+// effet visible était d'empêcher Marc de relancer sa propre veille.
+//
+// Compter par JOUR rend le balayage idempotent dans la journée : on peut le relancer autant
+// de fois qu'on veut, il ne vieillit rien de plus. Le seuil retrouve le sens qu'il a
+// toujours annoncé — « trois jours de silence ».
+describe("relancer la veille dans la même journée", () => {
+  const jour = "2026-07-30";
+
+  it("ne compte QU'UNE absence, quel que soit le nombre de passes", () => {
+    const o = offre({ id: "x" });
+    let j = journal("x", 0);
+
+    // Dix passes le même jour, l'offre absente à chaque fois.
+    for (let i = 0; i < 10; i++) {
+      j = appliquerBalayage([o], [], j, jour).journal;
+    }
+
+    expect(j["x"]!.absences).toBe(1);
+  });
+
+  it("ne périme rien en un seul jour, même au bord du seuil", () => {
+    const o = offre({ id: "x" });
+    // Une offre à un cran du seuil : la journée doit la faire passer à SEUIL, pas au-delà,
+    // et surtout pas plusieurs fois.
+    let j = journal("x", SEUIL_ABSENCES_PEREMPTION - 2);
+    let dernier = appliquerBalayage([o], [], j, jour);
+    for (let i = 0; i < 5; i++) {
+      j = dernier.journal;
+      dernier = appliquerBalayage([o], [], j, jour);
+    }
+    expect(dernier.journal["x"]!.absences).toBe(SEUIL_ABSENCES_PEREMPTION - 1);
+    expect(dernier.perimees).toEqual([]);
+  });
+
+  it("compte de nouveau le LENDEMAIN — le seuil reste des jours de silence", () => {
+    const o = offre({ id: "x" });
+    const j1 = appliquerBalayage([o], [], journal("x", 0), "2026-07-30").journal;
+    const j2 = appliquerBalayage([o], [], j1, "2026-07-31").journal;
+    expect(j2["x"]!.absences).toBe(2);
+  });
+
+  it("périme après SEUIL jours distincts, pas après SEUIL passes", () => {
+    const o = offre({ id: "x" });
+    const jours = ["2026-07-30", "2026-07-31", "2026-08-01"];
+    let j: JournalVeille = journal("x", 0);
+    let r = appliquerBalayage([o], [], j, jours[0]!);
+    for (const d of jours.slice(1)) {
+      j = r.journal;
+      // Deux passes par jour : le doublon ne doit rien accélérer.
+      r = appliquerBalayage([o], [], j, d);
+      r = appliquerBalayage([o], [], r.journal, d);
+    }
+    expect(r.perimees).toEqual(["x"]);
+  });
+
+  // Un journal écrit AVANT l'existence du champ n'a pas de date d'absence : sa prochaine
+  // absence se compte une fois, puis se date. Sans ce cas, la migration serait un pari.
+  it("relit un journal sans date d'absence sans le faire vieillir deux fois", () => {
+    const o = offre({ id: "x" });
+    const ancien: JournalVeille = {
+      x: { premiereVue: "2026-07-01", derniereVue: "2026-07-20", absences: 1 },
+    };
+    const r1 = appliquerBalayage([o], [], ancien, jour);
+    const r2 = appliquerBalayage([o], [], r1.journal, jour);
+    expect(r1.journal["x"]!.absences).toBe(2);
+    expect(r2.journal["x"]!.absences).toBe(2);
+  });
+
+  // Revoir l'offre efface la date d'absence : sinon le lendemain croirait avoir déjà compté.
+  it("remet le compteur ET sa date à zéro quand l'offre réapparaît", () => {
+    const o = offre({ id: "x" });
+    const absent = appliquerBalayage([o], [], journal("x", 1), jour).journal;
+    const revue = appliquerBalayage([o], [o], absent, jour).journal;
+    expect(revue["x"]!.absences).toBe(0);
+    expect(revue["x"]!.derniereAbsence).toBeUndefined();
+  });
+});

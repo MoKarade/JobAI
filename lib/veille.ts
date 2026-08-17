@@ -38,8 +38,26 @@ export interface SuiviVeille {
   premiereVue: string;
   /** Dernier balayage qui l'a vue (AAAA-MM-JJ). */
   derniereVue: string;
-  /** Balayages consécutifs sans la voir depuis. Remis à zéro dès qu'elle réapparaît. */
+  /**
+   * JOURS consécutifs sans la voir. Remis à zéro dès qu'elle réapparaît.
+   *
+   * ⚠️ DES JOURS, PAS DES PASSAGES — et c'est tout ce qui sépare « je peux relancer quand je
+   * veux » de « relancer détruit mes données ». Le compteur montait à CHAQUE passe : deux
+   * passes le même jour vieillissaient le stock de deux crans, trois le périmaient en une
+   * journée. C'est ce qui a produit le « −16 » du 16 août, et c'est ce qui a forcé le verrou
+   * de vingt heures — un verrou qui EMPÊCHAIT Marc de relancer sa propre veille.
+   *
+   * Le seuil a toujours voulu dire « trois jours de silence » : il le dit maintenant.
+   */
   absences: number;
+  /**
+   * Le jour où la dernière absence a été comptée (AAAA-MM-JJ).
+   *
+   * Additif et optionnel : un journal écrit avant ce champ se relit sans migration — sa
+   * prochaine absence sera comptée une fois, puis datée. Sans lui, rien ne distingue « déjà
+   * compté aujourd'hui » de « jamais compté », et le compteur remonterait à chaque passe.
+   */
+  derniereAbsence?: string;
 }
 
 /** L'état de la veille, par identifiant d'offre. Sérialisé en JSON entre deux passages. */
@@ -106,8 +124,14 @@ export function appliquerBalayage(
   //    Une offre jamais vue par la veille n'entre pas ici : son absence ne prouve rien.
   for (const [id, precedent] of Object.entries(journal)) {
     if (idsVues.has(id)) continue;
-    const absences = precedent.absences + 1;
-    suivant[id] = { ...precedent, absences };
+    // ⚠️ UNE ABSENCE PAR JOUR, PAS PAR PASSE. Une offre déjà comptée absente aujourd'hui ne
+    // vieillit pas une seconde fois parce qu'on a relancé la veille : son compteur reste où
+    // il est. C'est ce qui rend le balayage IDEMPOTENT dans la journée — donc relançable
+    // autant de fois qu'on veut, ce qui était impossible tant que chaque passe ajoutait un
+    // cran (trois clics de suite périmaient tout le stock).
+    const dejaCompteAujourdhui = precedent.derniereAbsence === aujourdhui;
+    const absences = dejaCompteAujourdhui ? precedent.absences : precedent.absences + 1;
+    suivant[id] = { ...precedent, absences, derniereAbsence: aujourdhui };
     const offre = parId.get(id);
     // Une offre disparue du suivi (supprimée à la main) n'a plus à être comptée.
     if (!offre) continue;

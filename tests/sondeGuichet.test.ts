@@ -12,15 +12,35 @@ import {
   fluxDeclares,
   DELAI_SONDE_MS,
 } from "@/lib/ingest/sondeGuichet";
+import { BUDGET_SONDE_MS } from "@/lib/synchro";
 
 describe("adressesCandidates — ce qu'on éprouve, et dans quel ordre", () => {
-  it("commence par des TÉMOINS de joignabilité", () => {
+  it("commence par un TÉMOIN de joignabilité", () => {
     const a = adressesCandidates("automatisation");
     // Si l'accueil lui-même ne répond pas, tout le reste est du bruit : « le flux est mort »
     // et « l'hôte est injoignable » sont deux conclusions opposées, et seule la première
     // justifierait d'abandonner la source.
     expect(a[0]).toMatch(/jobbank\.gc\.ca\/home$/);
-    expect(a[1]).toMatch(/guichetemplois\.gc\.ca\/accueil$/);
+  });
+
+  // ⚠️ LE PIRE CAS SE COMPTE PAR HÔTE, PAS SUR LA LISTE ENTIÈRE. La sonde interroge les
+  // domaines en parallèle et reste en série chez chacun : ce qui la borne est donc la file
+  // du domaine le plus chargé. Dix-huit adresses en série dépasseraient le mur de 60 s de la
+  // fonction, et la sonde mourrait sans rien rapporter — ce qui se lirait comme « le site ne
+  // répond pas ». Le test dérive la borne du budget et du délai, jamais d'un chiffre écrit.
+  it("aucun hôte ne porte plus d'adresses que le budget ne peut en payer", () => {
+    const parHote = new Map<string, number>();
+    for (const u of adressesCandidates("automatisation")) {
+      const h = new URL(u).hostname;
+      parHote.set(h, (parHote.get(h) ?? 0) + 1);
+    }
+    const pire = Math.max(...parHote.values());
+    expect(pire * DELAI_SONDE_MS).toBeLessThan(BUDGET_SONDE_MS);
+  });
+
+  it("couvre plusieurs sites, pas seulement le Guichet-Emplois", () => {
+    const hotes = new Set(adressesCandidates("test").map((u) => new URL(u).hostname));
+    expect(hotes.size).toBeGreaterThan(8);
   });
 
   it("éprouve l'adresse historique, celle qui avait fait éteindre la source", () => {
@@ -38,9 +58,15 @@ describe("adressesCandidates — ce qu'on éprouve, et dans quel ordre", () => {
     }
   });
 
-  it("ne vise que les deux domaines officiels — jamais un tiers", () => {
+  // La sonde ne RETIENT rien : elle mesure. Mais elle ne doit viser que des sites d'emploi
+  // publics, jamais une adresse arbitraire — c'est du trafic sortant au nom de Marc.
+  it("ne vise que des sites d'emploi, en HTTPS", () => {
     for (const u of adressesCandidates("test")) {
-      expect(new URL(u).hostname).toMatch(/^www\.(jobbank|guichetemplois)\.gc\.ca$/);
+      const url = new URL(u);
+      expect(url.protocol).toBe("https:");
+      expect(url.hostname).toMatch(
+        /(jobbank|guichetemplois|jobboom|jobillico|quebecemploi|espresso-jobs|isarta|grenier|jobsquebec|quebecentete|ville\.quebec|carrieres\.gouv|ulaval|indeed|careerjet)/,
+      );
     }
   });
 });
