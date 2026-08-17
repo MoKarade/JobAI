@@ -67,6 +67,19 @@ const nextConfig = {
     // exactement la panne du 2026-08-12, réintroduite par la porte qu'on vient d'ouvrir.
     // Règle : tout appelant de `executerVeilleComplete` s'ajoute ICI, dans le même commit.
     "/api/cron/geocodage": ["./data/depot/**"],
+    // ⚠️ ET LA RÈGLE CI-DESSUS A ÉTÉ VIOLÉE PAR CELUI QUI L'AVAIT ÉCRITE — [VEILLE-24].
+    //
+    // Le bouton « Lancer la veille » de `/sources` est un TROISIÈME appelant. Une Server
+    // Action est empaquetée avec la ROUTE qui l'utilise, pas avec le module qui la déclare :
+    // `/sources` avait donc besoin de son entrée, et ne l'a pas eue. Mesuré en production le
+    // 2026-08-17, dans le compte rendu du bouton lui-même : « depot-fichier EN ÉCHEC —
+    // dossier data/depot introuvable ». La seule source vivante de Marc, morte sur ce
+    // chemin, trois jours après qu'on ait fermé la même panne.
+    //
+    // Ce qui l'a rattrapée n'est aucun test — aucun ne peut voir un bundle serverless — mais
+    // le fait que la source DISE son empêchement au lieu de rendre un vide. Sans cette
+    // honnêteté, le bouton aurait affiché « 0 nouvelle » et rien n'aurait paru anormal.
+    "/sources": ["./data/depot/**"],
   },
   async headers() {
     return [
