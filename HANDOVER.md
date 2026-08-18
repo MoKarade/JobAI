@@ -6,6 +6,60 @@
 
 ---
 
+## Session 2026-08-18 — le rapport de veille, et le rayon réglable
+
+### [VEILLE-35] la découverte de pages carrières, retirée
+
+Demande de Marc : « supprime le truc de recherche page carrière ça marche pas ». Elle ne
+marchait effectivement pas — un `200` de SmartRecruiters ne prouve rien sans offres réelles
+(témoin négatif déjà mesuré), et les identifiants devinés trouvaient des homonymes
+d'Amsterdam. Retirée entièrement : la source, son bouton, ses écritures d'état. Le nettoyage
+a fait tomber cinq imports orphelins, chacun attrapé par ESLint — c'est ce que vaut un lint
+bloquant.
+
+### [VEILLE-36] un rapport qui ne peut plus se contredire
+
+Le 17 août l'écran affichait « 100 trouvées · 0 nouvelle · 26 déjà connues » : **74 offres
+disparaissaient sans motif**. Le tri travaillait très bien ; c'est le compte rendu qui mentait
+par omission, et il existait en DEUX copies incomplètes (le bouton assemblait la sienne, la
+page une autre). `lib/rapportVeille.ts` en fait une fonction PURE, `components/RapportVeille.tsx`
+un rendu unique servi aux deux endroits — automatique comme manuel, la demande de Marc.
+Le champ `sansMotif` **expose le reliquat** (`trouvees − (nouvelles + Σ refus)`) au lieu de
+laisser le lecteur faire la soustraction. Les notes moyennes EXCLUENT une note absente au lieu
+de la compter zéro (sinon la moyenne décrit la complétude de la saisie, pas la qualité des
+offres) et rendent `null` quand aucune n'est connue — jamais un 0 qui aurait l'air mesuré.
+Les villes ne sont nommées que sous les deux motifs qui se décident sur le lieu.
+
+### [VEILLE-37] le rayon, réglable depuis l'app
+
+Demande de Marc : « permet moi de faire une recherche et de régler le kilométrage alentour ».
+C'était son critère n°1 et la seule valeur qu'il ne pouvait pas toucher sans un commit.
+
+⚠️ **Ce qui comptait n'était pas le réglage, c'est ce qu'il PÉRIME.** Le registre des lieux
+est consulté AVANT toute nouvelle mesure : un verdict rendu sous l'ancien rayon et laissé en
+place n'aurait jamais été revu — Marc aurait élargi son rayon et rien n'aurait changé, sans
+qu'aucune erreur ne s'affiche. `rejugerRegistre` re-dérive tous les verdicts, **sans une seule
+requête**, parce que le registre stocke la distance mesurée et pas seulement le verdict.
+Les `introuvable` restent intacts (leur problème n'est pas la distance) ; `le` et `essais`
+sont conservés (re-juger n'est pas re-mesurer) ; le nombre de bascules est rapporté côté
+taille du registre, parce que « 0 sur 0 » et « 0 sur 40 » disent le contraire l'un de l'autre.
+Le rayon atteint aussi la NOTE, pas seulement l'acceptation. Bornes 5–300 km, une saisie hors
+bornes est dite et jamais rognée en silence.
+
+Gate vert au commit : typecheck · 1002 tests · lint · build.
+
+### Ce qui reste ouvert
+
+- **[VEILLE-32] + [VEILLE-34]** — deux défauts MESURÉS du barème (vocabulaire de notation
+  monolingue alors que le bassin de termes est bilingue : 6 offres récupérées ; accents non
+  normalisés : 4 offres). Non corrigés **délibérément** — §8 impose un ADR puis l'audit sur
+  les 38 offres du seed AVANT toute ligne, et les deux touchent la même fonction : un seul ADR.
+- **[VEILLE-33]** — `situer()` compare par sous-chaîne, donc « Quebec Province » passe.
+- **« qu'on trouve quasi-forcément une localisation »** — [VEILLE-31] a posé la mesure,
+  [VEILLE-33] et l'élargissement des replis de géocodage restent à faire.
+
+---
+
 ## Session 2026-08-17 (fin) — les 47 « lieu inconnu » : nommés, puis mesurés
 
 Compte rendu de Marc : `261 trouvée(s) · 1 nouvelle · 170 déjà connue(s) · 16 sous le

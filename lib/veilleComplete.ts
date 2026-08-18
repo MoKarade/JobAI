@@ -37,6 +37,7 @@ import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
 import { executerPasse } from "./ingest/passe";
 import { villesRefusees } from "./ingest/pipeline";
 import { CLE_RAPPORT, construireRapport, type RapportVeille } from "./rapportVeille";
+import { CLE_RAYON, RAYON_DEFAUT_KM } from "./rayon";
 import { recuperer } from "./ingest/sources";
 import { lireEtat, ecrireEtat } from "./etat";
 import type { JournalVeille } from "./veille";
@@ -53,7 +54,7 @@ const CLE_CURSEUR = "veille-curseur";
  * — or on stocke ici des lieux volontairement HORS bornes régionales, puisque c'est
  * justement le fait qu'ils soient loin qu'on a mesuré.
  */
-const CLE_LIEUX = "veille-lieux";
+export const CLE_LIEUX = "veille-lieux";
 
 /**
  * Le jour courant dans le fuseau de Marc.
@@ -88,11 +89,15 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
   }
 
   try {
-    const [connues, journal, curseur, lieux] = await Promise.all([
+    const [connues, journal, curseur, lieux, rayonMaxKm] = await Promise.all([
       lireOffres(),
       lireEtat<JournalVeille>(CLE_JOURNAL, {}),
       lireEtat<number>(CLE_CURSEUR, 0),
       lireEtat<RegistreLieux>(CLE_LIEUX, {}),
+      // Le rayon réglé par Marc, ou celui du profil s'il n'y a pas touché. Lu ICI et passé
+      // partout où il décide : la mesure des lieux et, plus bas, la note de distance. Deux
+      // lectures séparées finiraient par diverger d'une passe à l'autre.
+      lireEtat<number>(CLE_RAYON, RAYON_DEFAUT_KM),
     ]);
 
     if (connues === null) {
@@ -106,7 +111,7 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
       // les distances chez elle, et ne rend que des verdicts. La passe ne voit jamais un
       // point de référence — garde-fou n°1, tenu par la forme de la fonction, pas par une
       // convention qu'on pourrait oublier.
-      mesurer: (noms, registre) => mesurerLieuxInconnus(noms, registre, jour),
+      mesurer: (noms, registre) => mesurerLieuxInconnus(noms, registre, jour, rayonMaxKm),
     });
 
     // Les nouvelles offres d'abord : si l'écriture du journal échoue ensuite, on aura

@@ -13,7 +13,6 @@
 import { distanceKm, geocoderMunicipalites } from "./geocodage";
 import { appliquerJugements, type RegistreLieux } from "./ingest/lieux";
 import { domicile } from "./domicile";
-import { PROFIL_DEFAUT } from "./profil";
 
 /**
  * Budget de la mesure des lieux inconnus, en millisecondes.
@@ -34,15 +33,17 @@ export const BUDGET_LIEUX_MS = 12_000;
  * closure de distance, et n'est transmis à personne : `appliquerJugements` reçoit une
  * fonction, jamais un point. La passe de veille, elle, ne voit passer que des verdicts.
  *
- * Le rayon vient de `PROFIL_DEFAUT.rayonMaxKm`, la même constante que le barème : le jour où
- * Marc l'élargit, la liste des lieux acceptés suit toute seule. C'est exactement ce qui
- * manquait à la liste blanche, qu'il fallait rallonger à la main à chaque changement de
- * rayon — et qui restait donc en retard sur la décision.
+ * Le rayon est un PARAMÈTRE, pas une constante lue ici : c'est Marc qui le règle depuis
+ * l'app (`lib/rayon.ts`), et la fonction qui le reçoit ne peut donc pas être en désaccord
+ * avec ce que l'écran affiche. C'est exactement ce qui manquait à la liste blanche, qu'il
+ * fallait rallonger à la main à chaque changement de rayon — et qui restait donc en retard
+ * sur la décision.
  */
 export async function mesurerLieuxInconnus(
   noms: readonly string[],
   registre: RegistreLieux,
   jour: string,
+  rayonMaxKm: number,
 ): Promise<{ registre: RegistreLieux; juges: number; introuvables: number }> {
   if (noms.length === 0) return { registre, juges: 0, introuvables: 0 };
 
@@ -67,7 +68,7 @@ export async function mesurerLieuxInconnus(
     registre,
     r,
     (p) => distanceKm(chezMoi, p),
-    PROFIL_DEFAUT.rayonMaxKm,
+    rayonMaxKm,
     jour,
   );
   return { registre: suivant, juges: r.trouvees.length, introuvables: r.introuvables.length };

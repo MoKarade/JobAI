@@ -2134,3 +2134,28 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin-top: 0.5rem;
 }
 .rapport__detail:last-child { margin-bottom: 0; }
+
+/* ── Réglage du rayon ───────────────────────────────────────────────────────────────── */
+.rayon { display: flex; flex-direction: column; gap: 0.5rem; }
+.rayon__label {
+  font-size: var(--t-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+.rayon__ligne { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.rayon__champ {
+  width: 6rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--creux);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--t-m);
+  font-variant-numeric: tabular-nums;
+}
+.rayon__champ:focus-visible { outline: 2px solid var(--ambre); outline-offset: 2px; }
+.rayon__unite { font-family: var(--mono); color: var(--text-soft); margin-right: 0.4rem; }
+.rayon__aide { font-size: var(--t-xs); color: var(--text-soft); max-width: 68ch; }
+.rayon__message { font-size: var(--t-s); min-height: 1.2em; }

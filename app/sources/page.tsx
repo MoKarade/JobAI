@@ -17,8 +17,10 @@ import { Cadre } from "@/components/Cadre";
 import { RECHERCHES_GUICHET } from "@/lib/ingest/sources";
 import { BoutonVeille } from "@/components/BoutonVeille";
 import { RapportVeilleVue } from "@/components/RapportVeille";
+import { ReglageRayon } from "@/components/ReglageRayon";
 import { lireEtat } from "@/lib/etat";
 import { CLE_RAPPORT, type RapportVeille } from "@/lib/rapportVeille";
+import { CLE_RAYON, RAYON_DEFAUT_KM } from "@/lib/rayon";
 import { classerPanne } from "@/lib/panne";
 
 export const metadata = { title: "Sources — JobAI" };
@@ -36,10 +38,14 @@ export default async function Sources() {
   // journaux Vercel. Une base injoignable n'est pas une page cassée — on le dit et on rend
   // le reste, qui est statique.
   let dernier: RapportVeille | null = null;
+  let rayon = RAYON_DEFAUT_KM;
   try {
-    dernier = await lireEtat<RapportVeille | null>(CLE_RAPPORT, null);
+    [dernier, rayon] = await Promise.all([
+      lireEtat<RapportVeille | null>(CLE_RAPPORT, null),
+      lireEtat<number>(CLE_RAYON, RAYON_DEFAUT_KM),
+    ]);
   } catch (err) {
-    console.error("[sources] rapport illisible :", classerPanne(err));
+    console.error("[sources] état illisible :", classerPanne(err));
   }
   // Instant figé côté SERVEUR et passé au composant : lu dans le composant, le rendu
   // serveur et le rendu client différeraient d'une seconde et React signalerait une
@@ -92,6 +98,11 @@ export default async function Sources() {
             </span>
           </li>
         </ul>
+      </section>
+
+      <section className="cadre-section">
+        <h2 className="cadre-section__titre">Rayon</h2>
+        <ReglageRayon rayonInitial={rayon} />
       </section>
 
       <section className="cadre-section">

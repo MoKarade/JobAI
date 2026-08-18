@@ -42,6 +42,8 @@ import {
 // voulait faire pour la réutiliser — aurait publié les coordonnées du domicile de Marc.
 // Elle vit désormais dans un module ordinaire, où aucun `export` ne peut faire ça.
 import { domicile } from "./domicile";
+import { lireEtat } from "./etat";
+import { CLE_RAYON, RAYON_DEFAUT_KM, profilAvecRayon } from "./rayon";
 import { ENTREPRISES_CIBLES } from "./reference";
 import { employeursASituer, invaliderDistancesPrecisees, planifierDistances } from "./distances";
 import { villesARattraper } from "./ingest/pipeline";
@@ -1392,7 +1394,17 @@ export async function mesurerDistances(
     // vient d'être précisé cette passe (« ville » → « exacte ») : sans ça, `planifierDistances`
     // ne retoucherait jamais un `km` déjà connu, même devenu obsolète. Voir lib/distances.ts.
     const offresAMesurer = invaliderDistancesPrecisees(offres, raffinage.entreprisesPrecisees);
-    const majs = planifierDistances(offresAMesurer, positions, (p) => distanceKm(chezMoi, p));
+    // Le rayon réglé par Marc, appliqué à la NOTE comme il l'est à l'acceptation. Lu ici
+    // plutôt que passé en paramètre : `mesurerDistances` est appelée par trois chemins
+    // (le cron, la carte, l'accueil), et trois lectures valent mieux qu'un paramètre qu'un
+    // seul des trois penserait à fournir.
+    const rayonMaxKm = await lireEtat<number>(CLE_RAYON, RAYON_DEFAUT_KM);
+    const majs = planifierDistances(
+      offresAMesurer,
+      positions,
+      (p) => distanceKm(chezMoi, p),
+      profilAvecRayon(rayonMaxKm),
+    );
     for (const m of majs) {
       const valeurs: { km: number; majLe: Date; score?: number } = { km: m.km, majLe: new Date() };
       if (m.score !== null) valeurs.score = m.score;

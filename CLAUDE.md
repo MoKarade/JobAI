@@ -1065,6 +1065,27 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   refus se rend GROUPÉ et trié par fréquence : une liste de quarante-sept lignes ne se lit pas,
   trois lignes comptées désignent le correctif.
 
+- **Rendre un paramètre RÉGLABLE périme tout ce qui a été décidé sous son ancienne valeur —
+  et ce qui sauve la mise, c'est d'avoir stocké la MESURE, pas la conclusion.** En exposant
+  le rayon de recherche (`[VEILLE-37]`), le travail visible était un champ et une action ; le
+  vrai travail était ailleurs. Chaque verdict du registre des lieux avait été rendu SOUS un
+  rayon donné, et ce registre est consulté AVANT toute nouvelle mesure : écrire le nouveau
+  nombre sans y toucher aurait laissé « Baie-Comeau, hors région » en place alors qu'elle
+  venait d'entrer dans le rayon — jamais revu, aucune erreur, Marc règle son rayon et rien ne
+  change. C'est la leçon du « délai qui encode une prémisse » remontée d'un cran : ce n'est
+  plus un délai mais un VERDICT qui encode le seuil sous lequel il a été rendu. La question à
+  poser en rendant une constante réglable : **qu'est-ce qui, en base, a été décidé avec
+  l'ancienne valeur ?** Ici le re-jugement n'a coûté aucune requête, uniquement parce que
+  `appliquerJugements` stockait `km` à côté du verdict — un registre qui n'aurait gardé que la
+  conclusion aurait exigé de re-géocoder des dizaines de villes à chaque réglage, et le
+  réglage n'aurait probablement jamais été livré. Corollaire de conception : quand on met une
+  décision en cache, garder la GRANDEUR qui l'a produite, pas seulement son résultat.
+  Trois précisions qui se généralisent : re-juger n'est pas re-mesurer (garder l'horodatage
+  et le compte d'essais, sinon on rend son palier de retente à un nom qui ne l'a pas gagné) ;
+  ce qu'on n'a pas pu mesurer ne se re-juge pas (re-dériver depuis un `km` nul inventerait un
+  verdict) ; et un compte de bascules ne se rend jamais seul — « 0 sur 0 » dit qu'il n'y avait
+  rien à re-juger, « 0 sur 40 » que le réglage n'a rien libéré, et ce sont deux situations
+  opposées que le même « 0 » masquerait.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

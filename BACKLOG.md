@@ -754,6 +754,32 @@
 > exactement la note d'un titre sans description — 30 de ces points viennent de ce qu'on
 > ignore.
 
+- [x] **[VEILLE-37]** Rayon de recherche **réglable depuis l'app** (`lib/rayon.ts`,
+      `lib/actionsRayon.ts`, `components/ReglageRayon.tsx`). Le rayon était la seule valeur du
+      critère n°1 de Marc qu'il ne pouvait pas toucher sans un commit — il est passé de 50 à
+      75 km le 2026-08-17 par une modification du code, doublée d'un rallongement à la main de
+      la liste blanche. Le découplage était déjà acquis depuis que les lieux se MESURENT
+      ([VEILLE-31]) : il ne restait qu'un nombre à exposer.
+      ⚠️ **La partie délicate n'est pas de régler le rayon, c'est ce qu'il PÉRIME.** Chaque
+      verdict du registre des lieux a été rendu SOUS un rayon donné : « Baie-Comeau, hors
+      région » veut dire « à plus de 75 + 15 km ». Le registre étant consulté AVANT toute
+      nouvelle mesure, un verdict laissé en place n'aurait JAMAIS été revu : Marc aurait
+      élargi son rayon et rien n'aurait changé, sans qu'aucune erreur ne s'affiche. C'est mot
+      pour mot la leçon déjà consignée — « un délai de retente encode une PRÉMISSE : quand
+      elle tombe, le délai doit tomber avec ». `rejugerRegistre` re-dérive donc tous les
+      verdicts, et ne coûte AUCUNE requête parce que le registre stocke la DISTANCE mesurée,
+      pas seulement le verdict.
+      Trois détails qui ne sont pas des détails : les `introuvable` sont laissés tels quels
+      (les re-juger depuis un `km` nul inventerait un verdict) ; `le` et `essais` sont
+      CONSERVÉS (re-juger n'est pas re-mesurer — remettre la date à aujourd'hui ferait croire
+      à une mesure fraîche) ; et le nombre de bascules est rapporté à l'écran CÔTÉ taille du
+      registre, parce que « 0 bascule sur 0 lieu » et « 0 bascule sur 40 lieux » sont deux
+      situations opposées. Le rayon atteint aussi la NOTE (`profilAvecRayon` →
+      `scoreDistance`), pas seulement l'acceptation : sans ça le réglage ne ferait que la
+      moitié du chemin. Une saisie hors bornes (5–300 km) est DITE, jamais rognée en silence.
+      *Verrou* : `tests/rayon.test.ts` (12 cas, discriminant prouvé — le registre non re-jugé
+      garde son verdict périmé ; bornes et marge dérivées des constantes, jamais écrites en dur).
+
 - [ ] **[VEILLE-32]** ⚠️ **Le bassin de termes est bilingue, le VOCABULAIRE DE NOTATION ne
       l'est pas — et c'est le plus restrictif des deux qui gagne, en silence.** Mesuré à la
       veille du 2026-08-18, sur le lot réel : `PROFIL_DEFAUT.motsCoordination` ne contient

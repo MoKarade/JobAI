@@ -18,6 +18,7 @@
 // c'est lui qui décide. Fonctions PURES : la décision se teste sans base ni réseau.
 
 import { computeScore, PLAFOND_NOTE_CALCULEE } from "./scoring";
+import { PROFIL_DEFAUT, type Profil } from "./profil";
 import { memeEmployeur, positionDe } from "./employeurs";
 import type { Offre } from "./types";
 
@@ -84,6 +85,15 @@ export function planifierDistances(
   offres: readonly Offre[],
   positions: ReadonlyMap<string, Position>,
   distance: (p: Position) => number,
+  /**
+   * Le barème à appliquer, rayon réglé compris.
+   *
+   * ⚠️ IL DOIT ARRIVER JUSQU'ICI, sinon le réglage de Marc ne fait que la MOITIÉ du chemin :
+   * une ville entrerait dans la région élargie, mais l'offre garderait une note de distance
+   * calculée sur l'ancien rayon — donc zéro dès qu'elle dépasse 75 km, alors qu'elle est
+   * désormais dans le rayon voulu. Deux moitiés d'une même décision qui ne se parlent pas.
+   */
+  profil: Profil = PROFIL_DEFAUT,
 ): MiseAJourDistance[] {
   const majs: MiseAJourDistance[] = [];
 
@@ -108,7 +118,7 @@ export function planifierDistances(
     majs.push({
       id: o.id,
       km,
-      score: scoreAvecDistance(o, km),
+      score: scoreAvecDistance(o, km, profil),
       precision: pos.precision,
     });
   }
@@ -123,14 +133,18 @@ export function planifierDistances(
  * la lecture de Marc et fait autorité sur toute note calculée (le barème plafonne d'ailleurs
  * les calculées à 85 pour cette raison même).
  */
-export function scoreAvecDistance(offre: Offre, km: number): number | null {
+export function scoreAvecDistance(
+  offre: Offre,
+  km: number,
+  profil: Profil = PROFIL_DEFAUT,
+): number | null {
   if (offre.scoreSource !== "calcule") return null;
 
   // Le titre et les justifications sont ce dont on dispose ici : la description complète
   // n'est pas conservée en base (elle ne sert qu'au moment du tri). La note bougera donc
   // surtout par la composante distance, ce qui est précisément le but.
   const texte = offre.raisons.map((r) => r.texte).join(" ");
-  const r = computeScore({ titre: offre.poste, description: texte, km });
+  const r = computeScore({ titre: offre.poste, description: texte, km }, profil);
   return Math.min(r.total, PLAFOND_NOTE_CALCULEE);
 }
 
