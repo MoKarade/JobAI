@@ -8,24 +8,39 @@
 > à la main ne les a donc pas, et les redevine — c'est arrivé aujourd'hui. Le prompt vit
 > désormais dans le dépôt ; la Routine en est une COPIE, pas la source.
 
-## ⚠️ La règle qui prime sur tout : UNE seule passe par jour
+## ⚠️ La règle qui prime sur tout : un lot PARTIEL passe par le fichier
 
-**Avant de déposer, savoir si la passe du jour a déjà eu lieu.** Ce n'est pas une précaution
-de confort : `appliquerBalayage` incrémente les absences **par PASSE**
-(`absences: precedent.absences + 1`), sans aucune garde de date. Toute offre absente du lot
-prend donc une absence à chaque balayage, et à la troisième elle est **périmée**.
+⚠️ **SECTION CORRIGÉE LE 2026-08-18 — SA JUSTIFICATION ÉTAIT PÉRIMÉE, SA CONCLUSION TIENT.**
 
-Conséquence, mesurée le 2026-08-14 : déposer par `POST /api/ingest/depot` alors que le cron a
-déjà tourné le même jour compte une **deuxième** absence à tout le stock. Des offres bien
-ouvertes se ferment à l'écran, non parce qu'elles ont fermé mais parce que deux passes ont eu
-lieu dans la même journée. C'est la mécanique derrière le « −2 » signalé par Marc, et derrière
-l'effondrement de stock 78 → 30 documenté dans `next.config.mjs`.
+Elle affirmait que `appliquerBalayage` incrémente les absences « par PASSE, sans aucune garde
+de date », et que le seuil vaut trois. Les deux sont **faux depuis le 2026-08-17**. Mesuré
+dans le code, aujourd'hui :
+
+```
+lib/veille.ts:150  const dejaCompteAujourdhui = precedent.derniereAbsence === aujourdhui;
+lib/veille.ts:151  const absences = dejaCompteAujourdhui ? precedent.absences : precedent.absences + 1;
+lib/veille.ts:51   export const SEUIL_ABSENCES_PEREMPTION = 5;
+```
+
+Une offre déjà comptée absente aujourd'hui ne vieillit **pas** une seconde fois parce qu'on a
+relancé la veille : le balayage est IDEMPOTENT dans la journée. Le seuil est passé de 3 à 5,
+dérivé du cycle de rotation des termes. C'est précisément ce qui a rendu possible le bouton
+« Lancer la veille » de `/sources` — relançable autant de fois qu'on veut.
+
+**Ce qui reste vrai, et qui commande toujours le choix du canal**, c'est la section suivante :
+la route POST construit ses « offres vues » à partir du SEUL lot reçu
+(`app/api/ingest/depot/route.ts` : `const vues = apresAjout.filter((o) => idsDeposes.has(o.id))`).
+Poster un lot de huit trouvailles donne donc **une** absence — plus deux, mais une — aux
+quarante autres offres suivies. Pas de péremption immédiate, mais un décompte enclenché que
+seule une passe complète remet à zéro.
+
+Autrement dit : **le critère n'a jamais été « une passe a-t-elle tourné », c'est « mon lot
+est-il exhaustif »** — et c'est le seul qui survive à la correction du compteur.
 
 | Situation | Canal |
 |---|---|
-| Aucune passe n'a tourné **et** le lot re-présente tout le stock vivant | `POST` — il dépose ET balaie, c'est ce qu'on veut |
-| Une passe a déjà tourné aujourd'hui | **fichier** `data/depot/<JOUR>.json` |
-| Lot PARTIEL — les trouvailles du jour seulement | **fichier**, quoi qu'il arrive |
+| Le lot re-présente tout le stock vivant | `POST` — il dépose ET balaie, c'est ce qu'on veut |
+| Lot PARTIEL — ce qu'une recherche a rendu aujourd'hui | **fichier** `data/depot/<JOUR>.json`, quoi qu'il arrive |
 
 ⚠️ **La deuxième condition n'est pas une nuance, et elle m'a échappé à la première écriture
 de ce document (corrigée le 2026-08-15, preuve à l'appui).** La route POST construit ses
@@ -102,6 +117,22 @@ Il est utile ailleurs — il dit si un employeur est bien noté et ce qu'il paie
 projet et responsable technique en robotique, master, C++/Python/conception de cellules
 robotiques, cible « Project Manager »). Ça sert à choisir les termes de recherche — pas à
 alimenter un fichier versionné, où rien de personnel n'entre.
+
+## ⚠️ ZipRecruiter — AUCUN OUTIL EXPOSÉ dans la session du 2026-08-18
+
+Mesuré, pas supposé : la liste d'outils réellement disponibles ne contient que les quatre
+d'Indeed (`search_jobs`, `get_job_details`, `get_company_data`, `get_resume`). Aucun outil
+ZipRecruiter n'y figure.
+
+C'est la leçon « un connecteur activé peut n'exposer AUCUN outil » appliquée à la lettre :
+la CAPACITÉ se lit dans la liste d'outils, jamais dans un état de configuration. Tant que
+cette liste ne rend rien pour ZipRecruiter, les passages ci-dessous le concernant décrivent
+un canal INDISPONIBLE — les garder est utile (ils redeviendront vrais si le connecteur
+revient), mais une passe qui ne l'a pas doit le DIRE dans son rapport plutôt que de laisser
+croire que deux sources ont été balayées.
+
+Vérification en une ligne au début d'une passe : chercher `search_jobs` dans les outils
+disponibles et compter les fournisseurs. Un seul ⇒ le dire.
 
 ## Ce que les deux connecteurs font vraiment
 
@@ -223,8 +254,8 @@ Fais la veille JobAI du jour.
    recopie pas ici : la liste vivait en double, et l'exemplaire du prompt a
    fini par diverger de celle du code (huit d'un côté, douze de l'autre).
 
-   ⚠️ N'INTERROGE PAS TOUTE LA LISTE. Elle compte ~28 termes depuis le
-   2026-08-17 (français ET anglais — Honeywell, Alstom, AMETEK et Domtar
+   ⚠️ N'INTERROGE PAS TOUTE LA LISTE. Elle compte 48 termes (mesuré le
+   2026-08-18 : `PROFIL_DEFAUT.recherches`, français ET anglais — Honeywell, Alstom, AMETEK et Domtar
    publient en anglais dans la région, et Marc est bilingue). Les interroger
    tous chaque jour ferait sauter le quota Indeed, qui se referme en
    s'aggravant. C'est un BASSIN, pas une liste à épuiser.

@@ -754,6 +754,50 @@
 > exactement la note d'un titre sans description — 30 de ces points viennent de ce qu'on
 > ignore.
 
+- [ ] **[VEILLE-32]** ⚠️ **Le bassin de termes est bilingue, le VOCABULAIRE DE NOTATION ne
+      l'est pas — et c'est le plus restrictif des deux qui gagne, en silence.** Mesuré à la
+      veille du 2026-08-18, sur le lot réel : `PROFIL_DEFAUT.motsCoordination` ne contient
+      que du français (coordonnateur, superviseur, chargé de projet, gestionnaire…), alors
+      que le bassin de recherche est passé au bilingue le 2026-08-17 précisément parce que
+      « Honeywell, Alstom, AMETEK et Domtar publient en anglais dans la région ». On cherche
+      donc en anglais, on trouve en anglais, et le barème jette le résultat faute de le
+      comprendre.
+      **Chiffré, pas supposé — 6 des 16 refus « sous le plancher » du 18 août** basculent
+      de `fitRole 8` à `28` en ajoutant les équivalents anglais (`project manager`, `manager`,
+      `supervisor`, `superintendent`, `coordinator`, `team lead`, `lead engineer`, `director`)
+      à `motsCoordination`, mesure faite sur un profil en mémoire, sans toucher le fichier :
+
+      | Offre | avant | après |
+      |---|---|---|
+      | Trane Technologies — Project Manager Equipment | 8 | 28 |
+      | ELEM — Process engineer – project manager at Opting | 8 | 28 |
+      | Davie — Leader, Project Change Control | 8 | 28 |
+      | Manpower — Surintendant civil senior - Projets Hydro-Québec | 8 | 28 |
+      | Primo Brands — Operations Team Lead | 8 | 28 |
+      | CORACTIVE — Application Technologist | 8 | 28 |
+
+      Les trois premières sont littéralement des postes de **project manager** — la cible
+      DÉCLARÉE de Marc sur Indeed (`Preferred Job Titles: Project Manager`). Le barème les
+      écarte pour la seule raison qu'elles ne sont pas écrites en français.
+      ⚠️ **Non corrigé dans la passe qui l'a trouvé, et c'est délibéré** : le §8 du CLAUDE.md
+      impose un ADR AVANT toute ligne, puis l'audit sur les 38 offres du seed avec le tableau
+      [entreprise | poste | note avant | note après | écart]. Une liste de mots ajoutée à la
+      va-vite au barème est exactement le genre de changement qui déplace des dizaines de
+      notes sans qu'on l'ait mesuré. La mesure ci-dessus est l'ENTRÉE de cet audit, pas sa
+      conclusion : elle ne dit rien des faux positifs que l'anglais ferait entrer.
+      Sœur du même défaut, à vérifier dans le même ADR : `motsTechnique` porte quelques mots
+      anglais (`automation`, `robotic`, `plc`) mais pas `engineering`, `mechanical`, `design`,
+      `manufacturing`.
+
+- [ ] **[VEILLE-33]** La liste blanche de `situer()` compare par SOUS-CHAÎNE : « Quebec
+      Province » est accepté « dans la région » parce qu'il contient « quebec ». Trouvé le
+      2026-08-18 sur une offre réelle (Eco-services TGL, mine souterraine) dont l'annonce
+      disait « situé au Saguenay ». Le lot l'a corrigée à la lecture, mais rien dans le code
+      ne l'aurait attrapée. Le registre de mesure ([VEILLE-31]) ne la sauve pas non plus :
+      il n'est consulté qu'APRÈS les deux listes, donc jamais pour ce cas. Piste : exiger
+      que la correspondance porte sur un segment ENTIER du lieu normalisé plutôt que sur
+      une sous-chaîne quelconque — à mesurer contre les ~130 municipalités avant de changer.
+
 - [ ] **[VEILLE-06]** Lire l'annonce de chaque offre retenue (`get_job_details`) et en tirer
       les QUATRE champs qu'elle porte ensemble : description, salaire, adresse, séniorité.
       La description entre dans le dépôt (le schéma la porte déjà, on l'envoie vide).
