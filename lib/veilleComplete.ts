@@ -37,9 +37,6 @@ import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
 import { executerPasse } from "./ingest/passe";
 import { villesRefusees } from "./ingest/pipeline";
 import { recuperer } from "./ingest/sources";
-import type { AtsEntreprise } from "./ingest/types";
-import { MAX_ESSAIS_PAR_PASSE, BUDGET_DECOUVERTE_MS } from "./ingest/decouverteAts";
-import { avancerDecouverte, CLE_ATS } from "./decouverte";
 import { lireEtat, ecrireEtat } from "./etat";
 import type { JournalVeille } from "./veille";
 
@@ -90,10 +87,9 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
   }
 
   try {
-    const [connues, journal, ats, curseur, lieux] = await Promise.all([
+    const [connues, journal, curseur, lieux] = await Promise.all([
       lireOffres(),
       lireEtat<JournalVeille>(CLE_JOURNAL, {}),
-      lireEtat<AtsEntreprise[]>(CLE_ATS, []),
       lireEtat<number>(CLE_CURSEUR, 0),
       lireEtat<RegistreLieux>(CLE_LIEUX, {}),
     ]);
@@ -103,7 +99,7 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
     }
 
     const jour = aujourdhuiQuebec();
-    const rapport = await executerPasse(connues, journal, ats, curseur, jour, recuperer, {
+    const rapport = await executerPasse(connues, journal, curseur, jour, recuperer, {
       registre: lieux,
       // Le domicile ne franchit pas cette frontière : `mesurerLieuxInconnus` le lit, calcule
       // les distances chez elle, et ne rend que des verdicts. La passe ne voit jamais un
@@ -220,43 +216,6 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
       );
     }
 
-    // DÉCOUVRIR DES PAGES CARRIÈRES — ce qui remplit `veille-ats`, vide depuis toujours.
-    //
-    // ⚠️ ENVELOPPÉE, ET APRÈS LE FLUX VIVANT. Deux règles de la §7 se rencontrent ici :
-    // une étape SECONDAIRE ne doit jamais pouvoir bloquer l'intake (d'où le try/catch —
-    // le `try` de la passe n'a qu'un `finally`, une exception non capturée gèlerait tout le
-    // pipeline), et elle passe APRÈS ce qui nourrit Marc aujourd'hui.
-    //
-    // Elle est bornée par hôte, pas seulement par passe : voir `MAX_ESSAIS_PAR_FAMILLE`.
-    try {
-      // ⚠️ LE MÊME CODE QUE LE BOUTON, avec le plafond et le budget de la PASSE. Ici la
-      // découverte partage son mur de 60 s avec l'ingestion, la localisation et les bornes ;
-      // lancée à la main elle est seule, et peut prendre plus large. C'est la seule
-      // différence entre les deux chemins — tout le reste est `lib/decouverte.ts`.
-      const lot = await avancerDecouverte(jour, {
-        max: MAX_ESSAIS_PAR_PASSE,
-        budgetMs: BUDGET_DECOUVERTE_MS,
-      });
-
-      if (lot.compte.essais > 0) {
-        console.log(
-          `[ats] essais=${lot.compte.essais} confirmées=${lot.compte.confirmees}` +
-            ` réfutées=${lot.compte.refutees} indécis=${lot.compte.indecis}` +
-            ` absentes=${lot.compte.absentes} sautés=${lot.compte.sautes}` +
-            ` inscrites=${lot.etat.inscrites.length}` +
-            ` couverture=${lot.etat.faites}/${lot.etat.total}`,
-        );
-      } else {
-        // « 0 essai » et « rien à essayer » sont deux situations opposées : la première dit
-        // que le budget a été mangé ailleurs, la seconde que le balayage est à jour.
-        console.log(
-          `[ats] rien à essayer aujourd'hui — inscrites=${lot.etat.inscrites.length}` +
-            ` couverture=${lot.etat.faites}/${lot.etat.total}`,
-        );
-      }
-    } catch (err) {
-      console.warn(`[ats] découverte en échec (sans effet sur l'intake) : ${String(err)}`);
-    }
 
     // LOCALISER ET MESURER, ICI AUSSI — sans quoi « toujours à jour » dépendrait de Marc.
     //

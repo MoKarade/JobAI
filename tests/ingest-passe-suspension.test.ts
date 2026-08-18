@@ -56,7 +56,7 @@ describe("balayage suspendu quand aucune source ne répond", () => {
       const rec = () => {
         throw new Error("réseau coupé");
       };
-      const r = await executerPasse([OFFRE_SUIVIE], journal, [], 0, "2026-08-12", rec as never);
+      const r = await executerPasse([OFFRE_SUIVIE], journal, 0, "2026-08-12", rec as never);
 
       // La panne est DITE, pas rendue comme un jour vide.
       expect(r.sources.every((s) => !s.ok)).toBe(true);
@@ -85,7 +85,7 @@ describe("balayage suspendu quand aucune source ne répond", () => {
     const rec = () => {
       throw new Error("réseau coupé");
     };
-    const r = await executerPasse([OFFRE_SUIVIE], journal, [], 0, "2027-06-01", rec as never);
+    const r = await executerPasse([OFFRE_SUIVIE], journal, 0, "2027-06-01", rec as never);
     expect(r.sources.some((s) => s.ok)).toBe(true);
     expect(r.perimees).toEqual([OFFRE_SUIVIE.id]);
   });

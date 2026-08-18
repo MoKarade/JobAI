@@ -18,10 +18,10 @@ import { appliquerBalayage, resumerBalayage, type JournalVeille } from "../veill
 import type { Offre } from "../types";
 import { cleCanonique, idsStockesVus, lieuxAMesurer, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
 import { verdictsFermes, type RegistreLieux } from "./lieux";
-import { RECHERCHES_GUICHET, sourceAts, sourceGuichet } from "./sources";
+import { RECHERCHES_GUICHET, sourceGuichet } from "./sources";
 import { sourceDepotFichier } from "./depotFichier";
 import { villeCoherente } from "./depotSchema";
-import type { AtsEntreprise, OffreBrute, Recuperateur, ResultatSource, Source } from "./types";
+import type { OffreBrute, Recuperateur, ResultatSource, Source } from "./types";
 
 /** Sources interrogées par exécution. Au-delà, on dépasse la durée d'une fonction. */
 export const MAX_SOURCES_PAR_PASSE = 14;
@@ -113,11 +113,7 @@ export interface RapportPasse {
  * `depart` fait tourner la sélection d'un jour à l'autre : sans lui, les mêmes sources
  * seraient interrogées chaque jour et les dernières de la liste ne le seraient JAMAIS.
  */
-export function selectionnerSources(
-  ats: readonly AtsEntreprise[],
-  depart: number,
-  aujourdhui: string,
-): Source[] {
+export function selectionnerSources(depart: number, aujourdhui: string): Source[] {
   // ⚠️ LE DÉPÔT DE FICHIERS EST HORS ROTATION, ET C'EST TOUT L'INTÉRÊT. La rotation existe
   // pour ne pas dépasser la durée d'une fonction en interrogeant douze sources RÉSEAU. Le
   // dépôt ne fait aucune requête : il lit un fichier du projet. Le mettre dans la rotation
@@ -125,10 +121,7 @@ export function selectionnerSources(
   // ce jour-là, et la péremption les ferait disparaître alors qu'elles sont bien là.
   const depot = sourceDepotFichier(aujourdhui);
 
-  const reseau = [
-    ...RECHERCHES_GUICHET.map((r) => sourceGuichet(r)),
-    ...ats.map((a) => sourceAts(a)),
-  ];
+  const reseau = RECHERCHES_GUICHET.map((r) => sourceGuichet(r));
   if (reseau.length <= MAX_SOURCES_PAR_PASSE) return [depot, ...reseau];
 
   const debut = ((depart % reseau.length) + reseau.length) % reseau.length;
@@ -144,7 +137,6 @@ export function selectionnerSources(
  *
  * @param connues     Le suivi actuel.
  * @param journal     L'état de la veille au passage précédent.
- * @param ats         Les pages carrières connues.
  * @param depart      Curseur de rotation des sources.
  * @param aujourdhui  Date du balayage (AAAA-MM-JJ). Paramètre, jamais l'horloge.
  * @param rec         L'accès réseau, injecté.
@@ -155,7 +147,6 @@ export function selectionnerSources(
 export async function executerPasse(
   connues: readonly Offre[],
   journal: JournalVeille,
-  ats: readonly AtsEntreprise[],
   depart: number,
   aujourdhui: string,
   rec: Recuperateur,
@@ -174,7 +165,7 @@ export async function executerPasse(
     ) => Promise<{ registre: RegistreLieux; juges: number; introuvables: number }>;
   },
 ): Promise<RapportPasse> {
-  const sources = selectionnerSources(ats, depart, aujourdhui);
+  const sources = selectionnerSources(depart, aujourdhui);
 
   // En parallèle : les sources sont indépendantes, et les enchaîner ferait dépasser la
   // durée de la fonction bien avant d'avoir tout interrogé.
