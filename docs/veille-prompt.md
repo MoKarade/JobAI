@@ -118,21 +118,28 @@ projet et responsable technique en robotique, master, C++/Python/conception de c
 robotiques, cible « Project Manager »). Ça sert à choisir les termes de recherche — pas à
 alimenter un fichier versionné, où rien de personnel n'entre.
 
-## ⚠️ ZipRecruiter — AUCUN OUTIL EXPOSÉ dans la session du 2026-08-18
+## ⚠️ ZipRecruiter — LA DISPONIBILITÉ SE MESURE AU MOMENT DE S'EN SERVIR
 
-Mesuré, pas supposé : la liste d'outils réellement disponibles ne contient que les quatre
-d'Indeed (`search_jobs`, `get_job_details`, `get_company_data`, `get_resume`). Aucun outil
-ZipRecruiter n'y figure.
+Vécu le 2026-08-18, en deux heures, dans la MÊME session :
 
-C'est la leçon « un connecteur activé peut n'exposer AUCUN outil » appliquée à la lettre :
-la CAPACITÉ se lit dans la liste d'outils, jamais dans un état de configuration. Tant que
-cette liste ne rend rien pour ZipRecruiter, les passages ci-dessous le concernant décrivent
-un canal INDISPONIBLE — les garder est utile (ils redeviendront vrais si le connecteur
-revient), mais une passe qui ne l'a pas doit le DIRE dans son rapport plutôt que de laisser
-croire que deux sources ont été balayées.
+1. Début de passe — la liste d'outils ne contenait que les quatre d'Indeed. J'ai écrit ici,
+   noir sur blanc, « AUCUN OUTIL EXPOSÉ », et fait la veille sur une seule source.
+2. Deux heures plus tard — `mcp__ZipRecruiter__search_jobs` était là. La note que je venais
+   d'écrire était déjà fausse, et la veille du jour était incomplète.
 
-Vérification en une ligne au début d'une passe : chercher `search_jobs` dans les outils
-disponibles et compter les fournisseurs. Un seul ⇒ le dire.
+**La leçon n'est donc pas « ZipRecruiter est disponible » ni « il ne l'est pas » — c'est
+qu'une note d'indisponibilité se périme sans prévenir.** Exactement ce que la §7 du CLAUDE.md
+dit déjà de l'accès réseau : « l'accès d'une session se MESURE au moment où l'on en a besoin,
+jamais depuis une note écrite la veille ». Ça vaut aussi pour les connecteurs, et ça vaut à
+l'échelle de l'HEURE, pas du jour.
+
+Conséquence opératoire : **relire la liste d'outils juste avant de balayer**, et si une source
+manque, le dire dans le rapport SANS l'inscrire ici comme un fait durable. Un connecteur
+absent est un état, pas une propriété.
+
+⚠️ **Et ZipRecruiter n'expose que `search_jobs`** — aucun outil de détail, mesuré. Ses offres
+entrent donc SANS description, donc notées sur leur seul titre. Ce n'est pas un jugement du
+poste, c'est un défaut de lecture, et le rapport doit le dire.
 
 ## Ce que les deux connecteurs font vraiment
 

@@ -789,6 +789,23 @@
       anglais (`automation`, `robotic`, `plc`) mais pas `engineering`, `mechanical`, `design`,
       `manufacturing`.
 
+- [ ] **[VEILLE-34]** ⚠️ **`normaliserTitre` ne retire PAS les accents, et les mots-clés du
+      barème en portent.** Mesuré le 2026-08-18 sur le lot réel : `motsCoordination` contient
+      « chargé de projet » ; un titre écrit « Charge de projet » (sans accent) ne matche pas.
+      Ce n'est pas un cas d'école — **ZipRecruiter rend une bonne part de ses titres
+      désaccentués** (« Charge(e) de projet », « Contremaitre », « Ingenieur »), et
+      Indeed le fait aussi par endroits.
+      **Chiffré : 4 offres du lot du 18 août** passent de `fitRole 8` à `28` par la seule
+      comparaison insensible aux accents, sans ajouter un seul mot au vocabulaire :
+      Regulvar (Chargé de projet), Solution SFT, TEHORA, **Davie — Charge de projet,
+      maintenance**.
+      C'est la sœur exacte de la leçon déjà consignée : « une expression composée ne survit
+      pas à l'écriture inclusive » — `normaliserTitre` a été corrigé pour le `(e)` et pas pour
+      les accents. La correction est mécanique (`normalize("NFD")` + `\p{Diacritic}` des DEUX
+      côtés de la comparaison), mais elle touche `lib/scoring.ts` : §8 s'applique, ADR et audit
+      sur les 38 offres du seed AVANT toute ligne. À traiter dans le MÊME ADR que [VEILLE-32] —
+      les deux corrigent la même fonction et leurs effets se cumulent.
+
 - [ ] **[VEILLE-33]** La liste blanche de `situer()` compare par SOUS-CHAÎNE : « Quebec
       Province » est accepté « dans la région » parce qu'il contient « quebec ». Trouvé le
       2026-08-18 sur une offre réelle (Eco-services TGL, mine souterraine) dont l'annonce
