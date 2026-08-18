@@ -2076,6 +2076,27 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 }
 .rapport__libelle { font-size: var(--t-2xs); color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; }
 
+/* La fraîcheur du dépôt. Un liseré porteur de sens, pas une décoration : « vieillissant »
+   se remarque, « rompu » se lit avant les chiffres qu'il disqualifie. Aucun hex ici — les
+   jetons décident, et `tests/styles.test.ts` refuse tout #rrggbb dans une règle. */
+.rapport__fraicheur {
+  font-size: var(--t-s);
+  line-height: 1.45;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  background: var(--creux);
+  border-left: 3px solid var(--border);
+  margin-bottom: var(--pas-2);
+}
+.rapport__fraicheur--vieillissant {
+  border-left-color: var(--ambre);
+  color: var(--text);
+}
+.rapport__fraicheur--rompu {
+  border-left-color: var(--rouge);
+  color: var(--text);
+}
+
 .rapport__meilleure {
   font-size: var(--t-s);
   padding: 0.5rem 0.7rem;

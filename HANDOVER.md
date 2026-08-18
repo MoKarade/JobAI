@@ -48,6 +48,45 @@ bornes est dite et jamais rognée en silence.
 
 Gate vert au commit : typecheck · 1002 tests · lint · build.
 
+### [VEILLE-38] la fraîcheur du dépôt — un silence mesuré, puis fermé
+
+⚠️ **Trouvé en mesurant, pas en lisant** : la veille n'a plus qu'**UNE seule source**, le
+dépôt de fichiers. `RECHERCHES_GUICHET` est vide (404 prouvé) et les pages carrières sont
+parties avec [VEILLE-35]. `selectionnerSources` rend `depot-fichier` et rien d'autre, quel
+que soit le jour — vérifié par sonde.
+
+Conséquence que rien ne montrait : le dépôt lit une **fenêtre de sept jours**. Un jour sans
+lot déposé, il rend quand même ceux de la veille, tout passe en « déjà connue », et le rapport
+affiche « 0 nouvelle » — exactement ce qu'il afficherait un jour sans embauche. Ce projet a
+déjà payé ce silence (cron muet trois jours, péremption en série, tous les voyants au vert).
+Le rapport porte désormais `depot: { dernierJour, retardJours }`, dérivé de ce que la source
+a RÉELLEMENT lu, et l'écran le dit AVANT les chiffres qu'il disqualifie.
+
+Prouvé contre le vrai dossier : 18 août `retard=0` (muet) · 19 août `retard=1` · 21 août
+`retard=3` (« rompu ») · 30 août fenêtre vide (`retard=null`). Les quatre rendaient le même
+écran auparavant. Seuil d'alerte à DEUX jours : crier au premier matin manqué apprendrait à
+ignorer le voyant.
+
+### Sur « quasi-forcément une localisation » — mesuré, largement atteint
+
+Sonde sur les **309 offres des huit lots réels** : 298 « dans la région », 4 « hors région »,
+**7 seulement « lieu inconnu »** — et ces sept sont légitimes (5 × « canada », 1 champ vide,
+1 « dorval »). Les 47 du 17 août ne venaient pas du dépôt mais de `smartrecruiters:dexterra`,
+source retirée depuis. Sur le canal qui alimente réellement la veille, la localisation est
+donc trouvée dans **97,7 %** des cas. Il reste [VEILLE-33] (comparaison par sous-chaîne)
+comme défaut de JUSTESSE, pas de couverture.
+
+### ⚠️ Ce que « full auto » peut et ne peut pas vouloir dire ici
+
+Le bouton et le cron **ne vont chercher aucune offre sur Internet** : ils relisent le dépôt,
+trient, notent, périment. Les offres nouvelles arrivent par la Routine quotidienne, qui tire
+dans une session Claude où vivent les connecteurs Indeed et ZipRecruiter. Du point de vue de
+Marc c'est bien automatique — il ne fait rien — mais la chaîne passe par une session, pas par
+l'app, et aucune ligne de code de l'app ne peut la remplacer : ces deux services n'ont pas
+d'API publique et le moissonnage est interdit (garde-fou n°4). [VEILLE-38] est la conséquence
+directe : puisque la seule source vivante est hors de l'app, son silence devait devenir visible.
+
+
 ### Ce qui reste ouvert
 
 - **[VEILLE-32] + [VEILLE-34]** — deux défauts MESURÉS du barème (vocabulaire de notation

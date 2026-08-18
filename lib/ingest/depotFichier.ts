@@ -27,6 +27,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { LotDeposeSchema, type LotDepose } from "./depotSchema";
+import { ID_SOURCE_DEPOT } from "./types";
 import type { OffreBrute, ResultatSource, Source } from "./types";
 
 /** Le dossier des dépôts, relatif à la racine du projet. */
@@ -98,6 +99,28 @@ export function fichiersDansLaFenetre(
     .sort((a, b) => b.localeCompare(a));
 }
 
+/**
+ * Le jour du lot le plus RÉCENT que la fenêtre contient, ou `null` si elle est vide.
+ *
+ * PURE. Dérivée de `fichiersDansLaFenetre` — et surtout pas d'un second filtre écrit à côté :
+ * deux façons de décider « ce fichier compte-t-il ? » finissent toujours par diverger, et
+ * c'est le plus permissif des deux qui rendrait ici une fraîcheur que la passe n'a pas lue.
+ * La liste rendue par `fichiersDansLaFenetre` est déjà triée du plus récent au plus ancien ;
+ * on ne re-trie donc pas, on prend la tête — mais on extrait la date du NOM plutôt que de
+ * supposer la position, pour que le lien ne casse pas si le tri change.
+ */
+export function dernierJourDepose(
+  noms: readonly string[],
+  aujourdhui: string,
+  fenetreJours = FENETRE_DEPOT_JOURS,
+): string | null {
+  const dates = fichiersDansLaFenetre(noms, aujourdhui, fenetreJours)
+    .map((n) => NOM_FICHIER.exec(n)?.[1])
+    .filter((d): d is string => d !== undefined);
+  if (dates.length === 0) return null;
+  return dates.reduce((a, b) => (a >= b ? a : b));
+}
+
 /** Un lot validé, mis à la forme qu'attend le reste du pipeline. */
 export function brutesDuDepot(lot: Depot): OffreBrute[] {
   return lot.offres.map((o) => ({
@@ -131,7 +154,7 @@ export function brutesDuDepot(lot: Depot): OffreBrute[] {
  */
 export function sourceDepotFichier(aujourdhui: string, racine = process.cwd()): Source {
   return {
-    id: "depot-fichier",
+    id: ID_SOURCE_DEPOT,
     nom: "Dépôt de fichiers (data/depot)",
     interroger: async (): Promise<ResultatSource> => {
       const dossier = resolve(racine, DOSSIER_DEPOT);
@@ -141,7 +164,7 @@ export function sourceDepotFichier(aujourdhui: string, racine = process.cwd()): 
       } catch {
         return {
           ok: false,
-          source: "depot-fichier",
+          source: ID_SOURCE_DEPOT,
           erreur:
             "dossier data/depot introuvable — bundle serverless amputé ? (outputFileTracingIncludes)",
         };
@@ -165,11 +188,11 @@ export function sourceDepotFichier(aujourdhui: string, racine = process.cwd()): 
       if (illisibles.length > 0) {
         return {
           ok: false,
-          source: "depot-fichier",
+          source: ID_SOURCE_DEPOT,
           erreur: `fichier(s) illisible(s) : ${illisibles.join(", ")}`,
         };
       }
-      return { ok: true, source: "depot-fichier", offres };
+      return { ok: true, source: ID_SOURCE_DEPOT, offres, dernierJour: dernierJourDepose(noms, aujourdhui) ?? undefined };
     },
   };
 }

@@ -1086,6 +1086,31 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   verdict) ; et un compte de bascules ne se rend jamais seul — « 0 sur 0 » dit qu'il n'y avait
   rien à re-juger, « 0 sur 40 » que le réglage n'a rien libéré, et ce sont deux situations
   opposées que le même « 0 » masquerait.
+- **Une source qui lit une FENÊTRE ne peut pas se taire : elle répète l'avant-veille, et le
+  silence prend l'apparence d'un résultat.** Le dépôt lit sept jours de lots. Le jour où
+  personne ne dépose, il rend quand même ceux d'avant, tout est compté « déjà connue », et
+  l'écran affiche « 0 nouvelle » — mot pour mot ce qu'il afficherait un jour sans embauche.
+  La règle déjà consignée (« un mécanisme qui ne peut pas atteindre sa source doit le DIRE »)
+  ne couvrait pas ce cas : ici la source RÉPOND, elle répond juste avec du vieux. Ce qu'il
+  faut donc exposer n'est pas l'échec mais **l'ÂGE de la donnée** — et le déduire de ce que
+  la source a réellement lu, jamais d'un second canal qui finirait par dire autre chose.
+  Une fenêtre glissante, un cache, un repli sur la dernière valeur connue : les trois ont ce
+  défaut, et il ne se voit sur aucun voyant. Corollaire de lecture : un chiffre nul doit être
+  QUALIFIÉ par la fraîcheur de ce qui l'a produit — « 0 » sur une donnée fraîche est une
+  observation, « 0 » sur une donnée qui rouille est l'absence d'observation, et les deux
+  appellent des gestes opposés (attendre, ou aller réparer la chaîne). Deux détails qui se
+  généralisent : le seuil d'alerte se place au DEUXIÈME manquement, pas au premier (crier
+  tous les matins apprend à ignorer le voyant — c'est ainsi que la CI de ce dépôt a été
+  ignorée quatre commits d'affilée) ; et « rien lu du tout » se rend `null`, jamais `0`, qui
+  se lirait « à jour » alors qu'on ne sait rien.
+- **Chercher un défaut est le meilleur moment pour recenser ce qui reste debout.** Je partais
+  corriger la localisation (« 47 lieu inconnu ») ; la sonde sur les 309 offres réelles a rendu
+  **7** lieux inconnus, tous légitimes — les 47 venaient d'une source retirée depuis. Le même
+  passage a montré que `selectionnerSources` ne rend plus qu'UNE source : ce n'était pas ce
+  que je cherchais, et c'était le vrai sujet. Deux conséquences : (a) mesurer AVANT de coder
+  évite de « corriger » ce qui marche (déjà consigné, re-vécu) ; (b) le retrait d'un composant
+  change la topologie du reste — après avoir supprimé une source, un chemin, un déclencheur,
+  RECENSER ce qu'il en reste plutôt que supposer que le reste est inchangé.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

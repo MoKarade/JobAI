@@ -754,6 +754,24 @@
 > exactement la note d'un titre sans description — 30 de ces points viennent de ce qu'on
 > ignore.
 
+- [x] **[VEILLE-38]** La FRAÎCHEUR du dépôt, dite (`dernierJourDepose`, `fraicheurDepot`).
+      Mesuré en cherchant tout autre chose : **la veille n'a plus qu'UNE source**, le dépôt
+      de fichiers. Le Guichet est désactivé (404 prouvé) et les pages carrières sont parties
+      avec [VEILLE-35]. Or le dépôt lit une **fenêtre de sept jours** : le jour où aucun lot
+      n'est déposé, il rend quand même ceux de la veille, tout est compté « déjà connue », et
+      le rapport affiche « 0 nouvelle » — mot pour mot ce qu'il afficherait un jour sans
+      embauche. Deux situations opposées, un seul affichage.
+      **Prouvé de bout en bout contre le vrai dossier** (sonde, pas raisonnement) :
+      le 18 août → 261 offres lues, `retard=0`, muet ; le 19 sans dépôt → 194 offres encore
+      lues, `retard=1` ; le 21 → 149 offres, `retard=3`, « rompu » ; le 30 → fenêtre vide,
+      `retard=null`. Sans ce champ, les quatre cas rendaient le même écran.
+      Le seuil d'alerte est à DEUX jours, pas un : crier au premier matin manqué apprendrait
+      à ignorer le voyant — c'est exactement ainsi que la CI de ce dépôt a été ignorée quatre
+      commits d'affilée. `retardJours` est `null` (jamais `0`) quand le dépôt n'a rien rendu :
+      « 0 » se lirait « à jour », alors qu'on ne sait rien.
+      *Verrou* : `tests/fraicheurDepot.test.ts` (14 cas ; fenêtre et seuil dérivés des
+      constantes, discriminant sur le fichier hors fenêtre, retard jamais négatif).
+
 - [x] **[VEILLE-37]** Rayon de recherche **réglable depuis l'app** (`lib/rayon.ts`,
       `lib/actionsRayon.ts`, `components/ReglageRayon.tsx`). Le rayon était la seule valeur du
       critère n°1 de Marc qu'il ne pouvait pas toucher sans un commit — il est passé de 50 à

@@ -68,7 +68,7 @@ export interface AdresseAnnoncee {
 
 export interface RapportPasse {
   /** Ce que chaque source a rendu, succès comme échec. */
-  sources: { id: string; ok: boolean; offres: number; erreur?: string }[];
+  sources: { id: string; ok: boolean; offres: number; erreur?: string; dernierJour?: string }[];
   trouvees: number;
   tri: Omit<Tri, "retenues">;
   nouvelles: string[];
@@ -178,7 +178,7 @@ export async function executerPasse(
   for (const r of resultats) {
     if (r.ok) {
       brutes.push(...r.offres);
-      compte.push({ id: r.source, ok: true, offres: r.offres.length });
+      compte.push({ id: r.source, ok: true, offres: r.offres.length, dernierJour: r.dernierJour });
     } else {
       compte.push({ id: r.source, ok: false, offres: 0, erreur: r.erreur });
     }

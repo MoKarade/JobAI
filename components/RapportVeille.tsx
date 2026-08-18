@@ -10,7 +10,7 @@
 // serveur et le rendu client différeraient d'une seconde et React signalerait une erreur
 // d'hydratation à chaque affichage.
 
-import { LIBELLE_MOTIF, depuis, type RapportVeille } from "@/lib/rapportVeille";
+import { LIBELLE_MOTIF, depuis, fraicheurDepot, type RapportVeille } from "@/lib/rapportVeille";
 
 /** Nombre de villes nommées par motif avant de dire « et N autres ». */
 const MAX_VILLES = 8;
@@ -46,6 +46,9 @@ export function RapportVeilleVue({
   // Le déclencheur en clair : « le planificateur » et « toi » ne se lisent pas pareil quand
   // on cherche pourquoi un chiffre a bougé.
   const parQui = rapport.declencheur === "bouton-app" ? "lancée à la main" : "automatique";
+  // ⚠️ AVANT LES CHIFFRES, PARCE QU'ELLE CHANGE LEUR SENS. « 0 nouvelle » sur un dépôt frais
+  // est une observation du marché ; sur un dépôt qui rouille, c'est l'absence d'observation.
+  const fraicheur = fraicheurDepot(rapport.depot);
 
   return (
     <section className="rapport" aria-label={titre}>
@@ -56,6 +59,12 @@ export function RapportVeilleVue({
           {quand ? ` · ${quand}` : ""}
         </p>
       </header>
+
+      {fraicheur.etat !== "frais" ? (
+        <p className={`rapport__fraicheur rapport__fraicheur--${fraicheur.etat}`} role="status">
+          {fraicheur.texte}
+        </p>
+      ) : null}
 
       {/* Les quatre chiffres qui répondent à « alors ? ». Le reste est du détail. */}
       <div className="rapport__chiffres">

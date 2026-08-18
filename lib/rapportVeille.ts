@@ -20,6 +20,10 @@
 
 import type { MotifRefus, Tri } from "./ingest/pipeline";
 import { villesRefusees } from "./ingest/pipeline";
+// L'id de la source, importé et jamais recopié : le rapport doit RECONNAÎTRE le dépôt parmi
+// les autres pour en dire la fraîcheur, et deux exemplaires d'une chaîne finissent par
+// diverger — la fraîcheur deviendrait muette sans qu'aucune erreur ne le signale.
+import { ID_SOURCE_DEPOT } from "./ingest/types";
 import type { Offre } from "./types";
 
 /** Clé sous laquelle le dernier rapport est conservé, pour l'écran. */
@@ -72,7 +76,24 @@ export interface RapportVeille {
   suivies: number;
 
   /** Une ligne par source interrogée : « 0 au total » ne dit pas laquelle s'est tue. */
-  sources: { id: string; ok: boolean; offres: number; erreur?: string }[];
+  sources: { id: string; ok: boolean; offres: number; erreur?: string; dernierJour?: string }[];
+  /**
+   * Fraîcheur du dépôt — le SEUL canal vivant depuis le retrait des pages carrières.
+   *
+   * ⚠️ C'EST LE SEUL CHIFFRE QUI DISTINGUE « RIEN DE NEUF » DE « PLUS RIEN N'ARRIVE ».
+   * Le dépôt lit une fenêtre de sept jours : le jour où aucun lot n'est déposé, il rend
+   * quand même ceux de la veille, tout est compté « déjà connue », et le rapport affiche
+   * « 0 nouvelle » — mot pour mot ce qu'il afficherait un jour sans embauche. Les deux
+   * situations appellent des gestes opposés : attendre, ou aller réparer la chaîne qui
+   * dépose. Ce projet a déjà payé ce silence — le cron de la veille a cessé d'être appelé
+   * pendant trois jours sans qu'un voyant ne change, pendant que la péremption éteignait
+   * les offres une à une.
+   *
+   * `retardJours` vaut 0 quand un lot du jour a bien été déposé, `null` quand le dépôt n'a
+   * rien rendu du tout (fenêtre vide, ou source en échec) — deux aveux différents, jamais
+   * un zéro qui aurait l'air d'une mesure.
+   */
+  depot: { dernierJour: string | null; retardJours: number | null };
   /** Lieux inconnus soumis au géocodeur pendant cette passe. */
   lieux: { demandes: number; juges: number; introuvables: number };
   /** Ce que la passe de localisation a fait, en clair. */
@@ -96,6 +117,15 @@ function moyenne(notes: readonly (number | null)[]): number | null {
   const connues = notes.filter((n): n is number => typeof n === "number");
   if (connues.length === 0) return null;
   return Math.round(connues.reduce((t, n) => t + n, 0) / connues.length);
+}
+
+/** Écart en jours entre deux dates AAAA-MM-JJ, ou `null` si l'une est illisible. */
+function ecartJours(de: string, a: string): number | null {
+  const t1 = Date.parse(`${de}T00:00:00Z`);
+  const t2 = Date.parse(`${a}T00:00:00Z`);
+  if (!Number.isFinite(t1) || !Number.isFinite(t2)) return null;
+  // Jamais négatif : un lot daté de demain signale une horloge fausse, pas de l'avance.
+  return Math.max(0, Math.round((t1 - t2) / 86_400_000));
 }
 
 /**
@@ -172,10 +202,68 @@ export function construireRapport(entree: {
     enSursis: entree.enSursis,
     suivies: actives.length,
     sources: entree.sources,
+    // Dérivé de ce que la source a RÉELLEMENT lu, jamais d'un paramètre séparé : un second
+    // canal pour la même information finirait par dire autre chose que la passe elle-même.
+    depot: (() => {
+      const d = entree.sources.find((s) => s.id === ID_SOURCE_DEPOT);
+      const dernierJour = d?.ok === true ? (d.dernierJour ?? null) : null;
+      return {
+        dernierJour,
+        retardJours: dernierJour === null ? null : ecartJours(entree.jour, dernierJour),
+      };
+    })(),
     lieux: entree.lieux,
     localisation: entree.localisation,
     villesCompletees: entree.villesCompletees,
     adressesAnnoncees: entree.adressesAnnoncees,
+  };
+}
+
+/**
+ * Au-delà de ce retard, le dépôt n'est plus « en avance d'un jour » : il est rompu.
+ *
+ * Deux jours, pas un : la Routine peut manquer un matin sans que la chaîne soit cassée, et
+ * crier au premier jour manquant apprendrait à ignorer le voyant — c'est exactement ainsi
+ * que la CI de ce dépôt a été ignorée quatre commits d'affilée. Deux jours consécutifs sans
+ * lot, en revanche, n'arrive pas par hasard.
+ */
+export const RETARD_DEPOT_ALERTE_JOURS = 2;
+
+export interface FraicheurDepot {
+  etat: "frais" | "vieillissant" | "rompu";
+  texte: string;
+}
+
+/**
+ * Ce que la fraîcheur du dépôt autorise à DIRE. PURE.
+ *
+ * ⚠️ ELLE EXISTE POUR QUALIFIER LE « 0 NOUVELLE », PAS POUR DÉCORER. Tant que le dépôt est
+ * frais, « 0 nouvelle » est une information sur le marché : il n'y a rien eu aujourd'hui.
+ * Dès qu'il rouille, le même « 0 » ne dit plus rien du tout — il dit que personne n'a
+ * regardé. Les deux se ressemblent à l'écran et appellent des gestes opposés : attendre, ou
+ * aller réparer la chaîne qui dépose. C'est précisément le silence que ce projet a déjà payé
+ * — un cron muet trois jours durant, pendant que la péremption éteignait les offres une à une.
+ */
+export function fraicheurDepot(depot: RapportVeille["depot"]): FraicheurDepot {
+  if (depot.retardJours === null) {
+    return {
+      etat: "rompu",
+      texte:
+        "Aucun lot de dépôt n’a été lu à cette passe. Le seul canal qui apporte des offres n’a rien rendu : tant que ça dure, « 0 nouvelle » ne dit rien du marché.",
+    };
+  }
+  if (depot.retardJours === 0) {
+    return { etat: "frais", texte: "Le lot du jour a bien été déposé." };
+  }
+  if (depot.retardJours < RETARD_DEPOT_ALERTE_JOURS) {
+    return {
+      etat: "vieillissant",
+      texte: `Aucun lot déposé aujourd’hui — le dernier date d’hier (${depot.dernierJour}).`,
+    };
+  }
+  return {
+    etat: "rompu",
+    texte: `Aucun lot déposé depuis ${depot.retardJours} jours — le dernier date du ${depot.dernierJour}. Tant que ça dure, « 0 nouvelle » ne dit rien du marché : la chaîne qui dépose est à vérifier.`,
   };
 }
 

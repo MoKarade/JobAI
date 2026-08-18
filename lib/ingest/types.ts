@@ -46,8 +46,37 @@ export interface OffreBrute {
 }
 
 /** Ce qu'une passe sur UNE source a donné. Un échec est dit, jamais confondu avec un vide. */
+/**
+ * L'identifiant de la source « dépôt de fichiers ».
+ *
+ * ⚠️ IL VIT DANS CE MODULE-CI, ET C'EST UNE CONTRAINTE DE BUNDLE, PAS UN GOÛT.
+ * Son propriétaire naturel serait `depotFichier.ts` — mais celui-ci importe `node:fs`, et
+ * `lib/rapportVeille.ts` (qui doit reconnaître le dépôt parmi les sources pour en dire la
+ * fraîcheur) est tiré jusque dans le bundle CLIENT par le bouton de veille. L'y importer
+ * embarquerait Node dans le navigateur. `types.ts` n'a aucune dépendance : les deux côtés
+ * peuvent le lire. Une chaîne recopiée des deux côtés, elle, finirait par diverger — et la
+ * fraîcheur deviendrait muette sans qu'aucune erreur ne le signale.
+ */
+export const ID_SOURCE_DEPOT = "depot-fichier";
+
 export type ResultatSource =
-  | { ok: true; source: string; offres: OffreBrute[] }
+  | {
+      ok: true;
+      source: string;
+      offres: OffreBrute[];
+      /**
+       * Jour de la donnée la plus FRAÎCHE que cette source a pu offrir (AAAA-MM-JJ).
+       *
+       * ⚠️ SANS LUI, UNE SOURCE QUI ROUILLE EST INDISCERNABLE D'UN MARCHÉ CALME. Le dépôt
+       * lit une fenêtre de sept jours : le jour où personne ne dépose, il rend quand même
+       * les lots des jours précédents, toutes les offres sont comptées « déjà connue », et
+       * le rapport affiche « 0 nouvelle » — exactement ce qu'il afficherait un jour sans
+       * embauche. C'est déjà arrivé : le cron de la veille a cessé d'être appelé pendant
+       * trois jours sans qu'un seul voyant ne change. Optionnel parce qu'une source réseau
+       * n'a pas de date de lot ; le renseigner est ce qui rend le silence détectable.
+       */
+      dernierJour?: string;
+    }
   | { ok: false; source: string; erreur: string };
 
 /**
