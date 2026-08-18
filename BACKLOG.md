@@ -855,9 +855,23 @@
       2026-08-18 sur une offre réelle (Eco-services TGL, mine souterraine) dont l'annonce
       disait « situé au Saguenay ». Le lot l'a corrigée à la lecture, mais rien dans le code
       ne l'aurait attrapée. Le registre de mesure ([VEILLE-31]) ne la sauve pas non plus :
-      il n'est consulté qu'APRÈS les deux listes, donc jamais pour ce cas. Piste : exiger
-      que la correspondance porte sur un segment ENTIER du lieu normalisé plutôt que sur
-      une sous-chaîne quelconque — à mesurer contre les ~130 municipalités avant de changer.
+      il n'est consulté qu'APRÈS les deux listes, donc jamais pour ce cas.
+      ⚠️ **La piste inscrite ici (« exiger un segment ENTIER plutôt qu'une sous-chaîne ») est
+      RÉFUTÉE — mesurée le 2026-08-18, elle échoue des DEUX côtés** :
+      · elle n'attrape pas le cas qui a motivé le ticket — « quebec province » se segmente en
+        `[quebec, province]`, donc « quebec » EST un segment entier : accepté, comme avant ;
+      · et elle **casse 23 offres réelles** — « saint-augustin-de-desmaures » n'apparie plus
+        « saint-augustin », la municipalité étant reconnue par PRÉFIXE et non par segment.
+      La mesure a aussi montré pourquoi la règle actuelle tient malgré tout : « saguenay
+      quebec » et « rouyn-noranda quebec » sont correctement REFUSÉS, non par la finesse de
+      l'appariement mais parce que `HORS_PORTEE` passe AVANT `MUNICIPALITES`.
+      Le vrai problème n'est donc pas structurel (sous-chaîne vs segment) mais **lexical** :
+      « quebec » désigne à la fois la ville et la province, et rien dans la chaîne ne tranche
+      sauf le mot qui l'accompagne (`province`, `provincia`, `state`). Piste corrigée : traiter
+      cette ambiguïté nommément — un lieu qui porte un qualificatif de PROVINCE sans autre
+      municipalité n'est pas « dans la région », il est **inconnu**, donc à MESURER par le
+      registre ([VEILLE-31]) plutôt qu'à accepter. Reste à vérifier contre les ~130 entrées
+      qu'aucune autre ne porte la même ambiguïté. §8 s'applique (logique d'admission).
 
 - [ ] **[VEILLE-06]** Lire l'annonce de chaque offre retenue (`get_job_details`) et en tirer
       les QUATRE champs qu'elle porte ensemble : description, salaire, adresse, séniorité.
