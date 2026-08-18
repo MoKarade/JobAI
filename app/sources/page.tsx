@@ -16,6 +16,10 @@ import { auth } from "@/auth";
 import { Cadre } from "@/components/Cadre";
 import { RECHERCHES_GUICHET } from "@/lib/ingest/sources";
 import { BoutonVeille } from "@/components/BoutonVeille";
+import { RapportVeilleVue } from "@/components/RapportVeille";
+import { lireEtat } from "@/lib/etat";
+import { CLE_RAPPORT, type RapportVeille } from "@/lib/rapportVeille";
+import { classerPanne } from "@/lib/panne";
 
 export const metadata = { title: "Sources — JobAI" };
 export const dynamic = "force-dynamic";
@@ -27,12 +31,36 @@ export default async function Sources() {
   const session = await auth();
   if (!session) redirect("/connexion");
 
+  // Le dernier rapport, quel qu'ait été son déclencheur. C'est LE point de la page : la
+  // veille tourne surtout toute seule, et jusqu'ici son travail n'existait que dans les
+  // journaux Vercel. Une base injoignable n'est pas une page cassée — on le dit et on rend
+  // le reste, qui est statique.
+  let dernier: RapportVeille | null = null;
+  try {
+    dernier = await lireEtat<RapportVeille | null>(CLE_RAPPORT, null);
+  } catch (err) {
+    console.error("[sources] rapport illisible :", classerPanne(err));
+  }
+  // Instant figé côté SERVEUR et passé au composant : lu dans le composant, le rendu
+  // serveur et le rendu client différeraient d'une seconde et React signalerait une
+  // erreur d'hydratation à chaque affichage.
+  const maintenant = Date.now();
+
   return (
     <Cadre actif="/sources" titre="Sources">
       <p className="intro-section">
         Les offres entrent par ces canaux, et seulement par ceux-là. Un canal muet est dit
         muet : rien n’est comblé par une estimation.
       </p>
+
+      {dernier !== null ? (
+        <RapportVeilleVue rapport={dernier} maintenant={maintenant} />
+      ) : (
+        <p className="intro-section">
+          Aucune passe n’a encore rendu de rapport. Le premier apparaîtra ici après la
+          prochaine veille — automatique ou lancée d’ici.
+        </p>
+      )}
 
       <section className="cadre-section">
         <h2 className="cadre-section__titre">Ce qui alimente la veille</h2>

@@ -17,41 +17,23 @@
 import { revalidatePath } from "next/cache";
 import { exigerSession } from "./session";
 import { executerVeilleComplete } from "./veilleComplete";
+import type { RapportVeille } from "./rapportVeille";
 
-/** Ce qu'une veille lancée à la main rapporte à l'écran. */
+/**
+ * Ce qu'une veille lancée à la main rapporte à l'écran.
+ *
+ * ⚠️ C'EST LE RAPPORT LUI-MÊME, PLUS UNE COPIE DE SES CHAMPS. La version précédente relisait
+ * une douzaine de nombres un par un depuis un `Record<string, unknown>` — et s'est trompée
+ * deux fois de suite : `ingerees` au lieu de `nouvelles`, `sources` traité comme un nombre
+ * alors que c'est un tableau. Les deux rendaient 0, donc « 0 ingérée sur 100 trouvées », un
+ * compte rendu qui se contredisait lui-même. Un champ absent d'un `Record` ne lève pas : il
+ * vaut `undefined`, et un défaut à 0 le déguise en mesure.
+ *
+ * Une structure TYPÉE traversée telle quelle ne peut pas faire cette erreur : le typecheck
+ * refuse un champ mal nommé.
+ */
 export type ResultatVeilleManuelle =
-  | {
-      ok: true;
-      trouvees: number;
-      nouvelles: number;
-      perimees: number;
-      enSursis: number;
-      doublons: number;
-      ecartees: number;
-      /**
-       * ⚠️ CES DEUX-LÀ MANQUAIENT, ET LES CHIFFRES NE S'ADDITIONNAIENT PAS.
-       *
-       * Mesuré le 2026-08-17 : « 100 trouvées · 0 nouvelle · 26 déjà connues · 0 sous le
-       * plancher ». Soixante-quatorze offres s'évaporaient de l'écran sans motif — elles
-       * étaient hors région (la source Dexterra est pancanadienne), mais le compte rendu ne
-       * portait pas ce motif. Un total dont les parties ne font pas la somme se lit comme
-       * une panne, alors que le tri faisait exactement son travail.
-       */
-      horsRegion: number;
-      lieuInconnu: number;
-      /**
-       * LES VILLES DERRIÈRE LES DEUX MOTIFS GÉOGRAPHIQUES, groupées et comptées.
-       *
-       * Le compte rendu du 2026-08-17 disait « 47 lieu inconnu » : un nombre sur lequel on
-       * ne peut rien décider. Selon que ces quarante-sept portent « Remote » ou des
-       * municipalités québécoises que la liste blanche ignore, le correctif est opposé —
-       * et rien à l'écran ne permettait de le savoir. Un motif se nomme AVEC son objet.
-       */
-      villesInconnues: { ville: string; n: number }[];
-      villesHorsRegion: { ville: string; n: number }[];
-      /** Une ligne par source interrogée : « 0 au total » ne dit pas laquelle s'est tue. */
-      sources: { id: string; ok: boolean; offres: number; erreur?: string }[];
-    }
+  | { ok: true; rapport: RapportVeille }
   | { ok: false; erreur: string };
 
 /**
@@ -76,38 +58,7 @@ export async function lancerVeille(): Promise<ResultatVeilleManuelle> {
   const r = await executerVeilleComplete("bouton-app");
   if (!r.ok) return { ok: false, erreur: r.erreur };
 
-  // ⚠️ LES CLÉS SE LISENT DANS `executerVeilleComplete`, PAS DE MÉMOIRE. Premier jet :
-  // `ingerees` (le compte s'appelle `nouvelles`) et `sources` traité comme un nombre alors
-  // que c'est un TABLEAU. Les deux rendaient 0 — donc « 0 ingérée sur 100 trouvées · 0
-  // source interrogée », un compte rendu qui se contredisait lui-même à l'écran et faisait
-  // croire à une panne. Un champ absent d'un `Record<string, unknown>` ne lève pas : il vaut
-  // `undefined`, et un défaut à 0 le déguise en mesure.
-  const c = r.compte as Record<string, unknown>;
-  const nombre = (v: unknown): number => (typeof v === "number" ? v : 0);
-  const sources = Array.isArray(c.sources)
-    ? (c.sources as { id: string; ok: boolean; offres: number; erreur?: string }[])
-    : [];
-  // Même prudence que pour `sources` : un champ absent d'un `Record<string, unknown>` ne
-  // lève pas, il vaut `undefined` — et un `[]` par défaut le déguiserait en « aucune ville
-  // refusée », c'est-à-dire en bonne nouvelle. Ici l'absence est indiscernable du vide, on
-  // l'assume, mais elle ne doit surtout pas provoquer un plantage de rendu.
-  const villes = (v: unknown): { ville: string; n: number }[] =>
-    Array.isArray(v) ? (v as { ville: string; n: number }[]) : [];
-
   revalidatePath("/");
   revalidatePath("/sources");
-  return {
-    ok: true,
-    trouvees: nombre(c.trouvees),
-    nouvelles: nombre(c.nouvelles),
-    perimees: nombre(c.perimees),
-    enSursis: nombre(c.enSursis),
-    doublons: nombre(c.doublons),
-    ecartees: nombre(c.ecartees),
-    horsRegion: nombre(c.horsRegion),
-    lieuInconnu: nombre(c.lieuInconnu),
-    villesInconnues: villes(c.villesInconnues),
-    villesHorsRegion: villes(c.villesHorsRegion),
-    sources,
-  };
+  return { ok: true, rapport: r.rapport };
 }

@@ -2025,3 +2025,112 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin-top: 0.4rem;
   max-width: 68ch;
 }
+
+/* ── Rapport de veille ──────────────────────────────────────────────────────────────────
+   Affiché à deux endroits (sous le bouton, en tête de /sources) par le MÊME composant.
+   La hiérarchie répond à « alors ? » avant « pourquoi ? » : quatre chiffres en haut, le
+   détail dessous. Les tons sémantiques viennent des jetons du projet — aucune couleur
+   n'est écrite en dur ici, `tests/styles.test.ts` le refuserait. */
+.rapport {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: var(--pas-2);
+  margin-bottom: var(--pas-2);
+}
+.rapport__entete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: var(--pas-2);
+}
+.rapport__titre { font-size: var(--t-m); font-weight: 600; }
+.rapport__meta { font-size: var(--t-xs); color: var(--text-soft); font-variant-numeric: tabular-nums; }
+
+/* Les quatre chiffres de tête. `auto-fit` plutôt qu'un nombre de colonnes figé : sur
+   téléphone ils s'empilent sans média-requête, et la carte ne déborde jamais. */
+.rapport__chiffres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: var(--pas-2);
+}
+.rapport__chiffre {
+  background: var(--creux);
+  border-left: 3px solid var(--border);
+  border-radius: 6px;
+  padding: 0.7rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.rapport__chiffre--bon { border-left-color: var(--vert); }
+.rapport__chiffre--alerte { border-left-color: var(--rouge); }
+.rapport__valeur {
+  font-family: var(--mono);
+  font-size: var(--t-xl);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.rapport__libelle { font-size: var(--t-2xs); color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.rapport__meilleure {
+  font-size: var(--t-s);
+  padding: 0.5rem 0.7rem;
+  background: var(--creux);
+  border-radius: 6px;
+  margin-bottom: var(--pas-2);
+}
+.rapport__note {
+  font-family: var(--mono);
+  color: var(--ambre-texte);
+  font-variant-numeric: tabular-nums;
+}
+
+.rapport__flux {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  font-size: var(--t-s);
+  color: var(--text-soft);
+  padding-bottom: var(--pas-2);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--pas-2);
+}
+.rapport__flux strong { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.rapport__soustitre {
+  font-size: var(--t-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+  margin-bottom: 0.5rem;
+}
+.rapport__refus, .rapport__detail { margin-bottom: var(--pas-2); }
+.rapport__motifs, .rapport__sources { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.rapport__motif {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(7rem, auto) 1fr;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: var(--t-s);
+}
+.rapport__motif-n { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.rapport__motif-nom { color: var(--text); }
+.rapport__villes { font-size: var(--t-xs); color: var(--text-soft); overflow-wrap: anywhere; }
+
+.rapport__source { display: flex; justify-content: space-between; gap: 1rem; font-size: var(--t-s); }
+.rapport__source-nom { font-family: var(--mono); overflow-wrap: anywhere; }
+.rapport__source-n { font-family: var(--mono); color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.rapport__source--muette .rapport__source-n { color: var(--rouge); }
+
+.rapport__ligne { font-size: var(--t-s); }
+.rapport__ligne--douce { color: var(--text-soft); font-size: var(--t-xs); margin-top: 0.25rem; }
+.rapport__alerte {
+  font-size: var(--t-s);
+  color: var(--rouge);
+  margin-top: 0.5rem;
+}
+.rapport__detail:last-child { margin-bottom: 0; }

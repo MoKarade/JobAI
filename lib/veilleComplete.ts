@@ -36,6 +36,7 @@ import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "./synchro";
 import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
 import { executerPasse } from "./ingest/passe";
 import { villesRefusees } from "./ingest/pipeline";
+import { CLE_RAPPORT, construireRapport, type RapportVeille } from "./rapportVeille";
 import { recuperer } from "./ingest/sources";
 import { lireEtat, ecrireEtat } from "./etat";
 import type { JournalVeille } from "./veille";
@@ -71,7 +72,7 @@ function aujourdhuiQuebec(): string {
 
 /** Le compte rendu d'une passe — ou la raison nommée de son refus. */
 export type ResultatVeille =
-  | { ok: true; declencheur: string; compte: Record<string, unknown> }
+  | { ok: true; declencheur: string; rapport: RapportVeille; compte: Record<string, unknown> }
   | { ok: false; statut: number; erreur: string };
 
 /**
@@ -255,9 +256,40 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
     }
     await ecrireEtat(CLE_CURSEUR, curseur + rapport.sources.length);
 
+    // ⚠️ LE RAPPORT S'ÉCRIT ICI, ET NON DANS LE BOUTON. C'est le seul endroit que TOUS les
+    // déclencheurs traversent : le planificateur, le cron de géocodage qui reprend la passe
+    // en retard, et le bouton de `/sources`. Assemblé dans le composant, il n'existait que
+    // quand Marc cliquait — c'est-à-dire presque jamais, puisque la veille tourne seule.
+    //
+    // Il est écrit APRÈS le journal et le registre : si son écriture échoue, on aura perdu
+    // un compte rendu, jamais une offre. L'ordre des écritures d'état dit ce qui compte.
+    const vue: RapportVeille = construireRapport({
+      jour,
+      fini: new Date().toISOString(),
+      declencheur,
+      trouvees: rapport.trouvees,
+      tri: rapport.tri,
+      nouvelles: rapport.nouvelles,
+      perimees: rapport.perimees,
+      revenues: rapport.revenues,
+      enSursis: rapport.enSursis,
+      offres: rapport.offres,
+      sources: rapport.sources,
+      lieux: {
+        demandes: rapport.lieux.demandes,
+        juges: rapport.lieux.juges,
+        introuvables: rapport.lieux.introuvables,
+      },
+      localisation,
+      villesCompletees: rapport.villesACompleter.length,
+      adressesAnnoncees,
+    });
+    await ecrireEtat(CLE_RAPPORT, vue);
+
     return {
       ok: true,
       declencheur,
+      rapport: vue,
       compte: {
         jour,
         resume: rapport.resume,
