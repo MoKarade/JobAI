@@ -1176,6 +1176,48 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   noms RÉELLEMENT rencontrés coûte cinq lignes et transforme une hypothèse invisible en
   mesure lisible. Corollaire de séquence : on MESURE depuis une route de diagnostic avant de
   brancher sur la passe quotidienne — brancher d'abord, c'est parier le seul flux qui marche.
+- **Un recensement qui rend un ENSEMBLE ne conclut RIEN sur une absence.** J'avais écrit un
+  `recenserBalises` qui rendait la LISTE des noms de champs vus sur vingt offres, pour
+  corriger mes hypothèses de format. Au premier passage réel, `city` et `state` n'y étaient
+  pas — et j'ai failli en conclure que le flux du Guichet n'a pas de ville. **Il en a une** :
+  les offres retenues portaient « Québec » et « Lévis ». Un ensemble sur un petit échantillon
+  ne distingue pas « ce champ n'existe pas dans le format » de « ces offres-là ne l'avaient
+  pas » : les deux rendent la même absence, et l'une des deux conclusions est fausse. Un
+  COMPTE tranche (`city: 0` ≠ `city: 1987`), à condition de dire aussi la taille de
+  l'échantillon — « city: 12 » ne se lit pas sans savoir si on en a vu 12 ou 2000. Et la
+  vraie force vient de la **mesure jumelle** : compter ce que la source ÉCRIT (les balises)
+  et ce que mon code en TIRE (les champs non vides) mesure la même chose par deux chemins —
+  l'écart entre les deux désigne le défaut sans qu'on ait à deviner de quel côté il est.
+- **Un plafond atteint transforme toutes les mesures d'une passe en PRÉFIXES.** La même
+  lecture s'est arrêtée sur `plafond-retenues` à ~42 % du flux : le total d'offres
+  régionales, la liste des villes inconnues et le recensement n'étaient plus des mesures,
+  seulement le début d'une. Le rapport le disait (`fin`), et j'ai quand même failli lire ces
+  comptes comme des résultats. Réflexe : **avant d'interpréter le moindre chiffre d'un
+  rapport borné, lire son motif d'arrêt** — et ne rien conclure tant qu'il n'est pas
+  « terminé ». Corollaire de dimensionnement : un plafond se calibre sur le DÉBIT MESURÉ, pas
+  sur une prudence a priori (ici ~25 Mo/s : lire le flux entier coûtait quelques secondes,
+  et le plafond prudent coûtait la conclusion).
+- **Une entité HTML non décodée ne casse rien — elle fait juste disparaître des données.**
+  `texteSimple` décodait `&nbsp; &amp; &lt; &gt; &quot; &#39;` mais pas **`&apos;`**, que le
+  flux du Guichet écrit. Non décodée, elle survit à `normaliserLieu` (« val-d&apos or ») et
+  ne peut plus matcher aucune entrée des listes de lieux : mesuré, `L'Islet` et
+  `Saint-Pierre-de-l'Île-d'Orléans` — DEUX villes de la région — tombaient en « lieu
+  inconnu », sans erreur ni trace. Et `L'Ancienne-Lorette` passait **par accident** (la liste
+  porte aussi la forme sans article), ce qui masquait le défaut : un faux positif qui cache
+  un faux négatif est le pire des deux. Règles : une table de décodage se veut COMPLÈTE
+  (entités nommées usuelles + numériques décimales et hexadécimales), `&amp;` se décode **en
+  dernier** (sinon `&amp;lt;` devient `<`, un décodage de trop), et un point de code invalide
+  laisse l'entité telle quelle plutôt que de lever — un flux mal formé n'est pas une raison
+  de perdre l'annonce entière.
+- **Le VOLUME d'une source n'est pas sa VALEUR, et ça se regarde avant de brancher.**
+  Le flux du Guichet porte des dizaines de milliers d'offres — et l'échantillon retenu
+  donne *sod layer*, *car washer*, *hairstylist*, *labourer*. Une source qui rend mille
+  offres dont aucune ne concerne le profil est un bruit coûteux (mesures Nominatim, place
+  dans la file, péremption à gérer), pas une trouvaille. Regarder l'ÉCHANTILLON avant de
+  se réjouir du compte. Corollaire mesuré ici : ses titres sont en ANGLAIS et ses
+  descriptions bilingues — la brancher avant `[VEILLE-32]`/`[VEILLE-34]` (vocabulaire de
+  notation monolingue) noterait tout à zéro, et on conclurait que la source ne vaut rien
+  alors que c'est le barème qui ne sait pas la lire.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

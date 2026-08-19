@@ -68,14 +68,30 @@ export interface RapportFlux {
   illisibles: number;
   octetsLus: number;
   ms: number;
+  /** Offres passées au recensement. Sans lui, un compte ne veut rien dire. */
+  balisesEchantillon: number;
   /**
-   * Les noms de balises rencontrés dans les premières offres.
+   * Combien d'offres de l'échantillon portaient chaque balise.
    *
-   * C'est l'aveu d'ignorance rendu utile : la liste des champs vient d'un échantillon
-   * TRONQUÉ, donc le premier passage réel doit pouvoir la corriger. Un champ mal nommé
-   * apparaît ici au lieu de disparaître silencieusement de chaque offre.
+   * ⚠️ DES COMPTES, PAS UN ENSEMBLE — ET C'EST UNE LEÇON PAYÉE. La première version rendait
+   * la LISTE des noms vus sur vingt offres. Au premier passage réel, `city` et `state` n'y
+   * étaient pas… alors que les offres retenues portaient bien une ville. Un ensemble sur un
+   * petit échantillon ne distingue pas « ce champ n'existe pas dans le format » de « ces
+   * offres-là ne l'avaient pas » : les deux rendent la même absence, et l'une des deux
+   * conclusions est fausse. Un compte tranche — `city: 0` et `city: 1987` ne se confondent
+   * plus.
    */
-  balisesVues: string[];
+  balisesVues: Record<string, number>;
+  /**
+   * Combien d'offres de l'échantillon ont rendu une valeur NON VIDE pour chaque champ que
+   * l'analyseur lit vraiment.
+   *
+   * C'est la MESURE JUMELLE de `balisesVues`, et elles se vérifient l'une l'autre : la
+   * première dit ce que le flux écrit, la seconde ce que mon code en tire. Un écart entre
+   * les deux (une balise présente dont le champ reste vide, ou l'inverse) désigne le défaut
+   * sans qu'on ait à deviner de quel côté il est.
+   */
+  champsRenseignes: Record<string, number>;
   /**
    * Le jour où le Guichet a RECONSTRUIT le flux (`lastBuildDate`), ou `null`.
    *
@@ -118,14 +134,45 @@ function champ(bloc: string, balise: string): string {
   return m ? texteSimple(m[1] ?? "").trim() : "";
 }
 
-/** Les noms de balises présents dans une offre. PURE. Sert à corriger mes hypothèses. */
+/**
+ * Les noms de balises DU FLUX présents dans une offre. PURE.
+ *
+ * ⚠️ LE CONTENU DES CDATA EST RETIRÉ D'ABORD. Les descriptions du Guichet sont du HTML :
+ * sans cette coupe, le recensement rend `ul`, `li` et `h2` au milieu des champs du flux, et
+ * la seule question qu'il sert à trancher — « mes noms de champs sont-ils les bons ? » — se
+ * noie dans le balisage des annonces.
+ */
 export function recenserBalises(job: string): string[] {
+  const sansCdata = job.replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, "");
   const noms = new Set<string>();
-  for (const m of job.matchAll(/<([a-z][\w.-]*)\s*\/?>/gi)) {
+  for (const m of sansCdata.matchAll(/<([a-z][\w.-]*)\s*\/?>/gi)) {
     const nom = m[1]?.toLowerCase();
     if (nom !== undefined && nom !== "job") noms.add(nom);
   }
   return [...noms].sort();
+}
+
+/**
+ * Les champs que l'analyseur lit VRAIMENT.
+ *
+ * Ils sont nommés ici plutôt qu'écrits en dur dans `analyserJobGuichet` pour que le
+ * recensement porte exactement sur eux : une liste recopiée à côté finirait par décrire un
+ * autre analyseur que celui qui tourne.
+ */
+export const CHAMPS_ANALYSES = [
+  "title",
+  "url",
+  "company",
+  "city",
+  "state",
+  "referencenumber",
+  "date",
+  "description",
+] as const;
+
+/** Ceux de ces champs qui portent une valeur non vide dans cette offre. PURE. */
+export function champsRenseignes(job: string): string[] {
+  return CHAMPS_ANALYSES.filter((c) => champ(job, c) !== "");
 }
 
 /** Une date `AAAA-MM-JJ` tirée d'un champ de date, ou `null`. PURE. */
@@ -199,8 +246,16 @@ export const BUDGET_MS_DEFAUT = 20_000;
  */
 export const MAX_RETENUES_DEFAUT = 400;
 
-/** Offres dont on recense les balises. Assez pour voir le schéma, pas pour le payer. */
-export const ECHANTILLON_BALISES = 20;
+/**
+ * Offres passées au recensement.
+ *
+ * ⚠️ VINGT NE SUFFISAIT PAS, ET LE PREMIER PASSAGE RÉEL L'A PROUVÉ. Sur vingt offres, `city`
+ * et `state` étaient absents du recensement alors que le flux les porte — assez pour me
+ * faire conclure que le format n'a pas de ville. Un recensement dont l'absence n'est pas
+ * concluante ne recense rien. Deux mille offres coûtent quelques expressions régulières sur
+ * du texte déjà en mémoire : c'est le prix pour qu'un zéro veuille dire zéro.
+ */
+export const ECHANTILLON_BALISES = 2000;
 
 /** Caractères de tête examinés pour y trouver `lastBuildDate`. */
 const ENTETE_MAX = 16 * 1024;
@@ -255,7 +310,9 @@ export async function lireFluxGuichet(
   const minuteur = setTimeout(() => ctrl.abort(), budgetMs);
 
   const retenues: OffreBrute[] = [];
-  const balises = new Set<string>();
+  const balises: Record<string, number> = {};
+  const champsVus: Record<string, number> = {};
+  let balisesEchantillon = 0;
   let vues = 0;
   let preFiltrees = 0;
   let ecartees = 0;
@@ -286,7 +343,9 @@ export async function lireFluxGuichet(
       for (const bloc of decoupe.jobs) {
         vues += 1;
         if (vues <= ECHANTILLON_BALISES) {
-          for (const nom of recenserBalises(bloc)) balises.add(nom);
+          balisesEchantillon += 1;
+          for (const nom of recenserBalises(bloc)) balises[nom] = (balises[nom] ?? 0) + 1;
+          for (const c of champsRenseignes(bloc)) champsVus[c] = (champsVus[c] ?? 0) + 1;
         }
         if (!estPeutEtreQuebec(bloc)) {
           preFiltrees += 1;
@@ -364,7 +423,9 @@ export async function lireFluxGuichet(
       illisibles,
       octetsLus,
       ms: maintenant() - debut,
-      balisesVues: [...balises].sort(),
+      balisesEchantillon,
+      balisesVues: balises,
+      champsRenseignes: champsVus,
       construitLe,
     };
   } finally {

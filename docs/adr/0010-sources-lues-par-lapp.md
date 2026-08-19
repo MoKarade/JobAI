@@ -454,3 +454,80 @@ Le texte des annonces passe par `expurgerPII` avant de sortir de la route : c'es
 3. Lire `villesInconnues` : elles disent si le registre des lieux sait placer ce que le
    Guichet nomme, ou s'il faut le laisser mesurer.
 4. Alors seulement, brancher une `Source` sur `selectionnerSources`.
+
+---
+
+## §7 — Ce que le PREMIER PASSAGE RÉEL a tranché (2026-08-19)
+
+Marc a appelé `/api/diagnostic/flux-guichet`. Voici ce que la mesure dit, et les deux
+défauts qu'elle a trouvés **dans mon propre code**.
+
+### Ce qui tient
+
+- **L'analyseur lit tout.** `illisibles: 0` sur plus de dix-huit mille offres vues. `title`,
+  `url`, `company`, `date`, `referencenumber` et `description` sont les bons noms.
+- **La lecture en flux tient sa promesse.** Environ 56 Mo lus en 2,3 s, sans jamais charger
+  le flux. Le budget de deux minutes n'a jamais été approché : le débit mesuré est d'environ
+  25 Mo/s, donc lire le flux ENTIER coûte quelques secondes.
+- **Le flux est frais** (`construitLe` = le jour même) et **il est gros** : plus de dix-huit
+  mille offres dans les 42 % du flux effectivement lus, dont environ 14 % passent le
+  pré-filtre Québec.
+
+### Défaut n°1 — mon recensement rendait un ENSEMBLE, donc il ne concluait rien
+
+`balisesVues` listait les noms vus sur **vingt** offres. `city` et `state` n'y étaient pas —
+et j'ai failli en conclure que le format n'a pas de ville. **Il en a une** : les offres
+retenues portent « Québec », « Lévis », « Saint-Apollinaire ».
+
+Un ensemble sur un petit échantillon ne distingue pas « ce champ n'existe pas dans le
+format » de « ces offres-là ne l'avaient pas » : les deux rendent la même absence, et l'une
+des deux conclusions est fausse. Corrigé en **comptes sur deux mille offres**, doublés d'une
+mesure jumelle (`champsRenseignes`) qui compte ce que l'analyseur en TIRE. Les deux se
+vérifient l'une l'autre : un écart désigne le défaut sans qu'on ait à deviner de quel côté
+il est. Le recensement ignore désormais le contenu des CDATA — les descriptions sont du
+HTML, et `ul`/`li`/`h2` noyaient les champs du flux.
+
+### Défaut n°2 — `&apos;` non décodée, et elle perdait des villes de la région
+
+Le rapport rendait `Val-d&apos;Or`. `texteSimple` décodait `&nbsp; &amp; &lt; &gt; &quot;
+&#39;` — pas `&apos;`, pas les entités numériques. Mesuré, pas déduit :
+
+| Ville | Avant | Après |
+|---|---|---|
+| `L&apos;Islet` (dans la région) | **lieu-inconnu** | dans-la-region |
+| `Saint-Pierre-de-l&apos;Ile-d&apos;Orleans` (dans la région) | **lieu-inconnu** | dans-la-region |
+| `Val-d&apos;Or` (hors région) | lieu-inconnu (coûte une mesure) | hors-region |
+| `L&apos;Ancienne-Lorette` | dans-la-region **par accident** | dans-la-region |
+
+L'entité survit à `normaliserLieu` (« val-d&apos or ») et ne peut plus matcher aucune
+entrée. `L'Ancienne-Lorette` ne passait que parce que la liste porte aussi la forme sans
+article — un faux positif qui masquait le défaut. Corrigé : `&apos;`, entités décimales et
+hexadécimales, `&amp;` décodée **en dernier** (sinon `&amp;lt;` deviendrait `<`).
+
+### Défaut n°3 — le plafond mordait avant la fin, donc aucun compte n'était concluant
+
+`fin: "plafond-retenues"` après environ 42 % du flux. Ni le total d'offres régionales, ni la
+liste des villes inconnues, ni le recensement n'étaient donc des mesures — seulement des
+préfixes. Plafond relevé de 500 à 5000 : le débit mesuré rend une lecture complète possible
+en quelques secondes.
+
+### Deux constats qui ne sont PAS des défauts, et qui comptent plus
+
+1. **Le contenu du flux est très majoritairement peu qualifié.** L'échantillon retenu
+   donne : *sod layer*, *car washer*, *hairstylist*, *labourer - food and beverage
+   processing*, *general labourer - landscaping*. Le volume est là ; la VALEUR pour le
+   profil de Marc reste à démontrer. Une source qui rend mille offres dont aucune ne le
+   concerne est un bruit coûteux, pas une trouvaille.
+2. **Les titres sont en ANGLAIS, les descriptions bilingues.** « automotive body painter »,
+   « assistant manager, restaurant », « machine set-up operator ». C'est exactement le
+   défaut que `[VEILLE-32]` (vocabulaire de notation monolingue) et `[VEILLE-34]` (accents)
+   décrivent — et brancher cette source AVANT de les corriger noterait tout à zéro.
+
+### Un coût à mesurer avant de brancher
+
+Sur les offres québécoises vues, **la moitié tombent en « lieu inconnu »**, et la liste est
+dominée par des municipalités de l'île de Montréal que `HORS_PORTEE` ne connaît pas parce
+qu'elles ne contiennent pas « montreal » : Saint-Laurent, Côte-Saint-Luc, Westmount,
+Hampstead, Outremont, Mont-Royal, Dorval, Saint-Léonard. Chacune coûterait une mesure
+Nominatim. ⚠️ Ce chiffre vient d'une passe TRONQUÉE : à re-mesurer sur une passe complète
+avant d'y toucher, et non à « corriger » sur la foi d'un préfixe.

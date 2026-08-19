@@ -31,6 +31,33 @@ describe("nettoyage du texte", () => {
   it("écrase les espaces multiples que produit le retrait des balises", () => {
     expect(texteSimple("<div>  a  </div>\n<div>b</div>")).toBe("a b");
   });
+
+  it("décode `&apos;` — MESURÉ sur le flux du Guichet, et il perdait des villes", () => {
+    // ⚠️ CE N'EST PAS COSMÉTIQUE. Le flux écrit « Val-d&apos;Or ». Non décodée, l'entité
+    // survit à `normaliserLieu` (« val-d&apos or ») et ne peut plus matcher aucune entrée
+    // des listes de lieux : `L'Islet` et `Saint-Pierre-de-l'Île-d'Orléans`, DEUX VILLES DE
+    // LA RÉGION, tombaient en « lieu inconnu ». Aucune erreur, aucune trace.
+    expect(texteSimple("L&apos;Islet")).toBe("L'Islet");
+    expect(texteSimple("Val-d&apos;Or")).toBe("Val-d'Or");
+  });
+
+  it("décode les entités NUMÉRIQUES, décimales comme hexadécimales", () => {
+    expect(texteSimple("Qu&#233;bec")).toBe("Québec");
+    expect(texteSimple("Caf&#xe9;")).toBe("Café");
+  });
+
+  it("laisse INTACTE une entité numérique hors des points de code valides", () => {
+    // Un flux mal formé n'est pas une raison de perdre l'annonce entière : on rend
+    // l'entité telle quelle plutôt que de lever.
+    expect(texteSimple("a&#999999999;b")).toBe("a&#999999999;b");
+    expect(texteSimple("a&#xD800;b")).toBe("a&#xD800;b");
+  });
+
+  it("décode `&amp;` EN DERNIER — sinon `&amp;lt;` subirait un décodage de trop", () => {
+    // `&amp;lt;` est une esperluette littérale suivie de « lt; ». Décoder `&amp;` d'abord
+    // en ferait un `<`, c'est-à-dire une balise fabriquée à partir de texte.
+    expect(texteSimple("a &amp;lt; b")).toBe("a &lt; b");
+  });
 });
 
 describe("dates", () => {

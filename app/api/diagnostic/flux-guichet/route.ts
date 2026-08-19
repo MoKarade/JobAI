@@ -34,14 +34,29 @@ export const maxDuration = 300;
 /** Budget de lecture. Bien au-delà d'une passe : ici on cherche à VOIR, pas à produire. */
 const BUDGET_MS = 120_000;
 
-/** Offres régionales gardées. Assez pour juger, trop peu pour peser en mémoire. */
-const MAX_RETENUES = 500;
+/**
+ * Offres régionales gardées.
+ *
+ * ⚠️ RELEVÉ APRÈS LE PREMIER PASSAGE RÉEL (2026-08-19). À 500, la lecture s'arrêtait sur
+ * `plafond-retenues` après ~13 % du flux — donc AUCUN de ses comptes n'était concluant : ni
+ * le total d'offres régionales, ni les villes inconnues, ni le recensement. Or la mesure a
+ * montré que le flux se lit à ~25 Mo/s : le lire ENTIER coûte quelques secondes, pas les
+ * deux minutes de budget. Le plafond n'a plus de raison de mordre avant la fin.
+ */
+const MAX_RETENUES = 5000;
 
 /** Offres montrées à l'œil humain. */
 const TAILLE_ECHANTILLON = 15;
 
 /** Caractères de description montrés. Une annonce entière ne se lit pas dans un JSON. */
 const EXTRAIT_MAX = 300;
+
+/** Un compte par clé, trié du plus fréquent au moins fréquent. Un JSON qui se lit. */
+function parFrequence(compte: Record<string, number>): { nom: string; n: number }[] {
+  return Object.entries(compte)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([nom, n]) => ({ nom, n }));
+}
 
 export async function GET() {
   try {
@@ -93,9 +108,14 @@ export async function GET() {
         retenues: rapport.retenues.length,
         megaoctetsLus: Math.round((rapport.octetsLus / (1024 * 1024)) * 10) / 10,
         secondes: Math.round(rapport.ms / 100) / 10,
-        // LE champ qui corrige mes hypothèses : si `title`, `city` ou `url` n'y sont pas,
-        // c'est l'analyseur qu'il faut reprendre, pas la source qu'il faut abandonner.
-        balisesVues: rapport.balisesVues,
+        // LES DEUX MESURES JUMELLES, celles qui corrigent mes hypothèses. `balisesVues` dit
+        // ce que le FLUX écrit ; `champsRenseignes` dit ce que mon ANALYSEUR en tire. Un
+        // écart entre les deux désigne le défaut sans qu'on ait à deviner de quel côté il
+        // est — et des COMPTES, jamais un ensemble : sur vingt offres, l'absence de `city`
+        // m'avait fait conclure que le format n'a pas de ville. Il en a une.
+        balisesEchantillon: rapport.balisesEchantillon,
+        balisesVues: parFrequence(rapport.balisesVues),
+        champsRenseignes: parFrequence(rapport.champsRenseignes),
         verdicts,
         // Groupées et triées par fréquence : quarante-sept lignes ne se lisent pas, trois
         // lignes comptées désignent le correctif.

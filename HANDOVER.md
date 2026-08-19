@@ -6,6 +6,47 @@
 
 ---
 
+## Session 2026-08-19 (soir, suite) — le premier passage RÉEL du flux Guichet
+
+Marc a appelé `/api/diagnostic/flux-guichet`. La mesure a validé la lecture en flux et
+trouvé **trois défauts dans mon code**, dont deux qui perdaient des données en silence.
+
+**Ce qui tient** : `illisibles: 0` sur plus de dix-huit mille offres — l'analyseur lit tout.
+Environ 56 Mo en 2,3 s sans jamais charger le flux (~25 Mo/s : le lire entier coûte quelques
+secondes). Flux frais, et gros.
+
+**Défaut n°1 — mon recensement ne concluait rien.** Il rendait un ENSEMBLE de noms sur vingt
+offres. `city` et `state` n'y étaient pas, et j'ai failli conclure que le format n'a pas de
+ville — il en a une. Un ensemble sur un petit échantillon ne distingue pas « champ absent du
+format » de « champ absent de ces offres-là ». Refait en COMPTES sur deux mille offres, plus
+une mesure jumelle (`champsRenseignes`) qui compte ce que l'analyseur en tire : les deux se
+vérifient l'une l'autre.
+
+**Défaut n°2 — `&apos;` non décodée, et elle perdait des villes de la RÉGION.** Le flux écrit
+`Val-d&apos;Or`. Mesuré : `L&apos;Islet` et `Saint-Pierre-de-l&apos;Ile-d&apos;Orleans`
+tombaient en « lieu inconnu » ; `L&apos;Ancienne-Lorette` ne passait que par accident.
+Corrigé dans `texteSimple` (`&apos;` + entités numériques, `&amp;` en dernier).
+
+**Défaut n°3 — le plafond mordait à ~42 % du flux**, donc aucun compte n'était une mesure.
+Relevé de 500 à 5000.
+
+### Les deux constats qui comptent le plus, et qui ne sont pas des bugs
+
+1. **Le flux est très majoritairement peu qualifié** : *sod layer*, *car washer*,
+   *hairstylist*, *labourer*. Le volume est là ; la valeur pour le profil de Marc reste à
+   démontrer.
+2. **Les titres sont en ANGLAIS**, les descriptions bilingues. C'est exactement
+   `[VEILLE-32]` / `[VEILLE-34]` — brancher cette source avant de les corriger noterait
+   tout à zéro.
+
+### Ce que Marc a à faire
+
+Rappeler **une fois** `/api/diagnostic/flux-guichet` avec les correctifs en ligne. Cette
+fois on attend `fin: "flux-termine"` — la seule fin qui autorise à conclure. On y lira le
+vrai total d'offres régionales, `champsRenseignes` (city/state confirmés ou non), et la
+liste complète des villes inconnues. Rien n'est branché sur la passe d'ici là.
+
+
 ## Session 2026-08-19 (soir) — l'ingestion du flux Guichet, en streaming
 
 Demande de Marc : « vas-y pour l'ingestion du flux Guichet en streaming ». Livré :

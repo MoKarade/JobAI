@@ -764,8 +764,28 @@
       depuis la session) : d'où `recenserBalises` et la route de diagnostic. **Rien n'est
       branché sur la passe** tant que le recensement n'a pas été lu. Voir ADR-0010.
 
-- [ ] **[VEILLE-40]** Brancher le flux Guichet sur `selectionnerSources`, **après** avoir lu
-      le rapport de `/api/diagnostic/flux-guichet`. Trois choses à vérifier d'abord, dans cet
+- [x] **[VEILLE-41]** Les trois defauts trouves par le PREMIER PASSAGE REEL du flux Guichet.
+      (a) Le recensement rendait un ENSEMBLE sur 20 offres — il ne distinguait pas « champ
+      absent du format » de « champ absent de ces offres-la », et m'a presque fait conclure
+      que le flux n'a pas de ville. Refait en COMPTES sur 2000 offres + mesure jumelle
+      `champsRenseignes`. (b) `&apos;` non decodee dans `texteSimple` : `L'Islet` et
+      `Saint-Pierre-de-l'Ile-d'Orleans`, DEUX villes de la region, tombaient en « lieu
+      inconnu » (mesure). Corrige avec les entites numeriques ; `&amp;` decodee en dernier.
+      (c) Plafond de retenues atteint a ~42 % du flux : aucun compte n'etait concluant.
+      500 -> 5000. Quatre discriminations prouvees.
+
+- [ ] **[VEILLE-42]** ⚠️ **La moitie des offres quebecoises du flux tombent en « lieu
+      inconnu »**, et la liste est dominee par des municipalites de l'ile de Montreal que
+      `HORS_PORTEE` ignore faute de contenir « montreal » : Saint-Laurent, Cote-Saint-Luc,
+      Westmount, Hampstead, Outremont, Mont-Royal, Dorval, Saint-Leonard. Chacune couterait
+      une mesure Nominatim. ⚠️ Chiffre issu d'une passe TRONQUEE : re-mesurer sur une passe
+      complete AVANT d'y toucher — ne pas « corriger » sur la foi d'un prefixe.
+
+- [ ] **[VEILLE-40]** Brancher le flux Guichet sur `selectionnerSources`, **après** une
+      passe de diagnostic qui rend `flux-termine` (celle du 19 août s'est arrêtée sur
+      `plafond-retenues`, donc aucun de ses comptes n'était concluant) — et **après**
+      [VEILLE-32]/[VEILLE-34] : les titres du flux sont en ANGLAIS, un barème monolingue
+      les noterait tous à zéro. Trois choses à vérifier d'abord, dans cet
       ordre : `balisesVues` (les champs supposés existent-ils ?), `verdicts` +
       `villesInconnues` (le registre des lieux sait-il placer ce que le Guichet nomme ?), et
       l'échantillon à l'œil. ⚠️ `Source.interroger` reçoit un `Recuperateur` (qui rend du

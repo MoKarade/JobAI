@@ -18,17 +18,43 @@
 import type { OffreBrute } from "./types";
 
 /** Retire les balises HTML d'une description. Les annonces d'ATS en sont pleines. */
+/**
+ * Un point de code en caractère, ou `null` s'il n'en est pas un.
+ *
+ * Rendre `null` fait laisser l'entité TELLE QUELLE plutôt que de lever : un flux qui porte
+ * `&#999999999;` est mal formé, ce n'est pas une raison pour perdre l'annonce entière.
+ */
+function pointDeCode(n: number): string | null {
+  if (!Number.isInteger(n) || n < 0 || n > 0x10ffff) return null;
+  // Les demi-codets isolés ne forment aucun caractère : `fromCodePoint` les accepte et
+  // produit une chaîne invalide qui casserait la normalisation en aval.
+  if (n >= 0xd800 && n <= 0xdfff) return null;
+  return String.fromCodePoint(n);
+}
+
 export function texteSimple(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
+    // ⚠️ LES ENTITÉS NUMÉRIQUES ET `&apos;` SE DÉCODENT, ET CE N'EST PAS COSMÉTIQUE.
+    // Mesuré le 2026-08-19 sur le flux du Guichet-Emplois : il écrit « Val-d&apos;Or ».
+    // Non décodée, l'entité survit à `normaliserLieu` (« val-d&apos or ») et ne peut plus
+    // matcher aucune entrée des listes de lieux — donc `L&apos;Islet` et
+    // `Saint-Pierre-de-l&apos;Ile-d&apos;Orleans`, DEUX VILLES DE LA RÉGION, tombaient en
+    // « lieu inconnu ». Aucune erreur, aucune trace : des offres régionales simplement
+    // absentes. `L&apos;Ancienne-Lorette` ne passait que par accident, la liste portant
+    // aussi la forme sans article.
+    .replace(/&#(\d+);/g, (t, n: string) => pointDeCode(Number(n)) ?? t)
+    .replace(/&#x([0-9a-f]+);/gi, (t, n: string) => pointDeCode(parseInt(n, 16)) ?? t)
+    .replace(/&apos;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    // `&amp;` EN DERNIER : décodée en premier, elle transformerait `&amp;lt;` (une
+    // esperluette littérale suivie de « lt; ») en `<`, un décodage de trop.
+    .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     // Une balise devient une espace, ce qui détache la ponctuation qui la suivait :
     // `<b>échéanciers</b>.` donnait « échéanciers . ». On resserre devant les seuls signes

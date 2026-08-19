@@ -17,7 +17,9 @@ import {
   ECHANTILLON_BALISES,
   TAMPON_MAX,
   URL_FLUX_GUICHET,
+  CHAMPS_ANALYSES,
   analyserJobGuichet,
+  champsRenseignes,
   estPeutEtreQuebec,
   extraireJobs,
   lireFluxGuichet,
@@ -150,6 +152,33 @@ describe("recenserBalises — l'aveu d'ignorance, rendu vérifiable", () => {
   it("n'inclut pas la balise englobante", () => {
     expect(recenserBalises(OFFRE_QC)).not.toContain("job");
   });
+
+  it("IGNORE le HTML des descriptions — sinon le recensement se noie dans le balisage", () => {
+    // Mesuré au premier passage réel : les descriptions du Guichet sont du HTML, et le
+    // recensement rendait `ul`, `li` et `h2` au milieu des champs du flux. La seule
+    // question qu'il sert à trancher se perdait dans le bruit.
+    const avecHtml = `<job><title><![CDATA[T]]></title><description><![CDATA[<ul><li>Tâche</li></ul>]]></description></job>`;
+    expect(recenserBalises(avecHtml)).toEqual(["description", "title"]);
+  });
+});
+
+describe("champsRenseignes — la mesure JUMELLE du recensement", () => {
+  it("ne compte que les champs qui portent VRAIMENT une valeur", () => {
+    // Elle et `recenserBalises` se vérifient l'une l'autre : l'une dit ce que le flux
+    // écrit, l'autre ce que l'analyseur en tire. L'écart désigne le défaut.
+    expect(champsRenseignes(job({ title: "T", url: "https://x.ca", city: "" })))
+      .toEqual(["title", "url"]);
+  });
+
+  it("couvre tous les champs que l'analyseur lit, sans en oublier", () => {
+    // Une liste recopiée à côté de l'analyseur finirait par décrire un autre analyseur que
+    // celui qui tourne.
+    expect([...CHAMPS_ANALYSES]).toContain("city");
+    expect([...CHAMPS_ANALYSES]).toContain("state");
+    expect(champsRenseignes(OFFRE_QC).sort()).toEqual(
+      ["city", "company", "date", "description", "referencenumber", "state", "title", "url"],
+    );
+  });
 });
 
 describe("estPeutEtreQuebec — un pré-filtre se trompe en GARDANT, jamais en jetant", () => {
@@ -240,12 +269,30 @@ describe("lireFluxGuichet — lire sans jamais charger", () => {
     expect(r.construitLe).toBeNull();
   });
 
-  it("recense les balises sur un ÉCHANTILLON, pas sur tout le flux", async () => {
-    const flux = `<source>${OFFRE_QC.repeat(ECHANTILLON_BALISES + 5)}</source>`;
-    const r = await lireFluxGuichet(sert(reponse(fluxDe([flux]))));
-    expect(r.balisesVues).toContain("company");
-    expect(r.balisesVues).toContain("state");
-    expect(r.vues).toBe(ECHANTILLON_BALISES + 5);
+  it("recense sur un ÉCHANTILLON BORNÉ, et dit combien d'offres il a vues", async () => {
+    // Sans `balisesEchantillon`, un compte ne veut rien dire : « city: 12 » ne se lit pas
+    // sans savoir si l'échantillon en portait 12 ou 2000.
+    const flux = `<source>${OFFRE_QC.repeat(6)}</source>`;
+    const r = await lireFluxGuichet(sert(reponse(fluxDe([flux]))), { maxRetenues: 10 });
+    expect(r.vues).toBe(6);
+    expect(r.balisesEchantillon).toBe(6);
+    expect(r.balisesVues["company"]).toBe(6);
+    expect(r.champsRenseignes["city"]).toBe(6);
+  });
+
+  it("DISCRIMINE « champ absent du format » de « champ absent de ces offres-là »", async () => {
+    // ⚠️ LA LEÇON DU PREMIER PASSAGE RÉEL. La version précédente rendait un ENSEMBLE de
+    // noms sur vingt offres : `city` n'y était pas, et j'en ai conclu que le format n'avait
+    // pas de ville — alors qu'il en a une. Un ensemble confond les deux absences ; un
+    // compte les sépare. Ici `state` est sur toutes les offres, `workterm` sur une seule,
+    // et `salary` sur aucune : trois situations, trois nombres.
+    const avecTerme = job({ title: "T", url: "https://x.ca", state: "QC", workterm: "Permanent" });
+    const sansTerme = job({ title: "T", url: "https://x.ca", state: "QC" });
+    const flux = `<source>${avecTerme}${sansTerme}${sansTerme}</source>`;
+    const r = await lireFluxGuichet(sert(reponse(fluxDe([flux]))), { maxRetenues: 10 });
+    expect(r.balisesVues["state"]).toBe(3);
+    expect(r.balisesVues["workterm"]).toBe(1);
+    expect(r.balisesVues["salary"]).toBeUndefined();
   });
 });
 
@@ -351,6 +398,13 @@ describe("lireFluxGuichet — une panne ne se déguise JAMAIS en journée calme"
 describe("les constantes disent ce qu'elles bornent", () => {
   it("vise le flux officiel, l'exception nommée du garde-fou n°4", () => {
     expect(URL_FLUX_GUICHET).toBe("https://www.jobbank.gc.ca/xmlfeed/jobbank.xml");
+  });
+
+  it("recense sur un échantillon assez GRAND pour qu'un zéro veuille dire zéro", () => {
+    // ⚠️ VINGT NE SUFFISAIT PAS, et le premier passage réel l'a prouvé : `city` était absent
+    // du recensement alors que le flux le porte. Un recensement dont l'absence n'est pas
+    // concluante ne recense rien.
+    expect(ECHANTILLON_BALISES).toBeGreaterThanOrEqual(1000);
   });
 
   it("laisse du budget au reste de la passe", () => {
