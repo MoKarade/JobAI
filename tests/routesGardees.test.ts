@@ -47,6 +47,11 @@ const EXEMPTIONS: Readonly<Record<string, string>> = {
   "/.well-known/oauth-protected-resource":
     "Découverte de la ressource protégée (RFC 9728). Même raison : c'est le document que le " +
     "client va chercher APRÈS un 401, pour savoir où se connecter.",
+  "/.well-known/oauth-protected-resource/[...chemin]":
+    "La MÊME métadonnée sous la forme suffixée par le chemin de la ressource " +
+    "(/.well-known/oauth-protected-resource/api/mcp). Plusieurs clients MCP la cherchent " +
+    "là plutôt que de suivre l'en-tête WWW-Authenticate, et abandonnent la connexion sans " +
+    "dire quelle adresse ils ont essayée. Même document, aucune donnée.",
   "/oauth/register":
     "Enregistrement dynamique de client (RFC 7591) : claude.ai s'enregistre lui-même, il " +
     "n'existe aucun secret pré-partagé pour filtrer l'appelant. Un enregistrement ne donne " +
