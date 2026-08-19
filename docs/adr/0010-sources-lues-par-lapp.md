@@ -217,6 +217,37 @@ Trois conséquences, à trancher avec les chiffres de la sonde :
    les grands groupes de la liste probablement aussi. Ce serait une **nouvelle famille**
    dans `FAMILLES_ATS`, donc du code et un test — pas un simple ajout de jeton.
 
+## §4 ter — Oracle Cloud HCM : ma description était FAUSSE, et ça annule la décision
+
+Le 2026-08-19 j'ai écrit à Marc qu'Oracle HCM exposait « une API REST publique
+(`recruitingCEJobRequisitions`) », et je lui ai proposé d'en faire une 6ᵉ famille. Il a dit
+oui **sur cette description**. Elle est fausse, et la documentation d'Oracle le dit deux fois :
+
+- `recruitingCEJobRequisitions` — « The service endpoints in this resource category are only
+  for Oracle internal use. »
+- `recruitingJobSitePostedJobs`, la ressource des offres PUBLIÉES — « can only be used by
+  approved Oracle Cloud Marketplace partners. »
+
+**Il n'existe donc pas d'API officielle d'offres chez Oracle.** Une 6ᵉ famille bâtie dessus
+ne tomberait pas sous l'exception « API officielles » du garde-fou n°4 : ce serait appeler un
+point d'entrée qu'Oracle déclare interne, c'est-à-dire la même catégorie que le moissonnage.
+
+Ce n'est pas LinkedIn pour autant — LinkedIn *interdit* explicitement ; Oracle, lui, ne
+publie simplement pas. Point d'entrée anonyme, données publiques, documentation qui dit
+« interne ». C'est une **zone grise**, et elle appartient à Marc, pas à moi.
+
+**Ce qui est fait à la place** : le point d'entrée d'Oracle chez Davie entre dans la SONDE
+(mesurer n'est pas ingérer), avec la réserve écrite à côté ; et la même cible — les offres de
+Chantier Davie — est sondée par le **Guichet-Emplois**, que le §4 nomme et dont le
+`robots.txt` est le plus permissif mesuré (`User-agent: *`, aucun `Disallow`,
+`Crawl-delay: 5`). Si le Guichet porte les offres de Davie, la zone grise devient inutile.
+C'est cette paire de candidats qui tranche.
+
+**Leçon de méthode, la même que celle de l'ADR-0005** : j'ai décrit une API depuis son NOM et
+son usage apparent, pas depuis sa documentation. « Le site carrières l'appelle » prouve que
+le point d'entrée répond, pas qu'il est offert. Avant d'annoncer une source à Marc — et
+surtout avant de lui faire prendre une décision dessus — lire ce que l'éditeur en DIT.
+
 ## §5 — Traiter le texte : « voir toutes les subtilités »
 
 `texteSimple` retire les balises. Ça ne suffit pas : ce qui décide du tri vit DANS la prose.

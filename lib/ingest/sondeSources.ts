@@ -348,6 +348,46 @@ export const CANDIDATS: readonly Candidat[] = [
       "`recruitee/robert` répondait très bien — avec des postes à Amsterdam.",
   },
 
+  // ── Oracle Cloud HCM : MESURÉ, pas branché — la voie publique n'existe pas ─────────
+  // ⚠️ J'AI ANNONCÉ À MARC UNE « API REST PUBLIQUE ». C'ÉTAIT FAUX, et la doc d'Oracle le
+  // dit deux fois : `recruitingCEJobRequisitions` est « only for Oracle internal use », et
+  // `recruitingJobSitePostedJobs` — la ressource des offres publiées — « can only be used
+  // by approved Oracle Cloud Marketplace partners ». Il n'y a donc pas d'API officielle
+  // d'offres chez Oracle, et une 6ᵉ famille bâtie dessus ne tomberait PAS sous l'exception
+  // « API officielles » du garde-fou n°4.
+  //
+  // On le SONDE quand même, parce que mesurer n'est pas ingérer et que la question « ce
+  // point d'entrée répond-il seulement ? » a une réponse utile : si Davie sert ses offres
+  // par là, le savoir vaut mieux que le supposer. Ce que la mesure ne rendra PAS, c'est le
+  // droit de s'en servir.
+  {
+    // La MÊME cible que le candidat Oracle ci-dessous, par une voie que le garde-fou n°4
+    // nomme explicitement. Si le Guichet porte les offres de Davie, la zone grise devient
+    // inutile : on prend la source propre. C'est la question que cette paire tranche.
+    id: "officielle:guichet-davie",
+    nom: "Guichet-Emplois — offres de Chantier Davie",
+    url: "https://www.jobbank.gc.ca/browsejobs/employer/Chantier%20Davie/QC",
+    voie: "officielle",
+    attendu: "les offres de Davie par la voie officielle — l'alternative propre à Oracle HCM",
+    reserve:
+      "La forme d'URL et le nom exact de l'employeur restent à confirmer par l'échantillon : " +
+      "un 200 sur une page « aucun résultat » se lit comme un succès et ne vaut rien.",
+  },
+  {
+    id: "oracle:davie",
+    nom: "Chantier Davie — Oracle Cloud HCM (point d'entrée du site carrières)",
+    url:
+      "https://fa-ewde-saasfaprod1.fa.ocs.oraclecloud.com/hcmRestApi/resources/latest/" +
+      "recruitingCEJobRequisitions?onlyData=true&finder=findReqs;siteNumber=CX_1,limit=25",
+    voie: "aucune-voie-publique",
+    attendu: "du JSON de réquisitions — ou un refus, qui trancherait aussi",
+    reserve:
+      "Hôte CONSTATÉ dans l'URL du site carrières de Davie ; le reste de la forme vient de la " +
+      "documentation Oracle, pas d'une visite. Et surtout : un 200 ici ne rend rien exploitable. " +
+      "Oracle documente ces points d'entrée comme internes ou réservés aux partenaires — les " +
+      "brancher exigerait de réviser le garde-fou n°4, ce qui est une décision de Marc.",
+  },
+
   // ── Les quatre agrégateurs demandés par Marc — on lit d'abord ce qu'ils AUTORISENT ──
   {
     id: "agregateur:indeed",
