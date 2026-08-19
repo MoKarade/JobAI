@@ -1766,9 +1766,13 @@ export async function modifierOffre(
 
     // Date d'envoi posée automatiquement au passage à « CV envoyé », et SEULEMENT si elle
     // est encore vide : réappliquer le statut ne doit pas réécrire une date déjà connue.
+    // ⚠️ `aujourdhui()` ET NON `toISOString()` — MESURÉ le 2026-08-19. Vercel tourne en UTC
+    // et Marc vit à UTC−4 : un CV marqué envoyé à 20 h 30 le 19 août était enregistré au
+    // 20 août. La règle est déjà écrite (« toute date que l'app ÉCRIT se calcule dans le
+    // fuseau de Marc »), et ce chemin d'écriture y échappait encore.
     const dateEnvoi =
       champs.statut === "CVenvoye" && !avant.dateEnvoi && !champs.dateEnvoi
-        ? new Date().toISOString().slice(0, 10)
+        ? aujourdhui(new Date())
         : champs.dateEnvoi;
 
     await db

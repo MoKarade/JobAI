@@ -28,6 +28,7 @@ import {
   propositionDe,
   supprimerCv,
 } from "./depot";
+import { aujourdhui as jourDansLeFuseau } from "../ajout";
 import { appliquerEcarts, calculerEcarts } from "./proposition";
 import { planifierRenotation, resumerPlan } from "./renotation";
 
@@ -35,9 +36,17 @@ export type Resultat<T = undefined> =
   | ({ ok: true } & (T extends undefined ? { message?: string } : { valeur: T; message?: string }))
   | { ok: false; erreur: string };
 
-/** La date du jour, au format des dates du projet. Isolée pour rester testable ailleurs. */
+/**
+ * La date du jour, au format des dates du projet.
+ *
+ * ⚠️ DÉLÈGUE À `lib/ajout.ts` — MESURÉ le 2026-08-19. Ce module recalculait la date en UTC
+ * (`toISOString`), alors que Vercel tourne en UTC et que Marc vit à UTC−4 : une modification
+ * de profil faite après 20 h locale datait du lendemain. La règle est écrite depuis
+ * longtemps (« toute date que l'app ÉCRIT se calcule dans le fuseau de Marc ») et deux
+ * chemins d'écriture y échappaient encore — trouvés en corrigeant le premier, jamais avant.
+ */
 function aujourdhui(): string {
-  return new Date().toISOString().slice(0, 10);
+  return jourDansLeFuseau(new Date());
 }
 
 async function session(): Promise<string | null> {

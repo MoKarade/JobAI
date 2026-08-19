@@ -1286,6 +1286,32 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   l'écran qu'il n'a plus sous les yeux, le moteur garde ses calculs — elle reste une exception.
   Et chaque condition porte son verrou : un test de frontière qui interdit au connecteur
   d'atteindre la base est ce qui empêche la condition n°2 de se dissoudre en intention.
+- **Zod STRIPPE les clés inconnues : un test qui croit éprouver un REJET éprouve peut-être un
+  silence.** Mon test « refuse un champ hors du domaine de Marc » passait — mais
+  `MiseAJourOffreSchema.parse({ score: 100 })` ne lève pas, il rend `{}` : le refus observé
+  venait de la garde « aucun champ à modifier », pas d'un rejet. Le nom du test mentait sur le
+  mécanisme, et il aurait continué de passer si le stripping avait disparu. Deux règles :
+  **mesurer ce que le schéma FAIT** (`safeParse` sur un cas mixte) avant d'écrire ce qu'un
+  test prouve, et éprouver le cas qui compte — ici une demande MIXTE (`{priorite, score}`) où
+  l'un doit bouger et l'autre pas, jamais un cas dégénéré qui tombe dans une autre garde.
+- **Une règle qui ne vit que dans un document se reperd — il lui faut un test-scan.**
+  « Toute date que l'app ÉCRIT se calcule dans le fuseau de Marc » est dans ce fichier depuis
+  des mois. Deux chemins d'écriture y échappaient quand même : la date d'envoi posée par
+  `modifierOffre` et la date de modification du profil de CV, toutes deux en
+  `new Date().toISOString()`. Mesuré : un CV marqué envoyé à 20 h 30 le 19 août était
+  enregistré au 20. Et le second site n'a été trouvé qu'en GREPANT LA CLASSE après avoir
+  corrigé le premier — corriger un site sans recenser ses voisins est une faute déjà payée
+  trois fois ici (`ville`, `adresse`, les quatre listes de colonnes). Le garde doit
+  DISCRIMINER : `new Date().toISOString()` (une horloge fraîche, interdite) n'est pas
+  `new Date(t).toISOString()` (une date que la SOURCE a donnée, légitime) — un motif trop
+  large ferait tomber les conversions honnêtes, et on prendrait l'habitude de le contourner.
+- **Éprouver un serveur par son PROTOCOLE, pas par ses handlers.** Appeler directement le
+  handler d'un outil MCP contourne tout ce que le SDK fait autour : validation des schémas,
+  forme des réponses, liste des outils exposés. On teste alors sa propre fonction, pas ce que
+  le client verra — et la liste des outils EST le contrat public, puisqu'un outil ajouté sans
+  décision devient appelable par un modèle. Le transport en mémoire du SDK rend le vrai
+  chemin testable sans réseau ; c'est lui qui a montré qu'un `readOnlyHint` omis fait passer
+  une écriture pour anodine.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

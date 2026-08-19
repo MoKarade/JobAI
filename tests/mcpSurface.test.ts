@@ -44,6 +44,14 @@ function importsDe(source: string): string[] {
 
 const FICHIERS = fichiersSpec();
 
+/**
+ * Le seul fichier de `lib/mcp/` autorisé à importer le SDK.
+ *
+ * Une constante nommée plutôt qu'une condition en ligne : le jour où la frontière déménage,
+ * on change un nom ici et le test dit exactement ce qui a bougé.
+ */
+const PORTEUR_DU_SDK = "serveur.ts";
+
 describe("frontière du connecteur MCP", () => {
   it("trouve bien des fichiers, au lieu de passer à vide", () => {
     // Un scan qui ne trouve rien PASSE, et sa protection est nulle en silence. C'est la
@@ -66,12 +74,14 @@ describe("frontière du connecteur MCP", () => {
     const source = readFileSync(chemin, "utf8");
     const cibles = importsDe(source);
 
-    it(`« ${nom} » n'importe PAS le SDK MCP`, () => {
-      // `serveur.ts` sera le seul fichier autorisé à le faire (lot 2). Tant qu'il n'existe
-      // pas, personne ne l'importe — et le jour où il arrive, cette exception s'écrit ici,
-      // motivée, plutôt que de se dissoudre dans une exclusion de dossier.
+    it(`« ${nom} » ${nom === PORTEUR_DU_SDK ? "est le SEUL à importer le SDK" : "n'importe PAS le SDK MCP"}`, () => {
+      // L'exception est NOMMÉE, pas dissoute dans une exclusion de dossier : `serveur.ts`
+      // est le porteur unique, et le test le vérifie DANS LES DEUX SENS — un second fichier
+      // qui importerait le SDK tombe, et un `serveur.ts` qui cesserait de l'importer tombe
+      // aussi (ce serait le signe que la frontière a déménagé sans qu'on le dise).
       const fautifs = cibles.filter((c) => c.includes("@modelcontextprotocol"));
-      expect(fautifs).toEqual([]);
+      if (nom === PORTEUR_DU_SDK) expect(fautifs.length).toBeGreaterThan(0);
+      else expect(fautifs).toEqual([]);
     });
 
     it(`« ${nom} » n'atteint PAS la base`, () => {

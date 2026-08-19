@@ -35,6 +35,11 @@ const EXEMPTIONS: Readonly<Record<string, string>> = {
     "échec fermé : 503 si le secret n'est pas configuré, 401 s'il est faux. Derrière la " +
     "garde de session, l'appel quotidien de Vercel recevrait une redirection HTML et la " +
     "veille ne tournerait jamais, sans qu'aucune alerte ne se déclenche.",
+  "/api/mcp":
+    "Gardée AUTREMENT — par MCP_TOKEN, comparé en temps constant, échec fermé (503 sans " +
+    "secret, 401 si faux), en attendant OAuth 2.1 (ADR-0011, lot 3). Un client MCP n'a " +
+    "aucune session Google : derrière la garde de session il recevrait une redirection " +
+    "HTML au lieu du JSON-RPC attendu, et le connecteur serait muet sans erreur.",
   "/api/cron/geocodage":
     "Même famille que /api/cron/veille, même CRON_SECRET (lib/cronAuth.ts) : une seconde " +
     "passe de géocodage quotidienne, à une autre heure ([CARTE-03], 2026-08-12).",

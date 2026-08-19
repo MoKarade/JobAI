@@ -38,6 +38,11 @@ export function estCheminPublic(chemin: string): boolean {
   // point d'entrée par lequel une Routine dépose ce qu'elle a trouvé — elle a le
   // connecteur Indeed mais aucun accès au dépôt, et aucune session Google.
   if (chemin === "/api/ingest/depot") return true;
+  // Même famille : le connecteur MCP porte sa propre authentification (jeton en temps
+  // constant aujourd'hui, OAuth 2.1 au lot 3 de l'ADR-0011). Un client MCP n'a pas de
+  // session Google ; derrière la garde de session il recevrait une redirection HTML au lieu
+  // du JSON-RPC attendu, et le connecteur serait muet sans qu'aucune erreur ne le dise.
+  if (chemin === "/api/mcp") return true;
 
   if (
     chemin.startsWith("/_next/static/") ||

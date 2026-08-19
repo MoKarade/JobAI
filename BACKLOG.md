@@ -759,9 +759,18 @@
       rendu, refus sur offre périmée). 32 tests. `tests/mcpSurface.test.ts` verrouille la
       frontière (pas de SDK, pas de base, pas de coordonnée), 3 discriminations prouvées.
 
-- [ ] **[MCP-02]** Le serveur MCP et son transport HTTP (`lib/mcp/serveur.ts`, seul fichier
-      autorisé à importer `@modelcontextprotocol/sdk` ; `app/api/mcp/route.ts`). L'exception
-      d'import s'écrit dans `mcpSurface.test.ts`, motivée — jamais une exclusion de dossier.
+- [x] **[MCP-02]** Le serveur MCP et son transport HTTP. `lib/mcp/serveur.ts` (seul fichier
+      autorise a importer le SDK — l'exception est NOMMEE dans `mcpSurface.test.ts` et
+      verifiee DANS LES DEUX SENS), `app/api/mcp/route.ts` (transport Web-standard, sans
+      etat, reponses JSON). Quatre outils. 13 tests par un VRAI client MCP — appeler un
+      handler contournerait la validation du SDK. Garde provisoire `MCP_TOKEN`, a RETIRER
+      dans le meme commit que MCP-03 (sinon second chemin d'entree sur la meme surface).
+
+- [x] **[DATE-01]** Deux dates ecrites en UTC, trouvees en ecrivant MCP-02 : `modifierOffre`
+      (date d'envoi) et `lib/cv/actions.ts`. Mesure : un CV marque envoye a 20 h 30 le 19
+      aout etait enregistre au 20. Les deux passent par `aujourdhui()` de `lib/ajout.ts`, et
+      `tests/datesEcrites.test.ts` scanne la classe — en DISCRIMINANT l'horloge fraiche
+      (interdite) d'une date deja donnee par une source (legitime). Regression prouvee.
 
 - [ ] **[MCP-03]** OAuth 2.1 : découverte (`/.well-known/oauth-*`), enregistrement dynamique
       de client, PKCE **S256**, code à usage unique, rotation du jeton de rafraîchissement,

@@ -6,6 +6,47 @@
 
 ---
 
+## Session 2026-08-19 — MCP lot 2/4 : le serveur et sa route (+ un bug de fuseau trouvé au passage)
+
+`lib/mcp/serveur.ts` (SEUL fichier autorisé à importer le SDK — mesuré : il tire `express`,
+`cors`, `hono`, `jose`, `ajv`) et `app/api/mcp/route.ts` (transport Web-standard du SDK, sans
+état, réponses JSON — un flux SSE sur une fonction serverless est facturé jusqu'à son mur de
+temps). Quatre outils : `chercher_offres`, `lire_offre`, `resume_suivi`, `modifier_suivi`.
+
+**13 tests par un VRAI client MCP**, pas en appelant les handlers : appeler un handler
+contourne la validation du SDK, donc n'éprouve pas ce que claude.ai verra. Trois
+discriminations prouvées (base muette rendue en liste vide, écriture quand rien ne change,
+écriture annoncée en lecture seule).
+
+⚠️ **Garde provisoire** : `MCP_TOKEN` (bearer, temps constant, échec fermé 503/401). claude.ai
+n'accepte QUE OAuth — ce jeton rend le connecteur testable dès maintenant, et **il se retire
+dans le même commit que l'arrivée d'OAuth** (lot 3), sinon c'est un second chemin d'entrée sur
+la même surface d'écriture. À poser dans les variables Vercel pour essayer.
+
+### ⚠️ Deux dates écrites en UTC, trouvées en écrivant le lot
+
+`modifierOffre` posait la date d'envoi avec `new Date().toISOString()`. **Mesuré** : un CV
+marqué envoyé à 20 h 30 le 19 août était enregistré au **20 août** (Vercel tourne en UTC, Marc
+vit à UTC−4). La règle est dans le CLAUDE.md depuis longtemps ; deux chemins d'écriture y
+échappaient — le second (`lib/cv/actions.ts`) n'a été trouvé qu'en grepant après avoir corrigé
+le premier. Les deux passent maintenant par `aujourdhui()` de `lib/ajout.ts`.
+
+Une règle qui ne vit que dans un document se reperd : `tests/datesEcrites.test.ts` la scanne
+désormais, en DISCRIMINANT l'horloge fraîche (`new Date()`, interdite) d'une date déjà donnée
+par une source (`new Date(t)`, légitime). Régression prouvée.
+
+### ⚠️ Un test qui mentait sur son mécanisme
+
+« REJETTE un champ hors du domaine de Marc » passait — mais Zod **strippe** les clés inconnues
+au lieu de lever : `{score: 100}` devient `{}`, donc le refus observé était « patch vide ».
+Refait sur le cas qui compte : une demande MIXTE (`{priorite, score}`) où la priorité bouge et
+le score ne bouge pas.
+
+### Reste
+
+Lot 3 : OAuth 2.1. Lot 4 : conversation RÉELLE depuis claude.ai.
+
+
 ## Session 2026-08-19 — un connecteur MCP pour claude.ai (ADR-0011, lot 1/4)
 
 Demande de Marc : « ensuite je veux un mcp ». Deux décisions lui ont été posées avant tout
