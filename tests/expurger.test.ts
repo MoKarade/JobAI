@@ -110,6 +110,65 @@ describe("adresse civique en prose", () => {
   });
 });
 
+describe("personne nommée par une civilité — le trou du 2026-08-19", () => {
+  // ⚠️ CE BLOC EXISTE PARCE QUE LA FUITE A EU LIEU, pas parce qu'on l'a imaginée. Une annonce
+  // ELEM rédigée en ANGLAIS disait « to the attention of Ms. … at rh@elem.global ». Le module
+  // ne portait AUCUN motif de civilité et la garde n'en connaissait que les formes françaises :
+  // le nom a traversé les deux et s'est retrouvé dans `data/depot/2026-08-18.json`, donc dans
+  // un dépôt PUBLIC, pendant une journée entière.
+
+  it("retire un nom précédé d'une civilité ANGLAISE — le cas vécu", () => {
+    const texte = `Send your application to the attention of ${["Ms.", "Exemple", "Untel"].join(" ")} at rh@exemple.test.`;
+    const r = expurgerPII(texte);
+    expect(r.texte).not.toContain("Untel");
+    expect(r.retires).toContain("personne nommée");
+  });
+
+  it("retire aussi les civilités FRANÇAISES, avec ou sans prénom", () => {
+    // Assemblés à l'EXÉCUTION : aucune ligne de source ne porte le motif complet, et la
+    // valeur est pourtant entière au runtime. C'est la convention déjà établie pour les
+    // numéros et les adresses d'épreuve — un garde de PII se déclenche sur ses propres
+    // fixtures, et il a raison.
+    for (const civilite of ["M.", "Mme", "Madame", "Mlle", "Mr.", "Mrs.", "Dr."]) {
+      const texte = `Contactez ${[civilite, "Exemple", "Untel"].join(" ")}.`;
+      expect(expurgerPII(texte).texte, `civilité non couverte : ${civilite}`).not.toContain("Untel");
+    }
+  });
+
+  it("LAISSE la boîte de rôle intacte — c'est là que Marc postule", () => {
+    const r = expurgerPII(`Écrire à ${["Ms.", "Exemple", "Untel"].join(" ")} — carriere@exemple.test`);
+    expect(r.texte).toContain("carriere@exemple.test");
+  });
+
+  it("NE MORD PAS sur « MS Office » : la casse est le discriminant", () => {
+    const texte = "Maitrise de la suite MS Office et de MS Project.";
+    expect(expurgerPII(texte).texte).toBe(texte);
+  });
+
+  it("NE MORD PAS sur « M. Sc. » : un diplôme n'est pas une personne", () => {
+    // Le second jeton doit faire au moins trois lettres ; « Sc. » en fait deux.
+    const texte = "Formation exigee : M. Sc. en genie industriel.";
+    expect(expurgerPII(texte).texte).toBe(texte);
+  });
+
+  it("NE MORD PAS sur une formule d'appel ni sur un mot qui commence par M", () => {
+    for (const texte of [
+      "Madame, Monsieur, nous vous remercions de votre interet.",
+      "Mission de l'entreprise : concevoir des cellules robotisees.",
+    ]) {
+      expect(expurgerPII(texte).texte).toBe(texte);
+    }
+  });
+
+  it("DISCRIMINE : sans le motif, le nom passerait — preuve par la catégorie rendue", () => {
+    // Si un jour quelqu'un retire ce motif, ce test tombe : le rapport ne portera plus la
+    // catégorie, et le texte contiendra encore le nom.
+    const r = expurgerPII(`À l'attention de ${["Mme", "Exemple", "Untel"].join(" ")}.`);
+    expect(r.retires).toEqual(["personne nommée"]);
+    expect(r.texte).toContain("[personne nommée retirée]");
+  });
+});
+
 describe("le rapport dit ce qui a été retiré, jamais la valeur", () => {
   it("nomme les catégories, dédoublonnées et triées", () => {
     const r = expurgerPII(`a.b@x.ca, ${TEL}, et c.d@y.ca`);

@@ -217,6 +217,12 @@ describe("garde-fou n°1 — aucune donnée personnelle en clair", () => {
       { nom: "courriel nominatif", motif: /[\p{L}][\p{L}'-]*\.[\p{L}][\p{L}'-]*@[\p{L}\d.-]+\.[a-z]{2,}/u },
       { nom: "profil LinkedIn personnel", motif: /linkedin\.com\/in\// },
       { nom: "téléphone", motif: /(?:\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/ },
+      // ⚠️ AJOUTÉ LE 2026-08-19, APRÈS UNE FUITE RÉELLE. Une annonce ELEM rédigée en ANGLAIS
+      // disait « to the attention of Ms. … ». Le scan ci-dessus ne portait aucun motif de
+      // civilité, et celui de la section « garde-fou n°1 » n'en connaissait que les formes
+      // FRANÇAISES : le nom a traversé l'outil ET la garde, et il était déjà dans
+      // `data/depot/2026-08-18.json` — donc dans un dépôt PUBLIC — depuis la veille.
+      { nom: "personne nommée", motif: /\b(?:M\.|Mme|Mlle|Monsieur|Madame|Mademoiselle|Ms\.|Mrs\.|Mr\.|Dr\.)\s+\p{Lu}[\p{L}'’-]{2,}/u },
     ];
     for (const { nom, motif } of motifs) {
       expect(chercher(motif, depots), `PII de tiers (${nom}) dans un dépôt`).toEqual([]);
@@ -249,8 +255,13 @@ describe("garde-fou n°1 — aucune donnée personnelle en clair", () => {
     expect(chercher(affectee, FICHIERS)).toEqual([]);
   });
 
-  it("aucune personne nommée par une civilité", () => {
-    const motif = /\b(M\.|Mme|Monsieur|Madame)\s+[A-ZÉÈÀ][a-zéèêàî]+/;
+  it("aucune personne nommée par une civilité, en français COMME en anglais", () => {
+    // ⚠️ LES CIVILITÉS ANGLAISES ONT ÉTÉ AJOUTÉES LE 2026-08-19, PARCE QU'IL EN MANQUAIT.
+    // Ce motif ne connaissait que `M.|Mme|Monsieur|Madame`. Les annonces de la région sont
+    // bilingues : « Ms. … » dans une annonce ELEM est passée sans un bruit. C'est la même
+    // classe de défaut que le barème monolingue — une règle écrite dans une seule langue
+    // laisse l'autre décider en silence.
+    const motif = /\b(?:M\.|Mme|Mlle|Monsieur|Madame|Mademoiselle|Ms\.|Mrs\.|Mr\.|Dr\.)\s+\p{Lu}[\p{L}'’-]{2,}/u;
     expect(chercher(motif, FICHIERS)).toEqual([]);
   });
 
@@ -313,10 +324,25 @@ describe("le scan discrimine réellement", () => {
       doitIgnorer: "HUB_TOKEN=",
     },
     {
-      nom: "civilité",
-      motif: /\b(M\.|Mme|Monsieur|Madame)\s+[A-ZÉÈÀ][a-zéèêàî]+/,
+      nom: "civilité française",
+      motif: /\b(?:M\.|Mme|Mlle|Monsieur|Madame|Mademoiselle|Ms\.|Mrs\.|Mr\.|Dr\.)\s+\p{Lu}[\p{L}'’-]{2,}/u,
       doitDetecter: "Entrevue avec Mme Untel la semaine prochaine.",
       doitIgnorer: "Contact RH déjà établi, entrevue passée en mars 2025.",
+    },
+    {
+      // Le cas RÉEL du 2026-08-19 : une annonce en anglais, une civilité anglaise.
+      nom: "civilité anglaise",
+      motif: /\b(?:M\.|Mme|Mlle|Monsieur|Madame|Mademoiselle|Ms\.|Mrs\.|Mr\.|Dr\.)\s+\p{Lu}[\p{L}'’-]{2,}/u,
+      doitDetecter: "Send your application to Ms. Exemple Untel at rh@exemple.test.",
+      // Et ce qu'il ne doit PAS mordre : « MS » (casse) n'est pas « Ms. ».
+      doitIgnorer: "Maitrise de la suite MS Office et de MS Project.",
+    },
+    {
+      // « M. Sc. » est un diplôme, pas une personne : le second jeton fait deux lettres.
+      nom: "civilité — le diplôme n'est pas une personne",
+      motif: /\b(?:M\.|Mme|Mlle|Monsieur|Madame|Mademoiselle|Ms\.|Mrs\.|Mr\.|Dr\.)\s+\p{Lu}[\p{L}'’-]{2,}/u,
+      doitDetecter: "Rencontre avec M. Untel jeudi.",
+      doitIgnorer: "Formation : M. Sc. en genie industriel.",
     },
   ];
 

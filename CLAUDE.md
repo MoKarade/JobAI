@@ -1111,6 +1111,31 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   évite de « corriger » ce qui marche (déjà consigné, re-vécu) ; (b) le retrait d'un composant
   change la topologie du reste — après avoir supprimé une source, un chemin, un déclencheur,
   RECENSER ce qu'il en reste plutôt que supposer que le reste est inchangé.
+- **Une règle de PII écrite dans UNE seule langue laisse l'autre entrer, et le dépôt est
+  public.** Le 2026-08-19, une annonce ELEM rédigée en anglais disait « to the attention of
+  Ms. … ». `expurgerPII` ne portait AUCUN motif de civilité, et `piiGuard` n'en connaissait
+  que les formes FRANÇAISES (`M.|Mme|Monsieur|Madame`) : le nom d'une personne tierce a
+  traversé l'outil ET la garde, et il était déjà dans `data/depot/2026-08-18.json` — donc
+  lisible du monde entier — depuis la veille. Le couple « l'outil nettoie, la garde refuse »
+  ne protège que ce que les DEUX savent nommer ; ici les deux avaient le même angle mort, ce
+  qui le rendait invisible. C'est exactement la classe de `[VEILLE-32]` (barème monolingue
+  sur un bassin bilingue) transposée à la sécurité : les annonces de la région sont
+  bilingues, donc toute liste de mots qui décide quelque chose doit l'être aussi.
+  Trois corollaires opératoires. (a) **Corriger l'outil ne nettoie pas ce qui est déjà
+  commité** : le rattrapage (re-passer l'expurgateur sur TOUS les dépôts) se livre dans le
+  même lot que le motif — sinon on ferme la porte en laissant la fuite dedans. (b) **Un
+  commentaire qui cite la valeur fautive la REPUBLIE.** Mon premier jet expliquait le motif
+  en recopiant le vrai nom dans `expurger.ts` ; la garde l'a refusé, à raison. Un exemple
+  vit dans un test, assemblé à l'exécution, jamais dans une explication. (c) **Un dépôt
+  public ne se répare pas par un commit** : le correctif retire la valeur du fichier
+  COURANT, pas de l'historique, des forks ni des miroirs. Le dire à Marc au lieu de laisser
+  croire que c'est effacé.
+- **Un plafond de lecture qu'on s'impose se dit AVEC la liste de ce qu'il a laissé de côté.**
+  « 13 annonces lues » ne se vérifie pas ; « 13 lues, 41 déposées sans description, les
+  voici » se vérifie. Le protocole l'exigeait déjà pour les lectures ; la même règle vaut
+  pour tout tirage (quels termes ? lesquels sautés ?) — deux tirages différents ne mesurent
+  pas la même chose, et sans la liste, « 51 offres » d'un jour ne se compare pas à celui
+  d'hier.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

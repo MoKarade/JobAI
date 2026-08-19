@@ -15,11 +15,18 @@
 // vient de fermer).
 //
 // ⚠️ CE QUE CE MODULE NE FAIT PAS
-// Il ne détecte pas un nom de personne isolé. C'est délibéré et c'est déjà écrit dans
-// `tests/piiGuard.test.ts` : un motif générique de patronyme est inutilisable en français
-// (mesuré : il attrapait « Machines-Outils », « Saint-Damien », « garde-fou »). On retire donc
-// ce qui a une FORME reconnaissable — courriel nominatif, profil personnel, téléphone, adresse
-// civique — et on laisse à la relecture ce qui n'en a pas.
+// Il ne détecte pas un nom de personne ISOLÉ, c'est-à-dire sans civilité devant. C'est
+// délibéré et c'est déjà écrit dans `tests/piiGuard.test.ts` : un motif générique de patronyme
+// est inutilisable en français (mesuré : il attrapait « Machines-Outils », « Saint-Damien »,
+// « garde-fou »). On retire donc ce qui a une FORME reconnaissable — courriel nominatif,
+// profil personnel, téléphone, adresse civique, et nom PRÉCÉDÉ D'UNE CIVILITÉ — et on laisse
+// à la relecture ce qui n'en a pas.
+//
+// ⚠️ Et la civilité se compte en FRANÇAIS COMME EN ANGLAIS. Ce module n'en connaissait aucune
+// jusqu'au 2026-08-19 ; la garde, elle, n'en connaissait que les formes françaises. Une
+// annonce rédigée en anglais (« Ms. … ») a donc traversé les deux et s'est retrouvée dans un
+// dépôt PUBLIC. Les annonces de la région sont bilingues : toute règle écrite ici doit l'être
+// aussi, sans quoi c'est le plus restrictif des deux vocabulaires qui décide en silence.
 
 /** Ce qu'une passe d'expurgement a retiré, par catégorie. Jamais la valeur elle-même. */
 export interface RapportExpurgement {
@@ -65,6 +72,33 @@ const MOTIFS: readonly Motif[] = [
     categorie: "téléphone",
     regex: /(?:\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/g,
     remplacement: "[téléphone retiré]",
+  },
+  {
+    // PERSONNE NOMMÉE par une civilité : une civilité (française ou anglaise) suivie d'un
+    // prénom, et éventuellement d'un nom de famille.
+    //
+    // ⚠️ AUCUN EXEMPLE COMPLET N'EST ÉCRIT ICI, ET C'EST VOULU. Un commentaire qui cite la
+    // valeur fautive la REPUBLIE — et le garde, qui ne distingue pas une explication de la
+    // chose expliquée, la refuse à raison. Les exemples vivent dans `tests/expurger.test.ts`,
+    // assemblés à l'exécution.
+    //
+    // ⚠️ CE MOTIF EST NÉ D'UNE FUITE RÉELLE, PAS D'UNE PRÉCAUTION. Le 2026-08-19, une annonce
+    // ELEM disait « Please send your application to the attention of Ms. … at rh@elem.global ».
+    // Le courriel de rôle a survécu (c'est voulu), le NOM est passé — et il était DÉJÀ dans
+    // `data/depot/2026-08-18.json`, donc dans un dépôt PUBLIC, depuis la veille. Ni l'outil
+    // (aucun motif de civilité ici) ni la garde (qui n'en connaissait que les formes
+    // FRANÇAISES) ne l'ont vu. C'est la même classe de défaut que le barème monolingue :
+    // les annonces de la région sont bilingues, la règle ne l'était pas.
+    //
+    // Ce qu'il ne mord PAS, prouvé dans les tests : « Suite MS Office » (casse différente),
+    // « M. Sc. en génie » (le second jeton doit faire au moins trois lettres), « Madame,
+    // Monsieur, » (formule d'appel, suivie d'une virgule), « Mission » (pas d'espace).
+    // Le second nom est optionnel : une civilité suivie du seul patronyme se retire aussi
+    // bien qu'une civilité suivie du prénom ET du patronyme.
+    categorie: "personne nommée",
+    regex:
+      /\b(?:M\.|Mme|Mlle|Monsieur|Madame|Mademoiselle|Ms\.|Mrs\.|Mr\.|Dr\.)\s+\p{Lu}[\p{L}'’-]{2,}(?:\s+\p{Lu}[\p{L}'’-]{2,})?/gu,
+    remplacement: "[personne nommée retirée]",
   },
   {
     // Adresse civique EN PROSE. Elle n'est pas retirée parce qu'elle serait secrète — une

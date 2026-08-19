@@ -6,6 +6,28 @@
 
 ---
 
+## Veille du 2026-08-19 — et une PII de tiers trouvée EN LIGNE
+
+Lot du jour déposé par FICHIER (`data/depot/2026-08-19.json`, 51 offres). Indeed seul :
+ZipRecruiter n'exposait aucun outil au moment du balayage — un ÉTAT du jour, pas un fait
+durable (le protocole dit de le mesurer à l'instant de s'en servir, et c'est ce qui a été fait).
+
+⚠️ **Le fait marquant n'est pas le lot, c'est ce qu'il a révélé.** Une annonce ELEM rédigée en
+ANGLAIS portait le nom d'une personne tierce derrière une civilité anglaise (« Ms. … »).
+`expurgerPII` n'avait AUCUN motif de civilité ; `piiGuard` n'en connaissait que les formes
+FRANÇAISES. Le nom a donc traversé l'outil ET la garde — et il était **déjà dans
+`data/depot/2026-08-18.json`**, dans un dépôt public, depuis la veille.
+
+Fermé dans le même lot : motif « personne nommée » (FR + EN) dans `expurger.ts`, même motif
+ajouté au scan des dépôts ET à la vérification générale de `piiGuard`, sept cas de
+discrimination (dont « MS Office » et « M. Sc. » qui ne doivent PAS mordre), et **rattrapage
+sur les huit dépôts existants**. Vérifié : plus aucune trace dans `data/`.
+
+⚠️ **Ce qui n'est PAS réglé, et que seul Marc peut trancher** : le nom reste dans
+l'HISTORIQUE git (commit du 18 août), donc dans les forks et miroirs éventuels. Un commit
+correctif ne l'en retire pas.
+
+
 ## Session 2026-08-18 — le rapport de veille, et le rayon réglable
 
 ### [VEILLE-35] la découverte de pages carrières, retirée
