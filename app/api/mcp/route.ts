@@ -5,12 +5,16 @@
 // n'a pas de session Google. Elle porte donc sa propre authentification, en ÉCHEC FERMÉ —
 // secret absent : 503 ; jeton faux : 401 ; comparaison en temps constant.
 //
-// ⚠️ CE JETON EST UNE ÉTAPE, PAS LA DESTINATION. claude.ai n'accepte QUE OAuth 2.0/2.1 pour
-// un connecteur personnalisé (mesuré sur FinanceAI) : ce `MCP_TOKEN` rend le connecteur
-// utilisable et testable dès maintenant depuis un client qui accepte un en-tête, et le lot 3
-// (ADR-0011) le remplace par un vrai serveur d'autorisation. Le laisser en place APRÈS
-// serait un second chemin d'entrée sur la même surface d'écriture : il se retire dans le
-// même commit que l'arrivée d'OAuth.
+// ⚠️ `MCP_TOKEN` A ÉTÉ RETIRÉ EN MÊME TEMPS QU'OAUTH EST ARRIVÉ, comme promis au lot 2. Un
+// second chemin d'entrée sur la même surface d'écriture, gardé par un secret partagé et
+// laissé « au cas où », est exactement le genre de porte qu'on oublie de refermer. Il n'y a
+// donc qu'une façon d'entrer : un jeton d'accès délivré par `/oauth/token`.
+//
+// ⚠️ L'APPARTENANCE SE VÉRIFIE ICI, À CHAQUE APPEL — pas seulement au moment où le jeton a
+// été délivré. Un contrôle posé à l'émission laisse vivre les jetons déjà émis : vécu sur
+// FinanceAI avec un cookie d'un an qui a survécu au verrou censé le fermer. Si
+// `AUTHORIZED_EMAIL` change, les jetons en circulation cessent de valoir quelque chose au
+// prochain appel.
 
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { eq } from "drizzle-orm";
@@ -18,12 +22,46 @@ import { db } from "@/lib/db";
 import { offers } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { creerServeur } from "@/lib/mcp/serveur";
-import { hubTokenValid } from "@/lib/hubToken";
+import { empreinte, estProprietaire } from "@/lib/mcp/oauth";
+import { origineDe } from "@/lib/mcp/origine";
+import { lireJetonValide } from "@/lib/oauthStore";
 import { aujourdhui } from "@/lib/ajout";
 import { CHAMPS_UTILISATEUR, type Offre } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+/** Le jeton porté par l'en-tête `Authorization`, ou `null`. */
+function jetonPorteur(requete: Request): string | null {
+  const entete = requete.headers.get("authorization") ?? "";
+  if (!entete.toLowerCase().startsWith("bearer ")) return null;
+  const valeur = entete.slice(7).trim();
+  return valeur === "" ? null : valeur;
+}
+
+/**
+ * Un 401 qui DIT où aller se connecter (RFC 9728).
+ *
+ * Sans l'en-tête `WWW-Authenticate`, un 401 est un mur : le client ne sait pas qu'il existe
+ * un serveur d'autorisation ni où le trouver, et claude.ai abandonne sans proposer de
+ * connexion. Avec lui, le refus devient une invitation.
+ *
+ * ⚠️ TOUS LES REFUS RENDENT LA MÊME CHOSE — jeton absent, invalide, expiré ou compte non
+ * autorisé. Distinguer ces cas dans la réponse en ferait un oracle : on saurait qu'un jeton
+ * a existé, ou qu'une adresse est la bonne. Le motif reste dans le corps pour Marc, jamais
+ * dans le code de statut ni dans l'en-tête.
+ */
+function defi(requete: Request, motif: string): Response {
+  const metadonnees = `${origineDe(requete)}/.well-known/oauth-protected-resource`;
+  return new Response(JSON.stringify({ ok: false, erreur: motif }), {
+    status: 401,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+      "WWW-Authenticate": `Bearer resource_metadata="${metadonnees}"`,
+    },
+  });
+}
 
 function refus(statut: number, erreur: string): Response {
   return new Response(JSON.stringify({ ok: false, erreur }), {
@@ -50,14 +88,18 @@ async function enregistrer(offre: Offre): Promise<void> {
 }
 
 export async function POST(requete: Request): Promise<Response> {
-  const attendu = process.env.MCP_TOKEN ?? "";
-  // Échec fermé : sans secret configuré, le connecteur n'existe pas. Une variable peut
-  // disparaître d'un déploiement à l'autre ; ce jour-là on se tait, on ne s'ouvre pas.
-  if (attendu === "") return refus(503, "connecteur désactivé");
+  const porteur = jetonPorteur(requete);
+  if (porteur === null) return defi(requete, "jeton absent");
 
-  const entete = requete.headers.get("authorization") ?? "";
-  const porteur = entete.toLowerCase().startsWith("bearer ") ? entete.slice(7).trim() : null;
-  if (!hubTokenValid(porteur, attendu)) return refus(401, "non autorisé");
+  const jeton = await lireJetonValide(empreinte(porteur), "acces", new Date());
+  if (jeton === null) return defi(requete, "jeton invalide ou expiré");
+
+  // Échec fermé : sans `AUTHORIZED_EMAIL`, `estProprietaire` rend faux et on refuse. On ne
+  // laisse pas passer « faute de règle » — une variable peut disparaître d'un déploiement à
+  // l'autre, et ce jour-là l'app doit se taire, pas s'ouvrir.
+  if (!estProprietaire(jeton.sujet, process.env.AUTHORIZED_EMAIL ?? "")) {
+    return defi(requete, "compte non autorisé");
+  }
 
   const transport = new WebStandardStreamableHTTPServerTransport({
     // Sans état : chaque requête est autonome. Une fonction serverless ne garde rien entre

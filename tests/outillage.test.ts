@@ -49,10 +49,34 @@ describe("le migrateur VÉRIFIE au lieu d'annoncer", () => {
     expect(source).toContain("information_schema.tables");
   });
 
-  it("connaît les tables attendues, y compris la dernière ajoutée", () => {
-    for (const table of ["offers", "offer_reasons", "villes"]) {
-      expect(source, `« ${table} » n'est pas vérifiée`).toContain(`"${table}"`);
-    }
+  it("DÉRIVE la liste des tables du schéma au lieu de la recopier", () => {
+    // ⚠️ ET LA LISTE RECOPIÉE AVAIT DÉJÀ DÉRIVÉ : elle nommait TROIS tables sur les onze du
+    // schéma. Les huit autres étaient créées par la migration puis jamais vérifiées après
+    // elle — donc une migration à moitié appliquée serait sortie en SUCCÈS, exactement la
+    // panne que ce script existe pour empêcher. Découvert en faisant dériver la liste côté
+    // test plutôt qu'en la relisant. On vérifie donc la MÉCANIQUE, pas des littéraux : une
+    // liste écrite à la main ici retomberait dans le même piège.
+    expect(source).toContain('from "../lib/db/schema"');
+    expect(source).toContain("getTableName");
+    expect(source).not.toMatch(/TABLES_ATTENDUES\s*=\s*\[\s*"/);
+  });
+
+  it("la dérivation couvre TOUTES les tables déclarées dans le schéma", async () => {
+    // La mécanique ne suffit pas : il faut qu'elle PRODUISE la bonne liste. On compare ce
+    // que la dérivation rend au nombre de `pgTable(` du fichier de schéma — un écart
+    // voudrait dire qu'une table est déclarée autrement et échappe au filtre.
+    const { getTableName, is } = await import("drizzle-orm");
+    const { PgTable } = await import("drizzle-orm/pg-core");
+    const schema = await import("../lib/db/schema");
+    const derivees = Object.values(schema)
+      .filter((v) => is(v, PgTable))
+      .map((t) => getTableName(t as never));
+
+    const brut = readFileSync(resolve(process.cwd(), "lib/db/schema.ts"), "utf8");
+    const declarees = [...brut.matchAll(/pgTable\(\s*"([a-z0-9_]+)"/g)].map((m) => m[1]!);
+
+    expect(declarees.length, "le scan du schéma est vide").toBeGreaterThanOrEqual(3);
+    expect(derivees.sort()).toEqual([...declarees].sort());
   });
 
   it("SORT EN ÉCHEC quand une table manque", () => {

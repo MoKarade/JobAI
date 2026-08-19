@@ -43,6 +43,18 @@ export function estCheminPublic(chemin: string): boolean {
   // session Google ; derrière la garde de session il recevrait une redirection HTML au lieu
   // du JSON-RPC attendu, et le connecteur serait muet sans qu'aucune erreur ne le dise.
   if (chemin === "/api/mcp") return true;
+  // La DÉCOUVERTE OAuth et les deux endpoints machine du serveur d'autorisation. claude.ai
+  // les appelle sans jeton — c'est justement ce qu'il vient chercher. Ce qui les protège :
+  // l'enregistrement ne donne AUCUN accès (il faut ensuite que Marc autorise en personne),
+  // et le jeton est gardé par PKCE plus un code à usage unique.
+  if (chemin === "/.well-known/oauth-authorization-server") return true;
+  if (chemin === "/.well-known/oauth-protected-resource") return true;
+  if (chemin === "/oauth/register") return true;
+  if (chemin === "/oauth/token") return true;
+  // ⚠️ `/oauth/authorize` N'EST PAS ICI, ET C'EST DÉLIBÉRÉ. C'est le point où Marc autorise
+  // EN PERSONNE : la garde de session l'envoie au login Google et le ramène avec les mêmes
+  // paramètres. L'ajouter aux chemins publics retirerait la connexion du flux — le
+  // connecteur délivrerait alors des jetons à qui les demande.
 
   if (
     chemin.startsWith("/_next/static/") ||

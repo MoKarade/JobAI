@@ -772,14 +772,15 @@
       `tests/datesEcrites.test.ts` scanne la classe — en DISCRIMINANT l'horloge fraiche
       (interdite) d'une date deja donnee par une source (legitime). Regression prouvee.
 
-- [ ] **[MCP-03]** OAuth 2.1 : découverte (`/.well-known/oauth-*`), enregistrement dynamique
-      de client, PKCE **S256**, code à usage unique, rotation du jeton de rafraîchissement,
-      mono-adresse `AUTHORIZED_EMAIL`. ⚠️ **`redirect_uri` validé par `new URL()` +
-      comparaison d'ORIGINE EXACTE, avec rejet de tout `username`/`password`** — jamais
-      `startsWith` : `http://127.0.0.1.evil.com` et `http://127.0.0.1@evil.com` passent un
-      préfixe, et c'est une prise de contrôle de compte (finding CRITIQUE de FinanceAI).
-      ⚠️ L'appartenance se vérifie **à l'usage**, pas seulement à l'émission : un contrôle
-      posé au callback n'arrête pas les jetons déjà délivrés.
+- [x] **[MCP-03]** OAuth 2.1 complet. `lib/mcp/oauth.ts` (logique pure : redirect_uri jugee
+      par `new URL()` + hote EXACT + rejet de l'userinfo, PKCE S256, empreintes, expiration),
+      `lib/oauthStore.ts` (etat, HORS de lib/mcp/ pour que le garde de frontiere reste
+      absolu), cinq routes, migration 0019. `/oauth/authorize` reste derriere la garde de
+      session — c'est le login Google de l'app qui authentifie Marc. `MCP_TOKEN` RETIRE dans
+      le meme commit, comme promis. ⚠️ Les deux chaines d'attaque de FinanceAI sont dans les
+      tests et font tomber la version fautive. Usage unique et rotation prouves sur une VRAIE
+      Postgres (PGlite) : deux echanges simultanes, un seul gagne — le motif naif en fait
+      gagner deux. Aucun nouveau secret a configurer.
 
 - [ ] **[MCP-04]** Branchement dans claude.ai, vérifié par une **conversation réelle**. Un
       déploiement vert ne prouve rien — leçon payée trois fois sur ce dépôt.

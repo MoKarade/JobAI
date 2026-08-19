@@ -134,6 +134,13 @@
       "when": 1786657496823,
       "tag": "0018_version_de_profil_sur_la_note",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787162032976,
+      "tag": "0019_connecteur_mcp",
+      "breakpoints": true
     }
   ]
 }

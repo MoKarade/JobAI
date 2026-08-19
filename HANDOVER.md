@@ -6,6 +6,47 @@
 
 ---
 
+## Session 2026-08-19 — MCP lot 3/4 : OAuth 2.1 (le connecteur est prêt côté app)
+
+`lib/mcp/oauth.ts` (logique pure), `lib/oauthStore.ts` (état — **hors de `lib/mcp/`** pour
+que le garde de frontière reste absolu), cinq routes, migration `0019_connecteur_mcp`.
+`MCP_TOKEN` **retiré dans le même commit**, comme promis au lot 2.
+
+**Le contrôle critique.** `jugerRedirectUri` valide par `new URL()`, hôte EXACT, et rejette
+tout `username`/`password`. Les **deux chaînes qui traversaient le `startsWith` de FinanceAI**
+sont dans les tests : `http://127.0.0.1.evil.com/cb` (sous-domaine) et
+`http://127.0.0.1@evil.com/cb` (userinfo). Réintroduire la version fautive les fait tomber —
+vérifié.
+
+**Usage unique et rotation prouvés sur une VRAIE Postgres** (PGlite + le SQL de migration
+réellement committé) : deux échanges simultanés du même code, un seul gagne. Le motif naïf
+« lire puis écrire » en fait gagner deux — mesuré.
+
+**`/oauth/authorize` reste derrière la garde de session**, et c'est tout le modèle : le
+middleware envoie Marc au login Google et le ramène avec les mêmes paramètres. Aucun écran de
+connexion à écrire, même compte, même règle mono-adresse. L'appartenance est re-vérifiée
+**à chaque appel** de `/api/mcp`, pas seulement à l'émission du jeton.
+
+### ⚠️ Deux listes de tables recopiées, toutes deux déjà fausses
+
+En dérivant la liste du script de migration, découvert qu'elle nommait **trois tables sur
+onze** : les huit autres étaient créées puis jamais vérifiées après migration — donc une
+migration à moitié appliquée serait sortie en SUCCÈS, la panne même que ce script existe pour
+empêcher. Et `tests/db.test.ts` annonçait « les huit tables attendues ». Les deux dérivent
+maintenant du schéma.
+
+### Ce que Marc a à faire (lot 4)
+
+1. **Appliquer la migration** : `npm run db:migrate` (elle crée `oauth_clients`,
+   `oauth_codes`, `oauth_jetons`).
+2. **Aucun nouveau secret à poser.** L'appartenance se juge sur `AUTHORIZED_EMAIL`, déjà
+   configuré ; les clients s'enregistrent eux-mêmes.
+3. Dans claude.ai → Connecteurs → ajouter un connecteur personnalisé, URL
+   `https://emploi.hubperso.com/api/mcp`. Il devrait proposer une connexion Google.
+4. ⚠️ **Un déploiement vert ne prouve rien** — leçon payée trois fois ici. Le seul signal
+   valable est une conversation réelle : demande-lui « résume mon suivi JobAI ».
+
+
 ## Session 2026-08-19 — MCP lot 2/4 : le serveur et sa route (+ un bug de fuseau trouvé au passage)
 
 `lib/mcp/serveur.ts` (SEUL fichier autorisé à importer le SDK — mesuré : il tire `express`,

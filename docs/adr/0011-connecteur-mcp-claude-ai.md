@@ -144,10 +144,35 @@ base, et le volume du scan est prouvé (un scan qui ne trouve aucun fichier pass
 
 | Lot | Contenu | État |
 |---|---|---|
-| 1 | Les outils (`*.spec.ts`), lecture ET écriture, testés, sans SDK ni réseau | — |
-| 2 | Le serveur MCP + le transport HTTP | — |
-| 3 | OAuth 2.1 (découverte, enregistrement, PKCE, rotation) | — |
-| 4 | Branchement dans claude.ai, vérifié par un appel RÉEL | — |
+| 1 | Les outils (`*.spec.ts`), lecture ET écriture, testés, sans SDK ni réseau | livré |
+| 2 | Le serveur MCP + le transport HTTP | livré |
+| 3 | OAuth 2.1 (découverte, enregistrement, PKCE, rotation) | livré |
+| 4 | Branchement dans claude.ai, vérifié par un appel RÉEL | **Marc** |
+
+### Ce que le lot 3 a livré, et ce qu'il PROUVE
+
+- `lib/mcp/oauth.ts` — la logique pure. `jugerRedirectUri` est le contrôle critique : les
+  **deux chaînes exactes** qui traversaient le `startsWith` de FinanceAI
+  (`http://127.0.0.1.evil.com/cb`, `http://127.0.0.1@evil.com/cb`) sont dans les tests, et
+  réintroduire la version fautive les fait tomber — vérifié.
+- `lib/oauthStore.ts` — l'état, **hors de `lib/mcp/`** pour que le garde de frontière reste
+  absolu. Rien n'est stocké en clair : codes et jetons vivent par leur empreinte, donc le
+  kill-switch d'incident est de vider la table.
+- Les cinq routes : découverte (RFC 8414 et 9728), enregistrement dynamique (RFC 7591),
+  autorisation, jeton. **`/oauth/authorize` reste derrière la garde de session** : le
+  middleware envoie Marc au login Google et le ramène. On n'écrit aucun écran de connexion,
+  et l'ajouter aux chemins publics délivrerait des jetons à qui les demande.
+- `/api/mcp` répond désormais aux jetons OAuth, et **`MCP_TOKEN` a été retiré dans le même
+  commit**, comme promis : un second chemin d'entrée laissé « au cas où » est une porte qu'on
+  oublie de refermer.
+- **Usage unique et rotation prouvés sur une VRAIE Postgres** (PGlite, avec le SQL de
+  migration réellement committé) : deux échanges simultanés du même code, un seul gagne. Le
+  motif naïf « lire puis écrire » en fait gagner deux — mesuré.
+
+### Ce qu'il n'y a PAS à configurer
+
+Aucun nouveau secret. L'appartenance se juge sur `AUTHORIZED_EMAIL`, qui existe déjà, et les
+clients s'enregistrent eux-mêmes. Il reste à appliquer la migration `0019_connecteur_mcp`.
 
 ⚠️ **Un lot n'est fini que MESURÉ.** « Le déploiement est vert » ne prouve rien sur ce qui
 tourne — leçon déjà payée trois fois sur ce dépôt (webhook non livré, `Redeploy` qui rejoue un

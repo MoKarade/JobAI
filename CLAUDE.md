@@ -1312,6 +1312,33 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   décision devient appelable par un modèle. Le transport en mémoire du SDK rend le vrai
   chemin testable sans réseau ; c'est lui qui a montré qu'un `readOnlyHint` omis fait passer
   une écriture pour anodine.
+- **Une liste écrite à la main devient fausse au chantier suivant — et deux d'entre elles
+  l'étaient déjà.** En ajoutant trois tables, j'ai fait DÉRIVER du schéma la liste que le
+  script de migration vérifie après coup. Elle nommait **trois tables sur onze** : les huit
+  autres étaient créées par la migration puis jamais contrôlées, donc une migration à moitié
+  appliquée serait sortie en SUCCÈS — exactement la panne que ce script existe pour empêcher,
+  rouverte par la liste censée la fermer. Le test voisin (`db.test.ts`) annonçait « les huit
+  tables attendues » et se trompait aussi. C'est la cinquième instance de la même classe sur
+  ce dépôt (quatre listes de colonnes, l'empreinte du seed, ces deux-ci). La règle : dès
+  qu'une liste ÉNUMÈRE ce qu'une autre source déclare, la dériver — et si la dériver est
+  impossible, le test qui la garde doit la dériver, LUI. C'est en faisant dériver côté test
+  que les deux dérives ont été trouvées, pas en relisant.
+- **Un contrôle de sécurité se teste avec les chaînes d'attaque EXACTES, pas avec des cas
+  plausibles.** `jugerRedirectUri` est protégé par deux chaînes nommément :
+  `http://127.0.0.1.evil.com/cb` (un sous-domaine — l'hôte réel est evil.com) et
+  `http://127.0.0.1@evil.com/cb` (la partie userinfo — l'hôte réel est evil.com aussi). Ce
+  sont celles qui ont traversé le `startsWith` de FinanceAI. Un test écrit sur des cas
+  « raisonnables » (une URL http quelconque, un schéma bizarre) passe avec l'implémentation
+  vulnérable : je l'ai vérifié en la réintroduisant. La preuve d'un garde de sécurité, c'est
+  qu'il tombe sur le code qu'on sait cassé — pas qu'il passe sur celui qu'on croit bon.
+- **Une garantie d'unicité vit dans l'ÉCRITURE, jamais dans une lecture qui la précède.**
+  « Ce code n'a pas encore servi » vérifié par un `SELECT` puis appliqué par un `UPDATE`
+  laisse une fenêtre où deux requêtes lisent la même chose et gagnent toutes les deux —
+  mesuré sur une vraie Postgres : le motif naïf produit deux gagnants, le motif
+  `UPDATE … WHERE consomme_le IS NULL RETURNING` un seul. Vaut pour tout usage unique : code
+  d'autorisation, rotation de jeton, réservation de passe. Et ça se prouve par un test de
+  COURSE (`Promise.all` de deux consommations), jamais par deux appels en séquence — le
+  séquentiel passe avec les deux implémentations.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

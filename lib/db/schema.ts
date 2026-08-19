@@ -572,3 +572,67 @@ export const colonnesCv = {
   televerseLe: cvs.televerseLe,
   valideLe: cvs.valideLe,
 } as const;
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * Le connecteur MCP et son serveur d'autorisation (ADR-0011).
+ *
+ * POURQUOI DE L'ÉTAT PLUTÔT QU'UN DESIGN SANS ÉTAT
+ * Un serveur OAuth entièrement sans état — des jetons signés, rien en base — est séduisant
+ * et ne peut PAS satisfaire OAuth 2.1 : un code d'autorisation doit être à USAGE UNIQUE et
+ * un jeton de rafraîchissement doit TOURNER. Les deux exigent de se souvenir de ce qui a
+ * déjà été consommé. C'est la leçon de FinanceAI, dont le design sans état les autorisait à
+ * être rejoués.
+ *
+ * ⚠️ RIEN N'EST STOCKÉ EN CLAIR. Codes et jetons vivent par leur EMPREINTE : une base lue
+ * par un tiers ne rend alors que des valeurs inutilisables. Et le kill-switch d'incident est
+ * direct — vider ces tables invalide tout, sans avoir à faire tourner une clé.
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ */
+
+/** Un client OAuth, enregistré dynamiquement par claude.ai (RFC 7591). */
+export const oauthClients = pgTable("oauth_clients", {
+  id: text("id").primaryKey(),
+  nom: text("nom").notNull().default(""),
+  /**
+   * Les adresses de redirection, telles qu'enregistrées.
+   *
+   * ⚠️ LA COMPARAISON SERA EXACTE, jamais un préfixe : `http://127.0.0.1.evil.com` et
+   * `http://127.0.0.1@evil.com` traversent un `startsWith` — finding CRITIQUE de FinanceAI.
+   * Chaque adresse est jugée à l'enregistrement (`jugerRedirectUri`) puis comparée telle
+   * quelle à l'autorisation.
+   */
+  redirectUris: text("redirect_uris").array().notNull(),
+  creeLe: timestamp("cree_le", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Un code d'autorisation. À USAGE UNIQUE : `consommeLe` est ce qui l'empêche d'être rejoué. */
+export const oauthCodes = pgTable("oauth_codes", {
+  empreinte: text("empreinte").primaryKey(),
+  clientId: text("client_id").notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  /** Le défi PKCE annoncé. S256 seulement. */
+  defi: text("defi").notNull(),
+  /** L'adresse du compte qui a autorisé — re-vérifiée à CHAQUE usage du jeton. */
+  sujet: text("sujet").notNull(),
+  expireLe: timestamp("expire_le", { withTimezone: true }).notNull(),
+  consommeLe: timestamp("consomme_le", { withTimezone: true }),
+});
+
+/**
+ * Un jeton délivré — d'accès ou de rafraîchissement.
+ *
+ * Une seule table pour les deux : ils ont le même cycle de vie (empreinte, sujet, échéance,
+ * révocation) et deux tables jumelles finiraient par diverger sur la révocation, qui est
+ * précisément ce qu'on ne veut pas rater.
+ */
+export const oauthJetons = pgTable("oauth_jetons", {
+  empreinte: text("empreinte").primaryKey(),
+  genre: text("genre", { enum: ["acces", "rafraichissement"] }).notNull(),
+  clientId: text("client_id").notNull(),
+  sujet: text("sujet").notNull(),
+  expireLe: timestamp("expire_le", { withTimezone: true }).notNull(),
+  /** Posé à la ROTATION comme à la révocation : un jeton de rafraîchissement ne sert qu'une fois. */
+  revoqueLe: timestamp("revoque_le", { withTimezone: true }),
+  creeLe: timestamp("cree_le", { withTimezone: true }).notNull().defaultNow(),
+});

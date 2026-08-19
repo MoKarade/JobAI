@@ -40,6 +40,23 @@ const EXEMPTIONS: Readonly<Record<string, string>> = {
     "secret, 401 si faux), en attendant OAuth 2.1 (ADR-0011, lot 3). Un client MCP n'a " +
     "aucune session Google : derrière la garde de session il recevrait une redirection " +
     "HTML au lieu du JSON-RPC attendu, et le connecteur serait muet sans erreur.",
+  "/.well-known/oauth-authorization-server":
+    "Découverte OAuth (RFC 8414). claude.ai la lit AVANT d'avoir le moindre jeton : la " +
+    "mettre derrière la garde rendrait la connexion impossible. Document public par nature, " +
+    "il ne porte aucune donnée — seulement les adresses des endpoints.",
+  "/.well-known/oauth-protected-resource":
+    "Découverte de la ressource protégée (RFC 9728). Même raison : c'est le document que le " +
+    "client va chercher APRÈS un 401, pour savoir où se connecter.",
+  "/oauth/register":
+    "Enregistrement dynamique de client (RFC 7591) : claude.ai s'enregistre lui-même, il " +
+    "n'existe aucun secret pré-partagé pour filtrer l'appelant. Un enregistrement ne donne " +
+    "AUCUN accès — il faut ensuite que Marc autorise en personne sur /oauth/authorize, qui " +
+    "reste, elle, derrière la garde de session. Le contrôle qui compte est jugerRedirectUri.",
+  "/oauth/token":
+    "Échange du code contre un jeton. Le client n'a pas encore de jeton : c'est ce qu'il " +
+    "vient chercher. Gardé par PKCE S256 (le vérificateur que seul le client légitime " +
+    "connaît), un code à USAGE UNIQUE garanti par la base, et la rotation du jeton de " +
+    "rafraîchissement.",
   "/api/cron/geocodage":
     "Même famille que /api/cron/veille, même CRON_SECRET (lib/cronAuth.ts) : une seconde " +
     "passe de géocodage quotidienne, à une autre heure ([CARTE-03], 2026-08-12).",

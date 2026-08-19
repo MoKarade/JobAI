@@ -19,11 +19,24 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { migrate } from "drizzle-orm/neon-http/migrator";
-import { sql } from "drizzle-orm";
+import { getTableName, is, sql } from "drizzle-orm";
+import { PgTable } from "drizzle-orm/pg-core";
+import * as schema from "../lib/db/schema";
 import { chargerEnvLocal, diagnostiquerUrl, messageComplet } from "../lib/chargerEnv";
 
-/** Les tables que le schéma doit avoir créées. Le script échoue si l'une manque. */
-const TABLES_ATTENDUES = ["offers", "offer_reasons", "villes"] as const;
+/**
+ * Les tables que le schéma doit avoir créées. Le script échoue si l'une manque.
+ *
+ * ⚠️ DÉRIVÉES DU SCHÉMA, PLUS RECOPIÉES — ET LA LISTE RECOPIÉE AVAIT DÉJÀ DÉRIVÉ. Elle
+ * nommait trois tables sur les onze du schéma : `entreprises_lieux`, `registre_noms`, `cvs`
+ * et les autres étaient créées par la migration puis JAMAIS vérifiées après elle. Une
+ * migration à moitié appliquée serait donc sortie en succès — exactement la panne que ce
+ * script existe pour empêcher, rouverte par la liste censée la fermer. Découvert en faisant
+ * DÉRIVER la liste côté test plutôt qu'en la relisant.
+ */
+const TABLES_ATTENDUES: readonly string[] = Object.values(schema)
+  .filter((v) => is(v, PgTable))
+  .map((t) => getTableName(t as PgTable));
 
 async function main() {
   chargerEnvLocal();

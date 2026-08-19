@@ -102,31 +102,24 @@ function hash(s: string): number {
 }
 
 describe("migration", () => {
-  it("crée les huit tables attendues", async () => {
+  it("crée EXACTEMENT les tables déclarées dans le schéma", async () => {
+    // ⚠️ LA LISTE SE DÉRIVE, ELLE NE SE RECOPIE PAS — et la version recopiée venait de
+    // tomber au premier ajout de tables, en annonçant « huit » alors qu'il y en a onze.
+    // C'est le même défaut que les quatre listes de colonnes déjà payées par ce dépôt, et
+    // que la liste du script de migration, qui nommait trois tables sur onze. Une liste
+    // écrite à la main devient fausse au chantier suivant ; une liste dérivée dit la vérité
+    // sans qu'on y pense, et fait tomber le test quand une table est déclarée sans migration.
+    const declarees = [
+      ...readFileSync(resolve(process.cwd(), "lib/db/schema.ts"), "utf8")
+        .matchAll(/pgTable\(\s*"([a-z0-9_]+)"/g),
+    ].map((m) => m[1]!);
+    expect(declarees.length, "le scan du schéma est vide").toBeGreaterThanOrEqual(8);
+
     const r = await pg.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' ORDER BY table_name`,
     );
-    expect(r.rows.map((x) => x.table_name)).toEqual([
-      // Le CV téléversé et le profil qu'on en tire. La table la plus sensible du projet :
-      // le fichier y dort en entier (choix de Marc, ADR-0009), et `colonnesCv` est la
-      // projection sans blob à utiliser partout ailleurs.
-      "cvs",
-      "entreprises_lieux",
-      "offer_reasons",
-      "offers",
-      // Les établissements du Registre des entreprises, filtrés sur la région. Table de
-      // RÉFÉRENCE : aucune donnée de Marc, remplacée en bloc à chaque import.
-      "registre_etablissements",
-      // Les dénominations : le nom d'un établissement n'est souvent pas celui sous lequel
-      // on connaît l'entreprise (mesuré : 11 trouvées sur 73 sans cette table).
-      "registre_noms",
-      // Ce que la base sait avoir déjà appliqué : empreinte du jeu de départ, et
-      // temporisation des passes de fond. C'est ce qui permet à l'app de se synchroniser
-      // seule sans réécrire les offres à chaque affichage.
-      "sync_state",
-      "villes",
-    ]);
+    expect(r.rows.map((x) => x.table_name)).toEqual([...declarees].sort());
   });
 
   it("pose bien les 14 contraintes CHECK du schéma", async () => {
