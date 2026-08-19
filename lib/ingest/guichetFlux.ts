@@ -91,7 +91,26 @@ export interface RapportFlux {
    * ou une chaîne vide déguisée. Un filtre bâti sur une valeur supposée se tromperait en
    * silence, comme le pré-filtre. On compte donc les valeurs AVANT de s'en servir.
    */
-  inventaire: Record<string, Record<string, number>>;
+  inventaireVues: Record<string, Record<string, number>>;
+  /**
+   * Le même inventaire, mais sur les offres RETENUES.
+   *
+   * ⚠️ C'EST CELUI QUI DÉCIDE, ET LE PREMIER PASSAGE A MONTRÉ POURQUOI. `inventaireVues`
+   * porte sur les premières offres du flux, qui couvrent tout le Canada : sur deux mille,
+   * 223 seulement étaient québécoises. Ses distributions décrivent donc le Canada
+   * (« English 1726 », des codes postaux de Surrey et de Calgary), pas ce qu'on ingérerait.
+   * Lire l'un pour l'autre, c'est conclure sur un préfixe non représentatif — la même faute
+   * que le recensement sur vingt offres, une population plus loin.
+   */
+  inventaireRetenues: Record<string, Record<string, number>>;
+  /**
+   * Les blocs XML BRUTS des premières offres retenues.
+   *
+   * Pour que l'œil humain puisse apparier un code à son titre — c'est la seule façon de
+   * vérifier qu'un code de profession dit bien ce que la norme prétend, plutôt que de le
+   * supposer.
+   */
+  brutsRetenus: string[];
   /**
    * Combien d'offres de l'échantillon ont rendu une valeur NON VIDE pour chaque champ que
    * l'analyseur lit vraiment.
@@ -136,13 +155,21 @@ export function extraireJobs(tampon: string): { jobs: string[]; reste: string } 
   return { jobs, reste: tampon.slice(depuis) };
 }
 
-/** Le contenu d'une balise, CDATA compris. PURE. */
+/**
+ * Le contenu d'une balise, CDATA compris. PURE.
+ *
+ * Exportée sous `lireChamp` : la route de diagnostic doit pouvoir tirer d'une offre
+ * n'importe quel champ du flux — y compris ceux que l'analyseur n'utilise pas encore — sans
+ * que ce module décide d'avance lesquels méritent d'être regardés.
+ */
 function champ(bloc: string, balise: string): string {
   const cdata = new RegExp(`<${balise}[^>]*>\\s*<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>\\s*</${balise}>`, "i");
   const brut = new RegExp(`<${balise}[^>]*>([\\s\\S]*?)</${balise}>`, "i");
   const m = cdata.exec(bloc) ?? brut.exec(bloc);
   return m ? texteSimple(m[1] ?? "").trim() : "";
 }
+
+export { champ as lireChamp };
 
 /**
  * Les noms de balises DU FLUX présents dans une offre. PURE.
@@ -310,6 +337,9 @@ export interface Inventaire {
  */
 export const MAX_CLASSES = 400;
 
+/** Offres retenues dont on garde le bloc brut. Assez pour l'œil, trop peu pour peser. */
+export const MAX_BRUTS_RETENUS = 15;
+
 export interface OptionsFlux {
   url?: string;
   budgetMs?: number;
@@ -354,7 +384,9 @@ export async function lireFluxGuichet(
   const retenues: OffreBrute[] = [];
   const balises: Record<string, number> = {};
   const champsVus: Record<string, number> = {};
-  const valeurs: Record<string, Record<string, number>> = {};
+  const valeursVues: Record<string, Record<string, number>> = {};
+  const valeursRetenues: Record<string, Record<string, number>> = {};
+  const brutsRetenus: string[] = [];
   let balisesEchantillon = 0;
   let vues = 0;
   let preFiltrees = 0;
@@ -379,6 +411,23 @@ export async function lireFluxGuichet(
     let entete: string | null = "";
     let fin: FinLecture = "flux-termine";
 
+    /** Compte les valeurs d'une offre dans l'accumulateur donné. */
+    const inventorier = (seaux: Record<string, Record<string, number>>, bloc: string): void => {
+      for (const inv of inventaire) {
+        const brut = champ(bloc, inv.champ);
+        const classe = brut === "" ? "(vide)" : (inv.classer?.(brut) ?? brut);
+        const seau = (seaux[inv.nom] ??= {});
+        // La borne ne s'applique qu'aux classes NOUVELLES : une classe déjà connue continue
+        // de se compter, sinon les comptes deviendraient faux au lieu d'être seulement
+        // incomplets.
+        const cle =
+          seau[classe] !== undefined || Object.keys(seau).length < MAX_CLASSES
+            ? classe
+            : "(autres)";
+        seau[cle] = (seau[cle] ?? 0) + 1;
+      }
+    };
+
     /** Traite les offres complètes du tampon. Rend `true` si le plafond est atteint. */
     const consommer = (): boolean => {
       const decoupe = extraireJobs(tampon);
@@ -389,19 +438,7 @@ export async function lireFluxGuichet(
           balisesEchantillon += 1;
           for (const nom of recenserBalises(bloc)) balises[nom] = (balises[nom] ?? 0) + 1;
           for (const c of champsRenseignes(bloc)) champsVus[c] = (champsVus[c] ?? 0) + 1;
-          for (const inv of inventaire) {
-            const brut = champ(bloc, inv.champ);
-            const classe = brut === "" ? "(vide)" : (inv.classer?.(brut) ?? brut);
-            const seau = (valeurs[inv.nom] ??= {});
-            // La borne ne s'applique qu'aux classes NOUVELLES : une classe déjà connue
-            // continue de se compter, sinon les comptes deviendraient faux au lieu d'être
-            // seulement incomplets.
-            const cle =
-              seau[classe] !== undefined || Object.keys(seau).length < MAX_CLASSES
-                ? classe
-                : "(autres)";
-            seau[cle] = (seau[cle] ?? 0) + 1;
-          }
+          inventorier(valeursVues, bloc);
         }
         if (!estPeutEtreQuebec(bloc)) {
           preFiltrees += 1;
@@ -417,6 +454,8 @@ export async function lireFluxGuichet(
           continue;
         }
         retenues.push(offre);
+        inventorier(valeursRetenues, bloc);
+        if (brutsRetenus.length < MAX_BRUTS_RETENUS) brutsRetenus.push(bloc);
         if (retenues.length >= maxRetenues) return true;
       }
       return false;
@@ -482,7 +521,9 @@ export async function lireFluxGuichet(
       balisesEchantillon,
       balisesVues: balises,
       champsRenseignes: champsVus,
-      inventaire: valeurs,
+      inventaireVues: valeursVues,
+      inventaireRetenues: valeursRetenues,
+      brutsRetenus,
       construitLe,
     };
   } finally {

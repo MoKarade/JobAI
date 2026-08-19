@@ -23,7 +23,7 @@
 import { NextResponse } from "next/server";
 import { exigerSession } from "@/lib/session";
 import { expurgerPII } from "@/lib/ingest/expurger";
-import { lireFluxGuichet, type Inventaire } from "@/lib/ingest/guichetFlux";
+import { lireChamp, lireFluxGuichet, type Inventaire } from "@/lib/ingest/guichetFlux";
 import { situer, type VerdictRegion } from "@/lib/ingest/region";
 import type { OffreBrute } from "@/lib/ingest/types";
 
@@ -76,6 +76,7 @@ const EXTRAIT_MAX = 300;
  */
 const INVENTAIRE: readonly Inventaire[] = [
   { nom: "state", champ: "state" },
+  { nom: "postalcode-lettre", champ: "postalcode", classer: (v) => v.trim().slice(0, 1).toUpperCase() || "(vide)" },
   { nom: "postalcode-region", champ: "postalcode", classer: (v) => v.replace(/\s+/g, "").slice(0, 3).toUpperCase() },
   { nom: "noc2021", champ: "noc2021" },
   { nom: "noc2021-niveau", champ: "noc2021", classer: (v) => v.trim().slice(0, 2) },
@@ -86,6 +87,21 @@ const INVENTAIRE: readonly Inventaire[] = [
   { nom: "worklanguage", champ: "worklanguage" },
   { nom: "salary", champ: "salary" },
 ];
+
+/**
+ * Un inventaire mis en forme : combien de classes distinctes, et les vingt plus fréquentes.
+ *
+ * Le nombre de classes DISTINCTES est rendu à côté du top : sans lui, vingt lignes se
+ * liraient comme un inventaire complet alors qu'il peut en manquer des centaines.
+ */
+function resumerInventaire(inv: Record<string, Record<string, number>>) {
+  return Object.fromEntries(
+    Object.entries(inv).map(([nom, compte]) => [
+      nom,
+      { distinctes: Object.keys(compte).length, top: parFrequence(compte).slice(0, 20) },
+    ]),
+  );
+}
 
 /** Un compte par clé, trié du plus fréquent au moins fréquent. Un JSON qui se lit. */
 function parFrequence(compte: Record<string, number>): { nom: string; n: number }[] {
@@ -153,15 +169,25 @@ export async function GET() {
         balisesEchantillon: rapport.balisesEchantillon,
         balisesVues: parFrequence(rapport.balisesVues),
         champsRenseignes: parFrequence(rapport.champsRenseignes),
-        // Ce que les champs CONTIENNENT. Plafonné à vingt classes par champ : au-delà, une
-        // liste ne se lit plus, et les vingt premières suffisent à décider si un champ est
-        // exploitable. `(autres)` dit ce que la borne interne a regroupé.
-        inventaire: Object.fromEntries(
-          Object.entries(rapport.inventaire).map(([nom, compte]) => [
-            nom,
-            { distinctes: Object.keys(compte).length, top: parFrequence(compte).slice(0, 20) },
-          ]),
-        ),
+        // ⚠️ DEUX INVENTAIRES, DEUX POPULATIONS — ET C'EST TOUT LE PROPOS.
+        // `vues` porte sur les premières offres du flux, qui couvrent tout le Canada :
+        // sur deux mille, 223 seulement étaient québécoises. Ses distributions décrivent
+        // donc le Canada, pas ce qu'on ingérerait. `retenues` porte sur les offres
+        // RÉGIONALES : c'est lui qui décide. Les lire l'un pour l'autre, c'est conclure sur
+        // un préfixe non représentatif.
+        inventaireVues: resumerInventaire(rapport.inventaireVues),
+        inventaireRetenues: resumerInventaire(rapport.inventaireRetenues),
+        // Le code de profession appairé à son titre : la seule façon de vérifier qu'il dit
+        // bien ce que la norme prétend, au lieu de le supposer.
+        professions: rapport.brutsRetenus.map((b) => ({
+          titre: lireChamp(b, "title"),
+          noc2021: lireChamp(b, "noc2021"),
+          education: lireChamp(b, "education"),
+          experience: lireChamp(b, "experience"),
+          salary: lireChamp(b, "salary"),
+          postalcode: lireChamp(b, "postalcode"),
+          worklanguage: lireChamp(b, "worklanguage"),
+        })),
         verdicts,
         // Groupées et triées par fréquence : quarante-sept lignes ne se lisent pas, trois
         // lignes comptées désignent le correctif.

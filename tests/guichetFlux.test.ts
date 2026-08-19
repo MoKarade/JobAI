@@ -15,6 +15,7 @@ import { describe, it, expect } from "vitest";
 import {
   BUDGET_MS_DEFAUT,
   ECHANTILLON_BALISES,
+  MAX_BRUTS_RETENUS,
   MAX_CLASSES,
   TAMPON_MAX,
   URL_FLUX_GUICHET,
@@ -22,6 +23,7 @@ import {
   analyserJobGuichet,
   champsRenseignes,
   estPeutEtreQuebec,
+  lireChamp,
   extraireJobs,
   lireFluxGuichet,
   recenserBalises,
@@ -310,7 +312,7 @@ describe("inventaire — savoir qu'une balise existe ne dit pas ce qu'elle PORTE
       maxRetenues: 10,
       inventaire: [{ nom: "jobtype", champ: "jobtype" }],
     });
-    expect(r.inventaire["jobtype"]).toEqual({ Permanent: 2, Temporaire: 1 });
+    expect(r.inventaireVues["jobtype"]).toEqual({ Permanent: 2, Temporaire: 1 });
   });
 
   it("applique `classer` — une cardinalité brute ne s'interprète pas", () => {
@@ -334,7 +336,7 @@ describe("inventaire — savoir qu'une balise existe ne dit pas ce qu'elle PORTE
         ],
       },
     ).then((r) => {
-      expect(r.inventaire["fsa"]).toEqual({ G1V: 1, G1R: 1, H3A: 1 });
+      expect(r.inventaireVues["fsa"]).toEqual({ G1V: 1, G1R: 1, H3A: 1 });
     });
   });
 
@@ -344,7 +346,7 @@ describe("inventaire — savoir qu'une balise existe ne dit pas ce qu'elle PORTE
       maxRetenues: 10,
       inventaire: [{ nom: "salary", champ: "salary" }],
     });
-    expect(r.inventaire["salary"]).toEqual({ "(vide)": 1 });
+    expect(r.inventaireVues["salary"]).toEqual({ "(vide)": 1 });
   });
 
   it("BORNE les classes distinctes, et DIT ce qu'elle a regroupé", async () => {
@@ -359,7 +361,7 @@ describe("inventaire — savoir qu'une balise existe ne dit pas ce qu'elle PORTE
       maxRetenues: MAX_CLASSES + 50,
       inventaire: [{ nom: "salary", champ: "salary" }],
     });
-    const seau = r.inventaire["salary"] ?? {};
+    const seau = r.inventaireVues["salary"] ?? {};
     expect(Object.keys(seau)).toHaveLength(MAX_CLASSES + 1);
     expect(seau["(autres)"]).toBe(5);
   });
@@ -375,13 +377,44 @@ describe("inventaire — savoir qu'une balise existe ne dit pas ce qu'elle PORTE
       sert(reponse(fluxDe([`<source>${distinctes}${repetee}${repetee}</source>`]))),
       { maxRetenues: MAX_CLASSES + 50, inventaire: [{ nom: "salary", champ: "salary" }] },
     );
-    expect(r.inventaire["salary"]?.["0 $ / h"]).toBe(3);
-    expect(r.inventaire["salary"]?.["(autres)"]).toBeUndefined();
+    expect(r.inventaireVues["salary"]?.["0 $ / h"]).toBe(3);
+    expect(r.inventaireVues["salary"]?.["(autres)"]).toBeUndefined();
+  });
+
+  it("SÉPARE les offres VUES des offres RETENUES — deux populations, deux verdicts", async () => {
+    // ⚠️ LE DÉFAUT QUE LE TROISIÈME PASSAGE RÉEL A RÉVÉLÉ. L'inventaire ne portait que sur
+    // les premières offres du flux, qui couvrent tout le Canada : sur deux mille, 223
+    // seulement étaient québécoises. Ses distributions décrivaient donc le Canada — pas ce
+    // qu'on ingérerait. Lire l'un pour l'autre, c'est conclure sur un préfixe non
+    // représentatif, la même faute que le recensement sur vingt offres.
+    const qc = job({ title: "T", url: "https://x.ca/1", state: "QC", worklanguage: "French" });
+    const bc = job({ title: "T", url: "https://x.ca/2", state: "QC", worklanguage: "English" });
+    const flux = `<source>${qc}${bc}${bc}${bc}</source>`;
+    const r = await lireFluxGuichet(sert(reponse(fluxDe([flux]))), {
+      maxRetenues: 10,
+      inventaire: [{ nom: "worklanguage", champ: "worklanguage" }],
+      garder: (_o, brut) => brut.includes("French"),
+    });
+    // Vues : les quatre. Retenues : la seule francophone. Les deux inventaires DIFFÈRENT.
+    expect(r.inventaireVues["worklanguage"]).toEqual({ French: 1, English: 3 });
+    expect(r.inventaireRetenues["worklanguage"]).toEqual({ French: 1 });
+  });
+
+  it("garde les blocs BRUTS des premières retenues — pour apparier un code à son titre", async () => {
+    // Vérifier qu'un code de profession dit bien ce que la norme prétend exige de le voir
+    // À CÔTÉ du titre. Sans ça, on suppose.
+    const r = await lireFluxGuichet(
+      sert(reponse(fluxDe([`<source>${OFFRE_QC.repeat(MAX_BRUTS_RETENUS + 4)}</source>`]))),
+      { maxRetenues: 100 },
+    );
+    expect(r.brutsRetenus).toHaveLength(MAX_BRUTS_RETENUS);
+    expect(lireChamp(r.brutsRetenus[0] ?? "", "company")).toBe("Laserax");
   });
 
   it("n'inventorie RIEN quand on ne lui demande rien", async () => {
     const r = await lireFluxGuichet(sert(reponse(fluxDe([`<source>${OFFRE_QC}</source>`]))));
-    expect(r.inventaire).toEqual({});
+    expect(r.inventaireVues).toEqual({});
+    expect(r.inventaireRetenues).toEqual({});
   });
 });
 

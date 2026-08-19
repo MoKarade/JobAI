@@ -1242,6 +1242,25 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   réflexe « la source marche, on la branche » noierait l'écran sous des postes que Marc ne
   veut pas. Une source abondante ne se branche qu'avec le critère qui la trie — et ce critère
   se choisit sur des valeurs MESURÉES, pas sur l'enthousiasme du volume.
+- **Un échantillon décrit la population dont il est TIRÉ, jamais celle qui t'intéresse — et
+  c'est la troisième fois en une session.** Mon inventaire de valeurs portait sur les deux
+  mille premières offres d'un flux national : `state` y donnait BC 561, ON 480, AB 393 et
+  seulement **QC 223**. Toutes ses distributions décrivaient donc le Canada — « English
+  1726 », des codes postaux de Surrey et Calgary — alors que la question était « à quoi
+  ressemblent les offres RÉGIONALES qu'on ingérerait ? ». Les trois instances du jour ont la
+  même forme : recensement sur les 20 premières offres, comptes lus sur une passe arrêtée à
+  42 %, inventaire sur un préfixe national. Le réflexe qui les attrape toutes : **nommer la
+  population dans le nom du champ** (`inventaireVues` vs `inventaireRetenues`), pour qu'on ne
+  puisse plus lire l'un pour l'autre sans s'en apercevoir. Et quand deux populations
+  coexistent, les mesurer TOUTES LES DEUX : c'est l'écart entre elles qui révèle le biais.
+- **Un gabarit de texte servi par une source tierce n'est pas stable, même à quelques minutes
+  d'intervalle.** Entre deux appels, le Guichet a basculé les libellés de ses descriptions du
+  français à l'anglais (« Durée de l'emploi » → « Work Term ») : chaque description a
+  raccourci de 44 à 49 caractères, uniformément. Rien n'a cassé parce qu'on ne parse pas ces
+  libellés — mais tout code qui extrairait un fait du TEXTE d'une annonce aurait changé de
+  résultat sans qu'une ligne bouge chez nous. Quand une source expose un champ DÉDIÉ (ici
+  `education`, `experience`, `workterm`, énumérations propres), le lire plutôt que d'extraire
+  la même information de sa prose.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

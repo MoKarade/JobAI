@@ -6,6 +6,45 @@
 
 ---
 
+## Session 2026-08-19 (soir, 4e passe) — l'inventaire mesurait la mauvaise population
+
+L'inventaire de valeurs a rendu ses chiffres, et ils ont révélé un défaut **dans le
+diagnostic lui-même** : `state` disait BC 561, ON 480, AB 393, **QC 223**. L'inventaire
+portait sur les 2000 PREMIÈRES offres du flux — le Canada entier — pas sur les 1306 offres
+régionales. Donc « English 1726 » était le chiffre du Canada, et les codes postaux dominants
+venaient de Surrey et Calgary. **Troisième fois** que je conclus depuis un préfixe non
+représentatif (20 offres pour le recensement, 42 % du flux pour le plafond, le Canada ici).
+
+Corrigé : **deux inventaires nommés par leur population** — `inventaireVues` (décrit le
+FORMAT) et `inventaireRetenues` (décrit ce qu'on ingérerait, et c'est lui qui décide). Plus
+`brutsRetenus` : les blocs XML des 15 premières offres retenues, pour apparier un code de
+profession à son titre au lieu de le supposer. Discrimination prouvée.
+
+### Ce qui tient malgré la mauvaise population (ça ne dépend pas d'elle)
+
+- **`noc2021` est un vrai code à cinq chiffres** (63200, 62020, 44100, 73300…), 257 valeurs
+  distinctes. C'est le filtre indépendant de la langue qu'on cherchait.
+- **`education` (11 valeurs), `experience` (9), `jobtype` (3), `workterm` (4),
+  `worklanguage` (4) sont des ÉNUMÉRATIONS propres** — directement exploitables, zéro
+  traitement de langue.
+- **`salary` est structuré** : « $37.00 hourly », « $4,337.00 to $6,413.00 monthly (to be
+  negotiated) ». Analysable par motif.
+
+### ⚠️ Le gabarit des descriptions a CHANGÉ entre deux appels
+
+Les libellés sont passés du français à l'anglais (« Durée de l'emploi » → « Work Term ») et
+CHAQUE description a raccourci de 44 à 49 caractères. `vues` est passé de 41 062 à 41 195 :
+le flux est reconstruit souvent, et **le texte de ses descriptions n'est pas stable**.
+Argument de plus pour lire les champs DÉDIÉS (qui sont des énumérations) plutôt que d'extraire
+des faits du texte.
+
+### Ce que Marc a à faire
+
+Un dernier appel à `/api/diagnostic/flux-guichet`. Le rapport porte maintenant
+`inventaireRetenues` (la bonne population) et `professions` (code ↔ titre appariés). C'est
+ça qui décide du critère de tri, et donc si la source vaut d'être branchée.
+
+
 ## Session 2026-08-19 (soir, 3e passe) — la passe COMPLÈTE du flux Guichet
 
 `fin: "flux-termine"` — la première mesure qui autorise à conclure.
