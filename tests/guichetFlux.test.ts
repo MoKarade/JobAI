@@ -15,6 +15,7 @@ import { describe, it, expect } from "vitest";
 import {
   BUDGET_MS_DEFAUT,
   ECHANTILLON_BALISES,
+  MAX_CLASSES,
   TAMPON_MAX,
   URL_FLUX_GUICHET,
   CHAMPS_ANALYSES,
@@ -293,6 +294,94 @@ describe("lireFluxGuichet — lire sans jamais charger", () => {
     expect(r.balisesVues["state"]).toBe(3);
     expect(r.balisesVues["workterm"]).toBe(1);
     expect(r.balisesVues["salary"]).toBeUndefined();
+  });
+});
+
+describe("inventaire — savoir qu'une balise existe ne dit pas ce qu'elle PORTE", () => {
+  it("compte les VALEURS, pas seulement la présence du champ", async () => {
+    // La faute du recensement en ensemble, d'un cran plus loin : `noc2021` sur 100 % des
+    // offres ne dit pas si la valeur est un code, un libellé ou une chaîne vide déguisée.
+    const flux = `<source>${job({ title: "A", url: "https://x.ca/1", jobtype: "Permanent" })}${job({
+      title: "B",
+      url: "https://x.ca/2",
+      jobtype: "Permanent",
+    })}${job({ title: "C", url: "https://x.ca/3", jobtype: "Temporaire" })}</source>`;
+    const r = await lireFluxGuichet(sert(reponse(fluxDe([flux]))), {
+      maxRetenues: 10,
+      inventaire: [{ nom: "jobtype", champ: "jobtype" }],
+    });
+    expect(r.inventaire["jobtype"]).toEqual({ Permanent: 2, Temporaire: 1 });
+  });
+
+  it("applique `classer` — une cardinalité brute ne s'interprète pas", () => {
+    // Dix mille codes postaux distincts n'apprennent rien ; six régions de tri décident.
+    return lireFluxGuichet(
+      sert(
+        reponse(
+          fluxDe([
+            `<source>${job({ title: "A", url: "https://x.ca/1", postalcode: "G1V 4M6" })}${job({
+              title: "B",
+              url: "https://x.ca/2",
+              postalcode: "G1R 2B5",
+            })}${job({ title: "C", url: "https://x.ca/3", postalcode: "H3A 1A1" })}</source>`,
+          ]),
+        ),
+      ),
+      {
+        maxRetenues: 10,
+        inventaire: [
+          { nom: "fsa", champ: "postalcode", classer: (v) => v.replace(/\s+/g, "").slice(0, 3) },
+        ],
+      },
+    ).then((r) => {
+      expect(r.inventaire["fsa"]).toEqual({ G1V: 1, G1R: 1, H3A: 1 });
+    });
+  });
+
+  it("rend `(vide)` plutôt que d'omettre — « absent » et « présent mais vide » diffèrent", async () => {
+    const flux = `<source>${job({ title: "A", url: "https://x.ca/1", salary: "" })}</source>`;
+    const r = await lireFluxGuichet(sert(reponse(fluxDe([flux]))), {
+      maxRetenues: 10,
+      inventaire: [{ nom: "salary", champ: "salary" }],
+    });
+    expect(r.inventaire["salary"]).toEqual({ "(vide)": 1 });
+  });
+
+  it("BORNE les classes distinctes, et DIT ce qu'elle a regroupé", async () => {
+    // Un champ de texte libre peut porter autant de valeurs distinctes que d'offres : sans
+    // borne, l'inventaire reconstruirait en mémoire ce que ce module existe pour ne pas
+    // accumuler. Un inventaire tronqué qui se présenterait comme complet ferait conclure
+    // sur un préfixe — la faute déjà payée avec le plafond de retenues.
+    const offres = Array.from({ length: MAX_CLASSES + 5 }, (_, i) =>
+      job({ title: "T", url: `https://x.ca/${i}`, salary: `${i} $ / h` }),
+    ).join("");
+    const r = await lireFluxGuichet(sert(reponse(fluxDe([`<source>${offres}</source>`]))), {
+      maxRetenues: MAX_CLASSES + 50,
+      inventaire: [{ nom: "salary", champ: "salary" }],
+    });
+    const seau = r.inventaire["salary"] ?? {};
+    expect(Object.keys(seau)).toHaveLength(MAX_CLASSES + 1);
+    expect(seau["(autres)"]).toBe(5);
+  });
+
+  it("CONTINUE de compter une classe DÉJÀ connue une fois la borne atteinte", async () => {
+    // La borne ne doit rendre l'inventaire qu'INCOMPLET, jamais FAUX : rabattre une classe
+    // connue sur « (autres) » ferait mentir son compte, ce qui est pire que de l'ignorer.
+    const distinctes = Array.from({ length: MAX_CLASSES }, (_, i) =>
+      job({ title: "T", url: `https://x.ca/d${i}`, salary: `${i} $ / h` }),
+    ).join("");
+    const repetee = job({ title: "T", url: "https://x.ca/r", salary: "0 $ / h" });
+    const r = await lireFluxGuichet(
+      sert(reponse(fluxDe([`<source>${distinctes}${repetee}${repetee}</source>`]))),
+      { maxRetenues: MAX_CLASSES + 50, inventaire: [{ nom: "salary", champ: "salary" }] },
+    );
+    expect(r.inventaire["salary"]?.["0 $ / h"]).toBe(3);
+    expect(r.inventaire["salary"]?.["(autres)"]).toBeUndefined();
+  });
+
+  it("n'inventorie RIEN quand on ne lui demande rien", async () => {
+    const r = await lireFluxGuichet(sert(reponse(fluxDe([`<source>${OFFRE_QC}</source>`]))));
+    expect(r.inventaire).toEqual({});
   });
 });
 

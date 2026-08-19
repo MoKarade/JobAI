@@ -774,12 +774,33 @@
       (c) Plafond de retenues atteint a ~42 % du flux : aucun compte n'etait concluant.
       500 -> 5000. Quatre discriminations prouvees.
 
+- [x] **[VEILLE-43]** Inventaire des VALEURS du flux Guichet (`Inventaire` dans
+      `guichetFlux.ts`, borne 400 classes/champ avec `(autres)` dit, cable dans la route de
+      diagnostic). La passe COMPLETE a montre 11 champs presents sur 100 % des offres et
+      inutilises — dont `noc2021` (classerait une offre SANS mots-cles, donc sans le probleme
+      bilingue), `postalcode` (lieu exact, pas de geocodage, pas d'homonyme) et
+      `salary`/`education`/`experience` (ce que le bareme compte comme « inconnu »). Savoir
+      qu'une balise existe ne dit pas ce qu'elle porte : on compte les valeurs AVANT de s'en
+      servir. Trois discriminations prouvees.
+
+- [ ] **[VEILLE-44]** ⚠️ **DECISION MARC : 1 300 offres regionales par passe** (mesure sur
+      une passe complete), contre quelques dizaines suivies aujourd'hui. L'echantillon reste
+      domine par des postes peu qualifies. Brancher la source telle quelle noierait le
+      tableau. Le volume n'est pas le sujet, le TRI l'est — et `noc2021` est le premier
+      candidat serieux. A trancher sur l'inventaire de valeurs, pas avant. Bloque
+      [VEILLE-40].
+
 - [ ] **[VEILLE-42]** ⚠️ **La moitie des offres quebecoises du flux tombent en « lieu
       inconnu »**, et la liste est dominee par des municipalites de l'ile de Montreal que
       `HORS_PORTEE` ignore faute de contenir « montreal » : Saint-Laurent, Cote-Saint-Luc,
       Westmount, Hampstead, Outremont, Mont-Royal, Dorval, Saint-Leonard. Chacune couterait
-      une mesure Nominatim. ⚠️ Chiffre issu d'une passe TRONQUEE : re-mesurer sur une passe
-      complete AVANT d'y toucher — ne pas « corriger » sur la foi d'un prefixe.
+      une mesure Nominatim. ✔ RE-MESURE sur une passe COMPLETE : 3 366 offres en « lieu
+      inconnu », soit 50,8 % des quebecoises ; le top-25 n'en couvre que 36,6 % et l'ile de
+      Montreal 14,8 % — la queue est longue. ⚠️ **Le remede evident est un piege, MESURE** :
+      `HORS_PORTEE` est consulte AVANT les municipalites et compare par SOUS-CHAINE, donc
+      ajouter `saint-laurent` exclurait aussi `Saint-Laurent-de-l'Ile-d'Orleans`, qui est
+      DANS la region. C'est [VEILLE-33]. Le vrai levier est `postalcode` ([VEILLE-43]) :
+      une region de tri ne connait pas d'homonyme et ne coute aucune requete.
 
 - [ ] **[VEILLE-40]** Brancher le flux Guichet sur `selectionnerSources`, **après** une
       passe de diagnostic qui rend `flux-termine` (celle du 19 août s'est arrêtée sur

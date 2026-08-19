@@ -1218,6 +1218,30 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   descriptions bilingues — la brancher avant `[VEILLE-32]`/`[VEILLE-34]` (vocabulaire de
   notation monolingue) noterait tout à zéro, et on conclurait que la source ne vaut rien
   alors que c'est le barème qui ne sait pas la lire.
+- **Savoir qu'un champ EXISTE ne dit rien de ce qu'il PORTE.** Suite directe de la leçon
+  précédente, d'un cran plus loin : après avoir corrigé un recensement qui rendait un
+  ensemble, j'ai obtenu que `noc2021`, `salary` et `postalcode` sont présents sur 100 % des
+  offres du flux — et j'ai failli en déduire un plan de filtrage. Or un champ toujours
+  présent peut porter un code, un libellé, ou une chaîne vide déguisée : un filtre bâti sur
+  une valeur SUPPOSÉE se trompe en silence, exactement comme un pré-filtre. On compte donc
+  les VALEURS (par classe, parce qu'une cardinalité brute ne s'interprète pas — dix mille
+  salaires distincts n'apprennent rien, six classes décident) avant de s'en servir. Corollaire
+  de bornage : un inventaire de valeurs se borne en nombre de classes, et la borne ne doit
+  rendre le compte qu'INCOMPLET, jamais FAUX — une classe déjà connue continue de se compter,
+  seules les NOUVELLES tombent dans « (autres) », et « (autres) » se dit.
+- **Une liste blanche qui compare par SOUS-CHAÎNE ne s'étend pas par simple ajout : un nom
+  court avale ses composés.** Mesuré en préparant l'exclusion des arrondissements montréalais :
+  ajouter `saint-laurent` à `HORS_PORTEE` aurait aussi exclu `Saint-Laurent-de-l'Île-d'Orléans`,
+  qui est DANS la région — et comme `HORS_PORTEE` est consulté en PREMIER, l'exclusion aurait
+  gagné. Avant d'ajouter une entrée à une liste consultée par `includes`, vérifier qu'aucune
+  entrée existante ne la CONTIENT ni n'est CONTENUE par elle. Et quand une donnée sans
+  homonyme existe dans la source (ici le code postal), elle vaut mieux qu'une liste de noms,
+  quelle que soit la qualité de la liste.
+- **Le VOLUME d'une source est une question de TRI, pas de branchement.** Le flux du Guichet
+  rend 1 300 offres régionales par passe, là où le suivi en porte quelques dizaines. Le
+  réflexe « la source marche, on la branche » noierait l'écran sous des postes que Marc ne
+  veut pas. Une source abondante ne se branche qu'avec le critère qui la trie — et ce critère
+  se choisit sur des valeurs MESURÉES, pas sur l'enthousiasme du volume.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

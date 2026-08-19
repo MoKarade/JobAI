@@ -531,3 +531,80 @@ qu'elles ne contiennent pas « montreal » : Saint-Laurent, Côte-Saint-Luc, Wes
 Hampstead, Outremont, Mont-Royal, Dorval, Saint-Léonard. Chacune coûterait une mesure
 Nominatim. ⚠️ Ce chiffre vient d'une passe TRONQUÉE : à re-mesurer sur une passe complète
 avant d'y toucher, et non à « corriger » sur la foi d'un préfixe.
+
+---
+
+## §8 — La passe COMPLÈTE (2026-08-19) : ce que le flux contient vraiment
+
+`fin: "flux-termine"`. C'est la première mesure qui autorise à conclure.
+
+### Le flux, en chiffres
+
+| | |
+|---|---|
+| Offres dans le flux | 41 062 |
+| Lues | 128,5 Mo en 4,7 s (**~27 Mo/s**) |
+| Écartées par le pré-filtre Québec | 34 431 (83,9 %) |
+| **Offres québécoises** | **6 631** |
+| — dans la région | **1 300** (19,6 % des québécoises) |
+| — hors région | 1 965 (29,6 %) |
+| — lieu inconnu | **3 366 (50,8 %)** |
+| Illisibles | **0** |
+
+Lire le flux entier coûte moins de cinq secondes. La borne utile n'est pas le temps.
+
+### L'analyseur est confirmé, et le mystère du premier passage est résolu
+
+`champsRenseignes` colle **exactement** à `balisesVues` : l'analyseur tire tout ce que le
+flux écrit, sans perte. Et `city`, `state` et `postalcode` sont à **exactement le même
+compte** — 1972 sur 2000. Ces trois champs sont donc émis ensemble ou omis ensemble
+(1,4 % des offres n'ont aucun lieu, vraisemblablement les postes « partout au Canada »).
+
+C'est ce qui explique enfin le premier passage : mon recensement portait sur les vingt
+premières offres du flux, et il leur manquait les trois d'un coup. Un ensemble sur vingt
+offres a donc rendu une absence que j'ai prise pour une propriété du format.
+
+### Onze champs présents sur 100 % des offres, et que l'analyseur n'utilise pas
+
+`salary` · `education` · `experience` · `jobtype` · `workterm` · `hours` · `worklanguage` ·
+`noc2016` · `noc2021` · `expiry_date` · huit `job_*_flag`.
+
+Trois pourraient changer une décision :
+
+- **`noc2021`** — le code de profession normalisé. Il classerait une offre **sans passer par
+  des mots-clés** : plus de vocabulaire bilingue à tenir ([VEILLE-32]), plus d'accents à
+  normaliser ([VEILLE-34]). C'est la réponse structurelle au problème des titres anglais.
+- **`postalcode`** — un lieu EXACT là où on géocode un nom de ville. Sa région de tri (les
+  trois premiers caractères) séparerait l'île de Montréal de la région de Québec sans une
+  seule requête Nominatim et sans le piège des homonymes.
+- **`salary`, `education`, `experience`** — les composantes que le barème compte aujourd'hui
+  comme « inconnues », et pour lesquelles il donne des points à ce qu'il ignore.
+
+⚠️ **Aucune de leurs VALEURS n'a été vue.** Savoir qu'une balise existe ne dit pas ce qu'elle
+porte : `noc2021` pourrait être un code à cinq chiffres, un libellé, ou une chaîne vide
+déguisée. C'est la faute du recensement en ensemble, d'un cran plus loin — et bâtir un filtre
+sur une valeur supposée se tromperait en silence, exactement comme le pré-filtre.
+D'où l'**inventaire de valeurs** livré avec cette section : la route compte désormais les
+valeurs par classe (région de tri du code postal, niveau du code de profession) avant qu'on
+s'en serve. Le prochain appel décide.
+
+### Le coût de « lieu inconnu », maintenant mesuré
+
+3 366 offres, soit la moitié des québécoises. Le top-25 des villes n'en couvre que 36,6 %, et
+l'île de Montréal 14,8 % — la queue est longue.
+
+⚠️ **Et le remède évident est un piège, MESURÉ.** `HORS_PORTEE` est consulté AVANT les
+municipalités et compare par SOUS-CHAÎNE : ajouter `saint-laurent` pour écarter l'arrondissement
+montréalais exclurait du même coup **Saint-Laurent-de-l'Île-d'Orléans**, qui est dans la région
+(vérifié : les deux chaînes contiennent `saint-laurent`). C'est [VEILLE-33] qui se rappelle à
+nous. Le code postal, lui, ne connaît pas d'homonyme.
+
+### La vraie question, et elle est pour Marc
+
+**1 300 offres régionales.** Le suivi en porte aujourd'hui quelques dizaines. Brancher cette
+source telle quelle noierait le tableau sous des postes que Marc ne veut pas — l'échantillon
+est toujours dominé par *sod layer*, *car washer*, *hairstylist*, *labourer*.
+
+Le volume n'est donc pas le sujet : le **tri** l'est. Et `noc2021` est le premier candidat
+sérieux pour le faire sans dépendre du vocabulaire. À décider sur l'inventaire de valeurs,
+pas avant.

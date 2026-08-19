@@ -83,6 +83,16 @@ export interface RapportFlux {
    */
   balisesVues: Record<string, number>;
   /**
+   * Ce que les champs CONTIENNENT vraiment, par classe et par compte.
+   *
+   * ⚠️ SAVOIR QU'UNE BALISE EXISTE NE DIT RIEN DE CE QU'ELLE PORTE, et c'est la même faute
+   * que celle du recensement en ensemble, d'un cran plus loin. Le flux écrit `noc2021` sur
+   * toutes ses offres : ça ne dit pas si la valeur est un code à cinq chiffres, un libellé,
+   * ou une chaîne vide déguisée. Un filtre bâti sur une valeur supposée se tromperait en
+   * silence, comme le pré-filtre. On compte donc les valeurs AVANT de s'en servir.
+   */
+  inventaire: Record<string, Record<string, number>>;
+  /**
    * Combien d'offres de l'échantillon ont rendu une valeur NON VIDE pour chaque champ que
    * l'analyseur lit vraiment.
    *
@@ -271,11 +281,42 @@ const ENTETE_MAX = 16 * 1024;
  */
 export type Garder = (offre: OffreBrute, brut: string) => boolean;
 
+/**
+ * Un champ dont on veut connaître les VALEURS, pas seulement l'existence.
+ *
+ * `classer` ramène une valeur à sa classe — les trois premiers caractères d'un code postal,
+ * le niveau d'un code de profession — parce qu'un inventaire de valeurs BRUTES à forte
+ * cardinalité ne s'interprète pas : dix mille salaires distincts n'apprennent rien, six
+ * classes de salaire décident.
+ */
+export interface Inventaire {
+  /** Clé de sortie. Distincte du champ, pour inventorier deux fois le même sous deux angles. */
+  nom: string;
+  /** La balise lue. */
+  champ: string;
+  /** Défaut : la valeur telle quelle. */
+  classer?: (valeur: string) => string;
+}
+
+/**
+ * Classes distinctes retenues par champ.
+ *
+ * ⚠️ FILET ANTI-EXPLOSION, PAS UN RÉGLAGE. Un champ de texte libre (le salaire) peut porter
+ * autant de valeurs distinctes que d'offres : sans borne, l'inventaire d'un flux de
+ * quarante mille annonces reconstruirait en mémoire ce que ce module existe pour ne pas
+ * accumuler. Au-delà, les nouvelles classes sont comptées ensemble sous `(autres)` — dit,
+ * jamais silencieux : un inventaire tronqué qui se présenterait comme complet ferait
+ * conclure sur un préfixe, la faute déjà payée avec le plafond de retenues.
+ */
+export const MAX_CLASSES = 400;
+
 export interface OptionsFlux {
   url?: string;
   budgetMs?: number;
   maxRetenues?: number;
   garder?: Garder;
+  /** Les champs dont on veut connaître les valeurs. Vide = on n'inventorie rien. */
+  inventaire?: readonly Inventaire[];
   /** L'horloge, injectée : sans elle, le budget ne se teste qu'en attendant vraiment. */
   maintenant?: () => number;
 }
@@ -302,6 +343,7 @@ export async function lireFluxGuichet(
     budgetMs = BUDGET_MS_DEFAUT,
     maxRetenues = MAX_RETENUES_DEFAUT,
     garder = () => true,
+    inventaire = [],
     maintenant = () => Date.now(),
   } = options;
 
@@ -312,6 +354,7 @@ export async function lireFluxGuichet(
   const retenues: OffreBrute[] = [];
   const balises: Record<string, number> = {};
   const champsVus: Record<string, number> = {};
+  const valeurs: Record<string, Record<string, number>> = {};
   let balisesEchantillon = 0;
   let vues = 0;
   let preFiltrees = 0;
@@ -346,6 +389,19 @@ export async function lireFluxGuichet(
           balisesEchantillon += 1;
           for (const nom of recenserBalises(bloc)) balises[nom] = (balises[nom] ?? 0) + 1;
           for (const c of champsRenseignes(bloc)) champsVus[c] = (champsVus[c] ?? 0) + 1;
+          for (const inv of inventaire) {
+            const brut = champ(bloc, inv.champ);
+            const classe = brut === "" ? "(vide)" : (inv.classer?.(brut) ?? brut);
+            const seau = (valeurs[inv.nom] ??= {});
+            // La borne ne s'applique qu'aux classes NOUVELLES : une classe déjà connue
+            // continue de se compter, sinon les comptes deviendraient faux au lieu d'être
+            // seulement incomplets.
+            const cle =
+              seau[classe] !== undefined || Object.keys(seau).length < MAX_CLASSES
+                ? classe
+                : "(autres)";
+            seau[cle] = (seau[cle] ?? 0) + 1;
+          }
         }
         if (!estPeutEtreQuebec(bloc)) {
           preFiltrees += 1;
@@ -426,6 +482,7 @@ export async function lireFluxGuichet(
       balisesEchantillon,
       balisesVues: balises,
       champsRenseignes: champsVus,
+      inventaire: valeurs,
       construitLe,
     };
   } finally {

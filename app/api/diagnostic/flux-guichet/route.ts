@@ -23,7 +23,7 @@
 import { NextResponse } from "next/server";
 import { exigerSession } from "@/lib/session";
 import { expurgerPII } from "@/lib/ingest/expurger";
-import { lireFluxGuichet } from "@/lib/ingest/guichetFlux";
+import { lireFluxGuichet, type Inventaire } from "@/lib/ingest/guichetFlux";
 import { situer, type VerdictRegion } from "@/lib/ingest/region";
 import type { OffreBrute } from "@/lib/ingest/types";
 
@@ -50,6 +50,42 @@ const TAILLE_ECHANTILLON = 15;
 
 /** Caractères de description montrés. Une annonce entière ne se lit pas dans un JSON. */
 const EXTRAIT_MAX = 300;
+
+/**
+ * Les champs du flux dont on veut connaître les VALEURS.
+ *
+ * ⚠️ CHACUN EST ICI PARCE QU'IL POURRAIT CHANGER UNE DÉCISION, PAS PAR CURIOSITÉ.
+ * La passe complète du 2026-08-19 a montré que le flux porte onze champs que l'analyseur
+ * n'utilise pas, tous présents sur 100 % des offres. Trois d'entre eux valent le détour :
+ *
+ * - `noc2021` — le code de profession normalisé. S'il est bien là et bien formé, il classe
+ *   une offre SANS passer par des mots-clés : plus de vocabulaire bilingue à tenir à jour
+ *   ([VEILLE-32]), plus d'accents à normaliser ([VEILLE-34]). Le deuxième caractère du code
+ *   porterait le niveau de qualification — d'où l'inventaire séparé de ce caractère. ⚠️ Ce
+ *   dernier point est une LECTURE DE LA NORME, pas une mesure : c'est précisément ce que
+ *   l'inventaire doit confirmer ou démentir.
+ * - `postalcode` — un lieu EXACT là où on géocode aujourd'hui un nom de ville. Les trois
+ *   premiers caractères (la région de tri) suffiraient à séparer l'île de Montréal de la
+ *   région de Québec sans une seule requête Nominatim, et sans le piège des homonymes.
+ * - `salary`, `education`, `experience` — les composantes que le barème compte aujourd'hui
+ *   comme « inconnues », et qui lui font donner des points à ce qu'il ignore.
+ *
+ * ⚠️ RIEN N'EST BÂTI SUR EUX TANT QUE LEURS VALEURS N'ONT PAS ÉTÉ VUES. Savoir qu'une
+ * balise existe ne dit pas ce qu'elle porte — c'est la faute du recensement en ensemble,
+ * d'un cran plus loin.
+ */
+const INVENTAIRE: readonly Inventaire[] = [
+  { nom: "state", champ: "state" },
+  { nom: "postalcode-region", champ: "postalcode", classer: (v) => v.replace(/\s+/g, "").slice(0, 3).toUpperCase() },
+  { nom: "noc2021", champ: "noc2021" },
+  { nom: "noc2021-niveau", champ: "noc2021", classer: (v) => v.trim().slice(0, 2) },
+  { nom: "jobtype", champ: "jobtype" },
+  { nom: "workterm", champ: "workterm" },
+  { nom: "education", champ: "education" },
+  { nom: "experience", champ: "experience" },
+  { nom: "worklanguage", champ: "worklanguage" },
+  { nom: "salary", champ: "salary" },
+];
 
 /** Un compte par clé, trié du plus fréquent au moins fréquent. Un JSON qui se lit. */
 function parFrequence(compte: Record<string, number>): { nom: string; n: number }[] {
@@ -83,6 +119,7 @@ export async function GET() {
     const rapport = await lireFluxGuichet(fetch, {
       budgetMs: BUDGET_MS,
       maxRetenues: MAX_RETENUES,
+      inventaire: INVENTAIRE,
       garder: (o: OffreBrute) => {
         const v = situer(o.ville, o.description);
         verdicts[v] += 1;
@@ -116,6 +153,15 @@ export async function GET() {
         balisesEchantillon: rapport.balisesEchantillon,
         balisesVues: parFrequence(rapport.balisesVues),
         champsRenseignes: parFrequence(rapport.champsRenseignes),
+        // Ce que les champs CONTIENNENT. Plafonné à vingt classes par champ : au-delà, une
+        // liste ne se lit plus, et les vingt premières suffisent à décider si un champ est
+        // exploitable. `(autres)` dit ce que la borne interne a regroupé.
+        inventaire: Object.fromEntries(
+          Object.entries(rapport.inventaire).map(([nom, compte]) => [
+            nom,
+            { distinctes: Object.keys(compte).length, top: parFrequence(compte).slice(0, 20) },
+          ]),
+        ),
         verdicts,
         // Groupées et triées par fréquence : quarante-sept lignes ne se lisent pas, trois
         // lignes comptées désignent le correctif.

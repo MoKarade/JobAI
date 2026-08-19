@@ -6,6 +6,55 @@
 
 ---
 
+## Session 2026-08-19 (soir, 3e passe) — la passe COMPLÈTE du flux Guichet
+
+`fin: "flux-termine"` — la première mesure qui autorise à conclure.
+
+| | |
+|---|---|
+| Offres dans le flux | 41 062 |
+| Lues | 128,5 Mo en 4,7 s (~27 Mo/s) |
+| Québécoises | 6 631 |
+| — **dans la région** | **1 300** |
+| — hors région | 1 965 |
+| — lieu inconnu | 3 366 (50,8 %) |
+| Illisibles | **0** |
+
+**L'analyseur est confirmé** : `champsRenseignes` colle exactement à `balisesVues`. Et le
+mystère du passage précédent est résolu — `city`, `state` et `postalcode` sont au même
+compte EXACT (1972/2000) : ils sont émis ensemble ou omis ensemble, et il manquait les trois
+aux vingt premières offres du flux.
+
+**Onze champs présents sur 100 % des offres, inutilisés.** Trois pourraient tout changer :
+`noc2021` (code de profession normalisé — classerait une offre SANS mots-clés, donc sans le
+problème bilingue de [VEILLE-32]/[VEILLE-34]), `postalcode` (lieu exact, la région de tri
+sépare Montréal de Québec sans une seule requête Nominatim ni piège d'homonyme), et
+`salary`/`education`/`experience` (ce que le barème compte aujourd'hui comme « inconnu »).
+
+⚠️ **Aucune de leurs VALEURS n'a été vue.** Savoir qu'une balise existe ne dit pas ce
+qu'elle porte. Livré donc un **inventaire de valeurs** (`Inventaire` dans `guichetFlux.ts`,
+borné à 400 classes par champ, `(autres)` dit) : la route compte les valeurs par classe
+avant qu'on s'en serve.
+
+⚠️ **Piège mesuré sur [VEILLE-42]** : ajouter `saint-laurent` à `HORS_PORTEE` pour écarter
+l'arrondissement montréalais exclurait aussi **Saint-Laurent-de-l'Île-d'Orléans**, qui est
+dans la région (comparaison par sous-chaîne, `HORS_PORTEE` consulté en premier). C'est
+[VEILLE-33] qui se rappelle à nous. Le code postal ne connaît pas d'homonyme.
+
+### La vraie question, et elle est pour Marc
+
+**1 300 offres régionales** contre quelques dizaines suivies aujourd'hui. Brancher la source
+telle quelle noierait le tableau : l'échantillon reste dominé par *sod layer*, *car washer*,
+*hairstylist*, *labourer*. Le volume n'est pas le sujet — le TRI l'est.
+
+### Ce que Marc a à faire
+
+Rappeler `/api/diagnostic/flux-guichet` une dernière fois. Le rapport porte maintenant
+`inventaire` : les valeurs de `noc2021`, `postalcode`, `salary`, `education`, `experience`,
+`jobtype`, `workterm`. C'est ça qui décide comment trier — et donc si la source vaut d'être
+branchée.
+
+
 ## Session 2026-08-19 (soir, suite) — le premier passage RÉEL du flux Guichet
 
 Marc a appelé `/api/diagnostic/flux-guichet`. La mesure a validé la lecture en flux et
