@@ -1339,6 +1339,23 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   d'autorisation, rotation de jeton, réservation de passe. Et ça se prouve par un test de
   COURSE (`Promise.all` de deux consommations), jamais par deux appels en séquence — le
   séquentiel passe avec les deux implémentations.
+- **Un automatisme « pour ne plus jamais y penser » ne s'applique QUE là où quelqu'un l'a
+  appelé — donc tout module qui ajoute des tables en hérite.** L'app applique ses migrations
+  seule depuis juillet (demande de Marc). Mes routes OAuth ne le demandaient pas : en
+  production, un enregistrement légitime rendait **500 sans corps** parce que les trois
+  tables n'existaient pas encore. Rien dans le code ne rappelle cette obligation, et aucun
+  test ne pouvait la voir — la suite tourne sur PGlite, où les migrations sont appliquées par
+  le harnais. Réflexe : en ajoutant une table, grep qui appelle `assurerMigrations` et se
+  demander si le nouveau chemin d'entrée y passe. Et corollaire déjà écrit ici, re-vécu : un
+  500 muet est le pire des messages — les trois routes classent maintenant la panne
+  (`schema-absent` ≠ `base-injoignable`), parce que ces deux causes appellent des gestes
+  opposés et que les confondre envoie chercher au mauvais endroit.
+- **Sur un endpoint authentifié, une PANNE n'est pas un REFUS.** Rendre 401 quand la base ne
+  répond pas ferait croire au client que son jeton est mauvais : il le jette, redemande une
+  connexion, et recommence — en boucle, pendant que le vrai problème est ailleurs. Un 503
+  nommé se distingue et se corrige. À l'inverse, les refus d'authentification entre eux
+  doivent rester INDISCERNABLES (jeton absent, invalide, expiré, compte non autorisé) : les
+  distinguer en ferait un oracle.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

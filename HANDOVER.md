@@ -35,16 +35,37 @@ migration à moitié appliquée serait sortie en SUCCÈS, la panne même que ce 
 empêcher. Et `tests/db.test.ts` annonçait « les huit tables attendues ». Les deux dérivent
 maintenant du schéma.
 
+### VÉRIFIÉ EN PRODUCTION (pas seulement en test)
+
+| Vérification | Résultat |
+|---|---|
+| Découverte OAuth | 200, endpoints à la bonne origine |
+| `/api/mcp` sans jeton | 401 + `WWW-Authenticate` vers la métadonnée de ressource |
+| `redirect_uri` userinfo (`@evil.com`) | refusé — `userinfo-interdit` |
+| `redirect_uri` sous-domaine (`127.0.0.1.evil.com`) | refusé — `http-hors-loopback` |
+| Enregistrement légitime | **201** |
+| `/oauth/authorize` sans session | 307 vers le login, **tous les paramètres préservés** |
+| `/oauth/token`, code bidon | 400 `invalid_grant` |
+
+⚠️ **Le premier passage réel a trouvé un défaut que les tests ne pouvaient pas voir** : un
+enregistrement légitime rendait **500 sans corps**, parce que les trois tables n'existaient
+pas encore. L'app se migre elle-même depuis juillet, mais seulement là où on le lui demande —
+`lib/donnees.ts` et `lib/cv/depot.ts` le font, les routes OAuth non. Corrigé (les huit
+fonctions du store passent par `prete()`), et les trois routes qui touchent la base NOMMENT
+désormais la panne au lieu d'un 500 muet.
+
 ### Ce que Marc a à faire (lot 4)
 
-1. **Appliquer la migration** : `npm run db:migrate` (elle crée `oauth_clients`,
-   `oauth_codes`, `oauth_jetons`).
-2. **Aucun nouveau secret à poser.** L'appartenance se juge sur `AUTHORIZED_EMAIL`, déjà
-   configuré ; les clients s'enregistrent eux-mêmes.
-3. Dans claude.ai → Connecteurs → ajouter un connecteur personnalisé, URL
-   `https://emploi.hubperso.com/api/mcp`. Il devrait proposer une connexion Google.
-4. ⚠️ **Un déploiement vert ne prouve rien** — leçon payée trois fois ici. Le seul signal
-   valable est une conversation réelle : demande-lui « résume mon suivi JobAI ».
+1. **Rien à configurer.** Aucun nouveau secret ; l'appartenance se juge sur
+   `AUTHORIZED_EMAIL`, déjà en place. La migration s'applique toute seule (vérifié).
+2. Dans claude.ai → Connecteurs → connecteur personnalisé, URL
+   `https://emploi.hubperso.com/api/mcp`. Il proposera une connexion Google.
+3. ⚠️ **Un déploiement vert ne prouve rien** — leçon payée trois fois ici. Le seul signal
+   valable est une conversation réelle : demande-lui « résume mon suivi JobAI », puis une
+   écriture (« passe l'offre X en CV envoyé ») pour voir l'avant/après.
+
+*(Une ligne `oauth_clients` nommée « sonde-claude-code » vient de mes vérifications. Elle ne
+donne aucun accès — un client enregistré sans autorisation de Marc est une ligne inerte.)*
 
 
 ## Session 2026-08-19 — MCP lot 2/4 : le serveur et sa route (+ un bug de fuseau trouvé au passage)
