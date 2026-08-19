@@ -67,30 +67,21 @@ les décisions dans [`docs/adr/`](./docs/adr/).
 - **Endpoint hub** (`app/api/hub/summary/route.ts`) — jeton `x-hub-token` vérifié en temps
   constant, `Cache-Control: no-store`, summary honnêtement `building` tant qu'aucune donnée
   réelle n'existe.
-- TypeScript strict, **1214 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
+- TypeScript strict, suite Vitest complète, summary validé contre le **vrai** schéma du
+  contrat.
 
-### Appels LLM
+  *(Le nombre exact de tests était écrit ici — « 813 » — et se trompait de ~400 : il avait
+  vieilli sans que rien ne le signale. Un compteur au présent dans une liste de
+  caractéristiques rote à chaque PR. Le vrai chiffre se lit dans la CI, qui ne ment jamais ;
+  s'il faut le citer, c'est dans un récit daté, pas dans une affirmation permanente.)*
 
-Il y en a. Ce paragraphe a affirmé le contraire pendant un moment (« il n'y a aucun appel LLM
-dans l'app, pas de SDK Anthropic ») — c'était vrai à l'écriture et faux depuis l'arrivée du
-module CV :
+### Ce qui n'existe PAS encore
 
-- `@anthropic-ai/sdk` est en dépendance de **production** (`package.json`) ;
-- **un seul site d'appel** : `lib/cv/extraction.ts` (`client.messages.create`, modèle
-  `claude-haiku-4-5`), atteint par `extraireFaits` depuis `lib/cv/actions.ts`. C'est le
-  seul fichier de tout le dépôt qui importe le SDK.
-
-Le reste de la chaîne CV est **déterministe** : `lib/cv/proposition.ts` et
-`lib/cv/renotation.ts` travaillent sur ce que l'extraction a rendu, sans rappeler l'API. La
-**notation des offres** l'est aussi. Autrement dit, la dépense se concentre en un point —
-c'est ce qui rend la mesure facile, et son absence d'autant moins excusable.
-
-⚠️ **Conséquence non résolue** : JobAI ne compte pas ses tokens et ne publie aucun bloc
-`usage` (`lib/hubSummary.ts`). Elle apparaît donc « non suivie » dans la page « Coûts &
-quotas » du hub — mais ce n'est plus une **absence honnête**, c'est un **trou**. Le hub
-affiche un total qui ignore ce que JobAI dépense. Le corriger demande de comptabiliser les
-tokens à l'appel, comme DriveAI le fait (`src/Cout.gs`), puis de publier
-`usage.cost` — pas seulement une ligne de doc.
+À dire explicitement, parce que ce README a déjà menti dans l'autre sens : **il n'y a aucun
+appel LLM dans l'app**. Pas de SDK Anthropic, pas d'analyse d'offre par IA, pas de rédaction
+de CV ou de lettre. La notation est un barème déterministe. JobAI n'a donc **aucun coût d'API
+à publier** au bloc `usage` du contrat, et apparaît légitimement « non suivie » dans la page
+« Coûts & quotas » du hub — une absence honnête, pas un oubli.
 
 Le suivi des relances (`lib/relances.ts`, seuils 14 j / 45 j) est **codé et testé mais pas
 branché à l'interface** : la logique existe, rien ne l'affiche encore.
