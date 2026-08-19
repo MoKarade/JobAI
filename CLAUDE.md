@@ -1136,6 +1136,23 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   pour tout tirage (quels termes ? lesquels sautés ?) — deux tirages différents ne mesurent
   pas la même chose, et sans la liste, « 51 offres » d'un jour ne se compare pas à celui
   d'hier.
+- **Le gate ne vaut que pour l'arbre qu'il a VU : éditer après l'avoir lancé, c'est ne pas
+  l'avoir lancé.** CI rouge le 2026-08-19 sur un dépôt dont le gate local était sincèrement
+  vert — parce que j'avais lancé `npm run test`, PUIS édité un ADR, PUIS committé dans le
+  même appel. Le fichier fautif n'est jamais passé sous les tests. La règle « gate avant
+  chaque commit » se lit donc au sens strict : **la dernière chose avant `git commit` est le
+  gate, pas une édition**. Un enchaînement `édition && gate && commit` dans un seul appel est
+  sûr ; `gate` puis `édition && commit` ne l'est pas, et rien ne le signale — le gate a
+  affiché vert, il disait la vérité sur un arbre qui n'existe plus.
+- **Un compte d'octets écrit en tranches de trois EST un numéro d'assurance sociale pour un
+  scan de source.** `piiGuard` a fait échouer la CI sur la taille d'un flux citée dans un
+  ADR. Le garde a raison : il ne peut pas distinguer une mesure d'une identité. On adapte la
+  DONNÉE (écrire en Mo), jamais le motif — un garde assoupli une fois « parce que c'était un
+  faux positif » ne protège plus rien. ⚠️ Et la note qui expliquait le correctif a REFAIT
+  échouer le garde, parce qu'elle recitait la valeur : troisième occurrence du même piège
+  déjà consigné (les coordonnées d'un rectangle PDF, puis le commentaire qui les citait).
+  **Décrire la forme, ne jamais l'instancier** — et se relire en se demandant « est-ce que
+  mon explication contient la chose que j'explique ? ».
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

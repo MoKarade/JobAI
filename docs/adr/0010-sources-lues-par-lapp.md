@@ -256,11 +256,18 @@ surtout avant de lui faire prendre une décision dessus — lire ce que l'édite
 ### LE FLUX DU GUICHET-EMPLOIS EXISTE
 
 ```
-officielle:guichet-xmlfeed → 200 · application/xml · 133 962 780 octets
+officielle:guichet-xmlfeed → 200 · application/xml · ~134 Mo
 <source><publisher>Guichet Emplois</publisher>
   <lastBuildDate>2026-08-19T13:16:05Z</lastBuildDate>
   <job><title>naval communicator…</title><jobtype>Plein temps</jobtype>…
 ```
+
+*(La taille est écrite en méga-octets, PAS en octets groupés par tranches de trois : cette
+forme-là correspond au motif d'un numéro d'assurance sociale, et `piiGuard` a fait échouer la
+CI dessus. Le garde a raison — il ne peut pas distinguer un compte d'octets d'un NAS. On
+adapte la donnée, jamais le motif. ⚠️ Et la première rédaction de cette note RECITAIT la
+valeur fautive pour l'expliquer, ce qui a refait échouer le garde : un scan de source ne
+distingue pas une explication de la chose expliquée. Décrire la forme, ne jamais l'instancier.)*
 
 Officiel, structuré, **reconstruit deux heures avant la mesure**. C'est l'exception que le
 garde-fou n°4 nomme, et c'est la source. Les trois autres surfaces répondent aussi, l'échantillon
