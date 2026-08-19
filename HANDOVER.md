@@ -6,6 +6,44 @@
 
 ---
 
+## Session 2026-08-19 — « peut-on supprimer la Routine ? », réponse partielle MESURÉE
+
+**Non.** Et ce n'est pas une prudence, c'est un chiffre.
+
+Ce que la Routine dépose, passé au barème lui-même — 268 offres distinctes sur 9 lots :
+
+| | |
+|---|---|
+| coordination seule | **54 %** |
+| hors sujet | 32 % |
+| technicien sans encadrement | 6 % |
+| technique seule | 5 % |
+| **combinaison (coordination ET technique)** | **4 %** |
+
+Soit **~64 % portant une dimension coordination ou technique**. Titres réels :
+« Coordonnateur Fiabilité Maintenance », « Superviseur de production », « Surintendant ».
+L'échantillon régional du Guichet, lui : *sod layer*, *car washer*, *hairstylist*,
+*kitchen helper*. Et trois employeurs du Guichet cherchés dans le suivi → **0/3**.
+
+### ⚠️ Ce qui manque pour trancher, et que je ne masque pas
+
+1. Mon échantillon Guichet était les **15 premières** retenues, pas un tirage. Le
+   raisonnement sur préfixe m'a déjà trompé trois fois aujourd'hui.
+2. **On ne peut PAS comparer les deux populations avec ce barème** : son vocabulaire est
+   français, les titres du Guichet sont anglais — il rendrait « hors sujet » quel que soit
+   le mérite. J'ai failli faire cette comparaison injuste. La comparaison honnête passe par
+   la distribution NOC (`[NOC-02]`).
+
+**Conclusion tenable aujourd'hui** : la Routine est productive et reste la seule source
+alignée sur le profil. Sa redondance est INCONNUE, pas nulle.
+
+### Toujours bloqué
+
+`diagnostic_flux` n'apparaît toujours pas côté claude.ai après deux reconnexions. Le code est
+déployé et le serveur l'expose (test de transport). Il faut **retirer puis rajouter** le
+connecteur, pas seulement reconnecter.
+
+
 ## Session 2026-08-19 — le diagnostic devient un outil MCP (je peux le prendre moi-même)
 
 Marc : « fait rouler le diagnostic ». **Je ne pouvais pas**, et c'est mesuré, pas supposé :

@@ -856,6 +856,22 @@
       aucune offre existante ne change de note — aucune n'a de NOC — a VERIFIER par un test,
       pas a supposer. Revue de la flotte avant merge.
 
+- [ ] **[ROUTINE-01]** ⚠️ **NE PAS supprimer la Routine — reponse PARTIELLE, mesuree le
+      2026-08-19.** Ce qu'elle depose, passe au barème lui-meme (268 offres distinctes sur
+      9 lots) : **54 % coordination seule, 4 % la combinaison visee, 6 % technicien, 5 %
+      technique seule, 32 % hors sujet** — donc ~64 % portent une dimension coordination ou
+      technique. C'est une source ALIGNEE sur le profil. Titres reels : « Coordonnateur
+      Fiabilite Maintenance », « Superviseur de production », « Surintendant ».
+      L'echantillon regional du Guichet, lui, donne *sod layer*, *car washer*, *hairstylist*,
+      *kitchen helper*. Trois employeurs du Guichet cherches dans le suivi : 0/3 presents.
+      ⚠️ **CE QUI MANQUE POUR TRANCHER**, et c'est nomme : (a) mon echantillon Guichet etait
+      les 15 PREMIERES retenues, pas un tirage — le raisonnement sur prefixe m'a deja trompe
+      trois fois aujourd'hui ; (b) **on ne peut PAS comparer les deux populations avec ce
+      barème** : son vocabulaire est francais et les titres du Guichet sont anglais, donc il
+      rendrait « hors sujet » quel que soit le merite. La comparaison honnete passe par la
+      distribution NOC ([NOC-02]), pas par le barème. Conclusion tenable aujourd'hui : la
+      Routine est PRODUCTIVE et reste la seule source alignee ; sa redondance est INCONNUE.
+
 - [ ] **[VEILLE-44]** ⚠️ **DECISION MARC : 1 300 offres regionales par passe** (mesure sur
       une passe complete), contre quelques dizaines suivies aujourd'hui. L'echantillon reste
       domine par des postes peu qualifies. Brancher la source telle quelle noierait le
