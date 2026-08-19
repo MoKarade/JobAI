@@ -22,6 +22,20 @@ import { FAMILLES_ATS, type FamilleAts } from "./types";
 /** Combien de caractères de contenu on remonte. Assez pour VOIR, trop peu pour collecter. */
 export const TAILLE_ECHANTILLON = 400;
 
+/**
+ * Plafond de lecture du corps, en octets.
+ *
+ * ⚠️ NÉ D'UN INCIDENT DE LA SONDE ELLE-MÊME, le 2026-08-19. Le flux du Guichet-Emplois
+ * fait **134 Mo**, et la première version a fait `await r.text()` dessus : elle a chargé
+ * 134 Mo dans une fonction serverless pour n'en garder que 400 caractères. Ça a marché, et
+ * ça n'aurait pas dû être tenté — un flux deux fois plus gros aurait tué la fonction, et
+ * une sonde qui met l'app à genoux ne diagnostique plus rien.
+ *
+ * On lit donc par MORCEAUX et on s'arrête dès qu'on en sait assez. La taille rapportée
+ * devient alors un PLANCHER (« au moins tant »), pas une mesure — et le champ le dit.
+ */
+export const PLAFOND_LECTURE_OCTETS = 256 * 1024;
+
 /** Délai par candidat. Une source muette ne doit pas manger le budget des suivantes. */
 export const DELAI_SONDE_MS = 10_000;
 
@@ -72,6 +86,14 @@ export interface Mesure {
   taille: number;
   /** Un extrait du corps. C'est lui qui distingue un flux VALIDE d'un flux UTILE. */
   echantillon: string;
+  /**
+   * `true` quand la lecture a été coupée au plafond : `taille` est alors un PLANCHER.
+   *
+   * Sans ce drapeau, « 256 ko » se lirait comme la taille du flux alors que c'est celle de
+   * ce qu'on a bien voulu lire — et on choisirait une stratégie d'ingestion sur un chiffre
+   * faux. Le flux du Guichet fait 134 Mo, pas 256 ko.
+   */
+  tronque?: boolean;
   /**
    * Offres réellement extraites par l'analyseur de la famille, quand il y en a un.
    *
@@ -438,6 +460,39 @@ export type Dormir = (ms: number) => Promise<void>;
 const dormirVrai: Dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Lit le corps d'une réponse SANS dépasser le plafond.
+ *
+ * ⚠️ `await r.text()` n'a pas de frein : il télécharge tout, quelle que soit la taille.
+ * On lit donc le flux morceau par morceau et on ANNULE dès qu'on en a assez — ce qui coupe
+ * aussi le téléchargement, pas seulement l'accumulation.
+ */
+async function lireBorne(r: Response): Promise<{ corps: string; tronque: boolean }> {
+  if (r.body === null) return { corps: await r.text(), tronque: false };
+  const lecteur = r.body.getReader();
+  const decodeur = new TextDecoder();
+  let corps = "";
+  let octets = 0;
+  let tronque = false;
+  try {
+    for (;;) {
+      const { done, value } = await lecteur.read();
+      if (done) break;
+      octets += value.byteLength;
+      corps += decodeur.decode(value, { stream: true });
+      if (octets >= PLAFOND_LECTURE_OCTETS) {
+        tronque = true;
+        break;
+      }
+    }
+  } finally {
+    // Annule le téléchargement restant : sans ça on aurait borné la MÉMOIRE sans borner
+    // le RÉSEAU, et les 134 Mo continueraient d'arriver.
+    await lecteur.cancel().catch(() => undefined);
+  }
+  return { corps, tronque };
+}
+
+/**
  * Sonde chaque candidat, en SÉRIE, et rend ce qu'il a répondu.
  *
  * ⚠️ EN SÉRIE, ET AVEC UNE PAUSE. Paralléliser doublerait le débit vers des services tiers
@@ -469,7 +524,7 @@ export async function sonder(
           signal: ctrl.signal,
           cache: "no-store",
         });
-        const corps = await r.text();
+        const { corps, tronque } = await lireBorne(r);
         const estRobots = c.url.endsWith("/robots.txt");
         mesures.push({
           ...base,
@@ -477,6 +532,7 @@ export async function sonder(
           code: r.status,
           contentType: r.headers.get("content-type"),
           taille: corps.length,
+          ...(tronque ? { tronque: true } : {}),
           echantillon: echantillonner(corps),
           offres: compterOffres(corps, c.famille),
           ms: Date.now() - debut,

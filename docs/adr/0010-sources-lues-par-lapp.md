@@ -248,6 +248,77 @@ son usage apparent, pas depuis sa documentation. « Le site carrières l'appelle
 le point d'entrée répond, pas qu'il est offert. Avant d'annoncer une source à Marc — et
 surtout avant de lui faire prendre une décision dessus — lire ce que l'éditeur en DIT.
 
+## §4 quater — Le passage réel du 2026-08-19 : ce que la sonde a tranché
+
+19 candidats (le déploiement servait encore la version d'avant les deux candidats Davie).
+**0 injoignable.** Résultats qui décident.
+
+### LE FLUX DU GUICHET-EMPLOIS EXISTE
+
+```
+officielle:guichet-xmlfeed → 200 · application/xml · 133 962 780 octets
+<source><publisher>Guichet Emplois</publisher>
+  <lastBuildDate>2026-08-19T13:16:05Z</lastBuildDate>
+  <job><title>naval communicator…</title><jobtype>Plein temps</jobtype>…
+```
+
+Officiel, structuré, **reconstruit deux heures avant la mesure**. C'est l'exception que le
+garde-fou n°4 nomme, et c'est la source. Les trois autres surfaces répondent aussi, l'échantillon
+à l'appui : « Robotiq Jobs in Québec - Job Bank » pour la voie par employeur — la forme d'URL
+lue dans un résultat de recherche est donc CONFIRMÉE, cette fois par une visite.
+
+⚠️ **134 Mo est une contrainte d'ingénierie, pas un détail.** L'ingestion devra filtrer EN
+FLUX et ne jamais tout charger ; une passe qui bufferise ce flux tue la fonction. Voir §4 quinquies.
+
+### `extraireBlocRobots` a immédiatement payé — et retourné une conclusion
+
+| Site | Bloc `User-agent: *` réel | Ce que le début du fichier laissait croire |
+|---|---|---|
+| **ZipRecruiter** | **`Disallow: /`** | `Allow: /` — c'était le bloc *googlebot* |
+| LinkedIn | `Disallow: /` | conforme à leur avertissement |
+| Indeed | `Allow: /` **puis** `Disallow: /jobs/CA/`, `/viewjob?`, `/job/`, `/emplois/FR/`, `/rss`, `/graphql` | « Allow: / » seul |
+| Jobillico | pas de `Disallow` sur la recherche d'emploi ni les fiches d'entreprise ; `sitemap` publié | — |
+
+**ZipRecruiter passe donc de « la voie la plus propre » à « interdit à tout le monde sauf
+Google ».** C'est exactement le contresens que la première version de la sonde allait produire,
+et c'est le défaut n°2 corrigé le matin même qui l'a évité. **Indeed interdit explicitement
+les chemins d'offres** (`/jobs/CA/`, `/viewjob?`) : le `Allow: /` initial ne les couvre pas.
+
+**Jobillico est le seul des quatre dont le `robots.txt` n'interdit pas la recherche d'emploi.**
+⚠️ Mais le garde-fou n°4 affirme que « Indeed et Jobillico l'interdisent par leurs conditions ».
+`robots.txt` et CGU peuvent diverger, et **ce sont les CGU qui lient** : tant qu'elles n'ont pas
+été lues, la permission de `robots.txt` ne conclut rien.
+
+### Le discriminant `offres` a fait son travail dès son premier passage
+
+`jeton:robotiq-smartrecruiters` → 200, `totalFound: 0`, **`offres: 0`** ⇒ `joignable-mais-vide`.
+Le jeton `ROBOTIQInc` est constaté et l'API répond, mais elle ne rend **aucune offre**. Sans ce
+champ — `null` au passage précédent, faute de `famille` câblée — un 200 se serait lu comme un
+succès et le jeton serait entré dans la liste. C'est précisément le piège SmartRecruiters, et il
+s'est présenté au premier essai réel.
+
+### Deux portails sans `robots.txt`
+
+`carrieres.gouv.qc.ca` rend 200 en `text/html` sur `/robots.txt` (faux 200 : la page du site),
+`ville.quebec.qc.ca` rend 404. **Aucune permission explicite, aucune interdiction explicite.**
+
+## §4 quinquies — Ingérer 134 Mo : la contrainte qui commande la conception
+
+Le flux du Guichet ne se lit pas comme les autres sources.
+
+1. **Jamais de `await r.text()` dessus.** La sonde l'a fait à son premier passage : elle a
+   chargé 134 Mo dans une fonction serverless pour n'en garder que 400 caractères. Ça a marché,
+   et ça n'aurait pas dû être tenté. `PLAFOND_LECTURE_OCTETS` (256 ko) borne désormais la
+   lecture, la coupure est DITE (`tronque`), et le téléchargement est ANNULÉ — borner la
+   mémoire sans borner le réseau n'aurait rien borné.
+2. **L'ingestion filtre en FLUX** : lire par morceaux, découper sur `</job>`, ne garder que
+   ce qui concerne la région, jeter le reste au fil de l'eau. Le pic mémoire doit dépendre de
+   la taille d'UNE offre, jamais du flux.
+3. **La bande passante est un coût partagé.** 134 Mo par passe quotidienne, c'est du transfert
+   Vercel pour un compte qui sert six projets. À évaluer contre les jeux `open.canada.ca`
+   (5 trouvés), qui sont peut-être partitionnés — et contre la voie par EMPLOYEUR, bien plus
+   étroite pour les 36 cibles.
+
 ## §5 — Traiter le texte : « voir toutes les subtilités »
 
 `texteSimple` retire les balises. Ça ne suffit pas : ce qui décide du tri vit DANS la prose.

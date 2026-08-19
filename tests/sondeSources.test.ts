@@ -10,6 +10,7 @@ import {
   CANDIDATS,
   extraireBlocRobots,
   PAUSE_SONDE_MS,
+  PLAFOND_LECTURE_OCTETS,
   TAILLE_ECHANTILLON,
   compterOffres,
   echantillonner,
@@ -196,6 +197,54 @@ describe("extraireBlocRobots — lire le bloc qui NOUS vise, pas le début du fi
   it("rend un tableau vide plutôt que d'inventer, sur un fichier sans groupe", () => {
     expect(extraireBlocRobots("")).toEqual([]);
     expect(extraireBlocRobots("<!DOCTYPE html><html>pas un robots.txt</html>")).toEqual([]);
+  });
+});
+
+describe("lecture bornée — la sonde ne doit pas tuer l'app qu'elle diagnostique", () => {
+  /** Une réponse dont le corps arrive en morceaux, comme un vrai flux. */
+  const fluxDe = (morceaux: string[]) =>
+    new Response(
+      new ReadableStream<Uint8Array>({
+        start(ctrl) {
+          for (const m of morceaux) ctrl.enqueue(new TextEncoder().encode(m));
+          ctrl.close();
+        },
+      }),
+      { status: 200, headers: { "content-type": "application/xml" } },
+    );
+
+  const unCandidat = [
+    { id: "gros", nom: "Gros flux", url: "https://gros.test", voie: "officielle" as const, attendu: "" },
+  ];
+
+  it("DISCRIMINANT : coupe un flux énorme au plafond, et le DIT", async () => {
+    // Le cas vécu : le flux du Guichet fait 134 Mo, et la première version a tout chargé
+    // en mémoire dans une fonction serverless pour n'en garder que 400 caractères.
+    const enorme = Array.from({ length: 40 }, () => "x".repeat(16 * 1024));
+    const faux = (async () => fluxDe(enorme)) as unknown as typeof fetch;
+    const [m] = await sonder(unCandidat, faux, async () => {});
+    expect(m?.tronque).toBe(true);
+    expect(m?.taille).toBeLessThan(enorme.join("").length);
+    expect(m?.taille).toBeGreaterThanOrEqual(PLAFOND_LECTURE_OCTETS);
+  });
+
+  it("ne marque PAS tronqué un corps qui tient sous le plafond", async () => {
+    // Sinon « tronqué » perdrait son sens : il doit distinguer, pas décorer.
+    const faux = (async () => fluxDe(["<source><job>petit</job></source>"])) as unknown as typeof fetch;
+    const [m] = await sonder(unCandidat, faux, async () => {});
+    expect(m?.tronque).toBeUndefined();
+    expect(m?.taille).toBe("<source><job>petit</job></source>".length);
+  });
+
+  it("garde l'échantillon exploitable malgré la coupure — c'est lui qui tranche", async () => {
+    // Un flux coupé doit quand même montrer son DÉBUT : c'est ce qui distingue du XML
+    // d'offres d'une page d'erreur servie en 200.
+    const debut = '<?xml version="1.0"?><source><publisher>Guichet Emplois</publisher>';
+    const faux = (async () =>
+      fluxDe([debut, "y".repeat(600 * 1024)])) as unknown as typeof fetch;
+    const [m] = await sonder(unCandidat, faux, async () => {});
+    expect(m?.echantillon).toContain("Guichet Emplois");
+    expect(m?.tronque).toBe(true);
   });
 });
 
