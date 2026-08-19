@@ -1,6 +1,8 @@
 # ADR-0010 — Lire les offres DEPUIS L'APP : sources candidates, mesure d'accès, extraction
 
-- **Statut** : **Proposé** — en attente de la décision de Marc (aucune ligne de source écrite)
+- **Statut** : **Accepté** (décision Marc, 2026-08-19 : « TOUT et rajoute aussi Indeed,
+  LinkedIn, Jobillico, ZipRecruiter »). Q1, Q2 et Q3 sont ouvertes ; quatre agrégateurs
+  s'ajoutent au périmètre de MESURE. **Aucune source n'ingère encore quoi que ce soit.**
 - **Date** : 2026-08-19
 - **Exigé par** : garde-fou n°4 (« *Verrou : ADR-0002 avant toute nouvelle source* »)
 - **Se lit après** : ADR-0005 (précision de la veille), et le retrait `[VEILLE-35]`
@@ -78,6 +80,43 @@ Le §3 y répond par la mesure, pas par l'espoir.
 automatiquement. Si on y vient, chaque site exige sa propre vérification (`robots.txt`,
 conditions), site par site, dans un ADR séparé.
 
+## §2 bis — Les quatre agrégateurs ajoutés par Marc, et ce que chacun permet vraiment
+
+Marc a ouvert les trois questions et ajouté Indeed, LinkedIn, Jobillico et ZipRecruiter.
+Ils entrent donc dans le périmètre. **Mesurer n'est pas ingérer**, et la distinction porte
+tout le reste de cette section : une requête pour caractériser une réponse est légitime
+partout ; en tirer un flux d'offres dépend de ce que le service AUTORISE.
+
+Pour ces quatre-là, la sonde ne demande donc pas « est-ce joignable ? » — ils répondent
+tous — mais **`robots.txt`**, c'est-à-dire ce qu'ils autorisent de leur propre main. C'est
+la première question honnête pour n'importe quel site, et la seule qui décide de la suite.
+
+| Source | Voie légale connue | Ce que la sonde tranche |
+|---|---|---|
+| **Indeed** | *aucune voie publique* — l'API Publisher est fermée aux nouveaux inscrits depuis 2024 (mesuré). Le connecteur Indeed vit dans une session Claude, **pas dans l'app**. | ce que `robots.txt` permet |
+| **LinkedIn** | *aucune voie publique* — pas d'API d'offres ; Talent Solutions est réservée aux partenaires. | idem — et le risque porte sur le COMPTE de Marc, pas seulement sur l'accès |
+| **Jobillico** | *partenaire* — MESURÉ : leur API est une API de PUBLICATION, tout y est scopé aux entreprises gérées par le compte. Voie côté employeur, pas côté chercheur. | reste-t-il un flux public ? |
+| **ZipRecruiter** | *partenaire sur demande* — un programme Publisher existe et s'obtient par inscription ; l'API répond 401 sans clé. | **la seule des quatre dont la voie légale est à portée d'une démarche** |
+
+⚠️ **Ce que la sonde ne pourra PAS rendre légitime.** Si `robots.txt` interdit et qu'aucun
+programme partenaire n'est ouvert, il reste une seule façon technique d'ingérer : se faire
+passer pour un navigateur. Ce n'est pas un détail d'implémentation — c'est exactement ce que
+le garde-fou n°4 interdit, mot pour mot, et il a été écrit par Marc. Trois conséquences
+qu'il faut avoir dites AVANT et non après :
+
+1. **Ça exige de réviser le §4 du CLAUDE.md**, explicitement, dans un commit qui le dit.
+   Contourner en silence une règle que le projet affiche serait pire que la règle elle-même.
+2. **Ça casse en permanence.** Indeed et LinkedIn sont derrière une détection de robots ;
+   une IP de fonction serverless est identifiée vite. Le CLAUDE.md le note déjà pour
+   LinkedIn : « un pipeline qui casse en permanence et expose le compte n'est pas une feature ».
+3. **Le coût n'est pas symétrique.** Une source qui casse coûte une source ; un compte
+   LinkedIn banni coûte le réseau professionnel de quelqu'un qui cherche un emploi.
+
+**Recommandation, une fois, puis on suit la décision de Marc** : engager la démarche
+ZipRecruiter Publisher (voie propre, effort réel mais borné), garder Indeed via le canal
+qui marche déjà — le dépôt quotidien depuis la session Claude — et laisser LinkedIn de côté
+tant qu'aucune voie ne s'ouvre. La sonde donnera les chiffres pour trancher autrement.
+
 ## §3 — L'étape 1 est une SONDE DÉPLOYÉE, et elle n'est pas négociable
 
 **On ne peut pas écrire la liste des sources accessibles depuis ici.** Toute affirmation
@@ -116,8 +155,15 @@ là où le code tournera.
 | 7 | `open.canada.ca` — jeux EDSC/Guichet (CKAN) | données ouvertes | à mesurer ; ⚠️ ne PAS amputer la requête avec `fl=` |
 | 8 | `donneesquebec.ca` (CKAN) | données ouvertes | à mesurer |
 
-**Hors périmètre, et c'est définitif** : Indeed, LinkedIn, Jobillico, ZipRecruiter — conditions
-d'utilisation, blocage actif, ou API réservée aux éditeurs. Mesuré et refermé.
+| 9 | `ca.indeed.com/robots.txt` | agrégateur — voie publique inconnue | à mesurer (§2 bis) |
+| 10 | `www.linkedin.com/robots.txt` | agrégateur — voie publique inconnue | à mesurer (§2 bis) |
+| 11 | `www.jobillico.com/robots.txt` | agrégateur — partenaire | à mesurer (§2 bis) |
+| 12 | `www.ziprecruiter.com/robots.txt` | agrégateur — partenaire sur demande | à mesurer (§2 bis) |
+| 13-15 | `carrieres.gouv.qc.ca`, `ville.quebec.qc.ca`, Guichet `robots.txt` | portails publics | à mesurer |
+
+*(La ligne « hors périmètre définitif » qui figurait ici est retirée : Marc a ouvert ces
+quatre sources à la MESURE le 2026-08-19. Ce qui reste interdit sans révision du §4, c'est
+l'INGESTION de ce qu'elles interdisent — voir §2 bis.)*
 
 ## §4 — La liste d'entrée : d'où viennent les jetons
 
@@ -174,9 +220,20 @@ sur les 38 offres du seed avec le tableau avant/après, AVANT de brancher quoi q
 Les étapes 1 à 3 ne touchent NI `lib/scoring.ts` NI la logique de matching : elles n'appellent
 donc pas le §8. L'étape 5, oui.
 
+## Livré avec cet ADR (2026-08-19)
+
+- `lib/ingest/sondeSources.ts` — 15 candidats, mesure en série, contre-pression 1,1 s,
+  10 s par candidat, un `try` par candidat. **Ne réutilise PAS `recuperer`**, qui LÈVE sur
+  un non-2xx et écrase donc la seule information cherchée : le code.
+- `app/api/diagnostic/sources/route.ts` — gardée par la middleware **et** revérifiée côté
+  serveur ; `routesGardees.test.ts` la découvre et l'exige (vérifié, pas supposé).
+- `tests/sondeSources.test.ts` — 17 cas, dont les deux discriminants qui comptent :
+  « 200 sans offre » ≠ « 200 avec offres » (le piège SmartRecruiters) et « 403 » ≠
+  « injoignable » (la confusion qui avait produit le 0/180).
+
 ## Ce que cet ADR ne fait pas
 
-- Il n'autorise aucune source. Il autorise **une mesure**, et fixe ce qu'il faudra prouver.
+- Il n'ouvre aucune ingestion. Il livre **une mesure**, et fixe ce qu'il faudra prouver.
 - Il ne rouvre pas la découverte automatique : `[VEILLE-35]` tient.
 - Il ne promet aucun volume. Tant que la sonde n'a pas tourné, « combien d'offres en plus »
   n'a pas de réponse honnête.
