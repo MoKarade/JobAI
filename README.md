@@ -8,14 +8,27 @@ App de l'écosystème hub perso, aux côtés de FinanceAI, DriveAI et BatchChef.
 Destination : **`emploi.hubperso.com`**. Widget publié au hub via
 [`@mokarade/hub-contract`](https://github.com/MoKarade/hub-contract).
 
-> **Dépôt privé, et ce n'est pas négociable** : les données de suivi contiennent l'adresse du
-> domicile, le statut migratoire, l'historique de candidatures et des noms de personnes
-> tierces. Voir le garde-fou n°1 du [`CLAUDE.md`](./CLAUDE.md).
+> ⚠️ **Dépôt PUBLIC — donc aucune donnée personnelle, jamais.** Ce paragraphe a longtemps
+> annoncé l'inverse (« dépôt privé, et ce n'est pas négociable ») alors que le dépôt est
+> public depuis le premier jour. C'est la pire erreur qu'une doc puisse faire : annoncer un
+> filet qui n'existe pas. Marc a tranché en connaissance de cause le 2026-08-14 — **il reste
+> public**.
+>
+> Ce que ça change : les données de suivi contiennent l'adresse du domicile, le statut
+> migratoire, l'historique de candidatures et des noms de personnes tierces. En privé, une
+> PII commitée par erreur se rattrapait entre nous. En public, elle est **lisible du monde
+> entier à la seconde du push**, et un commit correctif ne la retire pas — l'historique, les
+> forks et les miroirs la gardent.
+>
+> `tests/piiGuard.test.ts` n'est donc pas une ceinture, c'est **le mur, et le seul**. Voir le
+> garde-fou n°1 du [`CLAUDE.md`](./CLAUDE.md), qui est à jour.
 
 ## État
 
 **En service, avec des données réelles.** Base Neon branchée, migrations appliquées
-automatiquement au démarrage, auth Google mono-adresse, interface livrée. Le premier lot réel
+automatiquement au démarrage, interface livrée. Côté auth, JobAI n'émet plus de session :
+elle **lit** celle que le hub pose sur `.hubperso.com` (`auth.ts`, `providers: []`), et
+demande au hub qui a le droit d'entrer (`lib/accesHub.ts`). Le premier lot réel
 de la veille est arrivé le 2026-07-31 (45 offres reçues, 40 ajoutées).
 
 L'état courant fait foi dans **[`HANDOVER.md`](./HANDOVER.md)** — à lire en premier, il est
@@ -54,15 +67,28 @@ les décisions dans [`docs/adr/`](./docs/adr/).
 - **Endpoint hub** (`app/api/hub/summary/route.ts`) — jeton `x-hub-token` vérifié en temps
   constant, `Cache-Control: no-store`, summary honnêtement `building` tant qu'aucune donnée
   réelle n'existe.
-- TypeScript strict, **813 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
+- TypeScript strict, **1214 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
 
-### Ce qui n'existe PAS encore
+### Appels LLM
 
-À dire explicitement, parce que ce README a déjà menti dans l'autre sens : **il n'y a aucun
-appel LLM dans l'app**. Pas de SDK Anthropic, pas d'analyse d'offre par IA, pas de rédaction
-de CV ou de lettre. La notation est un barème déterministe. JobAI n'a donc **aucun coût d'API
-à publier** au bloc `usage` du contrat, et apparaît légitimement « non suivie » dans la page
-« Coûts & quotas » du hub — une absence honnête, pas un oubli.
+Il y en a. Ce paragraphe a affirmé le contraire pendant un moment (« il n'y a aucun appel LLM
+dans l'app, pas de SDK Anthropic ») — c'était vrai à l'écriture et faux depuis l'arrivée du
+module CV :
+
+- `@anthropic-ai/sdk` est en dépendance de **production** (`package.json`) ;
+- `lib/cv/extraction.ts` appelle `client.messages.create` avec `claude-haiku-4-5` ;
+- `lib/cv/proposition.ts` et `lib/cv/renotation.ts` complètent la chaîne, couverts par
+  `tests/cvExtraction.test.ts`, `cvBornes.test.ts`, `cvTexte.test.ts`, `cvProposition.test.ts`.
+
+La **notation des offres**, elle, reste un barème déterministe : c'est le CV qui passe par le
+LLM, pas le tri.
+
+⚠️ **Conséquence non résolue** : JobAI ne compte pas ses tokens et ne publie aucun bloc
+`usage` (`lib/hubSummary.ts`). Elle apparaît donc « non suivie » dans la page « Coûts &
+quotas » du hub — mais ce n'est plus une **absence honnête**, c'est un **trou**. Le hub
+affiche un total qui ignore ce que JobAI dépense. Le corriger demande de comptabiliser les
+tokens à l'appel, comme DriveAI le fait (`src/Cout.gs`), puis de publier
+`usage.cost` — pas seulement une ligne de doc.
 
 Le suivi des relances (`lib/relances.ts`, seuils 14 j / 45 j) est **codé et testé mais pas
 branché à l'interface** : la logique existe, rien ne l'affiche encore.

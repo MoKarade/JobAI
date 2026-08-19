@@ -10,7 +10,8 @@ son profil, statuts de candidature, détection des réponses de recruteurs, et a
 pour l'analyse d'offres et la rédaction de CV/lettres ciblés.
 
 Stack : **Next.js 15** (App Router, Server Components + Server Actions) · **Neon** (Postgres
-serverless) + **Drizzle** · **Auth.js v5** (Google, mono-adresse) · **Anthropic SDK** ·
+serverless) + **Drizzle** · **Auth.js v5** (`providers: []` — la session vient du hub) ·
+**Anthropic SDK** ·
 **Zod** · **vitest**. Déploiement **Vercel** sur `emploi.hubperso.com`.
 Widget publié au hub perso via `GET /api/hub/summary` (contrat `@mokarade/hub-contract`).
 
@@ -152,6 +153,16 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
 - **La route hub est hors du middleware d'auth utilisateur** : elle porte sa propre
   authentification. L'ajouter au matcher renverrait une redirection HTML au hub, qui
   afficherait « injoignable » en permanence.
+- **`HUB_TOKEN` sert dans LES DEUX SENS.** Entrant : le hub le présente pour lire le summary
+  (ci-dessus). **Sortant** : JobAI le présente au hub sur `POST /api/acces` (`lib/accesHub.ts`)
+  pour demander « cette personne a-t-elle le droit d'entrer ici ? ». C'est ce jeton qui
+  IDENTIFIE JobAI côté hub, donc aucun `appId` n'est envoyé dans le corps. Sans lui, aucun
+  invité n'entre (échec fermé) — seul le propriétaire passe, parce qu'il est vérifié avant,
+  et sans réseau.
+- **`NEXT_PUBLIC_HUB_URL` n'est pas décoratif.** `lib/connexionHub.ts` en tire `URL_HUB`, qui
+  sert à la fois à la redirection de connexion ET de destination à `POST /api/acces`. La
+  pointer ailleurs « pour tester » coupe l'accès de tout le monde sauf le propriétaire,
+  silencieusement (échec fermé → `false`).
 - **Honnêteté** : `status:"building"` tant qu'aucune donnée réelle n'est en base. Le point de
   bascule unique est `getTrackerState()` — `null` = pas encore branché, `throw` = panne.
   **Règle de maintenance** : chaque phase qui rend une métrique réellement disponible la

@@ -38,7 +38,7 @@ commande` : c'est normal, ce n'est **pas une commande**, c'est une ligne de fich
 | # | Étape | Où | Durée |
 |---|---|---|---|
 | 1 | Créer la base Neon | neon.tech | 5 min |
-| 2 | Créer le client OAuth Google | Google Cloud Console | 10 min |
+| 2 | ~~Créer le client OAuth Google~~ — **supprimée**, JobAI n'en a plus | — | 0 min |
 | 3 | Générer les deux secrets | ton poste | 2 min |
 | 4 | Créer le projet Vercel et déployer | vercel.com | 10 min |
 | 5 | Brancher le domaine `emploi.hubperso.com` | Cloudflare + Vercel | 10 min |
@@ -63,31 +63,34 @@ commande` : c'est normal, ce n'est **pas une commande**, c'est une ligne de fich
 
 ---
 
-## Étape 2 — Le client OAuth Google
+## Étape 2 — ~~Le client OAuth Google~~ (supprimée)
 
-C'est ce qui permet la connexion. **Le même projet Google Cloud que le hub fait l'affaire**
-— pas besoin d'en créer un nouveau.
+> ⚠️ **Cette étape n'existe plus, et la suivre ferait perdre une soirée.** Elle demandait de
+> créer un client OAuth pour JobAI et de déclarer trois redirect URIs. Depuis l'étape 1 de
+> l'ADR 0001 du hub, **JobAI ne parle plus à Google du tout** : `auth.ts` déclare
+> `providers: []` (« AUCUN FOURNISSEUR, ET C'EST LE POINT »), il n'y a plus de bouton de
+> connexion — `app/connexion/page.tsx` redirige vers `hubperso.com/login` — et
+> `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` ont disparu de l'environnement.
+>
+> Un client créé pour JobAI ne servirait donc à rien, et le symptôme « redirect URI absent »
+> ne peut plus se produire ici.
 
-1. Va sur **https://console.cloud.google.com/apis/credentials**.
-2. Sélectionne le projet que tu utilises déjà pour le hub (celui où vivent les identifiants
-   OAuth de `hubperso.com`).
-3. **Create credentials** → **OAuth client ID** → type **Web application**.
-4. Nom : `JobAI`.
-5. Dans **Authorized redirect URIs**, ajoute ces **trois** entrées :
+### Ce qu'il faut à la place : brancher la session partagée
 
-   ```
-   http://localhost:3000/api/auth/callback/google
-   https://<ton-projet>.vercel.app/api/auth/callback/google
-   https://emploi.hubperso.com/api/auth/callback/google
-   ```
+JobAI **lit** la session que le hub pose sur `.hubperso.com`. Trois conditions, toutes
+nécessaires — il en manque une et la connexion boucle sans message d'erreur :
 
-   La deuxième, tu ne la connaîtras qu'après l'étape 4 : tu pourras revenir l'ajouter.
-   Google accepte de modifier la liste à tout moment, la prise en compte est immédiate.
-6. Valide. Google affiche un **Client ID** et un **Client secret** — garde-les.
+1. **`AUTH_SECRET` IDENTIQUE à celui du hub.** Le JWT est chiffré avec : un secret différent
+   et JobAI reçoit bien le cookie, mais n'en tire rien. Elle renvoie sur `/login`, le hub
+   reconnecte, et ça recommence.
+2. **`AUTH_COOKIE_DOMAIN=.hubperso.com`, en PRODUCTION seulement.** Un cookie portant ce
+   domaine est rejeté sur `localhost` et sur `<projet>.vercel.app` — et **silencieusement**.
+3. **Le domaine `emploi.hubperso.com` branché** (étape 5). Sur une adresse en `.vercel.app`,
+   le cookie ne franchit pas la frontière entre les deux domaines : la connexion unique ne
+   peut pas marcher, quoi qu'on configure.
 
-> Si tu préfères réutiliser le client OAuth existant du hub plutôt que d'en créer un
-> nouveau, c'est possible : ajoute simplement les trois URIs ci-dessus à sa liste. Un
-> client séparé reste plus propre (révocable indépendamment).
+Corollaire pour le développement local : sans `AUTH_COOKIE_DOMAIN`, il n'y a pas de session
+partagée sur `localhost`. C'est normal, pas une panne.
 
 ---
 
@@ -132,17 +135,22 @@ Garde cette seconde valeur : elle servira **deux fois**, à l'identique — côt
    | Nom | Valeur | Provenance |
    |---|---|---|
    | `DATABASE_URL` | la chaîne *pooled* | étape 1 |
-   | `GOOGLE_CLIENT_ID` | le Client ID | étape 2 |
-   | `GOOGLE_CLIENT_SECRET` | le Client secret | étape 2 |
-   | `AUTH_SECRET` | le secret de session | étape 3 |
-   | `AUTHORIZED_EMAIL` | `marc.richard4@gmail.com` | ton adresse |
+   | `AUTH_SECRET` | **la valeur EXACTE du hub**, pas une nouvelle | variables Vercel du hub |
+   | `AUTHORIZED_EMAIL` | `marc.richard4@gmail.com` | le propriétaire |
    | `HUB_TOKEN` | le jeton du hub | étape 3 |
+   | `AUTH_COOKIE_DOMAIN` | `.hubperso.com` — **Production UNIQUEMENT** | étape 2 |
+   | `NEXT_PUBLIC_HUB_URL` | `https://hubperso.com` (optionnel, c'est le défaut) | — |
 
-   Coche les trois environnements (Production, Preview, Development) pour chacune.
+   Coche les trois environnements (Production, Preview, Development) pour toutes **sauf**
+   `AUTH_COOKIE_DOMAIN`, qui ne va qu'en Production (voir étape 2).
 
-5. **Deploy**. Vercel te donne une URL en `https://jobai-xxxx.vercel.app`.
-6. **Retourne à l'étape 2** et ajoute cette URL exacte dans les redirect URIs Google
-   (avec `/api/auth/callback/google` à la fin).
+   Il n'y a **plus** de `GOOGLE_CLIENT_ID` ni de `GOOGLE_CLIENT_SECRET` : JobAI ne parle plus
+   à Google.
+
+5. **Deploy**. Vercel te donne une URL en `https://jobai-xxxx.vercel.app`. Elle sert à
+   vérifier que l'app démarre — mais **la connexion n'y marchera pas** : le cookie du hub ne
+   franchit pas la frontière `.vercel.app` / `.hubperso.com`. Ce n'est pas une panne, c'est
+   l'étape 5 qui manque.
 
 ### Appliquer le schéma et charger tes offres
 
@@ -161,8 +169,6 @@ puis enregistre (Ctrl+S) et ferme :
 
 ```
 DATABASE_URL=postgresql://user:motdepasse@ep-xxx-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
 AUTH_SECRET=...
 AUTHORIZED_EMAIL=marc.richard4@gmail.com
 HUB_TOKEN=...
@@ -240,8 +246,10 @@ moins de 50, c'est l'espace réservé qui a été collé au lieu de la vraie val
 `db:seed` est **relançable sans risque** : ton suivi (statut, priorité, date d'envoi, note
 personnelle) est préservé, seuls les champs de recherche sont rafraîchis.
 
-**À ce stade, l'app fonctionne.** Va sur ton URL Vercel, connecte-toi avec ton compte
-Google, tu dois voir tes 23 offres actives et tes 15 candidatures de 2025.
+**À ce stade, l'app démarre.** Sur l'URL `.vercel.app`, tu verras la redirection vers
+`hubperso.com/login` — mais pas tes offres : le cookie de session ne traverse pas d'un
+domaine à l'autre. Les données ne s'afficheront qu'une fois `emploi.hubperso.com` branché
+(étape 5). C'est attendu, ce n'est pas un problème de configuration.
 
 ---
 
@@ -288,10 +296,22 @@ la variable seule ne suffit pas.
 
 ## Vérifier que tout marche
 
-**L'app** : `https://emploi.hubperso.com` → connexion Google → tes offres s'affichent.
-Change un statut : il doit rester après un rafraîchissement de la page.
+**L'app** : `https://emploi.hubperso.com` → redirection vers `hubperso.com/login` →
+connexion → retour sur JobAI, tes offres s'affichent. Change un statut : il doit rester après
+un rafraîchissement.
 
-**Le refus d'accès** : connecte-toi avec une autre adresse Google. Tu dois être refusé.
+**La connexion unique** : connecte-toi d'abord sur `hubperso.com`, puis ouvre
+`emploi.hubperso.com` directement. Tu dois entrer **sans repasser par le login**. Si tu
+repasses par le login, c'est `AUTH_SECRET` qui diffère ou `AUTH_COOKIE_DOMAIN` qui manque.
+
+**Le refus d'accès** : connecte-toi avec une autre adresse Google, sans lui avoir accordé
+JobAI dans `hubperso.com/administration`. Tu dois être refusé.
+
+**L'ACCÈS ACCORDÉ** — le test qui compte vraiment, et le seul que l'ancienne procédure ne
+faisait pas : dans `hubperso.com/administration`, coche `jobai` pour cette adresse. Elle doit
+entrer **dans la minute**, sans redéploiement et sans toucher à `AUTHORIZED_EMAIL`. Décoche :
+elle doit ressortir, dans la minute aussi. Se connecter avec sa propre adresse ne prouve rien
+d'autre que le chemin du propriétaire, qui court-circuite le hub par construction.
 
 **L'endpoint du hub**, depuis PowerShell :
 
@@ -311,8 +331,9 @@ offre en gros chiffre.
 
 | Symptôme | Cause la plus probable |
 |---|---|
-| « Configuration » au login, ou redirection en boucle | Redirect URI Google absent ou mal orthographié. Il doit finir par `/api/auth/callback/google`, protocole et domaine exacts. |
+| Redirection en boucle entre JobAI et le hub | `AUTH_SECRET` différent de celui du hub (JobAI reçoit le cookie et n'arrive pas à le lire), ou `AUTH_COOKIE_DOMAIN` absent en Production. Ce n'est **jamais** un redirect URI Google : JobAI n'en a plus. |
 | Connexion refusée avec ton adresse | `AUTHORIZED_EMAIL` absent, mal orthographié, ou pas déployé (une variable ajoutée après le déploiement exige un redéploiement). |
+| Une personne INVITÉE est refusée alors que le hub la montre avec l'accès | `HUB_TOKEN` absent (JobAI ne peut pas interroger le hub → échec fermé), ou `NEXT_PUBLIC_HUB_URL` qui pointe ailleurs. Attendre une minute : le cache des réponses positives. Un refus, lui, n'est jamais mis en cache. |
 | Tout répond 503 avec `auth_non_configuree` | `AUTH_SECRET` ou `AUTHORIZED_EMAIL` manquant. C'est voulu : sans authentification configurée, l'app ne sert rien. |
 | « Base de données non configurée » à l'écran | `DATABASE_URL` absent des variables Vercel. |
 | « Aucune offre enregistrée » | La base répond mais elle est vide : lance `npm run db:seed`. |
