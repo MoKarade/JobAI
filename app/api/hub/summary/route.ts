@@ -23,8 +23,9 @@ import {
   type HubSummary,
 } from "@mokarade/hub-contract";
 import { hubTokenValid } from "@/lib/hubToken";
-import { APP, construireSummary } from "@/lib/hubSummary";
+import { APP, alertesCout, blocUsage, construireSummary } from "@/lib/hubSummary";
 import { getTrackerState } from "@/lib/trackerState";
+import { lireCoutPublie } from "@/lib/coutLlmStore";
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 
@@ -49,13 +50,28 @@ export async function GET(request: Request): Promise<Response> {
 
   let summary: HubSummary;
   try {
-    const etat = await getTrackerState();
-    summary = etat
-      ? construireSummary(etat, new Date().toISOString())
-      : // null = moteur pas encore branché. Honnête, et distinct d'une panne.
-        buildingSummary(APP, {
-          alertLabel: "Suivi pas encore en ligne — aucune donnée à publier.",
-        });
+    // Deux lectures indépendantes : l'état du suivi et la comptabilité des appels de
+    // modèle. Elles ne se remplacent pas — un CV analysé avant la première offre suivie
+    // laisse le suivi « pas branché » alors que le coût, lui, est bien réel.
+    const [etat, cout] = await Promise.all([getTrackerState(), lireCoutPublie()]);
+    if (etat) {
+      summary = construireSummary(etat, new Date().toISOString(), cout);
+    } else {
+      // null = moteur pas encore branché. Honnête, et distinct d'une panne.
+      const enConstruction = buildingSummary(APP, {
+        alertLabel: "Suivi pas encore en ligne — aucune donnée à publier.",
+      });
+      // ⚠️ LE COÛT SURVIT AU « EN CONSTRUCTION », ET C'EST LE CAS QUI L'A FAIT ÉCRIRE.
+      // Le suivi peut être vide alors qu'un CV a déjà été analysé : l'argent est dépensé
+      // pour de vrai. Laisser tomber le bloc ici publierait « non suivie » sur une app qui
+      // vient de payer un appel — le trou qu'on est en train de boucher, rouvert d'un cran
+      // plus loin.
+      summary = {
+        ...enConstruction,
+        alerts: [...enConstruction.alerts, ...alertesCout(cout)].slice(0, 10),
+        ...blocUsage(cout),
+      };
+    }
   } catch (err) {
     // Une panne réelle se DIT. On répond 200 avec un statut d'erreur : le hub affiche
     // alors un widget explicite, là où un 500 se confondrait avec une app injoignable.

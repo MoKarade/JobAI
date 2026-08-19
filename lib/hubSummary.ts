@@ -17,6 +17,7 @@ import {
   type HubMetric,
   type HubSummary,
 } from "@mokarade/hub-contract";
+import type { CoutPublie } from "./coutLlm";
 import type { ResumeSuivi } from "./types";
 
 /** Identité publiée au hub. L'`id` doit rester égal à l'entrée de `Hubperso/lib/sources.ts`. */
@@ -26,6 +27,47 @@ export const APP: HubSummary["app"] = {
   url: "https://emploi.hubperso.com",
   color: "#f2a31b",
 };
+
+/**
+ * Le bloc `usage` du contrat, ou rien. PURE, et le SEUL endroit qui décide.
+ *
+ * ⚠️ UN SEUL EXEMPLAIRE, PARCE QU'IL Y A DEUX CONSOMMATEURS. Le summary complet le porte,
+ * et le summary « en construction » aussi — un CV peut être analysé avant la première offre
+ * suivie, et le coût est alors bien réel pendant que le suivi n'est pas branché. Recopier la
+ * règle des deux côtés est exactement la classe de faute que ce dépôt a payée six fois : la
+ * seconde copie oublie l'arrondi, ou publie un `0` là où il faut une absence.
+ *
+ * `amount: 0` sur zéro appel AFFIRME « JobAI ne coûte rien » ; l'absence de bloc ADMET
+ * « non suivie », ce qui est vrai tant que rien n'a été dépensé. Un montant mesuré qui tombe
+ * à 0,00 $ après arrondi, lui, se publie : c'est une mesure, pas une absence de mesure.
+ */
+export function blocUsage(cout: CoutPublie): Pick<HubSummary, "usage"> | Record<string, never> {
+  if (cout.etat !== "mesure") return {};
+  return { usage: { cost: { amount: cout.montantUsd, currency: "USD", period: "total" } } };
+}
+
+/**
+ * Les alertes que la comptabilité impose. PURE, et partagée pour la même raison que
+ * `blocUsage` : « pas de montant » se lit « non suivie » au hub, donc exactement comme une
+ * app qui n'a jamais appelé de modèle. L'alerte est ce qui sépare les deux.
+ */
+export function alertesCout(cout: CoutPublie): HubAlert[] {
+  if (cout.etat === "illisible") {
+    return [{ label: "Compteur de coût LLM illisible", severity: "warn" }];
+  }
+  if (cout.etat === "non-mesure") {
+    return [{ label: `${cout.appelsNonMesures} appel(s) LLM non mesuré(s)`, severity: "warn" }];
+  }
+  if (cout.etat === "mesure" && cout.appelsNonMesures > 0) {
+    return [
+      {
+        label: libelle(`Coût sous-estimé : ${cout.appelsNonMesures} appel(s) non mesuré(s)`),
+        severity: "warn",
+      },
+    ];
+  }
+  return [];
+}
 
 /** Le contrat borne les libellés à 40 caractères ; on tronque proprement plutôt que d'être rejeté. */
 function libelle(texte: string, max = 40): string {
@@ -43,8 +85,15 @@ function libelle(texte: string, max = 40): string {
  *
  * @param genereLe date de génération, au format ISO. Passée en paramètre : une fonction
  *   qui lit l'horloge ne se teste pas deux fois de la même façon.
+ * @param cout ce que la comptabilité des appels de modèle permet de publier. Paramètre
+ *   pour la même raison que la date : la lecture du compteur est impure et vit dans
+ *   `lib/coutLlmStore.ts`. Absent ⇒ traité comme « aucun appel », donc pas de bloc `usage`.
  */
-export function construireSummary(resume: ResumeSuivi, genereLe: string): HubSummary {
+export function construireSummary(
+  resume: ResumeSuivi,
+  genereLe: string,
+  cout: CoutPublie = { etat: "aucun-appel" },
+): HubSummary {
   const metrics: HubMetric[] = [];
 
   if (resume.meilleure) {
@@ -103,6 +152,9 @@ export function construireSummary(resume: ResumeSuivi, genereLe: string): HubSum
     alerts.push({ label: "Aucune offre active suivie", severity: "info" });
   }
 
+  // Ce qui ne se mesure pas se DIT, plutôt que de s'arrondir à zéro (voir `alertesCout`).
+  alerts.push(...alertesCout(cout));
+
   return {
     contractVersion: CONTRACT_VERSION,
     app: APP,
@@ -111,5 +163,6 @@ export function construireSummary(resume: ResumeSuivi, genereLe: string): HubSum
     metrics: metrics.slice(0, 6),
     alerts,
     actions: [{ label: "Ouvrir JobAI", kind: "link", href: APP.url }],
+    ...blocUsage(cout),
   };
 }

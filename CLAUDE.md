@@ -156,7 +156,14 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   bascule unique est `getTrackerState()` — `null` = pas encore branché, `throw` = panne.
   **Règle de maintenance** : chaque phase qui rend une métrique réellement disponible la
   branche ici et fait passer le statut à `ok`. Jamais de chiffre fabriqué.
-- Le bloc `usage` (coût LLM) n'est publié que **mesuré**, jamais estimé.
+- Le bloc `usage` (coût LLM) n'est publié que **mesuré**, jamais estimé — et **pas du tout**
+  tant qu'aucun appel n'a eu lieu (`amount: 0` affirmerait « JobAI ne coûte rien »). Un seul
+  site d'appel dans le dépôt : `lib/cv/extraction.ts`, qui comptabilise lui-même (deux
+  appelants ; laisser chacun y penser serait « un outil qu'on peut oublier d'appeler »). Les
+  prix, le cumul et la règle de publication sont PURS (`lib/coutLlm.ts`), la lecture/écriture
+  du compteur est impure (`lib/coutLlmStore.ts`), et le bloc se compose en UN exemplaire
+  (`blocUsage`) pour les deux consommateurs — summary complet et summary « en construction ».
+  Période `total`, devise `USD` : le hub somme par période et convertit lui-même.
 
 ## 7. Leçons apprises (règles durables)
 
@@ -1364,6 +1371,26 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   est devenu un outil MCP en lecture seule. Réflexe général : un aller-retour humain qui se
   répète est un défaut d'outillage, pas une fatalité — et le canal existait déjà, il fallait
   juste y brancher la mesure.
+- **Une doc qui déduit une conclusion d'un fait devient FAUSSE en silence quand le fait
+  change — et la conclusion, elle, avait des conséquences.** Le README affirmait « aucun
+  appel LLM dans l'app » et en TIRAIT que l'absence de bloc `usage` au contrat du hub était
+  honnête. Le module CV a introduit un appel Anthropic ; personne n'est allé relire la
+  déduction. Résultat : pendant des semaines, l'absence de bloc n'était plus un aveu mais un
+  TROU, et le total « Coûts & quotas » du hub ignorait ce que JobAI dépense — sans qu'aucun
+  voyant ne change, puisque « non suivie » et « ne suit pas encore » s'affichent pareil.
+  Réflexe : en ajoutant une CAPACITÉ (un appel payant, une écriture, un scope), grep la doc
+  pour les phrases qui affirment son ABSENCE — ce sont elles qui portent des conclusions.
+  Corollaires du correctif, chacun payé ailleurs dans ce dépôt : (a) un champ absent d'un
+  relevé vaut `0`, jamais `undefined` — `undefined + nombre` donne `NaN` et **un seul `NaN`
+  empoisonne TOUT le cumul**, pas seulement l'appel concerné ; (b) une donnée illisible se
+  COMPTE (« le montant sous-estime de N appels ») au lieu de se rabattre sur zéro — un cumul
+  discrètement amputé est pire qu'une erreur visible, il se présente comme une mesure ; (c) la
+  lecture d'un compteur d'argent ne passe pas par un helper dont le `catch` rend le défaut
+  (`lireEtat`), sinon un JSON corrompu repart de zéro et publie un cumul amputé ; (d) la
+  comptabilité vit AU SITE D'APPEL, pas chez ses appelants — deux appelants, c'est déjà « un
+  outil qu'on peut oublier d'appeler » ; (e) elle se pose AVANT les validations de la réponse,
+  parce que l'appel est facturé même quand le schéma refuse ensuite.
+
 - **Un budget plus long que le MUR de sa fonction ne borne rien.** Le même diagnostic tourne
   derrière deux routes : 300 s en HTTP, 60 s en MCP. Y passer les mêmes 120 s ferait couper
   l'appel PAR LE DEHORS sur la seconde — et le client ne verrait qu'un timeout, sans le champ

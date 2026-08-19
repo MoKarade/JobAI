@@ -56,13 +56,39 @@ les décisions dans [`docs/adr/`](./docs/adr/).
   réelle n'existe.
 - TypeScript strict, **813 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
 
+### Ce que coûte l'app, et comment on le sait
+
+Ce README a affirmé pendant des semaines qu'« il n'y a aucun appel LLM dans l'app », et en
+tirait que l'absence de bloc `usage` au contrat du hub était honnête. **C'était faux depuis
+le module CV** : `lib/cv/extraction.ts` appelle Anthropic (Haiku 4.5) pour lire un CV. Ce
+n'était donc plus une absence, c'était un **trou** — le total affiché par le hub ignorait ce
+que JobAI dépense.
+
+C'est le seul appel de modèle du dépôt (`lib/cv/proposition.ts`, `lib/cv/renotation.ts` et la
+notation des offres sont déterministes). Il est désormais compté au moment où il est facturé,
+accumulé dans l'état, converti en dollars US et publié :
+
+| | où |
+|---|---|
+| les prix, le cumul, la règle de publication (PUR) | `lib/coutLlm.ts` |
+| lire et écrire le compteur | `lib/coutLlmStore.ts` |
+| le bloc `usage` du summary | `lib/hubSummary.ts` (`blocUsage`) |
+
+⚠️ **Tant qu'aucun appel n'a eu lieu, il n'y a PAS de bloc `usage` — surtout pas `amount: 0`.**
+C'est le garde-fou n°3 appliqué à l'argent : « 0,00 $ » affirme que l'app ne coûte rien,
+l'absence de bloc admet qu'on ne suit rien. La distinction est entre **zéro appel** (pas de
+bloc) et **des appels dont le coût arrondi tombe à 0,00 $** (bloc présent, montant 0) — le
+premier est une absence de mesure, le second est une mesure.
+
+La période publiée est `total` (cumul depuis toujours), comme FinanceAI, BatchChef et DriveAI :
+le hub somme **par période** et refuse de fusionner « cumulé » avec « ce mois-ci ». Une app qui
+publierait `mois` se retrouverait seule dans sa colonne et casserait le total pour tout le
+monde. La devise est `USD` — ce qu'Anthropic facture ; le hub convertit lui-même en CAD.
+
 ### Ce qui n'existe PAS encore
 
-À dire explicitement, parce que ce README a déjà menti dans l'autre sens : **il n'y a aucun
-appel LLM dans l'app**. Pas de SDK Anthropic, pas d'analyse d'offre par IA, pas de rédaction
-de CV ou de lettre. La notation est un barème déterministe. JobAI n'a donc **aucun coût d'API
-à publier** au bloc `usage` du contrat, et apparaît légitimement « non suivie » dans la page
-« Coûts & quotas » du hub — une absence honnête, pas un oubli.
+Pas d'analyse d'offre par IA, pas de rédaction de lettre : la notation reste un barème
+déterministe.
 
 Le suivi des relances (`lib/relances.ts`, seuils 14 j / 45 j) est **codé et testé mais pas
 branché à l'interface** : la logique existe, rien ne l'affiche encore.
