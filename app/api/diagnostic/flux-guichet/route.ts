@@ -78,8 +78,11 @@ const INVENTAIRE: readonly Inventaire[] = [
   { nom: "state", champ: "state" },
   { nom: "postalcode-lettre", champ: "postalcode", classer: (v) => v.trim().slice(0, 1).toUpperCase() || "(vide)" },
   { nom: "postalcode-region", champ: "postalcode", classer: (v) => v.replace(/\s+/g, "").slice(0, 3).toUpperCase() },
-  { nom: "noc2021", champ: "noc2021" },
-  { nom: "noc2021-niveau", champ: "noc2021", classer: (v) => v.trim().slice(0, 2) },
+  // ⚠️ AVEC DES EXEMPLES DE TITRES. Un compte ne se vérifie pas tout seul : « 63200 : 123 »
+  // ne dit pas si ce métier concerne Marc, « 63200 : 123 — cook, kitchen helper » se tranche
+  // d'un coup d'œil. C'est ce qui décidera de la liste des codes retenus (ADR-0012).
+  { nom: "noc2021", champ: "noc2021", exemplesDe: "title" },
+  { nom: "noc2021-niveau", champ: "noc2021", classer: (v) => v.trim().slice(0, 2), exemplesDe: "title" },
   { nom: "jobtype", champ: "jobtype" },
   { nom: "workterm", champ: "workterm" },
   { nom: "education", champ: "education" },
@@ -94,11 +97,11 @@ const INVENTAIRE: readonly Inventaire[] = [
  * Le nombre de classes DISTINCTES est rendu à côté du top : sans lui, vingt lignes se
  * liraient comme un inventaire complet alors qu'il peut en manquer des centaines.
  */
-function resumerInventaire(inv: Record<string, Record<string, number>>) {
+function resumerInventaire(inv: Record<string, Record<string, number>>, garder = 20) {
   return Object.fromEntries(
     Object.entries(inv).map(([nom, compte]) => [
       nom,
-      { distinctes: Object.keys(compte).length, top: parFrequence(compte).slice(0, 20) },
+      { distinctes: Object.keys(compte).length, top: parFrequence(compte).slice(0, garder) },
     ]),
   );
 }
@@ -176,7 +179,10 @@ export async function GET() {
         // RÉGIONALES : c'est lui qui décide. Les lire l'un pour l'autre, c'est conclure sur
         // un préfixe non représentatif.
         inventaireVues: resumerInventaire(rapport.inventaireVues),
-        inventaireRetenues: resumerInventaire(rapport.inventaireRetenues),
+        inventaireRetenues: resumerInventaire(rapport.inventaireRetenues, 40),
+        // La table qui DÉCIDE : par classe, le compte ET des titres réels. Sur les offres
+        // régionales seulement — la population qu'on ingérerait, jamais le préfixe du flux.
+        exemplesRetenues: rapport.exemplesRetenues,
         // Le code de profession appairé à son titre : la seule façon de vérifier qu'il dit
         // bien ce que la norme prétend, au lieu de le supposer.
         professions: rapport.brutsRetenus.map((b) => ({

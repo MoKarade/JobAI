@@ -17,6 +17,7 @@ import {
   ECHANTILLON_BALISES,
   MAX_BRUTS_RETENUS,
   MAX_CLASSES,
+  MAX_EXEMPLES_PAR_CLASSE,
   TAMPON_MAX,
   URL_FLUX_GUICHET,
   CHAMPS_ANALYSES,
@@ -411,10 +412,47 @@ describe("inventaire — savoir qu'une balise existe ne dit pas ce qu'elle PORTE
     expect(lireChamp(r.brutsRetenus[0] ?? "", "company")).toBe("Laserax");
   });
 
+  it("garde des exemples PAR CLASSE, sur les RETENUES seulement", async () => {
+    // ⚠️ UN COMPTE NE SE VÉRIFIE PAS TOUT SEUL. « 63200 : 3 » ne dit pas si ce métier
+    // concerne Marc ; « 63200 : 3 — Cook, Kitchen helper » se tranche d'un coup d'œil. Et
+    // les exemples viennent des RETENUES : un titre tiré du reste du flux illustrerait une
+    // classe qu'on n'ingérerait jamais.
+    const j = (c: Record<string, string>) => job({ ...c, state: "QC" });
+    const flux = `<source>${
+      j({ title: "Cook", url: "https://x.ca/1", noc2021: "63200" }) +
+      j({ title: "Kitchen helper", url: "https://x.ca/2", noc2021: "63200" }) +
+      j({ title: "Cook", url: "https://x.ca/3", noc2021: "63200" }) +
+      j({ title: "Mechanical engineer", url: "https://x.ca/4", noc2021: "21301" })
+    }</source>`;
+    const r = await lireFluxGuichet(sert(reponse(fluxDe([flux]))), {
+      maxRetenues: 10,
+      inventaire: [{ nom: "noc", champ: "noc2021", exemplesDe: "title" }],
+    });
+    expect(r.inventaireRetenues["noc"]).toEqual({ "63200": 3, "21301": 1 });
+    // DISTINCTS : trois annonces du même employeur ne doivent pas occuper toute la place.
+    expect(r.exemplesRetenues["noc"]?.["63200"]).toEqual(["Cook", "Kitchen helper"]);
+    expect(r.exemplesRetenues["noc"]?.["21301"]).toEqual(["Mechanical engineer"]);
+  });
+
+  it("BORNE le nombre d'exemples par classe", async () => {
+    const flux = `<source>${Array.from({ length: MAX_EXEMPLES_PAR_CLASSE + 4 }, (_, i) =>
+      job({ title: `Poste ${i}`, url: `https://x.ca/${i}`, state: "QC", noc2021: "63200" }),
+    ).join("")}</source>`;
+    const r = await lireFluxGuichet(sert(reponse(fluxDe([flux]))), {
+      maxRetenues: 50,
+      inventaire: [{ nom: "noc", champ: "noc2021", exemplesDe: "title" }],
+    });
+    expect(r.exemplesRetenues["noc"]?.["63200"]).toHaveLength(MAX_EXEMPLES_PAR_CLASSE);
+    // Le COMPTE, lui, n'est pas borné : c'est ce qui distingue « on n'en montre que trois »
+    // de « il n'y en avait que trois ».
+    expect(r.inventaireRetenues["noc"]?.["63200"]).toBe(MAX_EXEMPLES_PAR_CLASSE + 4);
+  });
+
   it("n'inventorie RIEN quand on ne lui demande rien", async () => {
     const r = await lireFluxGuichet(sert(reponse(fluxDe([`<source>${OFFRE_QC}</source>`]))));
     expect(r.inventaireVues).toEqual({});
     expect(r.inventaireRetenues).toEqual({});
+    expect(r.exemplesRetenues).toEqual({});
   });
 });
 

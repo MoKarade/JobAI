@@ -104,6 +104,13 @@ export interface RapportFlux {
    */
   inventaireRetenues: Record<string, Record<string, number>>;
   /**
+   * Quelques valeurs d'exemple par classe, sur les offres RETENUES seulement.
+   *
+   * Sur la population qui décide, jamais sur le préfixe du flux : un exemple tiré du Canada
+   * entier illustrerait une classe qu'on n'ingérera pas.
+   */
+  exemplesRetenues: Record<string, Record<string, string[]>>;
+  /**
    * Les blocs XML BRUTS des premières offres retenues.
    *
    * Pour que l'œil humain puisse apparier un code à son titre — c'est la seule façon de
@@ -323,6 +330,15 @@ export interface Inventaire {
   champ: string;
   /** Défaut : la valeur telle quelle. */
   classer?: (valeur: string) => string;
+  /**
+   * Un champ dont on garde quelques valeurs PAR CLASSE, pour l'œil humain.
+   *
+   * ⚠️ UN COMPTE NE SE VÉRIFIE PAS TOUT SEUL. « 63200 : 123 offres » ne dit pas si 63200 est
+   * un métier qui concerne Marc ; « 63200 : 123 offres — cuisinier, aide-cuisinier, chef de
+   * partie » se tranche d'un coup d'œil. C'est la même règle que pour les refus d'ingestion :
+   * compter ne suffit pas, il faut NOMMER l'objet.
+   */
+  exemplesDe?: string;
 }
 
 /**
@@ -339,6 +355,9 @@ export const MAX_CLASSES = 400;
 
 /** Offres retenues dont on garde le bloc brut. Assez pour l'œil, trop peu pour peser. */
 export const MAX_BRUTS_RETENUS = 15;
+
+/** Exemples gardés par classe. Trois suffisent à reconnaître un métier, mille ne se lisent pas. */
+export const MAX_EXEMPLES_PAR_CLASSE = 3;
 
 export interface OptionsFlux {
   url?: string;
@@ -387,6 +406,7 @@ export async function lireFluxGuichet(
   const valeursVues: Record<string, Record<string, number>> = {};
   const valeursRetenues: Record<string, Record<string, number>> = {};
   const brutsRetenus: string[] = [];
+  const exemples: Record<string, Record<string, string[]>> = {};
   let balisesEchantillon = 0;
   let vues = 0;
   let preFiltrees = 0;
@@ -411,11 +431,29 @@ export async function lireFluxGuichet(
     let entete: string | null = "";
     let fin: FinLecture = "flux-termine";
 
+    /** Garde quelques exemples par classe, sur les offres retenues seulement. */
+    const illustrer = (nom: string, classe: string, bloc: string, champExemple: string): void => {
+      const par = (exemples[nom] ??= {});
+      const liste = (par[classe] ??= []);
+      if (liste.length >= MAX_EXEMPLES_PAR_CLASSE) return;
+      const valeur = champ(bloc, champExemple);
+      // Un exemple répété n'illustre rien de plus : on garde des valeurs DISTINCTES, sinon
+      // trois annonces du même employeur occuperaient toute la place.
+      if (valeur !== "" && !liste.includes(valeur)) liste.push(valeur);
+    };
+
     /** Compte les valeurs d'une offre dans l'accumulateur donné. */
-    const inventorier = (seaux: Record<string, Record<string, number>>, bloc: string): void => {
+    const inventorier = (
+      seaux: Record<string, Record<string, number>>,
+      bloc: string,
+      avecExemples = false,
+    ): void => {
       for (const inv of inventaire) {
         const brut = champ(bloc, inv.champ);
         const classe = brut === "" ? "(vide)" : (inv.classer?.(brut) ?? brut);
+        if (avecExemples && inv.exemplesDe !== undefined) {
+          illustrer(inv.nom, classe, bloc, inv.exemplesDe);
+        }
         const seau = (seaux[inv.nom] ??= {});
         // La borne ne s'applique qu'aux classes NOUVELLES : une classe déjà connue continue
         // de se compter, sinon les comptes deviendraient faux au lieu d'être seulement
@@ -454,7 +492,7 @@ export async function lireFluxGuichet(
           continue;
         }
         retenues.push(offre);
-        inventorier(valeursRetenues, bloc);
+        inventorier(valeursRetenues, bloc, true);
         if (brutsRetenus.length < MAX_BRUTS_RETENUS) brutsRetenus.push(bloc);
         if (retenues.length >= maxRetenues) return true;
       }
@@ -523,6 +561,7 @@ export async function lireFluxGuichet(
       champsRenseignes: champsVus,
       inventaireVues: valeursVues,
       inventaireRetenues: valeursRetenues,
+      exemplesRetenues: exemples,
       brutsRetenus,
       construitLe,
     };

@@ -833,6 +833,29 @@
       qu'une balise existe ne dit pas ce qu'elle porte : on compte les valeurs AVANT de s'en
       servir. Trois discriminations prouvees.
 
+- [x] **[NOC-01]** Cadrage et instrument de mesure du tri par code de profession
+      (**ADR-0012**). `lib/nocProfession.ts` : lecture PURE d'un code, aucune semantique
+      devinee — le module ne sait pas ce qui interesse Marc et ne doit pas le savoir. TROIS
+      verdicts (`retenue` / `ecartee` / `code-illisible`) : un aveu n'est pas une decision,
+      et les confondre ferait passer un defaut de la SOURCE pour un tri qui fonctionne.
+      Comparaison ancree (2 chiffres ou 5), jamais un `startsWith` — un prefixe d'un chiffre
+      avalerait tout un domaine, niveaux 4 et 5 compris. 11 tests, 3 discriminations prouvees.
+      + la table de DECISION dans le diagnostic : par code, le compte ET des titres reels
+      distincts, sur les offres REGIONALES seulement. RIEN n'est branche sur le pipeline.
+
+- [ ] **[NOC-02]** Choisir la liste des codes retenus, **sur la table mesuree**. Elle vit
+      dans le PROFIL (`lib/profil.ts`), a cote de `motsCoordination` : c'est une decision de
+      Marc, pas une constante de code. ⚠️ Prealable : un appel a
+      `/api/diagnostic/flux-guichet` — `inventaireRetenues.noc2021` + `exemplesRetenues`
+      donnent code / compte / titres. Sans eux, toute liste serait une supposition deguisee
+      en regle, et la lecture « 2e chiffre = niveau de qualification » vient de la NORME,
+      pas d'une mesure.
+
+- [ ] **[NOC-03]** Brancher le filtre sur l'ingestion du flux Guichet, avec le compte des
+      ecartees PAR CODE (compter ne suffit pas, il faut nommer l'objet). Non-regression :
+      aucune offre existante ne change de note — aucune n'a de NOC — a VERIFIER par un test,
+      pas a supposer. Revue de la flotte avant merge.
+
 - [ ] **[VEILLE-44]** ⚠️ **DECISION MARC : 1 300 offres regionales par passe** (mesure sur
       une passe complete), contre quelques dizaines suivies aujourd'hui. L'echantillon reste
       domine par des postes peu qualifies. Brancher la source telle quelle noierait le

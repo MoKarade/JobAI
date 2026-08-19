@@ -6,6 +6,44 @@
 
 ---
 
+## Session 2026-08-19 — tri du flux Guichet par code de profession (ADR-0012, cadrage)
+
+Décision de Marc : « go pour le tri par noc2021 ». Ça touche le matching offre↔profil, donc
+le **§8** s'applique : ADR d'abord, audit sur du réel ensuite, code en dernier.
+
+**Le choix de conception** : `noc2021` sert de **filtre d'INGESTION**, pas de composante de
+note. Aucune offre du suivi actuel ne porte de code NOC (elles viennent d'Indeed ou d'une
+saisie manuelle) — un filtre d'ingestion ne peut donc pas modifier une note existante, ce qui
+retire tout risque de régression sur les 38 notes vérifiées à la main. Le brancher dans
+`computeScore` serait un chantier séparé.
+
+⚠️ **Adaptation assumée du §8, étape 2** : le protocole demande l'audit sur les 38 offres du
+seed. Impossible et vide de sens ici — **le seed n'a aucun code NOC**. L'audit porte donc sur
+les offres du Guichet, la seule population concernée. On ne saute pas l'étape, on la porte sur
+la bonne population.
+
+**Livré** : `lib/nocProfession.ts` (lecture PURE, aucune sémantique devinée — le module ne
+sait pas ce qui intéresse Marc), 11 tests, 3 discriminations prouvées. Plus la table de
+décision dans le diagnostic : par code, le compte **et des titres réels distincts**, sur les
+offres régionales seulement.
+
+**Rien n'est branché sur le pipeline.**
+
+### ⚠️ Ce que je ne sais PAS, et qui décide
+
+- La distribution des codes sur les offres **régionales** — celle que j'ai vue portait sur le
+  Canada (223 québécoises sur 2000).
+- Que le 2ᵉ chiffre soit bien le niveau de qualification : c'est une lecture de la NORME,
+  cohérente avec les données observées, **pas une mesure**. Le tableau code↔titre est ce qui
+  la confirmera ou la démentira.
+
+### Ce que Marc a à faire
+
+Un appel à `/api/diagnostic/flux-guichet`. On y lira `inventaireRetenues.noc2021` (les codes
+des offres régionales, par fréquence) et `exemplesRetenues` (les titres réels de chacun).
+C'est cette table qui décide de la liste — `[NOC-02]`.
+
+
 ## Session 2026-08-19 — le connecteur MCP MARCHE (lot 4/4, chantier clos)
 
 Marc l'a branché dans claude.ai : « ça marche ». Vérifié depuis une session sur les VRAIES
