@@ -35,6 +35,7 @@ import {
   FILTRES_VIDES,
   filtrer,
   sansDistanceMesuree,
+  sansNoteCalculee,
   unFiltreEstActif,
   type EtatFiltres,
 } from "@/lib/filtres";
@@ -61,6 +62,7 @@ export function CarteFiltrable({
   const table = useMemo(() => new Map(positions), [positions]);
   const retenues = useMemo(() => filtrer(offres, filtres), [offres, filtres]);
   const sansDistance = useMemo(() => sansDistanceMesuree(offres, filtres), [offres, filtres]);
+  const sansNote = useMemo(() => sansNoteCalculee(offres, filtres), [offres, filtres]);
 
   // ⚠️ LES CIBLES SONT TOUJOURS PASSÉES, MAIS ELLES N'AJOUTENT PLUS D'ÉPINGLE.
   //
@@ -132,6 +134,7 @@ export function CarteFiltrable({
         affichees={entreprises}
         total={entreprises + masquees + vue.aSituer.length + vue.sansLieu.length}
         sansDistance={sansDistance}
+        sansNote={sansNote}
         nom="entreprise"
       />
 

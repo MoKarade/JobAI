@@ -11,7 +11,13 @@
 
 import { useMemo, useState } from "react";
 import type { Offre } from "@/lib/types";
-import { FILTRES_VIDES, filtrer, sansDistanceMesuree, type EtatFiltres } from "@/lib/filtres";
+import {
+  FILTRES_VIDES,
+  filtrer,
+  sansDistanceMesuree,
+  sansNoteCalculee,
+  type EtatFiltres,
+} from "@/lib/filtres";
 import { CarteOffre } from "./CarteOffre";
 import { BoutonExport } from "./BoutonExport";
 import { CompteFiltre, Filtres } from "./Filtres";
@@ -21,6 +27,7 @@ export function ListeOffres({ offres }: { offres: Offre[] }) {
   const visibles = useMemo(() => filtrer(offres, filtres), [offres, filtres]);
 
   const sansDistance = useMemo(() => sansDistanceMesuree(offres, filtres), [offres, filtres]);
+  const sansNote = useMemo(() => sansNoteCalculee(offres, filtres), [offres, filtres]);
 
   return (
     <>
@@ -39,6 +46,7 @@ export function ListeOffres({ offres }: { offres: Offre[] }) {
         affichees={visibles.length}
         total={offres.length}
         sansDistance={sansDistance}
+        sansNote={sansNote}
         nom="offre"
       />
 

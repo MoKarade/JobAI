@@ -3,6 +3,7 @@
 // Extrait du composant pour être testable : c'est la logique que Marc utilise à chaque
 // consultation, et un filtre faux se remarque tard (on croit simplement qu'il n'y a rien).
 
+import { SEUIL_PALIER_A, SEUIL_PALIER_B } from "./scoring";
 import type { Offre } from "./types";
 
 export interface EtatFiltres {
@@ -10,8 +11,15 @@ export interface EtatFiltres {
   texte: string;
   /** Masquer les candidatures de 2025. */
   activesSeules: boolean;
-  /** Ne garder que les offres de palier A. */
-  notees80Plus: boolean;
+  /**
+   * Note minimale retenue. `null` = pas de seuil.
+   *
+   * ⚠️ UN SEUIL ET NON UNE BASCULE (demande de Marc, 2026-08-19 : « des filtres si j'en veux
+   * avec de meilleures notes »). C'était « Note 80+ », tout ou rien : au-dessous de 80 il
+   * fallait reparcourir les 193 offres à la main. La distance avait déjà ses paliers ; il
+   * n'y avait aucune raison que la note n'en ait pas — c'est le même geste.
+   */
+  noteMinimale: number | null;
   /**
    * Distance maximale retenue, en km. `null` = pas de limite.
    *
@@ -35,7 +43,7 @@ export interface EtatFiltres {
 export const FILTRES_VIDES: EtatFiltres = {
   texte: "",
   activesSeules: false,
-  notees80Plus: false,
+  noteMinimale: null,
   distanceMaxKm: null,
   historique: false,
   avecPerimees: false,
@@ -50,6 +58,17 @@ export const FILTRES_VIDES: EtatFiltres = {
  * entre dans le suivi — le filtre de région, lui, vit dans `lib/ingest/region.ts`.
  */
 export const PALIERS_DISTANCE_KM: readonly number[] = [10, 25, 50];
+
+/**
+ * Les paliers de note proposés.
+ *
+ * ⚠️ DÉRIVÉS DU BARÈME, PAS ÉCRITS ICI. Ce sont les seuils qui définissent déjà les paliers
+ * A et B (`lib/scoring.ts`) : le filtre propose donc exactement les coupures que la note
+ * elle-même reconnaît. Deux nombres recopiés auraient dérivé au premier ajustement du
+ * barème, et l'écran se serait mis à offrir des seuils qui ne correspondent plus à rien —
+ * la classe de défaut que ce dépôt a déjà payée cinq fois.
+ */
+export const PALIERS_NOTE: readonly number[] = [SEUIL_PALIER_B, SEUIL_PALIER_A];
 
 export function filtrer(offres: readonly Offre[], f: EtatFiltres): Offre[] {
   const q = f.texte.trim().toLowerCase();
@@ -66,7 +85,12 @@ export function filtrer(offres: readonly Offre[], f: EtatFiltres): Offre[] {
     // historique : celle-ci sert justement à regarder ce qui est derrière soi.
     if (!f.avecPerimees && !f.historique && o.perimeeLe !== null) return false;
 
-    if (f.notees80Plus && (o.score ?? 0) < 80) return false;
+    // ⚠️ UNE OFFRE NON NOTÉE NE FRANCHIT PAS UN SEUIL, et ce n'est pas la même chose que
+    // « mal notée ». `null` veut dire « pas encore évaluée » : la compter zéro serait un
+    // jugement qu'on n'a pas porté. Elle est donc écartée du seuil — on ne peut pas
+    // affirmer qu'elle vaut 80 — mais elle est COMPTÉE à part et DITE sous la barre, comme
+    // on le fait déjà pour une distance non mesurée.
+    if (f.noteMinimale !== null && (o.score === null || o.score < f.noteMinimale)) return false;
 
     // Une distance NON MESURÉE ne passe pas un seuil : on ne sait pas où elle est, et la
     // faire passer reviendrait à affirmer qu'elle est proche. Ce n'est pas gratuit — les
@@ -100,6 +124,23 @@ export function filtrer(offres: readonly Offre[], f: EtatFiltres): Offre[] {
  * offres n'est simplement pas encore mesurée. Le dire est la différence entre un filtre et
  * un mensonge par omission.
  */
+/**
+ * Combien d'offres un seuil de NOTE a écartées faute d'évaluation.
+ *
+ * Jumelle de `sansDistanceMesuree`, et pour la même raison : un filtre qui vide la liste
+ * sans dire pourquoi laisse croire qu'il n'y a rien. « Douze offres pas encore notées » et
+ * « douze offres sous le seuil » appellent deux gestes opposés — attendre une passe, ou
+ * baisser le seuil.
+ */
+export function sansNoteCalculee(offres: readonly Offre[], f: EtatFiltres): number {
+  if (f.noteMinimale === null) return 0;
+  return offres.filter((o) => {
+    if (f.historique ? !o.histo : f.activesSeules && o.histo) return false;
+    if (!f.avecPerimees && !f.historique && o.perimeeLe !== null) return false;
+    return o.score === null;
+  }).length;
+}
+
 export function sansDistanceMesuree(offres: readonly Offre[], f: EtatFiltres): number {
   if (f.distanceMaxKm === null) return 0;
   return offres.filter((o) => {

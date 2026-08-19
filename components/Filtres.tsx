@@ -12,18 +12,17 @@
 // La DÉCISION (`filtrer`) vit dans `lib/filtres.ts`, pure et testée ; ce fichier n'est que
 // le rendu et l'état. Deux surfaces, une règle, une barre.
 
-import { PALIERS_DISTANCE_KM, type EtatFiltres } from "@/lib/filtres";
+import { PALIERS_DISTANCE_KM, PALIERS_NOTE, type EtatFiltres } from "@/lib/filtres";
 
 /** Les bascules, dans l'ordre où elles se lisent. Le seuil de distance est à part. */
 const BASCULES: readonly { cle: BasculeFiltre; libelle: string }[] = [
   { cle: "activesSeules", libelle: "Actives" },
-  { cle: "notees80Plus", libelle: "Note 80+" },
   { cle: "historique", libelle: "Historique 2025" },
   { cle: "avecPerimees", libelle: "Voir les périmées" },
 ];
 
-/** Les filtres booléens — `texte` et `distanceMaxKm` ont leurs propres contrôles. */
-type BasculeFiltre = Exclude<keyof EtatFiltres, "texte" | "distanceMaxKm">;
+/** Les filtres booléens — `texte` et les deux SEUILS ont leurs propres contrôles. */
+type BasculeFiltre = Exclude<keyof EtatFiltres, "texte" | "distanceMaxKm" | "noteMinimale">;
 
 export function Filtres({
   filtres,
@@ -61,6 +60,26 @@ export function Filtres({
         </button>
       ))}
 
+      {/* Le seuil de NOTE : mêmes paliers que le barème, même geste que la distance. Un
+          second clic sur le palier actif le retire — sinon il n'y aurait aucun moyen de
+          revenir à « toutes ». */}
+      <span className="controles__groupe" role="group" aria-label="Note minimale">
+        {PALIERS_NOTE.map((note) => {
+          const actif = filtres.noteMinimale === note;
+          return (
+            <button
+              key={note}
+              type="button"
+              className={`filtre${actif ? " filtre--actif" : ""}`}
+              aria-pressed={actif}
+              onClick={() => onChange({ ...filtres, noteMinimale: actif ? null : note })}
+            >
+              Note ≥ {note}
+            </button>
+          );
+        })}
+      </span>
+
       {/* Le seuil de distance : des paliers plutôt qu'un curseur — on choisit « 25 km »,
           on ne cherche pas « 23 ». Un second clic sur le palier actif le retire, comme
           une bascule : sans ça, il n'y aurait aucun moyen de revenir à « toutes ». */}
@@ -97,11 +116,20 @@ export function CompteFiltre({
   affichees,
   total,
   sansDistance,
+  sansNote = 0,
   nom,
 }: {
   affichees: number;
   total: number;
   sansDistance: number;
+  /**
+   * Écartées par le seuil de NOTE faute d'évaluation.
+   *
+   * Dit séparément de `sansDistance` : « pas encore notée » et « trop loin » appellent deux
+   * gestes opposés — attendre une passe, ou baisser le seuil. Les additionner rendrait un
+   * chiffre qu'on ne saurait pas quoi faire.
+   */
+  sansNote?: number;
   /** « offre » ou « entreprise » — le compte doit nommer ce qu'il compte. */
   nom: string;
 }) {
@@ -114,6 +142,13 @@ export function CompteFiltre({
           {" · "}
           {sansDistance} sans distance mesurée, donc hors du seuil — la mesure se fait toute
           seule, au fil des passages.
+        </>
+      ) : null}
+      {sansNote > 0 ? (
+        <>
+          {" · "}
+          {sansNote} pas encore notée{sansNote > 1 ? "s" : ""}, donc hors du seuil — une note
+          absente n&apos;est pas une mauvaise note.
         </>
       ) : null}
     </p>

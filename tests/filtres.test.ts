@@ -9,6 +9,8 @@ import type { EtatFiltres } from "../lib/filtres";
 import {
   FILTRES_VIDES,
   PALIERS_DISTANCE_KM,
+  PALIERS_NOTE,
+  sansNoteCalculee,
   filtrer,
   sansDistanceMesuree,
   unFiltreEstActif,
@@ -38,12 +40,40 @@ describe("filtres", () => {
     expect(r.every((o) => o.histo)).toBe(true);
   });
 
-  it("« note 80+ » ne garde que le palier A", () => {
-    const r = filtrer(SEED, { ...FILTRES_VIDES, notees80Plus: true });
-    expect(r.length).toBeGreaterThan(0);
-    expect(r.every((o) => (o.score ?? 0) >= 80)).toBe(true);
-    // Les offres sans note ne doivent pas se glisser dedans via un `null` traité comme 0…
-    expect(r.every((o) => o.score !== null)).toBe(true);
+  it("le seuil de note ne garde que ce qui l'atteint, à CHAQUE palier", () => {
+    // Un SEUIL, plus une bascule : « Note 80+ » obligeait à reparcourir 193 offres dès
+    // qu'on voulait descendre un peu. On éprouve les deux paliers, pas seulement le haut —
+    // un filtre qui ne marcherait qu'à 80 passerait un test écrit sur 80 seul.
+    for (const seuil of PALIERS_NOTE) {
+      const r = filtrer(SEED, { ...FILTRES_VIDES, noteMinimale: seuil });
+      expect(r.length, `palier ${seuil}`).toBeGreaterThan(0);
+      expect(r.every((o) => o.score !== null && o.score >= seuil), `palier ${seuil}`).toBe(true);
+    }
+  });
+
+  it("un palier BAS garde au moins ce que garde un palier HAUT", () => {
+    // La monotonie du seuil : sans elle, un filtre pourrait « rater » des offres en
+    // s'assouplissant, et ça ne se verrait sur aucun palier pris isolément.
+    const [bas, haut] = [PALIERS_NOTE[0]!, PALIERS_NOTE[1]!];
+    const idsHaut = filtrer(SEED, { ...FILTRES_VIDES, noteMinimale: haut }).map((o) => o.id);
+    const idsBas = new Set(filtrer(SEED, { ...FILTRES_VIDES, noteMinimale: bas }).map((o) => o.id));
+    for (const id of idsHaut) expect(idsBas.has(id), id).toBe(true);
+  });
+
+  it("une offre NON NOTÉE ne franchit aucun seuil, et se COMPTE à part", () => {
+    // `null` veut dire « pas encore évaluée », pas « nulle » : la compter zéro serait un
+    // jugement qu'on n'a pas porté. Elle est donc écartée — on ne peut pas affirmer qu'elle
+    // vaut 80 — mais le compte le DIT, sinon la liste se vide sans explication.
+    const sansNote = { ...SEED[0]!, id: "sans-note", score: null, scoreSource: null };
+    const jeu = [...SEED, sansNote];
+    const f = { ...FILTRES_VIDES, noteMinimale: PALIERS_NOTE[1]! };
+    expect(filtrer(jeu, f).some((o) => o.id === "sans-note")).toBe(false);
+    // ⚠️ LE DELTA, PAS UN ABSOLU. Le jeu de départ porte DÉJÀ des offres sans note (mesuré),
+    // et un chiffre écrit en dur ici deviendrait faux à la prochaine offre ajoutée — la
+    // faute d'un test qui désigne par l'index plutôt que par le prédicat.
+    expect(sansNoteCalculee(jeu, f)).toBe(sansNoteCalculee(SEED, f) + 1);
+    // Sans seuil, on ne compte rien : le chiffre n'aurait aucun sens.
+    expect(sansNoteCalculee(jeu, FILTRES_VIDES)).toBe(0);
   });
 
   it("un seuil de distance exclut les distances INCONNUES", () => {
@@ -107,11 +137,13 @@ describe("filtres", () => {
       ...FILTRES_VIDES,
       activesSeules: true,
       distanceMaxKm: PALIERS_DISTANCE_KM[1]!,
-      notees80Plus: true,
+      noteMinimale: PALIERS_NOTE[1]!,
     });
-    expect(r.every((o) => !o.histo && o.km! <= PALIERS_DISTANCE_KM[1]! && o.score! >= 80)).toBe(
-      true,
-    );
+    expect(
+      r.every(
+        (o) => !o.histo && o.km! <= PALIERS_DISTANCE_KM[1]! && o.score! >= PALIERS_NOTE[1]!,
+      ),
+    ).toBe(true);
   });
 
   it("ne modifie jamais le tableau d'entrée", () => {
@@ -170,7 +202,7 @@ describe("« un filtre est-il posé ? »", () => {
     const cas: EtatFiltres[] = [
       { ...FILTRES_VIDES, texte: "laserax" },
       { ...FILTRES_VIDES, activesSeules: true },
-      { ...FILTRES_VIDES, notees80Plus: true },
+      { ...FILTRES_VIDES, noteMinimale: PALIERS_NOTE[1]! },
       { ...FILTRES_VIDES, distanceMaxKm: PALIERS_DISTANCE_KM[0]! },
       { ...FILTRES_VIDES, historique: true },
       { ...FILTRES_VIDES, avecPerimees: true },
