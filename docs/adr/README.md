@@ -23,3 +23,4 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 | [0007](./0007-google-maps-geocoding-repli.md) | Google Maps Geocoding, en repli étroit de Nominatim | Accepté |
 | [0008](./0008-poste-de-nuit.md) | « Poste de nuit » : le sombre en identité, l'épure cesse d'être une soustraction | Accepté — révisé le jour même (thème clair retiré) ; supersède la direction du 2026-08-05 ; ADR-0003 tient sur l'ambre |
 | [0009](./0009-profil-pilote-par-le-cv.md) | Le profil sort du code, et le CV le remplit | Accepté — retire `[V3-00]` (CV via Google Drive) |
+| [0010](./0010-sources-lues-par-lapp.md) | Lire les offres depuis l'app : sources candidates, mesure d'accès, extraction | **Proposé** — en attente de Marc ; aucune source ouverte, seule une sonde est demandée |
