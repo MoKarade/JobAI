@@ -25,6 +25,7 @@ import { creerServeur } from "@/lib/mcp/serveur";
 import { empreinte, estProprietaire } from "@/lib/mcp/oauth";
 import { origineDe } from "@/lib/mcp/origine";
 import { lireJetonValide } from "@/lib/oauthStore";
+import { classerPanne } from "@/lib/panne";
 import { aujourdhui } from "@/lib/ajout";
 import { CHAMPS_UTILISATEUR, type Offre } from "@/lib/types";
 
@@ -91,7 +92,22 @@ export async function POST(requete: Request): Promise<Response> {
   const porteur = jetonPorteur(requete);
   if (porteur === null) return defi(requete, "jeton absent");
 
-  const jeton = await lireJetonValide(empreinte(porteur), "acces", new Date());
+  let jeton: Awaited<ReturnType<typeof lireJetonValide>>;
+  try {
+    jeton = await lireJetonValide(empreinte(porteur), "acces", new Date());
+  } catch (err) {
+    // ⚠️ UNE PANNE N'EST PAS UN REFUS. Rendre 401 ici ferait croire au client que son jeton
+    // est mauvais — il le jetterait et redemanderait une connexion, en boucle, pendant que
+    // le vrai problème est ailleurs. Un 503 nommé se distingue, et se corrige.
+    const panne = classerPanne(err);
+    console.error("[api/mcp] lecture du jeton impossible", { panne, err });
+    return refus(
+      503,
+      panne === "schema-absent"
+        ? "schéma du connecteur pas encore appliqué ; réessaie dans un instant"
+        : "la base n'a pas répondu",
+    );
+  }
   if (jeton === null) return defi(requete, "jeton invalide ou expiré");
 
   // Échec fermé : sans `AUTHORIZED_EMAIL`, `estProprietaire` rend faux et on refuse. On ne

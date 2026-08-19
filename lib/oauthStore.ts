@@ -19,6 +19,24 @@
 import { and, eq, gt, isNull, lt } from "drizzle-orm";
 import { db } from "./db";
 import { oauthClients, oauthCodes, oauthJetons } from "./db/schema";
+import { assurerMigrations } from "./migrations";
+
+/**
+ * La base est prête à être interrogée.
+ *
+ * ⚠️ SANS CET APPEL, LE CONNECTEUR NE MARCHE PAS APRÈS UN DÉPLOIEMENT — mesuré en
+ * production le 2026-08-19 : `/oauth/register` rendait un 500 muet parce que les trois
+ * tables n'existaient pas encore. L'app se migre elle-même depuis juillet (demande de Marc :
+ * « je veux plus jamais avoir à faire run db migrate »), mais seulement là où quelqu'un
+ * pense à le demander : `lib/donnees.ts` et `lib/cv/depot.ts` le font, et ces routes-ci ne
+ * le faisaient pas. Un module qui ajoute des tables hérite donc AUSSI de cette obligation.
+ *
+ * La promesse est mémorisée par processus et Drizzle n'applique chaque fichier qu'une fois :
+ * l'appeler partout ne coûte rien.
+ */
+async function prete(): Promise<void> {
+  await assurerMigrations();
+}
 
 export interface ClientEnregistre {
   id: string;
@@ -31,10 +49,12 @@ export async function enregistrerClient(
   nom: string,
   redirectUris: readonly string[],
 ): Promise<void> {
+  await prete();
   await db.insert(oauthClients).values({ id, nom, redirectUris: [...redirectUris] });
 }
 
 export async function lireClient(id: string): Promise<ClientEnregistre | null> {
+  await prete();
   const [c] = await db.select().from(oauthClients).where(eq(oauthClients.id, id)).limit(1);
   return c === undefined ? null : { id: c.id, nom: c.nom, redirectUris: c.redirectUris };
 }
@@ -51,6 +71,7 @@ export async function poserCode(
   code: CodeEnAttente,
   expireLe: Date,
 ): Promise<void> {
+  await prete();
   await db.insert(oauthCodes).values({ empreinte, ...code, expireLe });
 }
 
@@ -66,6 +87,7 @@ export async function consommerCode(
   empreinte: string,
   maintenant: Date,
 ): Promise<CodeEnAttente | null> {
+  await prete();
   const lignes = await db
     .update(oauthCodes)
     .set({ consommeLe: maintenant })
@@ -94,6 +116,7 @@ export async function poserJeton(
   sujet: string,
   expireLe: Date,
 ): Promise<void> {
+  await prete();
   await db.insert(oauthJetons).values({ empreinte, genre, clientId, sujet, expireLe });
 }
 
@@ -108,6 +131,7 @@ export async function lireJetonValide(
   genre: GenreJeton,
   maintenant: Date,
 ): Promise<JetonValide | null> {
+  await prete();
   const [j] = await db
     .select()
     .from(oauthJetons)
@@ -127,6 +151,7 @@ export async function lireJetonValide(
  * simultanés ne doivent pas produire deux familles de jetons valides.
  */
 export async function revoquerJeton(empreinte: string, maintenant: Date): Promise<boolean> {
+  await prete();
   const lignes = await db
     .update(oauthJetons)
     .set({ revoqueLe: maintenant })
@@ -145,6 +170,7 @@ export async function revoquerJeton(empreinte: string, maintenant: Date): Promis
  * sans qu'on le voie.
  */
 export async function purger(maintenant: Date): Promise<void> {
+  await prete();
   // Par l'échéance seule : un jeton révoqué mais non expiré part avec les autres le moment
   // venu, et le garder d'ici là ne coûte rien. Une condition de plus ici serait une règle de
   // plus à tenir juste, pour un gain nul.

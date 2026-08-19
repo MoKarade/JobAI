@@ -13,6 +13,7 @@
 import { z } from "zod";
 import { genererSecret, jugerRedirectUri } from "@/lib/mcp/oauth";
 import { enregistrerClient } from "@/lib/oauthStore";
+import { classerPanne } from "@/lib/panne";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,10 @@ export async function POST(requete: Request): Promise<Response> {
 
   const parse = DemandeSchema.safeParse(brut);
   if (!parse.success) {
-    return erreur("invalid_client_metadata", "`redirect_uris` est obligatoire (1 à 10 adresses).");
+    return erreur(
+      "invalid_client_metadata",
+      "`redirect_uris` est obligatoire (1 à 10 adresses).",
+    );
   }
 
   // ⚠️ CHAQUE adresse est jugée, pas seulement la première. Un client qui en enregistre
@@ -48,12 +52,36 @@ export async function POST(requete: Request): Promise<Response> {
   for (const uri of parse.data.redirect_uris) {
     const verdict = jugerRedirectUri(uri);
     if (!verdict.ok) {
-      return erreur("invalid_redirect_uri", `Adresse refusée (${verdict.motif}) : ${uri}`);
+      return erreur(
+        "invalid_redirect_uri",
+        `Adresse refusée (${verdict.motif}) : ${uri}`,
+      );
     }
   }
 
   const id = genererSecret(16);
-  await enregistrerClient(id, parse.data.client_name ?? "", parse.data.redirect_uris);
+  try {
+    await enregistrerClient(
+      id,
+      parse.data.client_name ?? "",
+      parse.data.redirect_uris,
+    );
+  } catch (err) {
+    // ⚠️ UN 500 MUET EST CE QUI A COÛTÉ LE PLUS CHER À CE DÉPÔT. Mesuré en production le
+    // 2026-08-19 : cette route rendait un 500 sans corps parce que les tables n'existaient
+    // pas encore, et rien à l'écran de claude.ai n'aurait permis de le deviner. On nomme
+    // donc la panne — « le schéma n'est pas là » et « la base ne répond pas » appellent des
+    // gestes opposés, et les confondre envoie chercher au mauvais endroit.
+    const panne = classerPanne(err);
+    console.error("[oauth/register] enregistrement impossible", { panne, err });
+    return erreur(
+      "server_error",
+      panne === "schema-absent"
+        ? "Le schéma du connecteur n'est pas encore appliqué. Réessaie dans un instant : l'app applique ses migrations elle-même au premier accès."
+        : "La base n'a pas répondu. Réessaie.",
+      503,
+    );
+  }
 
   return Response.json(
     {

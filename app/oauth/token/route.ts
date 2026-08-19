@@ -23,7 +23,14 @@ import {
   genererSecret,
   verifierPkceS256,
 } from "@/lib/mcp/oauth";
-import { consommerCode, lireJetonValide, poserJeton, purger, revoquerJeton } from "@/lib/oauthStore";
+import {
+  consommerCode,
+  lireJetonValide,
+  poserJeton,
+  purger,
+  revoquerJeton,
+} from "@/lib/oauthStore";
+import { classerPanne } from "@/lib/panne";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +56,11 @@ const RafraichirSchema = z.object({
 });
 
 /** Délivre une paire, et rend la réponse OAuth. */
-async function delivrer(clientId: string, sujet: string, maintenant: Date): Promise<Response> {
+async function delivrer(
+  clientId: string,
+  sujet: string,
+  maintenant: Date,
+): Promise<Response> {
   const acces = genererSecret();
   const rafraichissement = genererSecret();
   await poserJeton(
@@ -79,6 +90,19 @@ async function delivrer(clientId: string, sujet: string, maintenant: Date): Prom
   );
 }
 
+/** Une panne de base, NOMMÉE. Deux causes, deux gestes — les confondre égare. */
+function pannBase(err: unknown, ou: string): Response {
+  const panne = classerPanne(err);
+  console.error(`[oauth/token] ${ou}`, { panne, err });
+  return erreur(
+    "server_error",
+    panne === "schema-absent"
+      ? "Le schéma du connecteur n'est pas encore appliqué. Réessaie dans un instant."
+      : "La base n'a pas répondu. Réessaie.",
+    503,
+  );
+}
+
 export async function POST(requete: Request): Promise<Response> {
   // Le corps arrive en `application/x-www-form-urlencoded` : c'est ce que la RFC impose et
   // ce que claude.ai envoie. On accepte aussi le JSON, parce qu'un client de test en envoie
@@ -96,50 +120,76 @@ export async function POST(requete: Request): Promise<Response> {
   const maintenant = new Date();
   const autorise = process.env.AUTHORIZED_EMAIL ?? "";
 
-  if (brut["grant_type"] === "authorization_code") {
-    const parse = CodeSchema.safeParse(brut);
-    if (!parse.success) return erreur("invalid_request", "Paramètres manquants ou invalides.");
-    const d = parse.data;
+  try {
+    if (brut["grant_type"] === "authorization_code") {
+      const parse = CodeSchema.safeParse(brut);
+      if (!parse.success)
+        return erreur("invalid_request", "Paramètres manquants ou invalides.");
+      const d = parse.data;
 
-    const enAttente = await consommerCode(empreinte(d.code), maintenant);
-    // Un code inconnu, expiré OU DÉJÀ CONSOMMÉ rend la même chose : un rejeu ne doit pas se
-    // distinguer d'une erreur ordinaire, sinon il devient un oracle.
-    if (enAttente === null) return erreur("invalid_grant", "Code invalide, expiré ou déjà utilisé.");
+      const enAttente = await consommerCode(empreinte(d.code), maintenant);
+      // Un code inconnu, expiré OU DÉJÀ CONSOMMÉ rend la même chose : un rejeu ne doit pas se
+      // distinguer d'une erreur ordinaire, sinon il devient un oracle.
+      if (enAttente === null)
+        return erreur(
+          "invalid_grant",
+          "Code invalide, expiré ou déjà utilisé.",
+        );
 
-    if (enAttente.clientId !== d.client_id) return erreur("invalid_grant", "Code émis pour un autre client.");
-    // L'adresse doit être la MÊME qu'à l'autorisation : c'est ce qui empêche de faire
-    // atterrir un code ailleurs que là où Marc l'a envoyé.
-    if (enAttente.redirectUri !== d.redirect_uri) return erreur("invalid_grant", "Adresse de retour différente.");
-    if (!verifierPkceS256(d.code_verifier, enAttente.defi)) {
-      return erreur("invalid_grant", "Vérificateur PKCE invalide.");
+      if (enAttente.clientId !== d.client_id)
+        return erreur("invalid_grant", "Code émis pour un autre client.");
+      // L'adresse doit être la MÊME qu'à l'autorisation : c'est ce qui empêche de faire
+      // atterrir un code ailleurs que là où Marc l'a envoyé.
+      if (enAttente.redirectUri !== d.redirect_uri)
+        return erreur("invalid_grant", "Adresse de retour différente.");
+      if (!verifierPkceS256(d.code_verifier, enAttente.defi)) {
+        return erreur("invalid_grant", "Vérificateur PKCE invalide.");
+      }
+      // ⚠️ RE-VÉRIFIÉ À L'USAGE, pas seulement à l'autorisation : si l'adresse autorisée
+      // change entre-temps, les codes en vol cessent immédiatement de valoir quelque chose.
+      if (!estProprietaire(enAttente.sujet, autorise))
+        return erreur("invalid_grant", "Compte non autorisé.", 403);
+
+      await purger(maintenant);
+      return delivrer(d.client_id, enAttente.sujet, maintenant);
     }
-    // ⚠️ RE-VÉRIFIÉ À L'USAGE, pas seulement à l'autorisation : si l'adresse autorisée
-    // change entre-temps, les codes en vol cessent immédiatement de valoir quelque chose.
-    if (!estProprietaire(enAttente.sujet, autorise)) return erreur("invalid_grant", "Compte non autorisé.", 403);
 
-    await purger(maintenant);
-    return delivrer(d.client_id, enAttente.sujet, maintenant);
+    if (brut["grant_type"] === "refresh_token") {
+      const parse = RafraichirSchema.safeParse(brut);
+      if (!parse.success)
+        return erreur("invalid_request", "Paramètres manquants ou invalides.");
+      const d = parse.data;
+
+      const emp = empreinte(d.refresh_token);
+      const jeton = await lireJetonValide(emp, "rafraichissement", maintenant);
+      if (jeton === null)
+        return erreur(
+          "invalid_grant",
+          "Jeton de rafraîchissement invalide ou expiré.",
+        );
+      if (jeton.clientId !== d.client_id)
+        return erreur("invalid_grant", "Jeton émis pour un autre client.");
+      if (!estProprietaire(jeton.sujet, autorise))
+        return erreur("invalid_grant", "Compte non autorisé.", 403);
+
+      // ROTATION : on révoque AVANT de délivrer, et le succès de la révocation fait foi. Deux
+      // rafraîchissements simultanés portant le même jeton ne peuvent pas gagner tous les deux.
+      const tourne = await revoquerJeton(emp, maintenant);
+      if (!tourne)
+        return erreur(
+          "invalid_grant",
+          "Jeton de rafraîchissement déjà utilisé.",
+        );
+
+      await purger(maintenant);
+      return delivrer(d.client_id, jeton.sujet, maintenant);
+    }
+
+    return erreur(
+      "unsupported_grant_type",
+      "Seuls `authorization_code` et `refresh_token` sont acceptés.",
+    );
+  } catch (err) {
+    return pannBase(err, "échange impossible");
   }
-
-  if (brut["grant_type"] === "refresh_token") {
-    const parse = RafraichirSchema.safeParse(brut);
-    if (!parse.success) return erreur("invalid_request", "Paramètres manquants ou invalides.");
-    const d = parse.data;
-
-    const emp = empreinte(d.refresh_token);
-    const jeton = await lireJetonValide(emp, "rafraichissement", maintenant);
-    if (jeton === null) return erreur("invalid_grant", "Jeton de rafraîchissement invalide ou expiré.");
-    if (jeton.clientId !== d.client_id) return erreur("invalid_grant", "Jeton émis pour un autre client.");
-    if (!estProprietaire(jeton.sujet, autorise)) return erreur("invalid_grant", "Compte non autorisé.", 403);
-
-    // ROTATION : on révoque AVANT de délivrer, et le succès de la révocation fait foi. Deux
-    // rafraîchissements simultanés portant le même jeton ne peuvent pas gagner tous les deux.
-    const tourne = await revoquerJeton(emp, maintenant);
-    if (!tourne) return erreur("invalid_grant", "Jeton de rafraîchissement déjà utilisé.");
-
-    await purger(maintenant);
-    return delivrer(d.client_id, jeton.sujet, maintenant);
-  }
-
-  return erreur("unsupported_grant_type", "Seuls `authorization_code` et `refresh_token` sont acceptés.");
 }
