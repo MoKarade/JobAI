@@ -162,11 +162,27 @@ export async function diagnostiquerFlux(
     inventaireVues: resumerInventaire(rapport.inventaireVues, 20),
     inventaireRetenues: resumerInventaire(rapport.inventaireRetenues, 40),
     // La table qui DÉCIDE : par classe, le compte ET des titres réels, sur les régionales.
-    exemplesRetenues: rapport.exemplesRetenues,
+    //
+    // ⚠️ EXPURGÉE, COMME TOUT TEXTE ÉCRIT PAR UN TIERS QUI SORT D'ICI. Un titre d'annonce
+    // est court et porte rarement une PII — mais « rarement » n'est pas « jamais », et ces
+    // titres partent désormais jusqu'à un écran (le choix des métiers retenus). La règle du
+    // dépôt ne distingue pas les champs par leur probabilité : ce qui vient d'un tiers passe
+    // par l'expurgateur. Il est pur et coûte une expression régulière.
+    exemplesRetenues: Object.fromEntries(
+      Object.entries(rapport.exemplesRetenues).map(([champ, parClasse]) => [
+        champ,
+        Object.fromEntries(
+          Object.entries(parClasse).map(([classe, titres]) => [
+            classe,
+            titres.map((t) => expurgerPII(t).texte),
+          ]),
+        ),
+      ]),
+    ),
     // Le code de profession appairé à son titre : la seule façon de vérifier qu'il dit bien
     // ce que la norme prétend, au lieu de le supposer.
     professions: rapport.brutsRetenus.map((b) => ({
-      titre: lireChamp(b, "title"),
+      titre: expurgerPII(lireChamp(b, "title")).texte,
       noc2021: lireChamp(b, "noc2021"),
       education: lireChamp(b, "education"),
       experience: lireChamp(b, "experience"),

@@ -18,9 +18,11 @@ import { RECHERCHES_GUICHET } from "@/lib/ingest/sources";
 import { BoutonVeille } from "@/components/BoutonVeille";
 import { RapportVeilleVue } from "@/components/RapportVeille";
 import { ReglageRayon } from "@/components/ReglageRayon";
+import { ReglageMetiers } from "@/components/ReglageMetiers";
 import { lireEtat } from "@/lib/etat";
 import { CLE_RAPPORT, type RapportVeille } from "@/lib/rapportVeille";
 import { CLE_RAYON, RAYON_DEFAUT_KM } from "@/lib/rayon";
+import { CLE_METIERS, METIERS_DEFAUT, normaliserMetiers } from "@/lib/metiersRetenus";
 import { classerPanne } from "@/lib/panne";
 
 export const metadata = { title: "Sources — JobAI" };
@@ -39,11 +41,17 @@ export default async function Sources() {
   // le reste, qui est statique.
   let dernier: RapportVeille | null = null;
   let rayon = RAYON_DEFAUT_KM;
+  let metiers: string[] = [...METIERS_DEFAUT];
   try {
-    [dernier, rayon] = await Promise.all([
+    let metiersBruts: string[];
+    [dernier, rayon, metiersBruts] = await Promise.all([
       lireEtat<RapportVeille | null>(CLE_RAPPORT, null),
       lireEtat<number>(CLE_RAYON, RAYON_DEFAUT_KM),
+      lireEtat<string[]>(CLE_METIERS, [...METIERS_DEFAUT]),
     ]);
+    // Re-normalisé à la lecture, comme dans `lireMetiers` : l'état est du JSON écrit par une
+    // version antérieure du code, et un code mal formé ne retient rien.
+    metiers = Array.isArray(metiersBruts) ? normaliserMetiers(metiersBruts).codes : [];
   } catch (err) {
     console.error("[sources] état illisible :", classerPanne(err));
   }
@@ -81,12 +89,25 @@ export default async function Sources() {
             </span>
           </li>
           <li className="sources__canal">
-            <span className="sources__nom">Guichet-Emplois</span>
+            <span className="sources__nom">Guichet-Emplois — RSS</span>
             <span className="sources__etat">désactivé</span>
             <span className="sources__note">
               {RECHERCHES_GUICHET.length === 0
                 ? "Son flux RSS répond 404 sur toutes les adresses testées, et l’hôte est refusé par la politique réseau. Le laisser tourner ferait des requêtes vouées à l’échec chaque matin, et on prendrait l’habitude de voir des sources en erreur."
                 : `${RECHERCHES_GUICHET.length} recherche(s) interrogée(s) chaque passe.`}
+            </span>
+          </li>
+          <li className="sources__canal">
+            <span className="sources__nom">Guichet-Emplois — flux complet</span>
+            <span
+              className={`sources__etat${metiers.length > 0 ? " sources__etat--actif" : ""}`}
+            >
+              {metiers.length > 0 ? "actif" : "éteint"}
+            </span>
+            <span className="sources__note">
+              {metiers.length > 0
+                ? `Le flux XML de tout le Canada, filtré sur ${metiers.length} code(s) de profession et sur la région. Réglable plus bas.`
+                : "Le flux XML de tout le Canada. Il n’est pas interrogé tant qu’aucun métier n’est retenu : sans tri, il ferait entrer des milliers d’offres que personne n’a demandées. À régler plus bas."}
             </span>
           </li>
           <li className="sources__canal">
@@ -103,6 +124,11 @@ export default async function Sources() {
       <section className="cadre-section">
         <h2 className="cadre-section__titre">Rayon</h2>
         <ReglageRayon rayonInitial={rayon} />
+      </section>
+
+      <section className="cadre-section">
+        <h2 className="cadre-section__titre">Métiers retenus dans le flux complet</h2>
+        <ReglageMetiers metiersInitiaux={metiers} />
       </section>
 
       <section className="cadre-section">

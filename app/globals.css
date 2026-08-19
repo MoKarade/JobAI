@@ -2182,3 +2182,70 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .rayon__unite { font-family: var(--mono); color: var(--text-soft); margin-right: 0.4rem; }
 .rayon__aide { font-size: var(--t-xs); color: var(--text-soft); max-width: 68ch; }
 .rayon__message { font-size: var(--t-s); min-height: 1.2em; }
+
+/* Réglage des métiers retenus dans le flux complet du Guichet. Reprend les jetons du
+   réglage du rayon : deux formulaires de la même page qui ne se ressembleraient pas
+   donneraient l'impression que l'un est plus officiel que l'autre. */
+.metiers { display: flex; flex-direction: column; gap: 0.75rem; }
+.metiers__label {
+  font-size: var(--t-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+.metiers__aide { font-size: var(--t-xs); color: var(--text-soft); max-width: 68ch; }
+.metiers__alerte { font-size: var(--t-xs); color: var(--ambre); max-width: 68ch; }
+.metiers__actuels { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.metiers__valeur { font-family: var(--mono); font-size: var(--t-s); overflow-wrap: anywhere; }
+.metiers__ligne-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.metiers__champ {
+  padding: 0.45rem 0.6rem;
+  background: var(--creux);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--t-m);
+  font-variant-numeric: tabular-nums;
+}
+.metiers__champ:focus-visible { outline: 2px solid var(--ambre); outline-offset: 2px; }
+.metiers__bloc { display: flex; flex-direction: column; gap: 0.4rem; }
+.metiers__soustitre { font-size: var(--t-s); font-weight: 600; margin: 0; }
+/* Le tableau peut compter quarante lignes : il défile dans son coin plutôt que d'allonger
+   la page, et la largeur du reste de l'écran ne dépend pas de lui. */
+.metiers__table {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.metiers__ligne {
+  display: grid;
+  grid-template-columns: minmax(6rem, auto) 4rem 1fr;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--t-xs);
+}
+.metiers__ligne:last-child { border-bottom: none; }
+.metiers__choix { display: flex; align-items: center; gap: 0.45rem; cursor: pointer; }
+.metiers__code { font-family: var(--mono); font-size: var(--t-s); }
+.metiers__n {
+  font-family: var(--mono);
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.metiers__titres { color: var(--text-soft); overflow-wrap: anywhere; }
+.metiers__message { font-size: var(--t-s); min-height: 1.2em; }
+
+@media (max-width: 32rem) {
+  /* Sous 32 rem, la colonne des titres n'a plus la place d'être lisible à côté du code :
+     elle passe dessous plutôt que de se réduire à deux mots par ligne. */
+  .metiers__ligne { grid-template-columns: minmax(6rem, auto) 4rem; }
+  .metiers__titres { grid-column: 1 / -1; }
+}
