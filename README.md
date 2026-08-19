@@ -76,12 +76,14 @@ dans l'app, pas de SDK Anthropic ») — c'était vrai à l'écriture et faux de
 module CV :
 
 - `@anthropic-ai/sdk` est en dépendance de **production** (`package.json`) ;
-- `lib/cv/extraction.ts` appelle `client.messages.create` avec `claude-haiku-4-5` ;
-- `lib/cv/proposition.ts` et `lib/cv/renotation.ts` complètent la chaîne, couverts par
-  `tests/cvExtraction.test.ts`, `cvBornes.test.ts`, `cvTexte.test.ts`, `cvProposition.test.ts`.
+- **un seul site d'appel** : `lib/cv/extraction.ts` (`client.messages.create`, modèle
+  `claude-haiku-4-5`), atteint par `extraireFaits` depuis `lib/cv/actions.ts`. C'est le
+  seul fichier de tout le dépôt qui importe le SDK.
 
-La **notation des offres**, elle, reste un barème déterministe : c'est le CV qui passe par le
-LLM, pas le tri.
+Le reste de la chaîne CV est **déterministe** : `lib/cv/proposition.ts` et
+`lib/cv/renotation.ts` travaillent sur ce que l'extraction a rendu, sans rappeler l'API. La
+**notation des offres** l'est aussi. Autrement dit, la dépense se concentre en un point —
+c'est ce qui rend la mesure facile, et son absence d'autant moins excusable.
 
 ⚠️ **Conséquence non résolue** : JobAI ne compte pas ses tokens et ne publie aucun bloc
 `usage` (`lib/hubSummary.ts`). Elle apparaît donc « non suivie » dans la page « Coûts &
