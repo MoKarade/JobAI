@@ -156,6 +156,13 @@ export function RapportVeilleVue({
               >
                 <span className="rapport__source-nom">{s.id}</span>
                 <span className="rapport__source-n">{s.ok ? s.offres : "en échec"}</span>
+                {/*
+                  Ce que la source a refusé. Rendu sous le compte plutôt qu'à côté : c'est
+                  une phrase, pas un nombre, et une source qui rapporte peu n'est lisible
+                  qu'avec elle — « 0 » seul ne distingue pas un marché calme d'un filtre qui
+                  n'a rien laissé passer.
+                */}
+                {s.note ? <span className="rapport__source-note">{s.note}</span> : null}
               </li>
             ))
           )}

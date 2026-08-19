@@ -2142,10 +2142,12 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .rapport__motif-nom { color: var(--text); }
 .rapport__villes { font-size: var(--t-xs); color: var(--text-soft); overflow-wrap: anywhere; }
 
-.rapport__source { display: flex; justify-content: space-between; gap: 1rem; font-size: var(--t-s); }
+.rapport__source { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.15rem 1rem; font-size: var(--t-s); }
 .rapport__source-nom { font-family: var(--mono); overflow-wrap: anywhere; }
 .rapport__source-n { font-family: var(--mono); color: var(--text-soft); font-variant-numeric: tabular-nums; }
 .rapport__source--muette .rapport__source-n { color: var(--rouge); }
+/* Ce que la source a refusé : une phrase, donc sa propre ligne sous le compte. */
+.rapport__source-note { flex-basis: 100%; font-size: var(--t-xs); color: var(--text-soft); overflow-wrap: anywhere; }
 
 .rapport__ligne { font-size: var(--t-s); }
 .rapport__ligne--douce { color: var(--text-soft); font-size: var(--t-xs); margin-top: 0.25rem; }

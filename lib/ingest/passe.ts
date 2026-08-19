@@ -20,6 +20,7 @@ import { cleCanonique, idsStockesVus, lieuxAMesurer, trier, villesACompleter, ty
 import { verdictsFermes, type RegistreLieux } from "./lieux";
 import { RECHERCHES_GUICHET, sourceGuichet } from "./sources";
 import { sourceDepotFichier } from "./depotFichier";
+import { sourceGuichetFlux, type OptionsSourceFlux } from "./sourceGuichetFlux";
 import { villeCoherente } from "./depotSchema";
 import type { OffreBrute, Recuperateur, ResultatSource, Source } from "./types";
 
@@ -68,7 +69,15 @@ export interface AdresseAnnoncee {
 
 export interface RapportPasse {
   /** Ce que chaque source a rendu, succès comme échec. */
-  sources: { id: string; ok: boolean; offres: number; erreur?: string; dernierJour?: string }[];
+  sources: {
+    id: string;
+    ok: boolean;
+    offres: number;
+    erreur?: string;
+    dernierJour?: string;
+    /** Ce que la source a refusé, en une ligne. Voir `ResultatSource.note`. */
+    note?: string;
+  }[];
   trouvees: number;
   tri: Omit<Tri, "retenues">;
   nouvelles: string[];
@@ -113,7 +122,19 @@ export interface RapportPasse {
  * `depart` fait tourner la sélection d'un jour à l'autre : sans lui, les mêmes sources
  * seraient interrogées chaque jour et les dernières de la liste ne le seraient JAMAIS.
  */
-export function selectionnerSources(depart: number, aujourdhui: string): Source[] {
+export function selectionnerSources(
+  depart: number,
+  aujourdhui: string,
+  /**
+   * De quoi construire la source du flux complet, ou `undefined` pour ne pas la construire.
+   *
+   * ⚠️ UNE LISTE DE MÉTIERS VIDE ÉTEINT LA SOURCE, elle ne la rend pas permissive. Sans ce
+   * garde, le jour où le module est branché, la première passe lirait ~130 Mo et ferait
+   * entrer des milliers d'offres que personne n'a demandées. Le défaut sûr d'un filtre qui
+   * n'a pas encore été réglé est de tout refuser, pas de tout laisser passer.
+   */
+  flux?: OptionsSourceFlux,
+): Source[] {
   // ⚠️ LE DÉPÔT DE FICHIERS EST HORS ROTATION, ET C'EST TOUT L'INTÉRÊT. La rotation existe
   // pour ne pas dépasser la durée d'une fonction en interrogeant douze sources RÉSEAU. Le
   // dépôt ne fait aucune requête : il lit un fichier du projet. Le mettre dans la rotation
@@ -121,15 +142,25 @@ export function selectionnerSources(depart: number, aujourdhui: string): Source[
   // ce jour-là, et la péremption les ferait disparaître alors qu'elles sont bien là.
   const depot = sourceDepotFichier(aujourdhui);
 
+  // ⚠️ LE FLUX COMPLET EST HORS ROTATION POUR LA MÊME RAISON QUE LE DÉPÔT, et elle est
+  // encore plus impérieuse ici : il est en passe de devenir la source PRINCIPALE. Une source
+  // sautée un jour sur deux voit ses offres prendre une absence ce jour-là, et trois
+  // absences périment. Le mettre dans la rotation reviendrait à périmer par intermittence
+  // ce qu'on vient d'ingérer — un faux positif de péremption dont la cause serait l'horaire.
+  const hors: Source[] = [depot];
+  if (flux !== undefined && flux.metiers.length > 0) {
+    hors.push(sourceGuichetFlux(flux).source);
+  }
+
   const reseau = RECHERCHES_GUICHET.map((r) => sourceGuichet(r));
-  if (reseau.length <= MAX_SOURCES_PAR_PASSE) return [depot, ...reseau];
+  if (reseau.length <= MAX_SOURCES_PAR_PASSE) return [...hors, ...reseau];
 
   const debut = ((depart % reseau.length) + reseau.length) % reseau.length;
   const choisies: typeof reseau = [];
   for (let i = 0; i < MAX_SOURCES_PAR_PASSE; i++) {
     choisies.push(reseau[(debut + i) % reseau.length]!);
   }
-  return [depot, ...choisies];
+  return [...hors, ...choisies];
 }
 
 /**
@@ -164,8 +195,28 @@ export async function executerPasse(
       registre: RegistreLieux,
     ) => Promise<{ registre: RegistreLieux; juges: number; introuvables: number }>;
   },
+  /**
+   * Le flux complet du Guichet, si Marc a choisi des métiers.
+   *
+   * Séparé de `lieux` parce que ce sont deux décisions indépendantes : on peut mesurer les
+   * lieux sans lire le flux, et l'inverse. Optionnel : sans lui, la passe se comporte
+   * exactement comme avant.
+   */
+  flux?: { metiers: readonly string[]; recuperer?: typeof fetch },
 ): Promise<RapportPasse> {
-  const sources = selectionnerSources(depart, aujourdhui);
+  // ⚠️ LE PRÉ-FILTRE RÉGIONAL DU FLUX VOIT LE REGISTRE D'AVANT LA MESURE, ET C'EST INHÉRENT.
+  // Les sources sont interrogées AVANT que la mesure des lieux n'ait tourné (elle apprend
+  // ses noms de ce que les sources rapportent). Le flux juge donc les villes avec les
+  // verdicts de la veille — ce qui n'a qu'une conséquence, bornée et qui se résorbe : une
+  // ville tout juste mesurée entre à la passe SUIVANTE, pas à celle-ci. Vouloir corriger ça
+  // en mesurant d'abord n'est pas possible : on ne saurait pas quoi mesurer.
+  const sources = selectionnerSources(
+    depart,
+    aujourdhui,
+    flux === undefined
+      ? undefined
+      : { ...flux, verdicts: verdictsFermes(lieux?.registre ?? {}) },
+  );
 
   // En parallèle : les sources sont indépendantes, et les enchaîner ferait dépasser la
   // durée de la fonction bien avant d'avoir tout interrogé.
@@ -178,7 +229,13 @@ export async function executerPasse(
   for (const r of resultats) {
     if (r.ok) {
       brutes.push(...r.offres);
-      compte.push({ id: r.source, ok: true, offres: r.offres.length, dernierJour: r.dernierJour });
+      compte.push({
+        id: r.source,
+        ok: true,
+        offres: r.offres.length,
+        dernierJour: r.dernierJour,
+        note: r.note,
+      });
     } else {
       compte.push({ id: r.source, ok: false, offres: 0, erreur: r.erreur });
     }

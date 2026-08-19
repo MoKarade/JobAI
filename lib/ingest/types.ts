@@ -76,6 +76,17 @@ export type ResultatSource =
        * n'a pas de date de lot ; le renseigner est ce qui rend le silence détectable.
        */
       dernierJour?: string;
+      /**
+       * Une ligne que la source écrit sur CE QU'ELLE A REFUSÉ, pour l'écran de diagnostic.
+       *
+       * ⚠️ SANS ELLE, UNE SOURCE QUI FILTRE EST INDISCERNABLE D'UNE SOURCE MUETTE. Le flux
+       * complet du Guichet voit ~67 000 offres et n'en rend qu'une poignée : « 0 offre »
+       * peut vouloir dire « la région n'embauche pas aujourd'hui » ou « la liste de métiers
+       * retenus ne correspond à rien ». Ce sont deux corrections opposées, et seul le
+       * DÉTAIL des refus les sépare. Optionnelle : une source qui ne refuse rien n'a rien à
+       * dire, et un texte vide vaut mieux qu'une ligne inventée.
+       */
+      note?: string;
     }
   | { ok: false; source: string; erreur: string };
 

@@ -76,7 +76,23 @@ export interface RapportVeille {
   suivies: number;
 
   /** Une ligne par source interrogée : « 0 au total » ne dit pas laquelle s'est tue. */
-  sources: { id: string; ok: boolean; offres: number; erreur?: string; dernierJour?: string }[];
+  sources: {
+    id: string;
+    ok: boolean;
+    offres: number;
+    erreur?: string;
+    dernierJour?: string;
+    /**
+     * Ce que la source a REFUSÉ, en une ligne (`ResultatSource.note`).
+     *
+     * ⚠️ SANS ELLE, UNE SOURCE QUI FILTRE BEAUCOUP EST INDISCERNABLE D'UNE SOURCE MUETTE.
+     * Le flux complet du Guichet voit des dizaines de milliers d'offres et n'en rapporte
+     * qu'une poignée : « 0 offre » peut vouloir dire « rien de neuf dans la région » ou
+     * « la liste de métiers retenus ne correspond à rien ». Deux corrections opposées,
+     * qu'aucun compte seul ne sépare.
+     */
+    note?: string;
+  }[];
   /**
    * Fraîcheur du dépôt — le SEUL canal vivant depuis le retrait des pages carrières.
    *

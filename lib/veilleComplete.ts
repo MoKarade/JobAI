@@ -35,6 +35,7 @@ import { EPOQUE_A_RETENTER } from "./travaux";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "./synchro";
 import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
 import { executerPasse } from "./ingest/passe";
+import { CLE_METIERS, METIERS_DEFAUT, normaliserMetiers } from "./metiersRetenus";
 import { villesRefusees } from "./ingest/pipeline";
 import { CLE_RAPPORT, construireRapport, type RapportVeille } from "./rapportVeille";
 import { CLE_RAYON, RAYON_DEFAUT_KM } from "./rayon";
@@ -89,7 +90,7 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
   }
 
   try {
-    const [connues, journal, curseur, lieux, rayonMaxKm] = await Promise.all([
+    const [connues, journal, curseur, lieux, rayonMaxKm, metiers] = await Promise.all([
       lireOffres(),
       lireEtat<JournalVeille>(CLE_JOURNAL, {}),
       lireEtat<number>(CLE_CURSEUR, 0),
@@ -98,6 +99,9 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
       // partout où il décide : la mesure des lieux et, plus bas, la note de distance. Deux
       // lectures séparées finiraient par diverger d'une passe à l'autre.
       lireEtat<number>(CLE_RAYON, RAYON_DEFAUT_KM),
+      // Les métiers retenus pour le flux complet du Guichet. Vide ⇒ la source n'est pas
+      // construite du tout : tant que Marc n'a pas choisi, la veille se comporte comme avant.
+      lireEtat<string[]>(CLE_METIERS, [...METIERS_DEFAUT]),
     ]);
 
     if (connues === null) {
@@ -112,7 +116,11 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
       // point de référence — garde-fou n°1, tenu par la forme de la fonction, pas par une
       // convention qu'on pourrait oublier.
       mesurer: (noms, registre) => mesurerLieuxInconnus(noms, registre, jour, rayonMaxKm),
-    });
+    },
+    // ⚠️ RE-NORMALISÉ ICI AUSSI. L'état est du JSON écrit par une version antérieure : rien
+    // ne garantit qu'il porte encore des codes lisibles, et un code mal formé ne retient
+    // rien (`codeRetenu`) — la source tournerait alors à vide sans qu'on sache pourquoi.
+    { metiers: normaliserMetiers(metiers).codes });
 
     // Les nouvelles offres d'abord : si l'écriture du journal échoue ensuite, on aura
     // gagné des offres et rejoué une passe, pas perdu du travail.

@@ -843,18 +843,20 @@
       + la table de DECISION dans le diagnostic : par code, le compte ET des titres reels
       distincts, sur les offres REGIONALES seulement. RIEN n'est branche sur le pipeline.
 
-- [ ] **[NOC-02]** Choisir la liste des codes retenus, **sur la table mesuree**. Elle vit
-      dans le PROFIL (`lib/profil.ts`), a cote de `motsCoordination` : c'est une decision de
-      Marc, pas une constante de code. ⚠️ Prealable : un appel a
-      `/api/diagnostic/flux-guichet` — `inventaireRetenues.noc2021` + `exemplesRetenues`
-      donnent code / compte / titres. Sans eux, toute liste serait une supposition deguisee
-      en regle, et la lecture « 2e chiffre = niveau de qualification » vient de la NORME,
-      pas d'une mesure.
+- [ ] **[NOC-02]** Choisir la liste des codes retenus, **sur la table mesuree**. ✔ REVISE
+      le 2026-08-19 : elle ne vit PAS dans `lib/profil.ts` mais dans l'ETAT
+      (`lib/metiersRetenus.ts`, cle `veille-metiers`), reglable par Marc depuis l'app — meme
+      raison que le rayon : une constante de code exige un commit, donc moi, pour chaque
+      correction. Reste a faire : l'ECRAN qui montre la table mesuree (code / compte /
+      titres reels) et ou Marc coche. Sans lui, il faut encore me demander de lancer le
+      diagnostic — c'est exactement la dependance qu'on cherche a supprimer.
 
-- [ ] **[NOC-03]** Brancher le filtre sur l'ingestion du flux Guichet, avec le compte des
-      ecartees PAR CODE (compter ne suffit pas, il faut nommer l'objet). Non-regression :
-      aucune offre existante ne change de note — aucune n'a de NOC — a VERIFIER par un test,
-      pas a supposer. Revue de la flotte avant merge.
+- [x] **[NOC-03]** Brancher le filtre sur l'ingestion du flux Guichet, avec le compte des
+      ecartees PAR CODE (compter ne suffit pas, il faut nommer l'objet). ✔ Livre :
+      `lib/ingest/sourceGuichetFlux.ts`, branche par `selectionnerSources` **hors rotation**
+      et seulement si la liste de metiers est non vide. Les refus partent a l'ecran par
+      `ResultatSource.note`. Non-regression : la source est INERTE par defaut (liste vide),
+      donc aucune offre existante ne change de note — verifie par test, pas suppose.
 
 - [ ] **[ROUTINE-01]** ⚠️ **NE PAS supprimer la Routine — reponse PARTIELLE, mesuree le
       2026-08-19.** Ce qu'elle depose, passe au barème lui-meme (268 offres distinctes sur
@@ -871,6 +873,13 @@
       rendrait « hors sujet » quel que soit le merite. La comparaison honnete passe par la
       distribution NOC ([NOC-02]), pas par le barème. Conclusion tenable aujourd'hui : la
       Routine est PRODUCTIVE et reste la seule source alignee ; sa redondance est INCONNUE.
+      ⚠️ **DEMANDE MARC 2026-08-19 : « je veux la supprimer, fais en sorte que je puisse ».**
+      Ce que l'app NE PEUT PAS reprendre : la part Indeed (garde-fou n°4 + conditions
+      d'Indeed — la Routine passe par le connecteur officiel, l'app n'y a pas acces).
+      Supprimer la Routine, c'est donc CHANGER DE SOURCE pour le flux complet du Guichet.
+      Le chemin est ouvert (voir [NOC-03]) ; ce qui reste avant que Marc puisse trancher :
+      l'ecran de [NOC-02], puis [VEILLE-32]/[VEILLE-34] — **le vrai verrou n'est pas le NOC,
+      c'est que le barème est monolingue face a des titres anglais**.
 
 - [ ] **[VEILLE-44]** ⚠️ **DECISION MARC : 1 300 offres regionales par passe** (mesure sur
       une passe complete), contre quelques dizaines suivies aujourd'hui. L'echantillon reste
@@ -901,6 +910,11 @@
       l'échantillon à l'œil. ⚠️ `Source.interroger` reçoit un `Recuperateur` (qui rend du
       TEXTE, donc chargerait les ~134 Mo) : le branchement devra passer le `fetch` brut, pas
       élargir `Recuperateur`. Le dépôt de fichiers reste la source active d'ici là.
+      ✔ **BRANCHÉ le 2026-08-19, mais ÉTEINT par défaut** : `sourceGuichetFlux` reçoit bien
+      le `fetch` brut (elle ignore le `Recuperateur` qu'on lui passe, dit dans son en-tête),
+      et `selectionnerSources` ne la construit QUE si la liste de métiers est non vide. Les
+      deux préalables ci-dessus tiennent donc toujours — ils décident du jour où Marc coche
+      un premier code, pas du branchement.
 
 - [x] **[VEILLE-38]** La FRAÎCHEUR du dépôt, dite (`dernierJourDepose`, `fraicheurDepot`).
       Mesuré en cherchant tout autre chose : **la veille n'a plus qu'UNE source**, le dépôt
