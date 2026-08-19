@@ -81,6 +81,14 @@ export interface Mesure {
   offres: number | null;
   ms: number;
   erreur?: string;
+  /**
+   * Les directives qui NOUS visent, quand le candidat est un `robots.txt`.
+   *
+   * Pas l'échantillon : le bloc qui compte est `User-agent: *`, et sur ZipRecruiter il
+   * arrive après le bloc `googlebot`. Lire le début du fichier avait fait croire à un
+   * `Allow: /` qui ne nous était pas adressé.
+   */
+  robots?: string[];
 }
 
 /** Le verdict lisible d'une mesure. PURE. */
@@ -132,6 +140,52 @@ export function compterOffres(corps: string, famille: FamilleAts | undefined): n
   }
 }
 
+/**
+ * Les directives d'un `robots.txt` qui s'appliquent à UN agent donné.
+ *
+ * ⚠️ CETTE FONCTION EST NÉE D'UN DÉFAUT DE LA SONDE ELLE-MÊME. Le premier passage rendait
+ * les 400 premiers caractères du fichier : sur ZipRecruiter (3 ko) on n'a vu que le bloc
+ * `googlebot`, et sur LinkedIn (120 ko) que l'en-tête. Or le bloc qui nous concerne est
+ * `User-agent: *`, et il est plus bas. Lire le début d'un fichier de règles et croire
+ * l'avoir lu, c'est exactement l'erreur que la sonde était censée empêcher.
+ *
+ * PURE. Un groupe commence à une suite de lignes `User-agent:` et court jusqu'au groupe
+ * suivant ; les commentaires (`#`) sont retirés — un `# Disallow: /` en commentaire
+ * n'interdit rien, et le confondre avec une règle ferait renoncer à un accès permis.
+ */
+export function extraireBlocRobots(texte: string, agent = "*"): string[] {
+  const lignes = texte
+    .split(/\r?\n/)
+    .map((l) => l.replace(/#.*$/, "").trim())
+    .filter((l) => l !== "");
+
+  const groupes: { agents: string[]; regles: string[] }[] = [];
+  let courant: { agents: string[]; regles: string[] } | null = null;
+  let dansEnTete = false;
+
+  for (const ligne of lignes) {
+    const m = /^user-agent\s*:\s*(.+)$/i.exec(ligne);
+    if (m) {
+      // Plusieurs `User-agent:` de suite partagent le MÊME groupe de règles.
+      if (!dansEnTete || courant === null) {
+        courant = { agents: [], regles: [] };
+        groupes.push(courant);
+        dansEnTete = true;
+      }
+      courant.agents.push(m[1]!.trim().toLowerCase());
+      continue;
+    }
+    dansEnTete = false;
+    if (courant !== null) courant.regles.push(ligne);
+  }
+
+  const vise = agent.toLowerCase();
+  const exact = groupes.find((g) => g.agents.includes(vise));
+  if (exact) return exact.regles;
+  // À défaut d'un bloc nommé, c'est le bloc générique qui s'applique.
+  return groupes.find((g) => g.agents.includes("*"))?.regles ?? [];
+}
+
 /** Un identifiant qu'aucune entreprise ne porte. Le TÉMOIN NÉGATIF. */
 const BIDON = "nexistepasdutout999";
 
@@ -155,6 +209,7 @@ export const CANDIDATS: readonly Candidat[] = [
   // ── API d'ATS : publiques, documentées, faites pour être consommées ────────────────
   {
     id: "ats:greenhouse",
+    famille: "greenhouse",
     nom: "Greenhouse — API publique de tableau d'offres",
     url: `https://boards-api.greenhouse.io/v1/boards/${BIDON}/jobs?content=true`,
     voie: "api-publique",
@@ -162,6 +217,7 @@ export const CANDIDATS: readonly Candidat[] = [
   },
   {
     id: "ats:lever",
+    famille: "lever",
     nom: "Lever — API publique d'offres",
     url: `https://api.lever.co/v0/postings/${BIDON}?mode=json`,
     voie: "api-publique",
@@ -169,6 +225,7 @@ export const CANDIDATS: readonly Candidat[] = [
   },
   {
     id: "ats:recruitee",
+    famille: "recruitee",
     nom: "Recruitee — API publique d'offres",
     url: `https://${BIDON}.recruitee.com/api/offers/`,
     voie: "api-publique",
@@ -177,6 +234,7 @@ export const CANDIDATS: readonly Candidat[] = [
   },
   {
     id: "ats:workable",
+    famille: "workable",
     nom: "Workable — API publique de widget",
     url: `https://apply.workable.com/api/v1/widget/accounts/${BIDON}?details=true`,
     voie: "api-publique",
@@ -184,6 +242,7 @@ export const CANDIDATS: readonly Candidat[] = [
   },
   {
     id: "ats:smartrecruiters",
+    famille: "smartrecruiters",
     nom: "SmartRecruiters — API publique d'offres",
     url: `https://api.smartrecruiters.com/v1/companies/${BIDON}/postings?limit=100`,
     voie: "api-publique",
@@ -241,6 +300,52 @@ export const CANDIDATS: readonly Candidat[] = [
     url: "https://www.ville.quebec.qc.ca/robots.txt",
     voie: "officielle",
     attendu: "les règles du portail municipal",
+  },
+
+  // ── Guichet-Emplois : les surfaces CONSTATÉES le 2026-08-19, à vérifier ─────────────
+  // ⚠️ CES TROIS URL VIENNENT DE RÉSULTATS DE RECHERCHE, PAS D'UNE VISITE. Ce projet
+  // s'est déjà trompé exactement là : les formes d'URL du Guichet écrites en août venaient
+  // de TITRES de résultats, et Marc a constaté que le premier lien tombait sur l'accueil.
+  // « Un lien lu dans une liste de résultats n'est pas un lien vérifié » — c'est la sonde,
+  // depuis Vercel, qui tranche. Elles sont ici POUR ÊTRE ÉPROUVÉES, pas parce qu'on y croit.
+  {
+    id: "officielle:guichet-xmlfeed",
+    nom: "Guichet-Emplois — flux XML",
+    url: "https://www.jobbank.gc.ca/xmlfeed/jobbank.xml",
+    voie: "officielle",
+    attendu: "du XML portant des offres — c'est LA surface d'ingestion recherchée",
+    reserve:
+      "URL lue dans un résultat de recherche, jamais visitée. Un 200 en `text/html` serait " +
+      "une page d'erreur déguisée, pas un flux : c'est l'ÉCHANTILLON qui tranche, pas le code.",
+  },
+  {
+    id: "officielle:guichet-recherche",
+    nom: "Guichet-Emplois — page de recherche",
+    url: "https://www.jobbank.gc.ca/jobsearch/",
+    voie: "officielle",
+    attendu: "la page de recherche ; leur robots.txt l'autorise avec Crawl-delay: 5",
+  },
+  {
+    id: "officielle:guichet-employeur",
+    nom: "Guichet-Emplois — offres par employeur",
+    url: "https://www.jobbank.gc.ca/browsejobs/employer/Robotiq/QC",
+    voie: "officielle",
+    attendu: "les offres d'un employeur nommé — la voie la plus ciblée pour les 36 cibles",
+    reserve: "Forme d'URL lue dans un résultat de recherche. À confirmer par l'échantillon.",
+  },
+
+  // ── Vérification d'un jeton ATS CONSTATÉ (et non deviné) ───────────────────────────
+  {
+    id: "jeton:robotiq-smartrecruiters",
+    nom: "Robotiq — jeton SmartRecruiters constaté",
+    url: "https://api.smartrecruiters.com/v1/companies/ROBOTIQInc/postings?limit=100",
+    voie: "api-publique",
+    famille: "smartrecruiters",
+    attendu: "des offres RÉELLES — c'est la deuxième vérification, indépendante de la première",
+    reserve:
+      "Le jeton `ROBOTIQInc` a été CONSTATÉ dans l'URL `careers.smartrecruiters.com/ROBOTIQInc`, " +
+      "pas déduit du nom. Reste la seconde vérification exigée : le contenu est-il dans la région ? " +
+      "`recruitee/robert` répondait très bien — avec des postes à Amsterdam.",
   },
 
   // ── Les quatre agrégateurs demandés par Marc — on lit d'abord ce qu'ils AUTORISENT ──
@@ -325,8 +430,10 @@ export async function sonder(
           cache: "no-store",
         });
         const corps = await r.text();
+        const estRobots = c.url.endsWith("/robots.txt");
         mesures.push({
           ...base,
+          ...(estRobots ? { robots: extraireBlocRobots(corps, "*") } : {}),
           code: r.status,
           contentType: r.headers.get("content-type"),
           taille: corps.length,

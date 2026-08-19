@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   CANDIDATS,
+  extraireBlocRobots,
   PAUSE_SONDE_MS,
   TAILLE_ECHANTILLON,
   compterOffres,
@@ -132,9 +133,69 @@ describe("la liste des candidats", () => {
     }
   });
 
+  it("les candidats ATS portent leur FAMILLE — sans quoi le discriminant est mort", () => {
+    // Défaut mesuré au premier passage réel : `offres` valait null partout, parce
+    // qu'aucun candidat ne portait `famille`. Le discriminant « 200 avec offres » vs
+    // « 200 sans offre » était testé unitairement et JAMAIS exercé en production.
+    for (const c of CANDIDATS.filter((x) => x.id.startsWith("ats:"))) {
+      expect(c.famille, `famille manquante : ${c.id}`).toBeTruthy();
+    }
+  });
+
   it("aucune URL en double : deux fois le même hôte, c'est deux fois le coût", () => {
     const urls = CANDIDATS.map((c) => c.url);
     expect(new Set(urls).size).toBe(urls.length);
+  });
+});
+
+describe("extraireBlocRobots — lire le bloc qui NOUS vise, pas le début du fichier", () => {
+  // La forme réelle de ZipRecruiter, mesurée le 2026-08-19 : le bloc googlebot d'abord.
+  const zip = [
+    "# GOOGLEBOT",
+    "User-agent: googlebot",
+    "Allow: /",
+    "Disallow: /unsubscribe",
+    "",
+    "User-agent: *",
+    "Disallow: /job/",
+    "Crawl-delay: 10",
+  ].join("\n");
+
+  it("DISCRIMINANT : ne rend PAS le bloc googlebot quand on demande le générique", () => {
+    // C'est le défaut mesuré : les 400 premiers caractères ne montraient que googlebot,
+    // et un « Allow: / » qui ne nous était pas adressé se lisait comme une permission.
+    const nous = extraireBlocRobots(zip, "*");
+    expect(nous).toEqual(["Disallow: /job/", "Crawl-delay: 10"]);
+    expect(nous).not.toContain("Allow: /");
+  });
+
+  it("rend le bloc nommé quand on le demande explicitement", () => {
+    expect(extraireBlocRobots(zip, "googlebot")).toEqual(["Allow: /", "Disallow: /unsubscribe"]);
+  });
+
+  it("retombe sur le bloc générique quand l'agent n'est pas nommé", () => {
+    expect(extraireBlocRobots(zip, "JobAI")).toEqual(["Disallow: /job/", "Crawl-delay: 10"]);
+  });
+
+  it("IGNORE les commentaires — un Disallow commenté n'interdit rien", () => {
+    // Le confondre avec une règle ferait renoncer à un accès parfaitement permis.
+    const avecCommentaire = "User-agent: *\n# Disallow: /tout\nAllow: /\n";
+    expect(extraireBlocRobots(avecCommentaire)).toEqual(["Allow: /"]);
+  });
+
+  it("groupe plusieurs User-agent consécutifs sur les MÊMES règles", () => {
+    const groupe = "User-agent: a\nUser-agent: b\nDisallow: /x\n";
+    expect(extraireBlocRobots(groupe, "a")).toEqual(["Disallow: /x"]);
+    expect(extraireBlocRobots(groupe, "b")).toEqual(["Disallow: /x"]);
+  });
+
+  it("lit la forme du Guichet-Emplois, mesurée : permissive avec un délai", () => {
+    expect(extraireBlocRobots("User-agent: *\nCrawl-delay: 5\n")).toEqual(["Crawl-delay: 5"]);
+  });
+
+  it("rend un tableau vide plutôt que d'inventer, sur un fichier sans groupe", () => {
+    expect(extraireBlocRobots("")).toEqual([]);
+    expect(extraireBlocRobots("<!DOCTYPE html><html>pas un robots.txt</html>")).toEqual([]);
   });
 });
 
