@@ -754,6 +754,24 @@
 > exactement la note d'un titre sans description — 30 de ces points viennent de ce qu'on
 > ignore.
 
+- [x] **[VEILLE-39]** Ingestion du **flux XML du Guichet-Emplois en streaming**
+      (`lib/ingest/guichetFlux.ts`, 29 tests, `app/api/diagnostic/flux-guichet`). Le flux
+      pèse ~134 Mo : le module lit par morceaux, découpe dès qu'une offre est complète, la
+      juge, la jette si elle est hors région — le pic mémoire dépend de la taille d'UNE
+      offre, jamais du flux. Quatre fins distinctes, dont `tampon-deborde` qui est une PANNE
+      et jamais un vide. Discrimination prouvée en cassant le code quatre fois.
+      ⚠️ **Le format des champs est une HYPOTHÈSE** (échantillon tronqué, hôte inaccessible
+      depuis la session) : d'où `recenserBalises` et la route de diagnostic. **Rien n'est
+      branché sur la passe** tant que le recensement n'a pas été lu. Voir ADR-0010.
+
+- [ ] **[VEILLE-40]** Brancher le flux Guichet sur `selectionnerSources`, **après** avoir lu
+      le rapport de `/api/diagnostic/flux-guichet`. Trois choses à vérifier d'abord, dans cet
+      ordre : `balisesVues` (les champs supposés existent-ils ?), `verdicts` +
+      `villesInconnues` (le registre des lieux sait-il placer ce que le Guichet nomme ?), et
+      l'échantillon à l'œil. ⚠️ `Source.interroger` reçoit un `Recuperateur` (qui rend du
+      TEXTE, donc chargerait les ~134 Mo) : le branchement devra passer le `fetch` brut, pas
+      élargir `Recuperateur`. Le dépôt de fichiers reste la source active d'ici là.
+
 - [x] **[VEILLE-38]** La FRAÎCHEUR du dépôt, dite (`dernierJourDepose`, `fraicheurDepot`).
       Mesuré en cherchant tout autre chose : **la veille n'a plus qu'UNE source**, le dépôt
       de fichiers. Le Guichet est désactivé (404 prouvé) et les pages carrières sont parties

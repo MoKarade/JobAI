@@ -1,0 +1,373 @@
+// lib/ingest/guichetFlux.ts — lire le flux du Guichet-Emplois SANS jamais le charger.
+//
+// POURQUOI CE FICHIER EXISTE
+// Le flux officiel (`jobbank.gc.ca/xmlfeed/jobbank.xml`) pèse ~134 Mo et porte les offres de
+// tout le Canada. Mesuré le 2026-08-19 : 200, `application/xml`, reconstruit deux heures plus
+// tôt. C'est l'exception que le garde-fou n°4 nomme, donc la source la plus légitime dont
+// dispose ce projet — et la seule qui couvre la région sans partenariat.
+//
+// ⚠️ SA TAILLE COMMANDE TOUTE LA CONCEPTION, ET CE N'EST PAS UNE PRÉCAUTION THÉORIQUE.
+// La sonde a fait `await r.text()` dessus à son premier passage : elle a chargé 134 Mo dans
+// une fonction serverless pour n'en garder que 400 caractères. Ça a marché, et un flux deux
+// fois plus gros aurait tué la fonction. Ici, RIEN n'accumule : on lit par morceaux, on
+// découpe dès qu'une offre est complète, on la juge, et on la jette si elle ne concerne pas
+// la région. Le pic mémoire doit dépendre de la taille d'UNE offre, jamais du flux.
+//
+// FORMAT — le format de syndication XML d'Indeed, que le Guichet publie (constaté le
+// 2026-08-19 : `<source><publisher>…<job><title>…<jobtype>…<workterm>…`). Les champs standard
+// sont `title`, `date`, `referencenumber`, `url`, `company`, `city`, `state`, `country`,
+// `description`, `salary`, `jobtype`. Le Guichet en ajoute (`workterm`, et d'autres que
+// l'échantillon de la sonde coupait en plein milieu).
+//
+// ⚠️ C'EST POURQUOI L'ANALYSEUR EST AUTO-DESCRIPTIF. Je n'ai pas pu lire le flux depuis cette
+// session (la passerelle refuse l'hôte), donc la liste exacte des champs est une HYPOTHÈSE
+// tirée d'un échantillon tronqué. `recenserBalises` rapporte les noms réellement rencontrés :
+// le premier passage réel dit le schéma au lieu que je le devine, et un champ que j'aurais
+// mal nommé se voit dans le recensement au lieu de disparaître en silence.
+
+import type { OffreBrute } from "./types";
+import { texteSimple } from "./analyseurs";
+import { entetes } from "./sources";
+
+/** L'adresse du flux, constatée le 2026-08-19 (200, `application/xml`). */
+export const URL_FLUX_GUICHET = "https://www.jobbank.gc.ca/xmlfeed/jobbank.xml";
+
+/**
+ * Taille maximale du tampon d'assemblage, en caractères.
+ *
+ * ⚠️ CE N'EST PAS UN RÉGLAGE DE PERFORMANCE, C'EST UN FILET ANTI-EXPLOSION. Le tampon ne
+ * garde que le FRAGMENT d'offre à cheval sur deux morceaux réseau — quelques kilo-octets.
+ * S'il dépasse ce seuil, c'est qu'aucun `</job>` n'arrive : flux malformé, balise renommée,
+ * ou page d'erreur servie à la place. Sans cette borne, on reconstruirait les 134 Mo en
+ * mémoire un morceau à la fois, exactement ce que ce module existe pour éviter.
+ */
+export const TAMPON_MAX = 4 * 1024 * 1024;
+
+/** Pourquoi la lecture s'est arrêtée. Jamais « terminé » quand elle ne l'est pas. */
+export type FinLecture =
+  /** Le flux est allé jusqu'au bout. C'est la seule fin qui autorise à conclure. */
+  | "flux-termine"
+  /** Le budget de temps est épuisé — passe PARTIELLE. */
+  | "budget-depasse"
+  /** Le plafond d'offres retenues est atteint — passe PARTIELLE. */
+  | "plafond-retenues"
+  /** Le tampon a débordé : flux malformé ou balise inattendue. PANNE, pas un vide. */
+  | "tampon-deborde";
+
+export interface RapportFlux {
+  fin: FinLecture;
+  /** Offres vues dans le flux, toutes régions confondues. */
+  vues: number;
+  /** Offres retenues par le prédicat. */
+  retenues: OffreBrute[];
+  /** Offres écartées par le pré-filtre bon marché, sans être analysées. */
+  preFiltrees: number;
+  /** Offres analysées mais écartées par le prédicat. */
+  ecartees: number;
+  /** Offres dont l'analyse n'a rien rendu d'exploitable (ni titre, ni lien). */
+  illisibles: number;
+  octetsLus: number;
+  ms: number;
+  /**
+   * Les noms de balises rencontrés dans les premières offres.
+   *
+   * C'est l'aveu d'ignorance rendu utile : la liste des champs vient d'un échantillon
+   * TRONQUÉ, donc le premier passage réel doit pouvoir la corriger. Un champ mal nommé
+   * apparaît ici au lieu de disparaître silencieusement de chaque offre.
+   */
+  balisesVues: string[];
+  /**
+   * Le jour où le Guichet a RECONSTRUIT le flux (`lastBuildDate`), ou `null`.
+   *
+   * ⚠️ C'EST LA FRAÎCHEUR DE LA SOURCE, PAS CELLE DES OFFRES. Sans lui, un flux figé depuis
+   * une semaine et un marché calme rendent le même « 0 nouvelle » — la panne exacte qui a
+   * laissé le cron de la veille muet trois jours durant sans qu'un voyant ne change.
+   */
+  construitLe: string | null;
+}
+
+/**
+ * Découpe un tampon en offres COMPLÈTES, et rend ce qui reste.
+ *
+ * PURE, et c'est la primitive de tout le module. Une offre coupée en deux par une frontière
+ * de morceau réseau n'est PAS rendue : elle repart dans `reste` et sera complétée au morceau
+ * suivant. La découper ici produirait une offre tronquée — un titre sans lien, une
+ * description à moitié — qui passerait les contrôles et entrerait en base amputée.
+ */
+export function extraireJobs(tampon: string): { jobs: string[]; reste: string } {
+  const jobs: string[] = [];
+  let depuis = 0;
+  for (;;) {
+    const debut = tampon.indexOf("<job>", depuis);
+    if (debut === -1) break;
+    const fin = tampon.indexOf("</job>", debut);
+    if (fin === -1) break;
+    jobs.push(tampon.slice(debut, fin + "</job>".length));
+    depuis = fin + "</job>".length;
+  }
+  // Tout ce qui précède la dernière offre complète est jeté : c'est l'en-tête du flux ou
+  // des offres déjà rendues. Garder le tampon entier ferait croître la mémoire sans fin.
+  return { jobs, reste: tampon.slice(depuis) };
+}
+
+/** Le contenu d'une balise, CDATA compris. PURE. */
+function champ(bloc: string, balise: string): string {
+  const cdata = new RegExp(`<${balise}[^>]*>\\s*<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>\\s*</${balise}>`, "i");
+  const brut = new RegExp(`<${balise}[^>]*>([\\s\\S]*?)</${balise}>`, "i");
+  const m = cdata.exec(bloc) ?? brut.exec(bloc);
+  return m ? texteSimple(m[1] ?? "").trim() : "";
+}
+
+/** Les noms de balises présents dans une offre. PURE. Sert à corriger mes hypothèses. */
+export function recenserBalises(job: string): string[] {
+  const noms = new Set<string>();
+  for (const m of job.matchAll(/<([a-z][\w.-]*)\s*\/?>/gi)) {
+    const nom = m[1]?.toLowerCase();
+    if (nom !== undefined && nom !== "job") noms.add(nom);
+  }
+  return [...noms].sort();
+}
+
+/** Une date `AAAA-MM-JJ` tirée d'un champ de date, ou `null`. PURE. */
+function jourDe(valeur: string): string | null {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(valeur.trim());
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const t = Date.parse(valeur);
+  if (!Number.isFinite(t)) return null;
+  return new Date(t).toISOString().slice(0, 10);
+}
+
+/**
+ * Une offre du flux, mise à la forme du pipeline. PURE.
+ *
+ * Rend `null` quand il manque le titre ou un lien http(s) : le reste du pipeline s'appuie
+ * sur ces deux champs, et une offre sans eux n'est pas une offre incomplète — c'est du bruit
+ * qu'on compterait comme une trouvaille.
+ */
+export function analyserJobGuichet(job: string): OffreBrute | null {
+  const titre = champ(job, "title");
+  const lien = champ(job, "url");
+  if (titre === "" || !/^https?:\/\//i.test(lien)) return null;
+
+  // La ville seule ne suffit pas à situer : « Saint-Georges » existe en Beauce ET en
+  // Mauricie. On garde la province à côté pour que `situer` puisse trancher plus tard.
+  const ville = champ(job, "city");
+
+  return {
+    refSource: champ(job, "referencenumber") || lien,
+    titre,
+    entreprise: champ(job, "company"),
+    ville,
+    lien,
+    description: champ(job, "description"),
+    publieeLe: jourDe(champ(job, "date")),
+  };
+}
+
+/**
+ * Le pré-filtre bon marché : cette offre mérite-t-elle d'être analysée ?
+ *
+ * PURE. Le flux couvre tout le Canada ; analyser à fond ~67 000 offres pour n'en garder que
+ * la région serait du travail jeté. On teste donc la province sur le texte BRUT du bloc,
+ * avant toute expression régulière coûteuse.
+ *
+ * ⚠️ UN PRÉ-FILTRE FAUX NE SE VOIT PAS — IL REND SIMPLEMENT ZÉRO. C'est pourquoi
+ * `lireFluxGuichet` compte séparément ce qu'il écarte (`preFiltrees`) : si le champ de
+ * province ne s'écrit pas comme je le suppose, le compte des pré-filtrées sera égal au
+ * compte des vues, et le rapport le criera au lieu de rendre une source « vide ».
+ */
+export function estPeutEtreQuebec(job: string): boolean {
+  return /\bQC\b|Qu[ée]bec/i.test(job);
+}
+
+/**
+ * Budget de temps par défaut, en millisecondes.
+ *
+ * Une passe partage un mur d'environ 60 s avec le tri, l'écriture et le géocodage. Vingt
+ * secondes de lecture laissent de quoi faire quelque chose de ce qu'on a lu — un lecteur
+ * qui consomme tout le budget rapporterait des offres que personne n'aurait le temps
+ * d'écrire.
+ */
+export const BUDGET_MS_DEFAUT = 20_000;
+
+/**
+ * Plafond d'offres retenues par lecture.
+ *
+ * Il ne borne PAS le flux (c'est le budget qui le fait) : il borne ce qu'on rapporte à
+ * l'appelant, donc la mémoire du rapport. Atteint, il se dit — `plafond-retenues` est une
+ * passe partielle, pas une lecture complète.
+ */
+export const MAX_RETENUES_DEFAUT = 400;
+
+/** Offres dont on recense les balises. Assez pour voir le schéma, pas pour le payer. */
+export const ECHANTILLON_BALISES = 20;
+
+/** Caractères de tête examinés pour y trouver `lastBuildDate`. */
+const ENTETE_MAX = 16 * 1024;
+
+/**
+ * Le prédicat de rétention.
+ *
+ * ⚠️ IL REÇOIT AUSSI LE BLOC BRUT, ET C'EST DÉLIBÉRÉ. `OffreBrute` est un contrat fermé :
+ * il ne porte ni la province, ni le type de poste, ni les champs que le Guichet ajoute et
+ * que je n'ai pas pu lire. Passer le bloc laisse l'appelant décider avec ce que la source
+ * dit VRAIMENT, au lieu de me faire deviner aujourd'hui la forme que devra avoir le
+ * contrat demain.
+ */
+export type Garder = (offre: OffreBrute, brut: string) => boolean;
+
+export interface OptionsFlux {
+  url?: string;
+  budgetMs?: number;
+  maxRetenues?: number;
+  garder?: Garder;
+  /** L'horloge, injectée : sans elle, le budget ne se teste qu'en attendant vraiment. */
+  maintenant?: () => number;
+}
+
+/**
+ * Lit le flux et rend ce qu'il faut en penser.
+ *
+ * ⚠️ LÈVE sur une réponse non-2xx ou sans corps, et ne rend JAMAIS un rapport vide dans ce
+ * cas. Un flux injoignable et un flux sans offre régionale se ressemblent à l'arrivée —
+ * l'un est une panne, l'autre une journée calme — et les confondre est exactement ce qui a
+ * laissé la veille muette trois jours durant. L'appelant transforme l'exception en
+ * `ResultatSource { ok: false }` ; c'est là que l'échec porte son nom.
+ *
+ * ⚠️ LE FLUX EST ANNULÉ DANS TOUS LES CAS (`finally`). Sortir de la boucle sans annuler
+ * bornerait la MÉMOIRE sans borner le RÉSEAU : les Mo restants continueraient d'arriver,
+ * et le budget qu'on croit avoir respecté serait dépensé à ne rien lire.
+ */
+export async function lireFluxGuichet(
+  recuperer: typeof fetch = fetch,
+  options: OptionsFlux = {},
+): Promise<RapportFlux> {
+  const {
+    url = URL_FLUX_GUICHET,
+    budgetMs = BUDGET_MS_DEFAUT,
+    maxRetenues = MAX_RETENUES_DEFAUT,
+    garder = () => true,
+    maintenant = () => Date.now(),
+  } = options;
+
+  const debut = maintenant();
+  const ctrl = new AbortController();
+  const minuteur = setTimeout(() => ctrl.abort(), budgetMs);
+
+  const retenues: OffreBrute[] = [];
+  const balises = new Set<string>();
+  let vues = 0;
+  let preFiltrees = 0;
+  let ecartees = 0;
+  let illisibles = 0;
+  let octetsLus = 0;
+  let construitLe: string | null = null;
+
+  try {
+    const r = await recuperer(url, {
+      headers: entetes(),
+      signal: ctrl.signal,
+      cache: "no-store",
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (r.body === null) throw new Error("flux sans corps");
+
+    const lecteur = r.body.getReader();
+    const decodeur = new TextDecoder();
+    let tampon = "";
+    /** L'en-tête, tant qu'on le collecte. `null` une fois qu'on l'a jugé. */
+    let entete: string | null = "";
+    let fin: FinLecture = "flux-termine";
+
+    /** Traite les offres complètes du tampon. Rend `true` si le plafond est atteint. */
+    const consommer = (): boolean => {
+      const decoupe = extraireJobs(tampon);
+      tampon = decoupe.reste;
+      for (const bloc of decoupe.jobs) {
+        vues += 1;
+        if (vues <= ECHANTILLON_BALISES) {
+          for (const nom of recenserBalises(bloc)) balises.add(nom);
+        }
+        if (!estPeutEtreQuebec(bloc)) {
+          preFiltrees += 1;
+          continue;
+        }
+        const offre = analyserJobGuichet(bloc);
+        if (offre === null) {
+          illisibles += 1;
+          continue;
+        }
+        if (!garder(offre, bloc)) {
+          ecartees += 1;
+          continue;
+        }
+        retenues.push(offre);
+        if (retenues.length >= maxRetenues) return true;
+      }
+      return false;
+    };
+
+    try {
+      for (;;) {
+        const { done, value } = await lecteur.read();
+        if (done) {
+          // Vide le décodeur : un caractère à cheval sur le dernier morceau se perdrait
+          // sans ce dernier appel, et c'est le genre de perte qui ne se voit jamais.
+          tampon += decodeur.decode();
+          consommer();
+          break;
+        }
+        octetsLus += value.byteLength;
+        const texte = decodeur.decode(value, { stream: true });
+        tampon += texte;
+
+        if (entete !== null) {
+          entete += texte;
+          const debutOffres = entete.indexOf("<job>");
+          if (debutOffres !== -1 || entete.length >= ENTETE_MAX) {
+            const zone = debutOffres === -1 ? entete : entete.slice(0, debutOffres);
+            construitLe = jourDe(champ(zone, "lastBuildDate"));
+            entete = null;
+          }
+        }
+
+        if (consommer()) {
+          fin = "plafond-retenues";
+          break;
+        }
+        if (tampon.length > TAMPON_MAX) {
+          fin = "tampon-deborde";
+          break;
+        }
+        if (maintenant() - debut >= budgetMs) {
+          fin = "budget-depasse";
+          break;
+        }
+      }
+    } catch (err) {
+      // Notre PROPRE minuteur a coupé la lecture : par construction, c'est le budget qui
+      // est épuisé, pas le flux qui est en panne. On garde ce qui a été lu et on le dit
+      // comme une passe partielle. Toute autre erreur remonte : une lecture qui casse ne
+      // doit jamais se déguiser en lecture incomplète.
+      if (!(err instanceof Error) || err.name !== "AbortError") throw err;
+      fin = "budget-depasse";
+    } finally {
+      await lecteur.cancel().catch(() => undefined);
+    }
+
+    return {
+      fin,
+      vues,
+      retenues,
+      preFiltrees,
+      ecartees,
+      illisibles,
+      octetsLus,
+      ms: maintenant() - debut,
+      balisesVues: [...balises].sort(),
+      construitLe,
+    };
+  } finally {
+    clearTimeout(minuteur);
+  }
+}

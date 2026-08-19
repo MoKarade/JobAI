@@ -6,6 +6,40 @@
 
 ---
 
+## Session 2026-08-19 (soir) — l'ingestion du flux Guichet, en streaming
+
+Demande de Marc : « vas-y pour l'ingestion du flux Guichet en streaming ». Livré :
+`lib/ingest/guichetFlux.ts` (lecture par morceaux, aucune accumulation), ses 29 tests, et
+`app/api/diagnostic/flux-guichet` pour MESURER le flux réel avant de le brancher.
+
+**La contrainte** : le flux pèse ~134 Mo. Le module lit par morceaux, découpe dès qu'une
+offre est complète, la juge, la jette si elle est hors région — le pic mémoire dépend de la
+taille d'UNE offre, jamais du flux. Quatre fins distinctes (`flux-termine`, `budget-depasse`,
+`plafond-retenues`, `tampon-deborde`) : une lecture partielle ne peut pas se lire comme une
+lecture complète, et un tampon qui déborde est une PANNE, jamais un vide.
+
+**Discrimination prouvée** en cassant le code quatre fois : sans l'annulation du flux, avec
+un découpage naïf, sans la borne de tampon, sans `stream: true` au décodage — chaque test
+visé tombe, puis remis en état. Le test d'annulation ne discriminait rien au premier jet
+(mon flux d'épreuve se fermait tout seul, et `cancel()` sur un flux clos ne rappelle jamais
+la source) : refait sur un flux qui coule encore, le cas réel.
+
+⚠️ **Le format des champs est une HYPOTHÈSE, pas une lecture.** L'échantillon dont il vient
+était tronqué par le plafond de la sonde, et la passerelle de session refuse `jobbank.gc.ca`.
+D'où `recenserBalises`, qui rapporte les noms RÉELLEMENT rencontrés, et la route de
+diagnostic qui les remonte.
+
+### Ce que Marc a à faire
+
+Appeler **une fois** `/api/diagnostic/flux-guichet` (connecté) et me donner la réponse. Ce
+qu'on y cherche, dans l'ordre : `balisesVues` (est-ce que `title`/`city`/`url`/`company`
+existent vraiment ?), `verdicts` et `villesInconnues` (le registre sait-il placer ce que le
+Guichet nomme ?), puis l'échantillon. Tant que ce n'est pas lu, **le flux n'est branché sur
+aucune passe** — le dépôt de fichiers reste la seule source active.
+
+Détail complet : `docs/adr/0010-sources-lues-par-lapp.md`, section « second lot ».
+
+
 ## Veille du 2026-08-19 — et une PII de tiers trouvée EN LIGNE
 
 Lot du jour déposé par FICHIER (`data/depot/2026-08-19.json`, 51 offres). Indeed seul :

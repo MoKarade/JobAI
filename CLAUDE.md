@@ -1153,6 +1153,29 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   déjà consigné (les coordonnées d'un rectangle PDF, puis le commentaire qui les citait).
   **Décrire la forme, ne jamais l'instancier** — et se relire en se demandant « est-ce que
   mon explication contient la chose que j'explique ? ».
+- **Un test de NETTOYAGE ne discrimine que si le nettoyage a encore quelque chose à faire.**
+  J'ai écrit « le flux est-il annulé ? » sur un flux d'épreuve qui se refermait tout seul
+  après son dernier morceau — or `cancel()` sur un flux déjà clos ne rappelle JAMAIS la
+  source : le test passait avec ET sans l'annulation, et il aurait « protégé » zéro. Refait
+  sur un flux qui coule encore (le cas réel : le vrai flux fait ~134 Mo et n'est pas fini
+  quand on s'arrête), il tombe dès qu'on retire le `finally`. La règle générale : pour un
+  test de libération (annulation, fermeture, verrou relâché, minuteur nettoyé), la condition
+  d'épreuve n'est pas « l'opération se termine », c'est **« la ressource est encore
+  détenue »** — sinon on éprouve un no-op. Et ça se vérifie comme tout le reste : casser le
+  code et regarder si le test tombe.
+- **Borner la mémoire ne borne PAS le réseau.** Sortir d'une boucle de lecture sans annuler
+  le flux laisse les Mo restants continuer d'arriver : le budget qu'on croit avoir respecté
+  est dépensé à ne rien lire, et la fonction meurt quand même. Toute lecture bornée d'un gros
+  corps se termine par un `cancel()` en `finally` — la borne de mémoire et la borne de
+  réseau sont deux gestes, pas un.
+- **Quand on ne peut pas LIRE la source, l'analyseur doit RAPPORTER ce qu'il a vu.**
+  Le format du flux Guichet vient d'un échantillon tronqué, et la passerelle de session
+  refuse l'hôte : les noms de champs sont une hypothèse. Un analyseur qui se contente de
+  chercher `title` rendrait « 0 offre » si le champ s'appelle autrement — indiscernable d'un
+  marché calme, la panne déjà payée trois jours durant. Un `recenserBalises` qui rapporte les
+  noms RÉELLEMENT rencontrés coûte cinq lignes et transforme une hypothèse invisible en
+  mesure lisible. Corollaire de séquence : on MESURE depuis une route de diagnostic avant de
+  brancher sur la passe quotidienne — brancher d'abord, c'est parier le seul flux qui marche.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

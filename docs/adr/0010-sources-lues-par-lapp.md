@@ -383,3 +383,74 @@ donc pas le §8. L'étape 5, oui.
 - Il ne rouvre pas la découverte automatique : `[VEILLE-35]` tient.
 - Il ne promet aucun volume. Tant que la sonde n'a pas tourné, « combien d'offres en plus »
   n'a pas de réponse honnête.
+
+---
+
+## Livré ensuite (2026-08-19, second lot) — l'ingestion du flux Guichet en streaming
+
+Décision de Marc : « vas-y pour l'ingestion du flux Guichet en streaming ». Le flux XML du
+Guichet-Emplois est l'exception que le garde-fou n°4 nomme, et la sonde l'a mesuré joignable
+(200, `application/xml`, reconstruit deux heures avant la mesure). Son `robots.txt` ne porte
+aucun `Disallow` — seulement un `Crawl-delay`. C'est la seule des sources examinées qui soit
+à la fois autorisée, complète sur la région, et sans démarche partenaire.
+
+### La contrainte qui commande toute la conception
+
+Le flux pèse environ **134 Mo**. La sonde a fait `await r.text()` dessus à son premier
+passage : elle a chargé le flux entier dans une fonction serverless pour n'en garder que
+quelques centaines de caractères. Ça a marché, et un flux deux fois plus gros aurait tué la
+fonction.
+
+`lib/ingest/guichetFlux.ts` n'accumule donc rien : il lit par morceaux, découpe dès qu'une
+offre est complète, la juge, et la jette si elle ne concerne pas la région. **Le pic mémoire
+dépend de la taille d'UNE offre, jamais du flux.** Quatre bornes, chacune rendue dans le
+rapport pour qu'une lecture partielle ne se lise jamais comme une lecture complète :
+
+| Fin | Ce qu'elle veut dire |
+|---|---|
+| `flux-termine` | La **seule** fin qui autorise à conclure |
+| `budget-depasse` | Passe partielle — un « 0 régionale » ne dit rien du flux |
+| `plafond-retenues` | Passe partielle — on a arrêté de rapporter, pas de lire |
+| `tampon-deborde` | **Panne** (balise renommée, page d'erreur servie) — jamais un vide |
+
+Le flux est annulé dans tous les cas (`finally`) : borner la mémoire sans borner le réseau
+ne borne rien — les Mo restants continueraient d'arriver, et le budget serait dépensé à ne
+rien lire.
+
+### L'analyseur est AUTO-DESCRIPTIF, et c'est un aveu assumé
+
+Le format vient du format de syndication XML d'Indeed, constaté sur un échantillon **tronqué
+en plein milieu** par le plafond de lecture de la sonde. La session qui a écrit ce module ne
+pouvait pas relire le flux (passerelle fermée, onze refus sur onze). Les noms de champs sont
+donc une **hypothèse**, pas une lecture.
+
+`recenserBalises` rapporte les noms de balises RÉELLEMENT rencontrés dans les premières
+offres. Un champ que j'aurais mal nommé apparaît alors dans le rapport au lieu de disparaître
+en silence de chaque offre — ce qui rendrait « 0 offre » indiscernable d'un marché calme.
+
+### Pourquoi une route de diagnostic AVANT le branchement
+
+Brancher un analyseur non vérifié sur la passe quotidienne préparerait exactement la panne
+que ce projet a déjà payée trois jours durant. `app/api/diagnostic/flux-guichet` fait donc la
+mesure d'abord, depuis Vercel : recensement des balises, comptes de chaque motif de rejet,
+villes inconnues groupées et triées par fréquence, et un échantillon d'offres pour l'œil
+humain — la seule vérification qu'aucun code ne remplace. Elle n'écrit rien en base.
+
+Le texte des annonces passe par `expurgerPII` avant de sortir de la route : c'est du texte
+écrit par des tiers, et la fuite de ce matin a montré ce que ça coûte de l'oublier.
+
+### Ce que ce lot ne fait PAS
+
+- Il ne branche pas le flux sur la passe quotidienne. Tant que le recensement des balises
+  n'a pas été lu, « combien d'offres » n'a pas de réponse honnête.
+- Il ne touche ni `lib/scoring.ts` ni la logique de matching — le §8 ne s'applique pas.
+- Il ne remplace pas le dépôt de fichiers, qui reste la source active.
+
+### Prochaine étape, dans l'ordre
+
+1. Marc appelle `/api/diagnostic/flux-guichet` une fois.
+2. Lire `balisesVues` : si `title`, `city`, `url` et `company` y sont, l'analyseur tient ;
+   sinon c'est lui qu'on reprend, pas la source qu'on abandonne.
+3. Lire `villesInconnues` : elles disent si le registre des lieux sait placer ce que le
+   Guichet nomme, ou s'il faut le laisser mesurer.
+4. Alors seulement, brancher une `Source` sur `selectionnerSources`.
