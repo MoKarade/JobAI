@@ -6,6 +6,49 @@
 
 ---
 
+## Session 2026-08-19 — un connecteur MCP pour claude.ai (ADR-0011, lot 1/4)
+
+Demande de Marc : « ensuite je veux un mcp ». Deux décisions lui ont été posées avant tout
+code, parce qu'elles changent l'ampleur d'un ordre de grandeur. Ses réponses : **claude.ai
+tout de suite** (donc OAuth 2.1 — mesuré : leurs connecteurs n'acceptent rien d'autre) et
+**écriture large**.
+
+L'écriture **amende le garde-fou n°2** (« le suivi appartient à Marc. Exception : aucune »).
+C'est consigné dans `docs/adr/0011-connecteur-mcp-claude-ai.md`, avec les quatre conditions
+qui bornent l'exception : elle ne couvre que ce que Marc demande, tout passe par
+`lib/suivi.ts`, l'avant/après remplace l'écran, et le moteur garde ses calculs.
+
+### ⚠️ Ce que la relecture de `promptSafety.ts` a trouvé, et qui compte plus que le lot
+
+Son en-tête dit ce qui protégeait vraiment l'app contre l'injection indirecte — et **ce
+n'était pas l'assainissement** : « le modèle ne fait que PROPOSER » et « aucun outil n'est
+exposé au modèle : il ne peut rien écrire ». **Un connecteur qui écrit casse les deux.**
+`sanitizePromptText` ne comble pas l'écart : il neutralise ce qui fait FRONTIÈRE, jamais ce
+qui fait sens, donc une consigne en langage naturel dans un nom d'employeur (venu du flux du
+Guichet) traverse intacte, par conception.
+
+Ce qui borne le dégât est désormais la SURFACE : quatre champs, jamais une offre périmée,
+jamais les calculs du moteur, aucune suppression, aucun outil sortant, et un avant/après
+rendu à chaque écriture. Pire cas : un statut faux, visible et réversible. Risque assumé par
+la décision de Marc, pas ignoré — et l'en-tête de `promptSafety.ts` le dit maintenant, parce
+qu'une doc qui affirme une chose fausse est pire qu'une doc absente.
+
+### Livré (lot 1/4)
+
+`lib/mcp/vue.ts` (la forme publiée, composée CHAMP PAR CHAMP — un champ ajouté au modèle
+interne n'est pas publié par accident), `lecture.spec.ts` (recherche, offre, résumé),
+`ecriture.spec.ts` (modification via `appliquerModification`, avant/après). 32 tests,
+`tests/mcpSurface.test.ts` verrouille la frontière : aucun `.spec.ts` n'importe le SDK MCP ni
+la base, aucune coordonnée n'est publiée. Trois discriminations prouvées.
+
+### Reste à faire
+
+Lot 2 : le serveur MCP + le transport HTTP. Lot 3 : OAuth 2.1 (découverte, enregistrement
+dynamique, PKCE S256, rotation) — ⚠️ le `redirect_uri` se valide par origine EXACTE via
+`new URL()`, jamais `startsWith` : c'est le finding CRITIQUE de FinanceAI. Lot 4 : branchement
+vérifié par une conversation RÉELLE depuis claude.ai, jamais par un déploiement vert.
+
+
 ## Session 2026-08-19 (soir, 4e passe) — l'inventaire mesurait la mauvaise population
 
 L'inventaire de valeurs a rendu ses chiffres, et ils ont révélé un défaut **dans le

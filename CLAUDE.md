@@ -1261,6 +1261,31 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   résultat sans qu'une ligne bouge chez nous. Quand une source expose un champ DÉDIÉ (ici
   `education`, `experience`, `workterm`, énumérations propres), le lire plutôt que d'extraire
   la même information de sa prose.
+- **Un module qui documente CE QUI LE PROTÈGE devient FAUX quand on change les conditions —
+  et c'est lui qu'il faut relire AVANT d'ajouter la fonctionnalité, pas après.** En écrivant
+  l'ADR du connecteur MCP, j'allais annoncer « le texte des annonces passe par
+  `sanitizePromptText`, donc l'injection est couverte ». En ouvrant le module pour le citer,
+  j'ai lu son propre en-tête : ce qui rendait une injection SANS CONSÉQUENCE n'était pas lui,
+  c'étaient deux règles — « le modèle ne fait que proposer » et « aucun outil ne lui est
+  exposé : il ne peut rien écrire ». **Un connecteur qui écrit casse les deux**, et
+  l'assainissement ne comble pas l'écart : il neutralise ce qui fait FRONTIÈRE (balises de
+  rôle, délimiteurs), jamais ce qui fait SENS — une consigne en langage naturel dans un nom
+  d'employeur traverse intacte, par conception. Trois règles en sortent. (a) Avant d'ajouter
+  une capacité, relire les modules de sécurité qu'on croit réutiliser et vérifier que LEURS
+  PRÉMISSES tiennent encore. (b) Quand une prémisse tombe, l'écrire DANS le module concerné
+  dans le même commit — une doc qui affirme une chose fausse est pire qu'une doc absente, et
+  la prochaine session la croira. (c) Quand le contrôle qui protégeait disparaît, dire ce qui
+  le remplace : ici ce n'est plus l'assainissement mais la SURFACE (quatre champs, jamais les
+  calculs du moteur, aucune suppression, aucun outil sortant, avant/après rendu) — un risque
+  assumé se borne et se nomme, il ne se tait pas.
+- **Une exception à un garde-fou non négociable se livre avec ses CONDITIONS, jamais seule.**
+  Marc a autorisé l'écriture depuis une conversation, ce que le garde-fou n°2 interdisait
+  explicitement (« Exception : aucune »). Une exception écrite « Marc a dit oui » avale la
+  règle au premier chantier suivant. Écrite en quatre conditions vérifiables — elle ne couvre
+  que ce que Marc demande, tout passe par le module écrivain unique, l'avant/après remplace
+  l'écran qu'il n'a plus sous les yeux, le moteur garde ses calculs — elle reste une exception.
+  Et chaque condition porte son verrou : un test de frontière qui interdit au connecteur
+  d'atteindre la base est ce qui empêche la condition n°2 de se dissoudre en intention.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

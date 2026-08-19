@@ -34,6 +34,15 @@
 // Ce module réduit la surface. Ce sont les deux règles ci-dessus qui rendent une injection
 // réussie sans conséquence.
 //
+// ⚠️ MISE À JOUR 2026-08-19 — LA SECONDE RÈGLE NE TIENT PLUS PARTOUT. Le connecteur MCP
+// (ADR-0011, décision Marc) expose au modèle des outils qui ÉCRIVENT dans le suivi. Sur ce
+// chemin-là, « aucun outil n'est exposé » est faux, et ce module ne comble pas l'écart : il
+// neutralise ce qui fait FRONTIÈRE, jamais ce qui fait sens — une consigne en langage naturel
+// glissée dans un nom d'employeur traverse intacte, par conception. Ce qui borne le dégât est
+// alors la SURFACE d'écriture (quatre champs, jamais les calculs du moteur, aucune
+// suppression, aucun outil sortant, avant/après rendu). Détail et arbitrage : ADR-0011.
+// La règle reste vraie telle quelle pour les autres appels au modèle, qui n'ont pas d'outils.
+//
 // ⚠️ IL NE TOUCHE JAMAIS DU TEXTE ÉCRIT PAR LE CODE. Un assainissement conçu pour du texte
 // D'UTILISATEUR appliqué à de la prose écrite par nous détruit des garde-fous : c'est vécu
 // dans FinanceAI, où un scrub aveugle a tronqué les notes qui empêchaient le modèle de

@@ -747,6 +747,36 @@
 
 ---
 
+## Chantier #07 — Connecteur MCP pour claude.ai 🟡
+
+> Cadré par **ADR-0011** (décision Marc, 2026-08-19). ⚠️ Ce chantier **amende le garde-fou
+> n°2** : l'écriture depuis une conversation est une exception nommée, bornée par quatre
+> conditions. Toute PR qui en retire une rouvre le trou que le garde-fou fermait.
+
+- [x] **[MCP-01]** Les outils, purs et testables sans réseau ni SDK. `lib/mcp/vue.ts` (forme
+      publiée composée CHAMP PAR CHAMP), `lecture.spec.ts` (recherche/offre/résumé, filtres
+      Zod avec `.finite()`), `ecriture.spec.ts` (via `appliquerModification`, avant/après
+      rendu, refus sur offre périmée). 32 tests. `tests/mcpSurface.test.ts` verrouille la
+      frontière (pas de SDK, pas de base, pas de coordonnée), 3 discriminations prouvées.
+
+- [ ] **[MCP-02]** Le serveur MCP et son transport HTTP (`lib/mcp/serveur.ts`, seul fichier
+      autorisé à importer `@modelcontextprotocol/sdk` ; `app/api/mcp/route.ts`). L'exception
+      d'import s'écrit dans `mcpSurface.test.ts`, motivée — jamais une exclusion de dossier.
+
+- [ ] **[MCP-03]** OAuth 2.1 : découverte (`/.well-known/oauth-*`), enregistrement dynamique
+      de client, PKCE **S256**, code à usage unique, rotation du jeton de rafraîchissement,
+      mono-adresse `AUTHORIZED_EMAIL`. ⚠️ **`redirect_uri` validé par `new URL()` +
+      comparaison d'ORIGINE EXACTE, avec rejet de tout `username`/`password`** — jamais
+      `startsWith` : `http://127.0.0.1.evil.com` et `http://127.0.0.1@evil.com` passent un
+      préfixe, et c'est une prise de contrôle de compte (finding CRITIQUE de FinanceAI).
+      ⚠️ L'appartenance se vérifie **à l'usage**, pas seulement à l'émission : un contrôle
+      posé au callback n'arrête pas les jetons déjà délivrés.
+
+- [ ] **[MCP-04]** Branchement dans claude.ai, vérifié par une **conversation réelle**. Un
+      déploiement vert ne prouve rien — leçon payée trois fois sur ce dépôt.
+
+---
+
 ## Chantier #06 — Précision de la veille ⬜
 
 > Cadré par **ADR-0005**. Ordre imposé : la profondeur AVANT le volume (décision Marc,
