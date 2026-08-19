@@ -1364,6 +1364,22 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   est devenu un outil MCP en lecture seule. Réflexe général : un aller-retour humain qui se
   répète est un défaut d'outillage, pas une fatalité — et le canal existait déjà, il fallait
   juste y brancher la mesure.
+- **Un réglage qui exige une session Claude n'est pas un réglage — c'est une dépendance, et
+  elle se supprime en livrant l'ÉCRAN, pas la donnée.** Le choix des codes de profession
+  retenus tenait dans une liste de deux caractères par entrée : j'aurais pu l'écrire en dur
+  en trente secondes. Mais Marc aurait dû me redemander à chaque correction, et surtout me
+  redemander de LANCER la mesure — le tableau code/compte/titres n'existait que dans un JSON
+  de plusieurs centaines de lignes que seule une session pouvait déclencher et lire. Le
+  travail utile n'était donc pas de choisir : c'était de rendre le choix faisable sans moi
+  (bouton de mesure, tableau, cases à cocher). Même leçon que le rayon, un cran plus loin :
+  là on avait sorti une CONSTANTE du code, ici on sort une MESURE. Corollaire de forme : un
+  tableau de décision montre le compte ET l'objet (« 65200 : 402 — Cook, Kitchen helper »),
+  jamais le compte seul, qui exige de connaître la nomenclature par cœur. Et un piège de
+  saisie vu à la première relecture : un champ texte dont la valeur affichée se DÉRIVE d'un
+  état normalisé mange les frappes intermédiaires (taper « 21301 » perd les caractères qui
+  ne font ni deux ni cinq chiffres) — la source de vérité est la SAISIE, les codes valides
+  s'en dérivent, jamais l'inverse.
+
 - **Un budget plus long que le MUR de sa fonction ne borne rien.** Le même diagnostic tourne
   derrière deux routes : 300 s en HTTP, 60 s en MCP. Y passer les mêmes 120 s ferait couper
   l'appel PAR LE DEHORS sur la seconde — et le client ne verrait qu'un timeout, sans le champ

@@ -843,13 +843,17 @@
       + la table de DECISION dans le diagnostic : par code, le compte ET des titres reels
       distincts, sur les offres REGIONALES seulement. RIEN n'est branche sur le pipeline.
 
-- [ ] **[NOC-02]** Choisir la liste des codes retenus, **sur la table mesuree**. ✔ REVISE
+- [x] **[NOC-02]** Choisir la liste des codes retenus, **sur la table mesuree**. ✔ REVISE
       le 2026-08-19 : elle ne vit PAS dans `lib/profil.ts` mais dans l'ETAT
       (`lib/metiersRetenus.ts`, cle `veille-metiers`), reglable par Marc depuis l'app — meme
       raison que le rayon : une constante de code exige un commit, donc moi, pour chaque
-      correction. Reste a faire : l'ECRAN qui montre la table mesuree (code / compte /
-      titres reels) et ou Marc coche. Sans lui, il faut encore me demander de lancer le
-      diagnostic — c'est exactement la dependance qu'on cherche a supprimer.
+      correction. ✔ LIVRE : l'ecran `/sources` mesure le flux (bouton), affiche chaque code
+      avec son compte ET des titres REELS (un compte seul ne se tranche pas), et Marc coche.
+      `lib/metiersMesure.ts` (PUR) fait la lecture du rapport ; une lecture PARTIELLE est
+      dite comme telle et jamais presentee comme une mesure. **La dependance a une session
+      Claude est supprimee** : c'etait tout l'objet de la demande.
+      ⚠️ Reste ouvert : QUELS codes retenir. C'est la decision de Marc, sur la table
+      mesuree — je ne la prends pas a sa place.
 
 - [x] **[NOC-03]** Brancher le filtre sur l'ingestion du flux Guichet, avec le compte des
       ecartees PAR CODE (compter ne suffit pas, il faut nommer l'objet). ✔ Livre :
