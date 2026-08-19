@@ -50,6 +50,13 @@ async function brancher(io: Partial<EntreesSorties> = {}) {
       enregistrees.push(o);
     },
     aujourdhui: () => "2026-08-19",
+    diagnostiquerFlux: async () => ({
+      fin: "flux-termine",
+      verdicts: { "dans-la-region": 2 },
+      inventaireRetenues: { noc2021: { distinctes: 1, top: [{ nom: "21301", n: 2 }] } },
+      exemplesRetenues: { noc2021: { "21301": ["Mechanical engineer"] } },
+      professions: [],
+    }),
     ...io,
   });
   const client = new Client({ name: "test", version: "1.0.0" });
@@ -76,7 +83,13 @@ describe("la surface exposée à claude.ai", () => {
     // appelable par un modèle. On la capture plutôt que de la supposer.
     const { client } = await brancher();
     const noms = (await client.listTools()).tools.map((t) => t.name).sort();
-    expect(noms).toEqual(["chercher_offres", "lire_offre", "modifier_suivi", "resume_suivi"]);
+    expect(noms).toEqual([
+      "chercher_offres",
+      "diagnostic_flux",
+      "lire_offre",
+      "modifier_suivi",
+      "resume_suivi",
+    ]);
   });
 
   it("annonce quels outils LISENT et lequel ÉCRIT", async () => {
@@ -87,6 +100,7 @@ describe("la surface exposée à claude.ai", () => {
     const parNom = new Map(outils.map((t) => [t.name, t.annotations?.readOnlyHint]));
     expect(parNom.get("chercher_offres")).toBe(true);
     expect(parNom.get("resume_suivi")).toBe(true);
+    expect(parNom.get("diagnostic_flux")).toBe(true);
     expect(parNom.get("modifier_suivi")).toBe(false);
   });
 });
@@ -131,6 +145,31 @@ describe("les lectures", () => {
     const { client } = await brancher();
     const r = corps(await client.callTool({ name: "resume_suivi", arguments: {} }));
     expect((r.parStatut as Record<string, number>)["Entrevue"]).toBe(0);
+  });
+});
+
+describe("diagnostic_flux — la table qui décide, pas les onze inventaires", () => {
+  it("rend par défaut la table des professions, avec ses exemples", async () => {
+    // Un rapport qu'on ne peut pas lire en entier ne se lit pas du tout : l'outil rend le
+    // résumé et UN inventaire, pas les onze.
+    const { client } = await brancher();
+    const r = corps(await client.callTool({ name: "diagnostic_flux", arguments: {} }));
+    expect(r.champ).toBe("noc2021");
+    expect(r.fin).toBe("flux-termine");
+    expect(r.exemples).toEqual({ "21301": ["Mechanical engineer"] });
+    expect(r.inventairesDisponibles).toEqual(["noc2021"]);
+  });
+
+  it("rend `null` — jamais un objet vide — pour un champ qui n'existe pas", async () => {
+    // « Le champ demandé n'existe pas » et « il n'a aucune valeur » sont deux choses
+    // différentes ; un objet vide tairait la première.
+    const { client } = await brancher();
+    const r = corps(
+      await client.callTool({ name: "diagnostic_flux", arguments: { champ: "inexistant" } }),
+    );
+    expect(r.inventaire).toBeNull();
+    expect(r.exemples).toBeNull();
+    expect(r.inventairesDisponibles).toEqual(["noc2021"]);
   });
 });
 

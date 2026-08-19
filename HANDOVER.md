@@ -6,6 +6,41 @@
 
 ---
 
+## Session 2026-08-19 — le diagnostic devient un outil MCP (je peux le prendre moi-même)
+
+Marc : « fait rouler le diagnostic ». **Je ne pouvais pas**, et c'est mesuré, pas supposé :
+`jobbank.gc.ca` rend **403 depuis la passerelle** de session, et
+`/api/diagnostic/flux-guichet` rend **401 `non_authentifie`** — le format de la middleware,
+donc je n'ai pas de session. C'était la quatrième fois que je demandais à Marc de coller un
+JSON.
+
+Livré : l'outil MCP **`diagnostic_flux`**, en lecture seule. Désormais je prends la mesure
+moi-même au lieu de la demander.
+
+- ⚠️ **Le `fetch` vers le Guichet reste dans `lib/ingest/`** (garde-fou n°4 : le seul dossier
+  autorisé à contacter une source d'offres). L'outil ne fait pas la requête — elle lui est
+  INJECTÉE par la route, comme le reste de ses entrées/sorties.
+- ⚠️ **Une seule implémentation, deux consommateurs** : `lib/ingest/diagnosticFlux.ts`. Deux
+  copies de la liste des champs inventoriés auraient répondu différemment à la même question,
+  et le jour où l'une ajoute un champ l'autre mesure autre chose — cinq fois payé sur ce dépôt.
+  La route HTTP est devenue mince.
+- ⚠️ **Budget adapté au MUR de chaque route** : 120 s en HTTP (mur 300), **40 s en MCP**
+  (mur 60). Un budget plus long que le mur ne borne rien : l'appel serait coupé par le dehors
+  sans rendre le `fin` qui dit si la lecture était complète.
+- L'outil rend par défaut le résumé + **la table des professions avec ses titres** — pas les
+  onze inventaires : un rapport qu'on ne peut pas lire en entier ne se lit pas du tout.
+  `champ` permet d'en demander un autre. Chaque appel relit le flux, et la description le dit.
+
+Le test de surface a attrapé le nouvel outil au passage — c'est exactement son rôle : la
+liste des outils EST le contrat public, un outil ajouté sans décision devient appelable.
+
+### Ce qu'il reste pour `[NOC-02]`
+
+Reconnecter le MCP dans claude.ai (il s'est déconnecté en cours de session) — ou, si c'est
+plus rapide, un dernier appel navigateur à `/api/diagnostic/flux-guichet`. Ensuite je prends
+la mesure seul.
+
+
 ## Session 2026-08-19 — tri du flux Guichet par code de profession (ADR-0012, cadrage)
 
 Décision de Marc : « go pour le tri par noc2021 ». Ça touche le matching offre↔profil, donc

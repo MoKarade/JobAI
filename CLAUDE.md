@@ -1356,6 +1356,19 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   nommé se distingue et se corrige. À l'inverse, les refus d'authentification entre eux
   doivent rester INDISCERNABLES (jeton absent, invalide, expiré, compte non autorisé) : les
   distinguer en ferait un oracle.
+- **Quand je demande la même mesure une quatrième fois, le problème n'est plus la mesure :
+  c'est que je n'ai pas d'accès.** Marc a collé quatre fois le JSON d'un diagnostic parce que
+  la passerelle de session refuse `jobbank.gc.ca` (403, mesuré) et que la route de diagnostic
+  exige une session que je n'ai pas (401 `non_authentifie`, le format de la middleware).
+  La bonne réponse n'était pas de mieux demander, c'était d'ouvrir un canal : le diagnostic
+  est devenu un outil MCP en lecture seule. Réflexe général : un aller-retour humain qui se
+  répète est un défaut d'outillage, pas une fatalité — et le canal existait déjà, il fallait
+  juste y brancher la mesure.
+- **Un budget plus long que le MUR de sa fonction ne borne rien.** Le même diagnostic tourne
+  derrière deux routes : 300 s en HTTP, 60 s en MCP. Y passer les mêmes 120 s ferait couper
+  l'appel PAR LE DEHORS sur la seconde — et le client ne verrait qu'un timeout, sans le champ
+  qui dit si la lecture était complète. Un budget se dérive du mur de l'appelant, jamais
+  d'une constante partagée entre appelants qui n'ont pas le même.
 
 ## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 

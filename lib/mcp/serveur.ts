@@ -19,6 +19,7 @@
 // veille muette trois jours durant.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
 import type { Offre } from "../types";
 import { FiltresSchema, chercherOffres, lireOffreVue, resumerPourMcp } from "./lecture.spec";
 import { EcritureSuiviSchema, preparerEcriture } from "./ecriture.spec";
@@ -31,6 +32,15 @@ export interface EntreesSorties {
   enregistrer: (offre: Offre) => Promise<void>;
   /** Le jour courant DANS LE FUSEAU DE MARC (`AAAA-MM-JJ`), jamais en UTC. */
   aujourdhui: () => string;
+  /**
+   * Mesure le flux du Guichet-Emplois.
+   *
+   * ⚠️ INJECTÉE, ET PAS SEULEMENT POUR LA TESTABILITÉ. `lib/ingest/` est le SEUL dossier
+   * autorisé à contacter une source d'offres (garde-fou n°4) : si ce module faisait la
+   * requête lui-même, il ouvrirait une seconde frontière réseau vers un site d'emploi, hors
+   * du seul endroit où elle est censée exister.
+   */
+  diagnostiquerFlux: () => Promise<Record<string, unknown>>;
 }
 
 /** Une réponse d'outil : du JSON, dans le seul format que le protocole transporte. */
@@ -106,6 +116,50 @@ export function creerServeur(io: EntreesSorties): McpServer {
       const offres = await io.lireOffres();
       if (offres === null) return panne(BASE_MUETTE);
       return json(resumerPourMcp(offres));
+    },
+  );
+
+  serveur.registerTool(
+    "diagnostic_flux",
+    {
+      title: "Mesurer le flux du Guichet-Emplois",
+      description:
+        "Lit le flux XML officiel du Guichet-Emplois et rend ce qu'il contient : combien " +
+        "d'offres, combien de régionales, la distribution des codes de profession (noc2021) " +
+        "avec des TITRES RÉELS pour chacun, et un échantillon. Sert à DÉCIDER quels métiers " +
+        "ingérer (ADR-0012). ⚠️ Ne lis pas `fin` en diagonale : seul « flux-termine » " +
+        "autorise à conclure — sous toute autre fin, les comptes ne sont que le début d'une " +
+        "mesure. Par défaut l'outil rend le résumé et la table des professions ; `champ` " +
+        "permet d'en demander une autre (postalcode-region, education, salary…). Chaque " +
+        "appel relit le flux : n'en fais pas plusieurs pour rien.",
+      inputSchema: { champ: z.string().max(40).optional() },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ champ: demande }) => {
+      const r = await io.diagnostiquerFlux();
+      const inventaires = (r["inventaireRetenues"] ?? {}) as Record<string, unknown>;
+      const exemples = (r["exemplesRetenues"] ?? {}) as Record<string, unknown>;
+      // Par défaut : la table qui décide. `noc2021` seul, pas les onze inventaires — un
+      // rapport qu'on ne peut pas lire en entier ne se lit pas du tout.
+      const cle = demande ?? "noc2021";
+      return json({
+        fin: r["fin"],
+        construitLe: r["construitLe"],
+        vues: r["vues"],
+        preFiltrees: r["preFiltrees"],
+        illisibles: r["illisibles"],
+        ecartees: r["ecartees"],
+        retenues: r["retenues"],
+        secondes: r["secondes"],
+        verdicts: r["verdicts"],
+        inventairesDisponibles: Object.keys(inventaires),
+        champ: cle,
+        // « Le champ demandé n'existe pas » et « il n'a aucune valeur » sont deux choses
+        // différentes : `null` le dit, un objet vide le tairait.
+        inventaire: inventaires[cle] ?? null,
+        exemples: exemples[cle] ?? null,
+        professions: r["professions"],
+      });
     },
   );
 

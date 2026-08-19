@@ -21,6 +21,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { offers } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
+import { BUDGET_MS_MCP, diagnostiquerFlux } from "@/lib/ingest/diagnosticFlux";
 import { creerServeur } from "@/lib/mcp/serveur";
 import { empreinte, estProprietaire } from "@/lib/mcp/oauth";
 import { origineDe } from "@/lib/mcp/origine";
@@ -133,6 +134,12 @@ export async function POST(requete: Request): Promise<Response> {
     // ⚠️ Le fuseau de Marc, jamais UTC : Vercel tourne en UTC et Marc vit à UTC−4, donc un
     // CV marqué envoyé après 20 h locale daterait du lendemain.
     aujourdhui: () => aujourdhui(new Date()),
+    // ⚠️ LE `fetch` VERS LE GUICHET RESTE DANS `lib/ingest/` — garde-fou n°4, qui nomme ce
+    // dossier comme le seul autorisé à contacter une source d'offres. Le budget est celui du
+    // MUR de CETTE route (60 s), pas celui de la route HTTP de diagnostic qui en a 300 : un
+    // budget plus long que le mur ne bornerait rien, et l'appel serait coupé par le dehors
+    // sans rendre le `fin` qui dit si la lecture était complète.
+    diagnostiquerFlux: () => diagnostiquerFlux(fetch, BUDGET_MS_MCP),
   });
 
   await serveur.connect(transport);
