@@ -180,6 +180,43 @@ Amsterdam) en est la preuve.
 4. La liste vit en clair dans le dépôt (`lib/ingest/atsCibles.ts`) — aucun secret, et un
    ajout se relit.
 
+## §4 bis — Recensement des ATS, 2026-08-19 : ce que les 36 cibles utilisent VRAIMENT
+
+Constaté par recherche web (WebSearch fonctionne depuis la session ; **WebFetch NON** — même
+proxy d'egress, `EGRESS_BLOCKED` — donc je peux trouver un jeton, jamais lire la page qui le
+porte ; la vérification appartient à la sonde déployée).
+
+| Employeur | Système constaté | Dans nos 5 familles ? |
+|---|---|---|
+| Robotiq | SmartRecruiters — jeton `ROBOTIQInc` | **oui** |
+| Chantier Davie | Oracle Cloud HCM (`fa.ocs.oraclecloud.com`) | non |
+| Techsol Marine | Glow in the Cloud + **Jobillico** | non |
+| Revtech Systèmes | page carrières sur son propre site | non |
+| Laserax | rien de constaté — **ne pas inventer** | ? |
+
+⚠️ **CE RECENSEMENT RENVERSE LA PRIORITÉ DU §2 bis.** Les cinq familles d'ATS visées sont
+celles des entreprises technologiques de taille moyenne ; les 36 cibles de Marc sont en
+majorité des **PME industrielles** et de **grands groupes**. Les premières publient sur
+Jobillico ou sur leur propre site, les seconds sur Workday / Oracle HCM / SuccessFactors.
+Une recherche sur `careers.smartrecruiters.com` restreinte au Québec a rendu Vidéotron,
+CIMA+, Vosker, O-I — aucune des 36.
+
+Trois conséquences, à trancher avec les chiffres de la sonde :
+
+1. **Le rendement des 5 familles est probablement FAIBLE sur cette liste précise.** Elles
+   restent gratuites à brancher (le transport existe), mais promettre du volume serait
+   exactement le chiffre-titre non mesuré que ce projet s'interdit.
+2. **Jobillico monte en priorité, et passe devant ZipRecruiter.** C'est là que publient
+   Chantier Davie et Techsol Marine — deux cibles réelles. Son `robots.txt` ne bloque que
+   `/ajax/`, `/social/` et les pages de test A/B ; les chemins de recherche d'emploi n'y
+   sont pas interdits. ⚠️ Mais un `robots.txt` dit ce qu'un moteur peut INDEXER, pas ce
+   qu'on peut faire des données : ses **conditions d'utilisation** restent à lire, et ce
+   sont elles qui lient.
+3. **Oracle Cloud HCM mérite d'être évalué comme 6ᵉ famille.** Son interface candidat
+   s'appuie sur une API REST publique (`recruitingCEJobRequisitions`) ; Davie l'utilise, et
+   les grands groupes de la liste probablement aussi. Ce serait une **nouvelle famille**
+   dans `FAMILLES_ATS`, donc du code et un test — pas un simple ajout de jeton.
+
 ## §5 — Traiter le texte : « voir toutes les subtilités »
 
 `texteSimple` retire les balises. Ça ne suffit pas : ce qui décide du tri vit DANS la prose.
