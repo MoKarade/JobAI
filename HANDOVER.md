@@ -6,6 +6,36 @@
 
 ---
 
+## Session 2026-08-19 — le connecteur MCP MARCHE (lot 4/4, chantier clos)
+
+Marc l'a branché dans claude.ai : « ça marche ». Vérifié depuis une session sur les VRAIES
+données — `resume_suivi` rend **193 offres suivies, 100 périmées, meilleure note 88** ;
+`chercher_offres` à 75+ rend **110 correspondances** avec `tronque: true` honoré. Les quatre
+outils répondent.
+
+C'est la seule vérification qui vaut : un déploiement vert ne prouve rien, leçon payée trois
+fois ici.
+
+### Ce que le dernier kilomètre a coûté
+
+Deux défauts qu'**aucun test ne pouvait voir**, trouvés en cherchant à faire MARCHER la
+chose plutôt qu'à la finir :
+
+1. Un enregistrement légitime rendait **500 sans corps** — les routes OAuth n'appelaient pas
+   `assurerMigrations`. La suite tourne sur PGlite, où le harnais applique les migrations
+   lui-même : le trou était structurellement invisible en test.
+2. Le SDK refuse de réutiliser un transport sans état. La route en crée bien un par requête,
+   mais la question ouverte était la bonne : **sans état, le serveur ne se souvient jamais
+   d'avoir été initialisé** — `tools/list` devait donc marcher sur un serveur neuf, sinon
+   seul le premier échange aurait fonctionné.
+
+### Où en est le reste
+
+Le flux Guichet (`[VEILLE-40]`, `[VEILLE-44]`) attend toujours une décision : **1 300 offres
+régionales par passe** contre quelques dizaines suivies, et un échantillon dominé par des
+postes peu qualifiés. Le tri est le sujet, pas le volume — et `noc2021` en est le candidat.
+
+
 ## Session 2026-08-19 — MCP lot 3/4 : OAuth 2.1 (le connecteur est prêt côté app)
 
 `lib/mcp/oauth.ts` (logique pure), `lib/oauthStore.ts` (état — **hors de `lib/mcp/`** pour

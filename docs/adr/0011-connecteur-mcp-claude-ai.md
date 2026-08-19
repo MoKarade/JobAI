@@ -147,7 +147,7 @@ base, et le volume du scan est prouvé (un scan qui ne trouve aucun fichier pass
 | 1 | Les outils (`*.spec.ts`), lecture ET écriture, testés, sans SDK ni réseau | livré |
 | 2 | Le serveur MCP + le transport HTTP | livré |
 | 3 | OAuth 2.1 (découverte, enregistrement, PKCE, rotation) | livré |
-| 4 | Branchement dans claude.ai, vérifié par un appel RÉEL | **Marc** |
+| 4 | Branchement dans claude.ai, vérifié par un appel RÉEL | livré, 2026-08-19 |
 
 ### Ce que le lot 3 a livré, et ce qu'il PROUVE
 
@@ -189,3 +189,30 @@ conversation réelle depuis claude.ai.
 - **Service séparé (Cloud Run) comme FinanceAI** — écarté : JobAI est déjà une app Next sur
   Vercel avec Auth.js et la session de Marc. Un second service ajouterait un déploiement, une
   chaîne de secrets et une frontière réseau, sans rien apporter ici.
+
+
+---
+
+## Lot 4 — vérifié par une conversation réelle (2026-08-19)
+
+Marc a branché le connecteur : « ça marche ». Vérifié depuis une session, sur les VRAIES
+données — c'est le seul signal qui compte, un déploiement vert n'en étant pas un.
+
+- `resume_suivi` → 193 offres suivies, 100 périmées, 0 non notée, meilleure note 88.
+- `chercher_offres` (score ≥ 75) → 110 correspondances, `tronque: true` honoré.
+- Les quatre outils répondent, l'avant/après de l'écriture est en place.
+
+### Ce que le branchement a coûté, et qu'aucun test ne pouvait voir
+
+1. **Un enregistrement légitime rendait 500 sans corps.** Les trois tables n'existaient pas
+   encore : l'app se migre elle-même depuis juillet, mais seulement là où on le lui demande,
+   et les routes OAuth ne le demandaient pas. Impossible à attraper en test — la suite tourne
+   sur PGlite, où le harnais applique les migrations lui-même. C'est la classe « un
+   automatisme ne s'applique que là où quelqu'un l'a appelé ».
+2. **Le SDK refuse de réutiliser un transport sans état.** La route en crée bien un par
+   requête, donc ce n'était pas un bug — mais la question qu'il a ouverte était la bonne :
+   sans état, le serveur ne se souvient jamais d'avoir été initialisé, donc `tools/list` doit
+   marcher sur un serveur NEUF. Sinon seul le tout premier échange aurait fonctionné, et la
+   panne se serait lue comme un bug de claude.ai.
+
+Les deux n'ont été trouvés qu'en cherchant à faire MARCHER la chose, pas à la finir.

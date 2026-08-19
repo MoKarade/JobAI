@@ -747,7 +747,7 @@
 
 ---
 
-## Chantier #07 — Connecteur MCP pour claude.ai 🟡
+## Chantier #07 — Connecteur MCP pour claude.ai ✅
 
 > Cadré par **ADR-0011** (décision Marc, 2026-08-19). ⚠️ Ce chantier **amende le garde-fou
 > n°2** : l'écriture depuis une conversation est une exception nommée, bornée par quatre
@@ -782,8 +782,18 @@
       Postgres (PGlite) : deux echanges simultanes, un seul gagne — le motif naif en fait
       gagner deux. Aucun nouveau secret a configurer.
 
-- [ ] **[MCP-04]** Branchement dans claude.ai, vérifié par une **conversation réelle**. Un
-      déploiement vert ne prouve rien — leçon payée trois fois sur ce dépôt.
+- [x] **[MCP-04]** Branche dans claude.ai et VERIFIE PAR UNE CONVERSATION REELLE le
+      2026-08-19 — le seul signal qui compte, un deploiement vert ne prouvant rien (lecon
+      payee trois fois ici). Mesure sur les vraies donnees : `resume_suivi` rend 193 offres
+      suivies / 100 perimees / meilleure note 88 ; `chercher_offres` rend les offres notees,
+      avec `tronque: true` sur 110 correspondances a 75+. Les quatre outils repondent.
+      ⚠️ Deux defauts trouves en essayant de le faire marcher, et invisibles autrement :
+      (a) un enregistrement legitime rendait 500 SANS CORPS — les routes OAuth n'appelaient
+      pas `assurerMigrations`, et aucun test ne pouvait le voir (la suite tourne sur PGlite,
+      ou le harnais applique les migrations lui-meme) ; (b) le SDK refuse de reutiliser un
+      transport sans etat, ce qui posait la vraie question — sans etat le serveur ne se
+      souvient jamais d'avoir ete initialise, donc `tools/list` DOIT marcher sur un serveur
+      neuf, sinon seul le premier echange fonctionnerait. Verifie.
 
 ---
 
