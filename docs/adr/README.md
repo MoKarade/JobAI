@@ -29,3 +29,4 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 | [0013](./0013-le-domaine-pondere-la-note.md) | Le domaine pondère la note, et le flux entre en entier | Proposé — décisions Marc du 2026-08-20 |
 | [0014](./0014-la-note-suit-le-profil.md) | La note suit le profil : distance re-calibree, conditions lues, carriere cadree | Propose — volet carriere BLOQUE tant que le CV n'est pas depose |
 | [0015](./0015-le-bareme-cesse-de-punir-le-technicien.md) | Le bareme cesse de punir le titre de technicien | Propose — debloque le volet D3 d'ADR-0014 |
+| [0016](./0016-la-carte-google-revient.md) | La carte Google revient, et le domicile avec elle | Propose — ressuscite ADR-0004, revise le garde-fou n1 |
