@@ -8,14 +8,27 @@ App de l'écosystème hub perso, aux côtés de FinanceAI, DriveAI et BatchChef.
 Destination : **`emploi.hubperso.com`**. Widget publié au hub via
 [`@mokarade/hub-contract`](https://github.com/MoKarade/hub-contract).
 
-> **Dépôt privé, et ce n'est pas négociable** : les données de suivi contiennent l'adresse du
-> domicile, le statut migratoire, l'historique de candidatures et des noms de personnes
-> tierces. Voir le garde-fou n°1 du [`CLAUDE.md`](./CLAUDE.md).
+> ⚠️ **Dépôt PUBLIC — donc aucune donnée personnelle, jamais.** Ce paragraphe a longtemps
+> annoncé l'inverse (« dépôt privé, et ce n'est pas négociable ») alors que le dépôt est
+> public depuis le premier jour. C'est la pire erreur qu'une doc puisse faire : annoncer un
+> filet qui n'existe pas. Marc a tranché en connaissance de cause le 2026-08-14 — **il reste
+> public**.
+>
+> Ce que ça change : les données de suivi contiennent l'adresse du domicile, le statut
+> migratoire, l'historique de candidatures et des noms de personnes tierces. En privé, une
+> PII commitée par erreur se rattrapait entre nous. En public, elle est **lisible du monde
+> entier à la seconde du push**, et un commit correctif ne la retire pas — l'historique, les
+> forks et les miroirs la gardent.
+>
+> `tests/piiGuard.test.ts` n'est donc pas une ceinture, c'est **le mur, et le seul**. Voir le
+> garde-fou n°1 du [`CLAUDE.md`](./CLAUDE.md), qui est à jour.
 
 ## État
 
 **En service, avec des données réelles.** Base Neon branchée, migrations appliquées
-automatiquement au démarrage, auth Google mono-adresse, interface livrée. Le premier lot réel
+automatiquement au démarrage, interface livrée. Côté auth, JobAI n'émet plus de session :
+elle **lit** celle que le hub pose sur `.hubperso.com` (`auth.ts`, `providers: []`), et
+demande au hub qui a le droit d'entrer (`lib/accesHub.ts`). Le premier lot réel
 de la veille est arrivé le 2026-07-31 (45 offres reçues, 40 ajoutées).
 
 L'état courant fait foi dans **[`HANDOVER.md`](./HANDOVER.md)** — à lire en premier, il est
@@ -54,7 +67,13 @@ les décisions dans [`docs/adr/`](./docs/adr/).
 - **Endpoint hub** (`app/api/hub/summary/route.ts`) — jeton `x-hub-token` vérifié en temps
   constant, `Cache-Control: no-store`, summary honnêtement `building` tant qu'aucune donnée
   réelle n'existe.
-- TypeScript strict, **813 tests** Vitest, summary validé contre le **vrai** schéma du contrat.
+- TypeScript strict, suite Vitest complète, summary validé contre le **vrai** schéma du
+  contrat.
+
+  *(Le nombre exact de tests était écrit ici — « 813 » — et se trompait de ~400 : il avait
+  vieilli sans que rien ne le signale. Un compteur au présent dans une liste de
+  caractéristiques rote à chaque PR. Le vrai chiffre se lit dans la CI, qui ne ment jamais ;
+  s'il faut le citer, c'est dans un récit daté, pas dans une affirmation permanente.)*
 
 ### Ce qui n'existe PAS encore
 
