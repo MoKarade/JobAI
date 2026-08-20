@@ -12,7 +12,13 @@
 // La DÉCISION (`filtrer`) vit dans `lib/filtres.ts`, pure et testée ; ce fichier n'est que
 // le rendu et l'état. Deux surfaces, une règle, une barre.
 
-import { PALIERS_DISTANCE_KM, PALIERS_NOTE, type EtatFiltres } from "@/lib/filtres";
+import {
+  PALIERS_DISTANCE_KM,
+  PALIERS_JOURS,
+  PALIERS_NOTE,
+  type EtatFiltres,
+} from "@/lib/filtres";
+import { CATEGORIES, CATEGORIE_LIBELLES } from "@/lib/categorie";
 
 /** Les bascules, dans l'ordre où elles se lisent. Le seuil de distance est à part. */
 const BASCULES: readonly { cle: BasculeFiltre; libelle: string }[] = [
@@ -21,8 +27,18 @@ const BASCULES: readonly { cle: BasculeFiltre; libelle: string }[] = [
   { cle: "avecPerimees", libelle: "Voir les périmées" },
 ];
 
-/** Les filtres booléens — `texte` et les deux SEUILS ont leurs propres contrôles. */
-type BasculeFiltre = Exclude<keyof EtatFiltres, "texte" | "distanceMaxKm" | "noteMinimale">;
+/**
+ * Les filtres BOOLÉENS — les seuils et la recherche ont leurs propres contrôles.
+ *
+ * ⚠️ DÉRIVÉ DU TYPE, PAS D'UNE LISTE D'EXCLUSION. C'était `Exclude<keyof EtatFiltres,
+ * "texte" | "distanceMaxKm" | "noteMinimale">` : une liste à tenir à la main, qui a dérivé
+ * dès qu'on a ajouté les filtres de date et de catégorie — leurs clés se sont retrouvées
+ * dans les bascules, où elles n'ont aucun sens. Sélectionner par la FORME (ce qui est
+ * booléen) se met à jour tout seul.
+ */
+type BasculeFiltre = {
+  [K in keyof EtatFiltres]: EtatFiltres[K] extends boolean ? K : never;
+}[keyof EtatFiltres];
 
 export function Filtres({
   filtres,
@@ -95,6 +111,44 @@ export function Filtres({
               onClick={() => onChange({ ...filtres, distanceMaxKm: actif ? null : km })}
             >
               ≤ {km} km
+            </button>
+          );
+        })}
+      </span>
+
+      {/* La FRAÎCHEUR. Le libellé dit « depuis », pas « il y a » : « 7 jours » seul se lit
+          aussi bien « les sept derniers » que « il y a sept ». */}
+      <span className="controles__groupe" role="group" aria-label="Repérées depuis">
+        {PALIERS_JOURS.map((j) => {
+          const actif = filtres.jours === j;
+          return (
+            <button
+              key={j}
+              type="button"
+              className={`filtre${actif ? " filtre--actif" : ""}`}
+              aria-pressed={actif}
+              onClick={() => onChange({ ...filtres, jours: actif ? null : j })}
+            >
+              {j === 1 ? "Aujourd’hui" : `${j} derniers jours`}
+            </button>
+          );
+        })}
+      </span>
+
+      {/* La CATÉGORIE de poste, dérivée du même barème que la note — jamais d'un calcul
+          parallèle qui la contredirait à l'écran. */}
+      <span className="controles__groupe" role="group" aria-label="Catégorie de poste">
+        {CATEGORIES.map((c) => {
+          const actif = filtres.categorie === c;
+          return (
+            <button
+              key={c}
+              type="button"
+              className={`filtre${actif ? " filtre--actif" : ""}`}
+              aria-pressed={actif}
+              onClick={() => onChange({ ...filtres, categorie: actif ? null : c })}
+            >
+              {CATEGORIE_LIBELLES[c]}
             </button>
           );
         })}

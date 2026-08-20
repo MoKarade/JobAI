@@ -22,9 +22,20 @@ import { CarteOffre } from "./CarteOffre";
 import { BoutonExport } from "./BoutonExport";
 import { CompteFiltre, Filtres } from "./Filtres";
 
-export function ListeOffres({ offres }: { offres: Offre[] }) {
+export function ListeOffres({
+  offres,
+  metiers = [],
+}: {
+  offres: Offre[];
+  /**
+   * Les métiers du domaine, pour que la CATÉGORIE affichée soit celle qui a servi à noter.
+   * Défaut vide : un appelant qui ne les passe pas obtient la catégorie déduite du seul
+   * titre — honnête, jamais faux, simplement moins fine.
+   */
+  metiers?: readonly string[];
+}) {
   const [filtres, setFiltres] = useState<EtatFiltres>(FILTRES_VIDES);
-  const visibles = useMemo(() => filtrer(offres, filtres), [offres, filtres]);
+  const visibles = useMemo(() => filtrer(offres, filtres, metiers), [offres, filtres, metiers]);
 
   const sansDistance = useMemo(() => sansDistanceMesuree(offres, filtres), [offres, filtres]);
   const sansNote = useMemo(() => sansNoteCalculee(offres, filtres), [offres, filtres]);

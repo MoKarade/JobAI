@@ -44,21 +44,8 @@ export const ID_SOURCE_FLUX_GUICHET = "guichet-flux";
  * (`plafond-retenues` part dans la note) : une passe partielle qui se présenterait comme
  * complète ferait croire que le flux ne porte que ça.
  */
-export const MAX_RETENUES_FLUX = 200;
+export const MAX_RETENUES_FLUX = 1_600;
 
-/**
- * Plafond en mode « tout » (ADR-0013, D3).
- *
- * La mesure du 2026-08-20 donne **1 290 régionales** sur une lecture complète. 1 600 laisse
- * la marge d'une bonne journée sans plafonner en silence — et `plafond-retenues` reste dit
- * dans la note quand il est atteint, parce qu'une passe partielle qui se présenterait comme
- * complète ferait croire que le marché s'est vidé.
- *
- * ⚠️ CE PLAFOND N'EST PAS LE VRAI MUR. Le vrai mur est la durée de la fonction : la route du
- * cron passe à 300 s et les insertions se font par LOTS, sans quoi 1 300 allers-retours
- * séquentiels vers la base épuiseraient le budget avant la fin de l'ingestion.
- */
-export const MAX_RETENUES_FLUX_TOUT = 1_600;
 
 /**
  * Offres au lieu INCONNU laissées passer par passe.
@@ -93,20 +80,6 @@ export interface OptionsSourceFlux {
   recuperer?: typeof fetch;
   budgetMs?: number;
   maxRetenues?: number;
-  /**
-   * Ce que la source fait des offres HORS des métiers retenus (ADR-0013, D3).
-   *
-   * `"domaine"` (défaut) — elles sont refusées à la lecture. C'est le comportement d'origine,
-   * et il reste le défaut sûr : une option qui n'a pas été réglée ne doit pas ouvrir les
-   * vannes.
-   *
-   * `"tout"` — elles sont RETENUES, avec leur code, et c'est la NOTE qui les range
-   * (facteur de domaine). Décision Marc du 2026-08-20 : « je veux voir toutes les offres
-   * dispos ». ⚠️ Le compte des écartées par code continue d'être tenu dans les deux modes :
-   * il dit ce que le filtre AURAIT retiré, ce qui reste l'information utile pour régler la
-   * liste.
-   */
-  mode?: "domaine" | "tout";
 }
 
 /** Ce que la lecture a refusé, et pourquoi. Rendu en une ligne lisible. */
@@ -196,12 +169,8 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
     verdicts = new Map(),
     recuperer = fetch,
     budgetMs = BUDGET_MS_DEFAUT,
-    mode = "domaine",
   } = options;
-  // Le plafond suit le MODE : filtrer rend quelques dizaines d'offres, tout ingérer en rend
-  // plus de mille. Un plafond unique servirait mal les deux.
-  const maxRetenues =
-    options.maxRetenues ?? (mode === "tout" ? MAX_RETENUES_FLUX_TOUT : MAX_RETENUES_FLUX);
+  const maxRetenues = options.maxRetenues ?? MAX_RETENUES_FLUX;
 
   let dernierBilan: BilanFlux | null = null;
 
@@ -212,6 +181,8 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
       let horsRegion = 0;
       let regionales = 0;
       let lieuInconnuRapporte = 0;
+      /** Places du quota consommées par le HORS-domaine. Voir le garde ci-dessous. */
+      let quotaLieuInconnu = 0;
       let lieuInconnuIgnore = 0;
       /** Le code lu pour chaque offre retenue, à rattacher après la lecture (ADR-0013). */
       const codesParRef = new Map<string, string | null>();
@@ -236,35 +207,52 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
             // domaine n'aurait rien à lire et le barème resterait aveugle à l'anglais.
             codesParRef.set(offre.refSource, code.trim() === "" ? null : code.trim());
             const verdict = jugerProfession(code, metiers);
-            const garderQuandMeme = mode === "tout";
             if (verdict === "code-illisible") {
               // ⚠️ UN CODE ILLISIBLE N'EST PAS UN REFUS DE MÉTIER, et il ne se compte pas
               // avec eux. C'est un défaut de la SOURCE — et le jour où le Guichet cesserait
               // de coder ses offres, ce compteur monterait en flèche pendant que « écartées
               // par métier » resterait à zéro. Les mélanger ferait passer une panne de flux
               // pour un tri qui fonctionne.
+              // ⚠️ UN CODE ILLISIBLE NE REFUSE PLUS — mais il se compte toujours. L'offre
+              // part avec `noc: null`, donc un domaine INCONNU, donc un facteur de note
+              // neutre : elle ne sera ni pénalisée ni favorisée par un défaut de la source.
+              // Une ignorance n'est pas un refus.
               codeIllisible++;
-              // ⚠️ EN MODE « TOUT », UN CODE ILLISIBLE NE REFUSE PLUS — mais il se compte
-              // toujours. L'offre part avec `noc: null`, donc un domaine INCONNU, donc un
-              // facteur neutre : elle ne sera ni pénalisée ni favorisée par un défaut de la
-              // source. C'est la même règle que partout ailleurs — une ignorance n'est pas
-              // un refus.
-              if (!garderQuandMeme) return false;
             } else if (verdict === "ecartee") {
+              // ⚠️ COMPTÉ SANS ÊTRE REFUSÉ (décision Marc 2026-08-20). Le métier ne filtre
+              // plus l'ingestion — toutes les offres régionales entrent et c'est la NOTE qui
+              // les range. Le compte reste tenu : il dit ce qu'un filtre AURAIT retiré, et
+              // c'est lui qui sert à juger la liste de métiers.
               const cle = code.trim() === "" ? "(vide)" : code.trim();
               ecarteesParCode[cle] = (ecarteesParCode[cle] ?? 0) + 1;
-              if (!garderQuandMeme) return false;
             }
 
-            // ⚠️ LE MÉTIER EST JUGÉ AVANT LE LIEU INCONNU, ET C'EST CE QUI BORNE LE QUOTA.
-            // Rapporter des lieux inconnus sert à faire APPRENDRE leurs noms à la mesure ;
-            // les rapporter avant d'avoir filtré le métier remplirait le quota de villes
-            // portées par des postes que Marc ne veut pas — la mesure travaillerait des
-            // jours pour débloquer des offres qui seraient refusées ensuite.
+            // ⚠️ LE MÉTIER NE REFUSE PLUS, MAIS IL PRIORISE ENCORE — et c'est ce qui sauve
+            // le quota.
+            //
+            // Rapporter des lieux inconnus sert à faire APPRENDRE leurs noms à la mesure, et
+            // le quota borne ce travail. Tant que le métier FILTRAIT, seules les offres du
+            // domaine pouvaient le consommer. Depuis qu'il ne filtre plus (décision Marc du
+            // 2026-08-20), les 40 places partiraient aux premières venues — or la moitié du
+            // flux tombe en lieu inconnu et 96 % de ces offres sont hors domaine. La mesure
+            // passerait des jours à débloquer des laveurs de voitures pendant qu'un
+            // coordonnateur de projet resterait sans ville.
+            //
+            // D'où deux régimes : une offre DU domaine passe toujours (elles sont rares —
+            // 3,5 % du flux mesuré — et bornées de toute façon par `maxRetenues`) ; les
+            // autres se partagent le quota.
             if (lieu === "lieu-inconnu") {
-              if (lieuInconnuRapporte >= MAX_LIEUX_INCONNUS_FLUX) {
-                lieuInconnuIgnore++;
-                return false;
+              // ⚠️ DEUX COMPTEURS, ET C'EST VOULU. `lieuInconnuRapporte` part à l'écran : il
+              // doit continuer de dire COMBIEN d'offres au lieu inconnu sont rapportées,
+              // toutes confondues. Le quota, lui, ne borne que les hors-domaine. Réutiliser
+              // le compteur affiché comme compteur de quota aurait changé en silence le sens
+              // d'un nombre que Marc lit.
+              if (verdict !== "retenue") {
+                if (quotaLieuInconnu >= MAX_LIEUX_INCONNUS_FLUX) {
+                  lieuInconnuIgnore++;
+                  return false;
+                }
+                quotaLieuInconnu++;
               }
               lieuInconnuRapporte++;
               return true;

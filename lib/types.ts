@@ -82,6 +82,15 @@ export const OffreSchema = z.object({
   lien: z.string().url().or(z.literal("")),
   /** Distance à vol d'oiseau, en km. null = inconnue (pas zéro). */
   km: z.number().finite().min(0).nullable(),
+
+  /**
+   * Code de profession NOC 2021, quand la source en publie un. `null` sinon.
+   *
+   * ⚠️ SON ABSENCE EST NEUTRE, jamais un « hors domaine ». C'est la règle que tient déjà
+   * `facteurDomaine` : une offre sans code est de domaine INCONNU, et la pénaliser
+   * reviendrait à punir toutes les offres d'Indeed et du dépôt, qui n'en portent aucun.
+   */
+  noc: z.string().nullable().optional(),
   /**
    * Ville de l'employeur, telle qu'annoncée par la source. `null` si inconnue.
    * Sert au géocodage : « ISS » seul est une recherche mondiale, « ISS, Québec » non.

@@ -5,6 +5,7 @@
 
 import { SEUIL_PALIER_A, SEUIL_PALIER_B } from "./scoring";
 import type { Offre } from "./types";
+import { categorieOffre, type Categorie } from "./categorie";
 
 export interface EtatFiltres {
   /** Recherche libre sur l'entreprise, le poste et les notes. */
@@ -38,6 +39,18 @@ export interface EtatFiltres {
    * savoir qu'une piste s'est fermée fait partie de l'histoire de la recherche.
    */
   avecPerimees: boolean;
+
+  /**
+   * Nombre de JOURS de repérage à garder, ou `null` pour toutes.
+   *
+   * ⚠️ C'est la date de REPÉRAGE, pas de publication : c'est celle que l'app connaît pour
+   * toutes ses offres. Filtrer sur une date de publication que la plupart des sources ne
+   * donnent pas écarterait en silence tout ce qui n'en porte pas.
+   */
+  jours: number | null;
+
+  /** Catégorie de poste, ou `null` pour toutes. Voir `lib/categorie.ts`. */
+  categorie: Categorie | null;
 }
 
 export const FILTRES_VIDES: EtatFiltres = {
@@ -47,6 +60,8 @@ export const FILTRES_VIDES: EtatFiltres = {
   distanceMaxKm: null,
   historique: false,
   avecPerimees: false,
+  jours: null,
+  categorie: null,
 };
 
 /**
@@ -70,7 +85,39 @@ export const PALIERS_DISTANCE_KM: readonly number[] = [10, 25, 50];
  */
 export const PALIERS_NOTE: readonly number[] = [SEUIL_PALIER_B, SEUIL_PALIER_A];
 
-export function filtrer(offres: readonly Offre[], f: EtatFiltres): Offre[] {
+/**
+ * Fenêtres de fraîcheur, en jours.
+ *
+ * Des paliers plutôt qu'un calendrier : on cherche « ce qui est arrivé cette semaine », on
+ * ne compose pas une date. Un second clic sur le palier actif le retire.
+ */
+export const PALIERS_JOURS: readonly number[] = [1, 7, 30];
+
+/**
+ * La date de repérage la plus ancienne acceptée, au format `AAAA-MM-JJ`.
+ *
+ * PURE et paramétrée par `maintenant` pour être testable : un helper de date qui lit
+ * l'horloge ne se teste que par le hasard du jour où on lance la suite.
+ */
+export function depuisJours(jours: number, maintenant: Date = new Date()): string {
+  const d = new Date(maintenant);
+  d.setDate(d.getDate() - (jours - 1));
+  // Le fuseau de Marc, comme partout ailleurs : Vercel tourne en UTC, et `toISOString()`
+  // rendrait DEMAIN après 20 h locale.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+export function filtrer(
+  offres: readonly Offre[],
+  f: EtatFiltres,
+  /** Les métiers du domaine — la catégorie s'en sert, comme la note. */
+  metiers: readonly string[] = [],
+): Offre[] {
   const q = f.texte.trim().toLowerCase();
 
   return offres.filter((o) => {
@@ -97,6 +144,19 @@ export function filtrer(offres: readonly Offre[], f: EtatFiltres): Offre[] {
     // offres fraîchement ingérées n'ont pas encore de distance — donc l'interface COMPTE
     // celles qui sont écartées pour cette raison, au lieu de les faire disparaître.
     if (f.distanceMaxKm !== null && (o.km === null || o.km > f.distanceMaxKm)) return false;
+
+    if (f.jours !== null) {
+      // ⚠️ COMPARAISON DE CHAÎNES `AAAA-MM-JJ`, pas de `Date`. Construire une `Date` depuis
+      // « 2026-08-20 » la place à MINUIT UTC : sur un fuseau en retard, l'offre du jour se
+      // retrouverait « demain » et le filtre « aujourd'hui » ne rendrait rien. Les deux
+      // bornes sont produites dans le même format, l'ordre lexicographique suffit.
+      if (o.dateReperage < depuisJours(f.jours)) return false;
+    }
+
+    if (f.categorie !== null) {
+      const c = categorieOffre(o.poste, o.raisons.map((r) => r.texte).join(" "), o.noc, metiers);
+      if (c !== f.categorie) return false;
+    }
 
     if (q) {
       const foin = [

@@ -69,12 +69,8 @@ const recuperateurInterdit: Recuperateur = async () => {
   throw new Error("le flux ne doit pas passer par le Recuperateur (130 Mo en mémoire)");
 };
 
-async function interroger(
-  corps: string,
-  metiers: readonly string[],
-  mode?: "domaine" | "tout",
-) {
-  const { source, bilan } = sourceGuichetFlux({ metiers, recuperer: sert(corps), mode });
+async function interroger(corps: string, metiers: readonly string[]) {
+  const { source, bilan } = sourceGuichetFlux({ metiers, recuperer: sert(corps) });
   const r = await source.interroger(recuperateurInterdit);
   return { r, bilan: bilan() };
 }
@@ -101,17 +97,17 @@ describe("sourceGuichetFlux — les trois décisions, dans l'ordre", () => {
     expect(bilan?.ecarteesParCode).toEqual({});
   });
 
-  it("écarte par MÉTIER en nommant le code — un total ne dit pas quoi corriger", async () => {
-    const flux = `<source>${offre({ ref: "1", ville: "Québec", noc: "65200" })}${offre({
-      ref: "2",
-      ville: "Lévis",
-      noc: "65200",
-    })}${offre({ ref: "3", ville: "Québec", noc: "75110" })}</source>`;
+  it("COMPTE le hors-métier en nommant le code, sans le refuser", async () => {
+    // ⚠️ LE CONTRAT A CHANGÉ LE 2026-08-20 (décision Marc). Le métier ne filtre plus
+    // l'ingestion : toutes les offres régionales entrent et c'est la NOTE qui les range. Ce
+    // que le compte dit n'est donc plus « ce qui a été jeté » mais « ce qu'un filtre AURAIT
+    // retiré » — et c'est ce chiffre qui sert à juger la liste de métiers.
+    const flux = `<source>${offre({ ref: "1", ville: "Québec", noc: "65311" })}</source>`;
     const { r, bilan } = await interroger(flux, ["22"]);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.offres).toHaveLength(0);
-    expect(bilan?.ecarteesParCode).toEqual({ "65200": 2, "75110": 1 });
+    expect(r.offres).toHaveLength(1);
+    expect(bilan?.ecarteesParCode["65311"]).toBe(1);
   });
 
   it("compte un code ILLISIBLE à part : c'est un aveu, pas une décision", async () => {
@@ -130,12 +126,13 @@ describe("sourceGuichetFlux — les trois décisions, dans l'ordre", () => {
     expect(bilan?.ecarteesParCode).toEqual({});
   });
 
-  it("une liste de métiers VIDE ne retient rien — le défaut sûr est de tout refuser", async () => {
+  it("une liste de métiers VIDE retient TOUT — elle ne filtre plus, elle priorise", async () => {
+    // Vide, la liste ne dit plus « éteins la source » : elle dit « aucun métier n'est
+    // prioritaire ». Les offres entrent toutes et le facteur de domaine vaut 1 partout.
     const flux = `<source>${offre({ ref: "1", ville: "Québec", noc: "22301" })}</source>`;
     const { r } = await interroger(flux, []);
-    expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.offres).toHaveLength(0);
+    expect(r.offres).toHaveLength(1);
   });
 });
 
@@ -158,26 +155,30 @@ describe("sourceGuichetFlux — le lieu inconnu PASSE, sinon la mesure ne l'appr
     expect(bilan?.regionales).toBe(0);
   });
 
-  it("le métier est jugé AVANT le quota : un lieu inconnu hors métier ne le consomme pas", async () => {
-    // Sinon le quota se remplirait de villes portées par des postes que Marc ne veut pas,
-    // et la mesure travaillerait des jours pour débloquer des offres refusées ensuite.
-    const flux = `<source>${offre({
-      ref: "1",
-      ville: "Sainte-Bidule-des-Monts",
-      noc: "65200",
-    })}</source>`;
-    const { r, bilan } = await interroger(flux, ["22"]);
-    expect(r.ok).toBe(true);
+  it("une offre DU domaine à lieu inconnu ne consomme PAS le quota", async () => {
+    // Le métier ne refuse plus, mais il PRIORISE : les rares offres du domaine passent
+    // toujours, et les autres se partagent les 40 places. Sans ça, la moitié du flux étant
+    // en lieu inconnu et 96 % hors domaine, le quota partirait aux laveurs de voitures.
+    const inconnues = Array.from({ length: MAX_LIEUX_INCONNUS_FLUX }, (_, i) =>
+      offre({ ref: `h${i}`, ville: "Villeneuve-du-Néant", noc: "65311" }),
+    ).join("");
+    const domaine = offre({ ref: "d1", ville: "Villeneuve-du-Néant", noc: "22301" });
+    const { r, bilan } = await interroger(`<source>${inconnues}${domaine}</source>`, ["22"]);
     if (!r.ok) return;
-    expect(r.offres).toHaveLength(0);
-    expect(bilan?.lieuInconnuRapporte).toBe(0);
-    expect(bilan?.ecarteesParCode).toEqual({ "65200": 1 });
+    // Les 40 hors domaine remplissent le quota ; la 41e — du domaine — passe quand même,
+    // et le compteur AFFICHÉ les compte toutes (c'est un compte, pas un quota).
+    expect(bilan?.lieuInconnuRapporte).toBe(MAX_LIEUX_INCONNUS_FLUX + 1);
+    expect(bilan?.lieuInconnuIgnore).toBe(0);
+    expect(r.offres.some((o) => o.refSource.includes("d1"))).toBe(true);
   });
 
   it("borne le passage, compte ce qu'il laisse en attente, et NE borne PAS les régionales", async () => {
     // Le cas se dérive de la constante, jamais de sa valeur du jour.
+    // ⚠️ DU HORS-DOMAINE (65…), parce que c'est LUI que le quota borne. Une offre du domaine
+    // passe sans le consommer — voir le test suivant. Poser ce cas avec des codes retenus
+    // testerait un bornage qui n'existe plus.
     const inconnus = Array.from({ length: MAX_LIEUX_INCONNUS_FLUX + 5 }, (_, i) =>
-      offre({ ref: `i${i}`, ville: `Sainte-Bidule-${i}`, noc: "22301" }),
+      offre({ ref: `i${i}`, ville: `Sainte-Bidule-${i}`, noc: "65311" }),
     ).join("");
     const regionales = Array.from({ length: 3 }, (_, i) =>
       offre({ ref: `q${i}`, ville: "Québec", noc: "22301" }),
@@ -268,12 +269,16 @@ describe("resumerBilanFlux — la ligne qui distingue « rien à prendre » de �
 });
 
 describe("selectionnerSources — le flux est construit seulement si Marc a choisi", () => {
-  it("ne le construit PAS sans métiers retenus", () => {
-    const sansOptions = selectionnerSources(0, "2026-08-19");
-    const listeVide = selectionnerSources(0, "2026-08-19", { metiers: [] });
-    for (const sources of [sansOptions, listeVide]) {
-      expect(sources.map((s) => s.id)).not.toContain(ID_SOURCE_FLUX_GUICHET);
-    }
+  it("le construit dès qu'on le demande — la liste de métiers n'allume plus rien", async () => {
+    // ⚠️ CONTRAT CHANGÉ (Marc, 2026-08-20). La liste ne filtre plus l'ingestion, donc une
+    // liste vide n'éteint plus la source : c'est l'appelant qui décide de lire le flux.
+    const avec = selectionnerSources(0, "2026-08-20", { metiers: [] });
+    expect(avec.some((s) => s.id === ID_SOURCE_FLUX_GUICHET)).toBe(true);
+  });
+
+  it("ne le construit pas si l'appelant ne le demande pas", () => {
+    const sans = selectionnerSources(0, "2026-08-20");
+    expect(sans.some((s) => s.id === ID_SOURCE_FLUX_GUICHET)).toBe(false);
   });
 
   it("le construit HORS ROTATION, comme le dépôt", () => {
@@ -301,7 +306,7 @@ describe("le code de profession voyage jusqu'à la note (ADR-0013)", () => {
     // Une source qui n'en publie pas doit donner une ABSENCE explicite : c'est ce que
     // `facteurDomaine` lit comme « domaine inconnu », donc neutre.
     const flux = `<source>${offre({ ref: "1", ville: "Québec", noc: "" })}</source>`;
-    const { r } = await interroger(flux, [], "tout");
+    const { r } = await interroger(flux, []);
     if (!r.ok) return;
     expect(r.offres.length).toBeGreaterThan(0);
     for (const o of r.offres) expect(o.noc).toBeNull();
@@ -311,7 +316,7 @@ describe("le code de profession voyage jusqu'à la note (ADR-0013)", () => {
     // ⚠️ LE TEST QUI COMPTE. Sans ce chemin, le barème d'ADR-0013 serait branché et inerte :
     // le facteur existerait, personne ne lui passerait de code, et rien ne le dirait.
     const flux = `<source>${offre({ ref: "1", ville: "Québec", noc: "65311", titre: "car washer" })}</source>`;
-    const { r } = await interroger(flux, [], "tout");
+    const { r } = await interroger(flux, []);
     if (!r.ok) return;
     const brute = r.offres[0];
     expect(brute?.noc).toBe("65311");
@@ -326,32 +331,4 @@ describe("le code de profession voyage jusqu'à la note (ADR-0013)", () => {
   });
 });
 
-describe("mode « tout » (ADR-0013, D3) — voir toute la région, laisser la note trier", () => {
-  const regionale = (ref: string, noc: string, titre: string) =>
-    offre({ ref, ville: "Québec", noc, titre });
 
-  it("en mode « domaine », le hors-liste est REFUSÉ — le comportement d'origine", async () => {
-    const flux = `<source>${regionale("1", "65311", "car washer")}${regionale("2", "70010", "coordo")}</source>`;
-    const { r, bilan } = await interroger(flux, ["70"]);
-    if (!r.ok) return;
-    expect(r.offres).toHaveLength(1);
-    expect(bilan?.ecarteesParCode["65311"]).toBe(1);
-  });
-
-  it("en mode « tout », le hors-liste est RETENU — et toujours COMPTÉ", async () => {
-    const flux = `<source>${regionale("1", "65311", "car washer")}${regionale("2", "70010", "coordo")}</source>`;
-    const { r, bilan } = await interroger(flux, ["70"], "tout");
-    if (!r.ok) return;
-    expect(r.offres).toHaveLength(2);
-    // Le compte de ce que le filtre AURAIT retiré reste tenu : c'est lui qui sert à régler
-    // la liste. Le mode change le sort de l'offre, jamais la mesure.
-    expect(bilan?.ecarteesParCode["65311"]).toBe(1);
-  });
-
-  it("le défaut est « domaine » — une option non réglée n'ouvre pas les vannes", async () => {
-    const flux = `<source>${regionale("1", "65311", "car washer")}</source>`;
-    const { r } = await interroger(flux, ["70"]);
-    if (!r.ok) return;
-    expect(r.offres).toHaveLength(0);
-  });
-});

@@ -49,8 +49,11 @@ export function CarteFiltrable({
   cibles,
   positions,
   ciblesManquantes,
+  metiers = [],
 }: {
   offres: Offre[];
+  /** Les métiers du domaine — la catégorie s'en sert, comme la note. */
+  metiers?: readonly string[];
   cibles: EntrepriseCible[];
   /** Positions déjà géocodées, sérialisées par la page (une `Map` ne traverse pas). */
   positions: [string, PositionEntreprise][];
@@ -60,7 +63,7 @@ export function CarteFiltrable({
   const [filtres, setFiltres] = useState<EtatFiltres>(FILTRES_VIDES);
 
   const table = useMemo(() => new Map(positions), [positions]);
-  const retenues = useMemo(() => filtrer(offres, filtres), [offres, filtres]);
+  const retenues = useMemo(() => filtrer(offres, filtres, metiers), [offres, filtres, metiers]);
   const sansDistance = useMemo(() => sansDistanceMesuree(offres, filtres), [offres, filtres]);
   const sansNote = useMemo(() => sansNoteCalculee(offres, filtres), [offres, filtres]);
 

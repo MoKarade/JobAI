@@ -148,12 +148,11 @@ export function selectionnerSources(
   // absences périment. Le mettre dans la rotation reviendrait à périmer par intermittence
   // ce qu'on vient d'ingérer — un faux positif de péremption dont la cause serait l'horaire.
   const hors: Source[] = [depot];
-  // ⚠️ DEUX CHEMINS D'ALLUMAGE, ET C'EST LE POINT DE D3 (ADR-0013). Une liste de métiers
-  // non vide construit la source FILTRÉE — le comportement d'origine. Le mode « tout » la
-  // construit AUSSI avec une liste vide : là, la liste ne filtre plus rien, elle définit le
-  // domaine pour la NOTE. Sans ce second chemin, « voir toutes les offres » serait
-  // impossible à exprimer, puisque vider la liste éteignait la source.
-  if (flux !== undefined && (flux.metiers.length > 0 || flux.mode === "tout")) {
+  // ⚠️ LA LISTE DE MÉTIERS N'ALLUME PLUS RIEN (décision Marc 2026-08-20). Elle ne filtre
+  // plus l'ingestion, elle pondère la NOTE — donc une liste vide n'éteint plus la source,
+  // elle rend seulement toutes les offres équivalentes au regard du domaine. Le flux est lu
+  // dès qu'on le demande, et c'est l'appelant qui décide de le demander.
+  if (flux !== undefined) {
     hors.push(sourceGuichetFlux(flux).source);
   }
 
@@ -207,12 +206,11 @@ export async function executerPasse(
    * lieux sans lire le flux, et l'inverse. Optionnel : sans lui, la passe se comporte
    * exactement comme avant.
    *
-   * ⚠️ `metiers` ne veut plus dire la même chose selon le `mode` (ADR-0013). En `domaine`
-   * il FILTRE l'ingestion ; en `tout` il ne filtre plus rien et définit le domaine pour la
-   * NOTE. C'est le même tableau, lu par deux mécanismes — d'où le `mode` à côté, qui dit
-   * lequel travaille.
+   * ⚠️ `metiers` ne FILTRE PLUS l'ingestion : il définit le domaine pour la NOTE. Toutes les
+   * offres régionales entrent, et le facteur de domaine les range. Ce qu'un filtre aurait
+   * retiré reste COMPTÉ et part à l'écran — c'est ce compte qui sert à juger la liste.
    */
-  flux?: { metiers: readonly string[]; recuperer?: typeof fetch; mode?: "domaine" | "tout" },
+  flux?: { metiers: readonly string[]; recuperer?: typeof fetch },
 ): Promise<RapportPasse> {
   // ⚠️ LE PRÉ-FILTRE RÉGIONAL DU FLUX VOIT LE REGISTRE D'AVANT LA MESURE, ET C'EST INHÉRENT.
   // Les sources sont interrogées AVANT que la mesure des lieux n'ait tourné (elle apprend

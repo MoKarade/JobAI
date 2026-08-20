@@ -13,73 +13,29 @@
 // faudrait un commit — donc moi — pour la corriger. C'est exactement ce que le réglage du
 // rayon a défait le 2026-08-17, et pour la même raison.
 //
-// ⚠️ LE DÉFAUT EST VIDE, ET C'EST DÉLIBÉRÉ. Une liste vide rend la source du flux INERTE :
-// elle n'est pas interrogée du tout. Ni « tout passe » (qui inonderait le suivi au premier
-// cron, sans que personne ne l'ait demandé), ni une sélection devinée (qui écarterait en
-// silence des métiers que Marc n'a jamais refusés). Tant qu'il n'a pas choisi, la veille se
-// comporte exactement comme avant.
+// ⚠️ LE DÉFAUT A CHANGÉ DE POSTURE LE 2026-08-20, ET C'EST UNE DÉCISION DE MARC
+// (« c'est trop compliqué »). Il était VIDE : la source du flux restait éteinte tant qu'il
+// n'avait pas composé sa liste, et le facteur de domaine restait inerte — donc un laveur de
+// voitures proche battait un coordonnateur de projet. Exiger une décision avant que l'app
+// serve à quelque chose ÉTAIT le défaut.
+//
+// Désormais la liste porte quatre codes MESURÉS sur une lecture complète du flux, et elle ne
+// FILTRE plus rien : elle pondère la NOTE. Toutes les offres régionales entrent, le domaine
+// les range. C'est modifiable dans les réglages avancés, et personne n'a besoin d'y aller.
 
 /** Clé sous laquelle les métiers retenus sont conservés. */
 export const CLE_METIERS = "veille-metiers";
 
-/** Clé d'état du mode d'ingestion du flux (ADR-0013, D3). */
-export const CLE_MODE_FLUX = "veille-flux-mode";
-
 /**
- * Les trois états du flux du Guichet. Le binaire d'avant — liste vide = source éteinte,
- * liste remplie = source filtrée — n'avait pas de place pour « tout », que Marc a demandé
- * le 2026-08-20 (« je veux voir toutes les offres dispos »).
+ * Les métiers qui définissent le domaine de Marc — donc la NOTE, jamais l'ingestion.
  *
- * ⚠️ `eteint` reste le DÉFAUT. Un réglage qu'on n'a pas encore touché ne doit pas faire
- * entrer 1 300 offres à la première passe.
+ * ⚠️ MESURÉS, pas choisis au jugé (lecture complète du flux, 2026-08-20, `flux-termine`,
+ * 1 290 régionales) : 21 sciences appliquées (10 offres) · 22 personnel technique (24) ·
+ * 70 cadres des métiers et de la construction (4) · 92 surveillants en transformation (7).
+ * Ensemble 45 sur 1 290 — 3,5 %. Le reste du flux est cuisinier, laveur de voitures,
+ * soudeur, manœuvre : c'est ce que le facteur de domaine fait redescendre.
  */
-export type ModeFlux = "eteint" | "domaine" | "tout";
-export const MODE_FLUX_DEFAUT: ModeFlux = "eteint";
-
-/**
- * Ce que chaque mode fait, en toutes lettres.
- *
- * ⚠️ ICI ET PAS DANS LE COMPOSANT. Un réglage qui allume une source doit dire son EFFET
- * avant d'être cliqué, et l'écrire à côté du bouton le ferait dériver du comportement réel
- * au premier changement — la classe de défaut que le dépôt a déjà payée avec deux listes de
- * seuils recopiées. Une règle, un exemplaire.
- */
-export const MODE_FLUX_LIBELLES: Readonly<Record<ModeFlux, { titre: string; effet: string }>> = {
-  eteint: {
-    titre: "Éteint",
-    effet: "Le flux complet du Guichet n'est pas lu. Seules les sources en rotation alimentent la veille.",
-  },
-  domaine: {
-    titre: "Mon domaine seulement",
-    effet:
-      "Le flux est lu et FILTRÉ par les codes ci-dessous : seules ces offres entrent. Quelques dizaines par passe.",
-  },
-  tout: {
-    titre: "Toute la région",
-    effet:
-      "Toutes les offres régionales entrent (~1 300 par passe) et c'est la NOTE qui les range : hors des codes ci-dessous, elle est divisée par deux.",
-  },
-};
-
-/**
- * Lit un mode venu de l'état — du JSON écrit par une version antérieure, donc suspect.
- *
- * ⚠️ `brut` ABSENT (`null`/`undefined`) N'EST PAS `eteint`, et la nuance est une
- * rétrocompatibilité, pas une subtilité. Avant ADR-0013, il n'y avait pas de mode : une
- * liste de métiers non vide SUFFISAIT à allumer la source, filtrée. Rabattre l'absence sur
- * `eteint` ÉTEINDRAIT une source que Marc avait allumée, sans rien dire. L'absence se lit
- * donc à travers la liste : non vide ⇒ `domaine` (ce qu'elle voulait dire), vide ⇒ `eteint`.
- *
- * Une valeur EXPLICITE, elle, fait foi — y compris `eteint`, qui doit pouvoir éteindre une
- * source dont la liste reste remplie.
- */
-export function normaliserModeFlux(brut: unknown, metiers: readonly string[] = []): ModeFlux {
-  if (brut === "domaine" || brut === "tout" || brut === "eteint") return brut;
-  return metiers.length > 0 ? "domaine" : MODE_FLUX_DEFAUT;
-}
-
-/** Rien tant que Marc n'a pas choisi. Voir l'en-tête : le vide éteint la source. */
-export const METIERS_DEFAUT: readonly string[] = [];
+export const METIERS_DEFAUT: readonly string[] = ["21", "22", "70", "92"];
 
 /**
  * Codes retenus au maximum.

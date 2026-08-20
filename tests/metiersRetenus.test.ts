@@ -11,8 +11,6 @@ import {
   METIERS_DEFAUT,
   metiersRedondants,
   normaliserMetiers,
-  normaliserModeFlux,
-  MODE_FLUX_DEFAUT,
 } from "../lib/metiersRetenus";
 import { codeRetenu, lireCodeNoc } from "../lib/nocProfession";
 
@@ -69,10 +67,6 @@ describe("normaliserMetiers — ce qui est lu, et ce qui est refusé À VOIX HAU
     expect(juste.codes).toHaveLength(MAX_METIERS);
   });
 
-  it("le défaut est VIDE — la source du flux reste éteinte tant que Marc n'a pas choisi", () => {
-    expect(METIERS_DEFAUT).toEqual([]);
-  });
-
   it("tout code accepté est effectivement comparable par codeRetenu", () => {
     // Le lien entre les deux modules est l'invariant qui compte : accepter une forme que
     // `codeRetenu` ne sait pas comparer produirait une liste inerte, sans erreur.
@@ -94,32 +88,19 @@ describe("metiersRedondants — dire ce qui ne sert à rien plutôt que de le re
   });
 });
 
-describe("normaliserModeFlux — l'absence de mode n'éteint pas une source allumée", () => {
-  it("lit une valeur explicite telle quelle, y compris « eteint »", () => {
-    expect(normaliserModeFlux("tout", ["70"])).toBe("tout");
-    expect(normaliserModeFlux("domaine", ["70"])).toBe("domaine");
-    // Explicite : éteint MALGRÉ une liste remplie. C'est ce qui permet de couper la source
-    // sans avoir à vider ses réglages.
-    expect(normaliserModeFlux("eteint", ["70"])).toBe("eteint");
+describe("METIERS_DEFAUT — le défaut n'est plus vide, et il est MESURÉ", () => {
+  it("porte les quatre classes relevées sur la lecture complète du flux", () => {
+    // ⚠️ CE TEST VERROUILLE UNE DÉCISION, pas une valeur de commodité. Repasser le défaut à
+    // vide rendrait le facteur de domaine inerte — donc un laveur de voitures proche
+    // battrait un coordonnateur de projet, le défaut MESURÉ le 2026-08-20 et corrigé.
+    expect([...METIERS_DEFAUT].sort()).toEqual(["21", "22", "70", "92"]);
   });
 
-  it("sans mode enregistré, une liste NON VIDE vaut « domaine » — le comportement d'avant", () => {
-    // ⚠️ LA RÉTROCOMPATIBILITÉ. Avant ADR-0013 il n'y avait pas de mode : une liste remplie
-    // suffisait à allumer la source filtrée. Rabattre l'absence sur « eteint » couperait en
-    // silence une source que Marc avait allumée.
-    for (const absent of [null, undefined, "", "n'importe quoi", 42]) {
-      expect(normaliserModeFlux(absent, ["70", "92"])).toBe("domaine");
-    }
-  });
-
-  it("sans mode enregistré et liste VIDE, c'est « eteint » — le défaut sûr", () => {
-    for (const absent of [null, undefined, "bidon"]) {
-      expect(normaliserModeFlux(absent, [])).toBe("eteint");
-    }
-  });
-
-  it("le défaut du paramètre `metiers` ne rallume rien", () => {
-    expect(normaliserModeFlux(null)).toBe(MODE_FLUX_DEFAUT);
-    expect(MODE_FLUX_DEFAUT).toBe("eteint");
+  it("est lisible par le normaliseur — un défaut mal formé ne retiendrait rien", () => {
+    // Un code hors des deux granularités que `codeRetenu` compare serait silencieusement
+    // ignoré : le défaut doit franchir sa propre validation.
+    const r = normaliserMetiers([...METIERS_DEFAUT].join(" "));
+    expect(r.codes).toHaveLength(METIERS_DEFAUT.length);
+    expect(r.rejets).toEqual([]);
   });
 });

@@ -9,6 +9,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { after } from "next/server";
 import { lireOffres } from "@/lib/donnees";
+import { lireMetiers } from "@/lib/actionsMetiers";
 import { mesurerDistances } from "@/lib/actions";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "@/lib/synchro";
 import { db } from "@/lib/db";
@@ -42,9 +43,17 @@ export default async function Accueil() {
   // Même patron que la route du hub — l'erreur est journalisée ET expliquée à l'écran.
   let offres: Offre[] | null = null;
   let panne: Panne | null = null;
+  /**
+   * Les métiers du domaine, pour la CATÉGORIE affichée.
+   *
+   * ⚠️ Lus à côté des offres et non dans le composant : c'est un composant client, et une
+   * lecture d'état côté client exigerait une route. Un défaut vide ne casse rien — la
+   * catégorie se déduit alors du seul titre, ce qui reste honnête.
+   */
+  let metiers: string[] = [];
 
   try {
-    offres = await lireOffres();
+    [offres, metiers] = await Promise.all([lireOffres(), lireMetiers()]);
   } catch (err) {
     console.error("[page] lecture des offres impossible", err);
     // La classification vit dans `lib/panne.ts`, partagée avec la page Carte : écrite deux
@@ -157,7 +166,7 @@ export default async function Accueil() {
           />
           <TableauBord resume={resumer(offres, aujourdhui(new Date()))} />
           <FormulaireAjout />
-          <ListeOffres offres={offres} />
+          <ListeOffres offres={offres} metiers={metiers} />
         </>
       )}
     </Cadre>

@@ -18,13 +18,10 @@ import { exigerSession } from "./session";
 import { lireEtat, ecrireEtat } from "./etat";
 import {
   CLE_METIERS,
-  CLE_MODE_FLUX,
   MAX_METIERS,
   METIERS_DEFAUT,
   metiersRedondants,
   normaliserMetiers,
-  normaliserModeFlux,
-  type ModeFlux,
 } from "./metiersRetenus";
 
 export type ResultatMetiers =
@@ -39,44 +36,6 @@ export type ResultatMetiers =
       active: boolean;
     }
   | { ok: false; erreur: string };
-
-/**
- * Le mode d'ingestion du flux, tel que la passe le lira.
- *
- * ⚠️ LU AVEC LA LISTE, jamais seul : sans mode enregistré, c'est la liste qui dit ce que
- * Marc voulait (non vide ⇒ `domaine`). Lire le mode sans elle rendrait `eteint` et
- * afficherait « source coupée » sur une source qui tourne.
- */
-export async function lireModeFlux(): Promise<ModeFlux> {
-  const [brut, codes] = await Promise.all([
-    lireEtat<string | null>(CLE_MODE_FLUX, null),
-    lireMetiers(),
-  ]);
-  return normaliserModeFlux(brut, codes);
-}
-
-/** Enregistre le mode d'ingestion du flux (ADR-0013, D3). */
-export async function reglerModeFlux(
-  mode: string,
-): Promise<{ ok: true; mode: ModeFlux } | { ok: false; erreur: string }> {
-  try {
-    await exigerSession();
-  } catch {
-    return { ok: false, erreur: "Authentification requise." };
-  }
-  // ⚠️ NORMALISÉ SANS LA LISTE, ET C'EST VOULU. Ici la valeur vient d'un FORMULAIRE, pas de
-  // l'état : une valeur inconnue est une saisie fautive, et le défaut sûr d'une saisie
-  // fautive est d'éteindre, jamais de déduire une intention de la liste.
-  const choisi = normaliserModeFlux(mode);
-  try {
-    await ecrireEtat(CLE_MODE_FLUX, choisi);
-    revalidatePath("/sources");
-    return { ok: true, mode: choisi };
-  } catch (err) {
-    console.error("[metiers] mode du flux non enregistré", err);
-    return { ok: false, erreur: "Le mode n’a pas pu être enregistré. Voir les journaux." };
-  }
-}
 
 /** Les métiers retenus, pour l'affichage et pour la passe. */
 export async function lireMetiers(): Promise<string[]> {

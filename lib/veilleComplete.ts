@@ -35,14 +35,7 @@ import { EPOQUE_A_RETENTER } from "./travaux";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "./synchro";
 import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
 import { executerPasse } from "./ingest/passe";
-import {
-  CLE_METIERS,
-  CLE_MODE_FLUX,
-  METIERS_DEFAUT,
-  normaliserMetiers,
-  normaliserModeFlux,
-  type ModeFlux,
-} from "./metiersRetenus";
+import { CLE_METIERS, METIERS_DEFAUT, normaliserMetiers } from "./metiersRetenus";
 import { villesRefusees } from "./ingest/pipeline";
 import { CLE_RAPPORT, construireRapport, type RapportVeille } from "./rapportVeille";
 import { CLE_RAYON, RAYON_DEFAUT_KM } from "./rayon";
@@ -102,29 +95,13 @@ export type ResultatVeille =
  * Quand deux chemins peuvent lancer la même passe, savoir LEQUEL l'a lancée est la première
  * question qu'on se pose en cas d'anomalie — et la seule qu'un journal muet ne répond pas.
  */
-/**
- * Traduit l'état (liste + mode) en ce que la passe attend, ou `undefined`.
- *
- * ⚠️ `eteint` DOIT rendre `undefined`, pas un mode. La passe ne construit la source que si
- * on lui passe cet objet : c'est le seul endroit où « éteint » devient réellement éteint,
- * quelle que soit la liste. Le traduire en `{ mode: "domaine" }` rallumerait la source dès
- * que la liste est non vide — soit exactement l'inverse de ce que Marc aurait demandé.
- */
-function fluxDemande(
-  codes: string[],
-  mode: ModeFlux,
-): { metiers: readonly string[]; mode: "domaine" | "tout" } | undefined {
-  if (mode === "eteint") return undefined;
-  return { metiers: codes, mode };
-}
-
 export async function executerVeilleComplete(declencheur: string): Promise<ResultatVeille> {
   if (!process.env.DATABASE_URL) {
     return { ok: false, statut: 503, erreur: "base non configurée" };
   }
 
   try {
-    const [connues, journal, curseur, lieux, rayonMaxKm, metiers, modeBrut] = await Promise.all([
+    const [connues, journal, curseur, lieux, rayonMaxKm, metiers] = await Promise.all([
       lireOffres(),
       lireEtat<JournalVeille>(CLE_JOURNAL, {}),
       lireEtat<number>(CLE_CURSEUR, 0),
@@ -136,10 +113,6 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
       // Les métiers retenus pour le flux complet du Guichet. Vide ⇒ la source n'est pas
       // construite du tout : tant que Marc n'a pas choisi, la veille se comporte comme avant.
       lireEtat<string[]>(CLE_METIERS, [...METIERS_DEFAUT]),
-      // Le mode d'ingestion du flux (ADR-0013, D3). Lu ICI, avec le reste de l'état, pour
-      // qu'une seule lecture commande la passe entière — deux lectures séparées finiraient
-      // par diverger, comme le rayon l'avait montré.
-      lireEtat<string | null>(CLE_MODE_FLUX, null),
     ]);
 
     if (connues === null) {
@@ -158,7 +131,11 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
     // ⚠️ RE-NORMALISÉ ICI AUSSI. L'état est du JSON écrit par une version antérieure : rien
     // ne garantit qu'il porte encore des codes lisibles, et un code mal formé ne retient
     // rien (`codeRetenu`) — la source tournerait alors à vide sans qu'on sache pourquoi.
-    fluxDemande(normaliserMetiers(metiers).codes, normaliserModeFlux(modeBrut, normaliserMetiers(metiers).codes)));
+    // ⚠️ LE FLUX EST TOUJOURS LU EN ENTIER (décision Marc 2026-08-20, « c'est trop
+    // compliqué »). Les codes ne filtrent plus l'ingestion : toutes les offres régionales
+    // entrent, et c'est la NOTE qui les range. Il n'y a plus de mode à régler, donc plus de
+    // mode à se tromper.
+    { metiers: normaliserMetiers(metiers).codes });
 
     // Les nouvelles offres d'abord : si l'écriture du journal échoue ensuite, on aura
     // gagné des offres et rejoué une passe, pas perdu du travail.

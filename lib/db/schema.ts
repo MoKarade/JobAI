@@ -53,6 +53,20 @@ export const offers = pgTable(
     km: real("km"),
 
     /**
+     * Code de profession NOC 2021, quand la source en publie un.
+     *
+     * ⚠️ STOCKÉ POUR QUE LA CATÉGORIE AFFICHÉE NE CONTREDISE PAS LA NOTE. Le barème s'en
+     * sert déjà (facteur de domaine, plancher de rôle) : sans lui en base, l'écran devrait
+     * re-déduire la catégorie du TITRE seul et rendrait « Autre » pour un
+     * `construction project coordinator` que la note met à 73. Deux chiffres qui se
+     * contredisent à l'écran valent moins que pas de chiffre du tout.
+     *
+     * `null` là où la source n'en publie pas (Indeed, dépôt, saisie manuelle) — et cette
+     * absence reste NEUTRE partout : elle ne vaut pas « hors domaine ».
+     */
+    noc: text("noc"),
+
+    /**
      * Ville de l'employeur, telle que la source l'a annoncée.
      *
      * Ajoutée le 2026-07-31 : sans elle, un employeur qui n'est pas dans les entreprises

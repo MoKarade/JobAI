@@ -22,15 +22,7 @@ import { ReglageMetiers } from "@/components/ReglageMetiers";
 import { lireEtat } from "@/lib/etat";
 import { CLE_RAPPORT, type RapportVeille } from "@/lib/rapportVeille";
 import { CLE_RAYON, RAYON_DEFAUT_KM } from "@/lib/rayon";
-import {
-  CLE_METIERS,
-  CLE_MODE_FLUX,
-  METIERS_DEFAUT,
-  MODE_FLUX_DEFAUT,
-  normaliserMetiers,
-  normaliserModeFlux,
-  type ModeFlux,
-} from "@/lib/metiersRetenus";
+import { CLE_METIERS, METIERS_DEFAUT, normaliserMetiers } from "@/lib/metiersRetenus";
 import { classerPanne } from "@/lib/panne";
 
 export const metadata = { title: "Sources — JobAI" };
@@ -50,22 +42,16 @@ export default async function Sources() {
   let dernier: RapportVeille | null = null;
   let rayon = RAYON_DEFAUT_KM;
   let metiers: string[] = [...METIERS_DEFAUT];
-  let modeFlux: ModeFlux = MODE_FLUX_DEFAUT;
   try {
     let metiersBruts: string[];
-    let modeBrut: string | null;
-    [dernier, rayon, metiersBruts, modeBrut] = await Promise.all([
+    [dernier, rayon, metiersBruts] = await Promise.all([
       lireEtat<RapportVeille | null>(CLE_RAPPORT, null),
       lireEtat<number>(CLE_RAYON, RAYON_DEFAUT_KM),
       lireEtat<string[]>(CLE_METIERS, [...METIERS_DEFAUT]),
-      lireEtat<string | null>(CLE_MODE_FLUX, null),
     ]);
     // Re-normalisé à la lecture, comme dans `lireMetiers` : l'état est du JSON écrit par une
     // version antérieure du code, et un code mal formé ne retient rien.
     metiers = Array.isArray(metiersBruts) ? normaliserMetiers(metiersBruts).codes : [];
-    // Le mode se lit AVEC la liste : sans mode enregistré, c'est elle qui dit ce que Marc
-    // voulait. Voir `normaliserModeFlux`.
-    modeFlux = normaliserModeFlux(modeBrut, metiers);
   } catch (err) {
     console.error("[sources] état illisible :", classerPanne(err));
   }
@@ -142,7 +128,7 @@ export default async function Sources() {
 
       <section className="cadre-section">
         <h2 className="cadre-section__titre">Métiers retenus dans le flux complet</h2>
-        <ReglageMetiers metiersInitiaux={metiers} modeInitial={modeFlux} />
+        <ReglageMetiers metiersInitiaux={metiers} />
       </section>
 
       <section className="cadre-section">

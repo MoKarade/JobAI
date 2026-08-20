@@ -9,12 +9,30 @@ import type { EtatFiltres } from "../lib/filtres";
 import {
   FILTRES_VIDES,
   PALIERS_DISTANCE_KM,
+  PALIERS_JOURS,
   PALIERS_NOTE,
   sansNoteCalculee,
+  depuisJours,
   filtrer,
   sansDistanceMesuree,
   unFiltreEstActif,
 } from "../lib/filtres";
+
+/**
+ * Une offre de travail pour les cas ciblés.
+ *
+ * ⚠️ DÉRIVÉE DU SEED, jamais écrite à la main : un littéral recopié perd un champ au premier
+ * ajout au type, et le test se met à couvrir une forme qui n'existe plus.
+ */
+const OFFRE_TEST = {
+  ...SEED[0]!,
+  perimeeLe: null,
+  histo: false,
+  // ⚠️ RAISONS VIDÉES. Celles du seed parlent d'« automatisation » et d'« électromécanique » :
+  // la catégorie lit la description autant que le titre, et un cas censé tester
+  // « coordination » basculait en « combinaison » à cause d'un texte sans rapport avec lui.
+  raisons: [],
+};
 
 describe("filtres", () => {
   it("sans filtre, tout passe", () => {
@@ -206,9 +224,51 @@ describe("« un filtre est-il posé ? »", () => {
       { ...FILTRES_VIDES, distanceMaxKm: PALIERS_DISTANCE_KM[0]! },
       { ...FILTRES_VIDES, historique: true },
       { ...FILTRES_VIDES, avecPerimees: true },
+      { ...FILTRES_VIDES, jours: PALIERS_JOURS[0]! },
+      { ...FILTRES_VIDES, categorie: "coordination" },
     ];
     for (const f of cas) expect(unFiltreEstActif(f)).toBe(true);
     // Volume prouvé : un filtre AJOUTÉ au type sans cas ici ferait tomber ce compte.
     expect(cas).toHaveLength(Object.keys(FILTRES_VIDES).length);
+  });
+});
+
+describe("filtre de FRAÎCHEUR — une comparaison de chaînes, jamais de Date", () => {
+  it("depuisJours rend une borne au format AAAA-MM-JJ, inclusive du jour demandé", () => {
+    const t = new Date("2026-08-20T15:00:00Z");
+    // « aujourd'hui » = 1 jour, donc la borne EST aujourd'hui : un palier de 1 qui rendrait
+    // hier laisserait passer les offres de la veille sous l'étiquette « Aujourd'hui ».
+    expect(depuisJours(1, t)).toBe("2026-08-20");
+    expect(depuisJours(7, t)).toBe("2026-08-14");
+    expect(depuisJours(30, t)).toBe("2026-07-22");
+  });
+
+  it("⚠️ ne bascule PAS de jour le soir — le fuseau de Marc, pas UTC", () => {
+    // 2026-08-20 23:30 à Québec = 2026-08-21 03:30 UTC. `toISOString()` rendrait le 21 et le
+    // filtre « aujourd'hui » ne trouverait plus les offres repérées le 20.
+    expect(depuisJours(1, new Date("2026-08-21T03:30:00Z"))).toBe("2026-08-20");
+  });
+
+  it("garde les offres repérées dans la fenêtre, écarte les plus anciennes", () => {
+    const recente = { ...OFFRE_TEST, id: "r", dateReperage: depuisJours(1) };
+    const vieille = { ...OFFRE_TEST, id: "v", dateReperage: "2020-01-01" };
+    const r = filtrer([recente, vieille], { ...FILTRES_VIDES, jours: 7 });
+    expect(r.map((o) => o.id)).toEqual(["r"]);
+  });
+});
+
+describe("filtre de CATÉGORIE", () => {
+  it("ne garde que la catégorie demandée", () => {
+    const coord = { ...OFFRE_TEST, id: "c", poste: "Coordonnateur de projet" };
+    const autre = { ...OFFRE_TEST, id: "a", poste: "car washer" };
+    const r = filtrer([coord, autre], { ...FILTRES_VIDES, categorie: "coordination" });
+    expect(r.map((o) => o.id)).toEqual(["c"]);
+  });
+
+  it("tient compte du code de profession, comme la note", () => {
+    const parLeCode = { ...OFFRE_TEST, id: "n", poste: "computer network technician", noc: "22220" };
+    const sansCode = { ...OFFRE_TEST, id: "s", poste: "computer network technician", noc: null };
+    const r = filtrer([parLeCode, sansCode], { ...FILTRES_VIDES, categorie: "coordination" }, ["22"]);
+    expect(r.map((o) => o.id)).toEqual(["n"]);
   });
 });

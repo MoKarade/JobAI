@@ -335,6 +335,9 @@ export function trier(
       dateEnvoi: "",
       score: note.total,
       scoreSource: "calcule",
+      // Le code repart AVEC l'offre : c'est lui qui rend la catégorie affichée cohérente
+      // avec la note. Sans lui en base, l'écran re-déduirait la catégorie du titre seul.
+      noc: brute.noc ?? null,
       raisons: raisonsAutomatiques(brute, note.total),
       notes: noteDeProvenance(brute, aujourdhui),
       userNote: "",
