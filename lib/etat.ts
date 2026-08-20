@@ -21,6 +21,23 @@ export async function lireEtat<T>(cle: string, defaut: T): Promise<T> {
   }
 }
 
+/**
+ * La valeur BRUTE, sans parser. `null` = la ligne n'existe pas.
+ *
+ * ⚠️ ELLE EXISTE PARCE QUE `lireEtat` NE PEUT PAS DISTINGUER « absent » DE « illisible » :
+ * son `catch` rend le défaut dans les deux cas, ce qui est le bon comportement pour un
+ * curseur ou un registre (on repart, la passe suivante réécrit). Pour un COMPTEUR DE COÛT,
+ * c'est le pire : un JSON corrompu repartirait de zéro et publierait un cumul amputé avec
+ * l'autorité d'une mesure. L'appelant qui a besoin de la distinction parse lui-même.
+ *
+ * Une deuxième copie de l'`upsert` aurait fini par diverger — d'où une lecture de plus ici,
+ * plutôt qu'un module d'état parallèle.
+ */
+export async function lireEtatBrut(cle: string): Promise<string | null> {
+  const [ligne] = await db.select().from(syncState).where(eq(syncState.cle, cle));
+  return ligne ? ligne.valeur : null;
+}
+
 export async function ecrireEtat(cle: string, valeur: unknown): Promise<void> {
   const v = JSON.stringify(valeur);
   const maj = await db

@@ -46,15 +46,31 @@ const REPONSE_AVEC_COORDONNEES = {
   manques: ["Aucune certification en santé-sécurité"],
 };
 
+/** Ce que le faux SDK rend. Modifiable par cas de test. */
+let usageRendu: unknown = { input_tokens: 1000, output_tokens: 200 };
+let contenuRendu: unknown[] = [
+  { type: "tool_use", name: "rendre_profil", input: REPONSE_AVEC_COORDONNEES },
+];
+
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     messages = {
       create: async () => ({
         stop_reason: "tool_use",
-        content: [{ type: "tool_use", name: "rendre_profil", input: REPONSE_AVEC_COORDONNEES }],
+        content: contenuRendu,
+        usage: usageRendu,
       }),
     };
   },
+}));
+
+/**
+ * La comptabilité est mockée : `extraireFaits` l'appelle par DÉFAUT (c'est le point — elle
+ * ne doit pas pouvoir être oubliée par un appelant), et l'écrivain réel touche la base.
+ */
+const comptabilise = vi.fn(async (_usage: unknown) => {});
+vi.mock("@/lib/coutLlmStore", () => ({
+  enregistrerUsageLlm: (usage: unknown) => comptabilise(usage),
 }));
 
 const { extraireFaits, expurgerCoordonnees } = await import("@/lib/cv/extraction");
@@ -148,5 +164,54 @@ describe("les échecs restent honnêtes", () => {
     const r = await extraireFaits("trop court");
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.raison).toMatch(/scanné|texte/i);
+  });
+});
+
+describe("la comptabilité de l'appel", () => {
+  beforeEach(() => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "cle-de-test");
+    comptabilise.mockClear();
+    usageRendu = { input_tokens: 1000, output_tokens: 200 };
+    contenuRendu = [{ type: "tool_use", name: "rendre_profil", input: REPONSE_AVEC_COORDONNEES }];
+  });
+
+  it("est appelée par DÉFAUT, sans que l'appelant ait à y penser", async () => {
+    // ⚠️ LE POINT : `extraireFaits` a deux appelants (téléversement et ré-analyse). Laisser
+    // chacun penser à compter, c'est « un outil qu'on peut oublier d'appeler ne protège
+    // rien » — et le premier oubli produirait un cumul silencieusement amputé.
+    await extraireFaits(TEXTE_CV);
+    expect(comptabilise).toHaveBeenCalledTimes(1);
+    expect(comptabilise).toHaveBeenCalledWith({ input_tokens: 1000, output_tokens: 200 });
+  });
+
+  it("compte l'appel MÊME quand la réponse est ensuite refusée", async () => {
+    // L'appel est fait et FACTURÉ : ce qui suit peut échouer (pas de bloc `tool_use`,
+    // réponse hors schéma) sans qu'Anthropic rende ses tokens. Compter après les
+    // validations sous-estimerait le coût exactement les jours où ça ne va pas.
+    contenuRendu = [{ type: "text", text: "je préfère répondre en prose" }];
+    const r = await extraireFaits(TEXTE_CV);
+    expect(r.ok).toBe(false);
+    expect(comptabilise).toHaveBeenCalledTimes(1);
+  });
+
+  it("une panne de comptabilité ne fait PAS échouer l'extraction", async () => {
+    // Perdre la mesure d'un appel est regrettable ; perdre l'analyse d'un CV parce que la
+    // base a hoqueté ne l'est pas. La garantie tient quel que soit l'écrivain injecté.
+    const r = await extraireFaits(TEXTE_CV, {
+      comptabiliser: async () => {
+        throw new Error("base injoignable");
+      },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("n'est PAS appelée quand l'appel n'a pas eu lieu", async () => {
+    // Pas de clé, texte trop court : rien n'a été facturé, rien ne doit être compté —
+    // sinon le compteur passerait de « aucun appel » à « des appels non mesurés », et le
+    // hub afficherait une alerte pour un appel qui n'a jamais existé.
+    await extraireFaits("trop court");
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    await extraireFaits(TEXTE_CV, { cle: undefined });
+    expect(comptabilise).not.toHaveBeenCalled();
   });
 });

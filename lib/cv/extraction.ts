@@ -25,6 +25,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { baliserDonnees, CONSIGNE_DONNEES, sanitizePromptText } from "../promptSafety";
+import { enregistrerUsageLlm } from "../coutLlmStore";
 import { FaitsSchema, type Faits } from "../profil";
 
 /**
@@ -226,8 +227,21 @@ export function bornerListes(brut: unknown): { valeur: unknown; tronquees: strin
  */
 export async function extraireFaits(
   texteCv: string,
-  options: { cle?: string | undefined } = {},
+  options: {
+    cle?: string | undefined;
+    /**
+     * Où part le relevé d'usage de l'appel. Injecté, avec un défaut qui écrit vraiment.
+     *
+     * ⚠️ LA COMPTABILITÉ VIT ICI, PAS CHEZ L'APPELANT, ET C'EST LE POINT. `extraireFaits` a
+     * DEUX appelants (téléversement et ré-analyse) : laisser chacun penser à compter, c'est
+     * la règle « un outil qu'on peut oublier d'appeler ne protège rien », et le premier
+     * oubli produirait un cumul silencieusement amputé. Injecté pour rester testable sans
+     * base — le module ne connaît toujours aucune I/O de persistance en propre.
+     */
+    comptabiliser?: (usage: unknown) => Promise<void>;
+  } = {},
 ): Promise<ResultatExtraction> {
+  const comptabiliser = options.comptabiliser ?? enregistrerUsageLlm;
   const cle = options.cle ?? process.env.ANTHROPIC_API_KEY;
   if (!cle) {
     // Échec fermé, et DIT. Surtout pas un profil vide qui passerait pour un résultat.
@@ -266,6 +280,26 @@ export async function extraireFaits(
     // doit permettre de distinguer « recharge ton crédit » de « ce CV est illisible ».
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, raison: `Appel à l'API refusé ou indisponible : ${msg}` };
+  }
+
+  // ⚠️ COMPTÉ ICI, ET PAS PLUS BAS. L'appel est fait et FACTURÉ : ce qui suit peut encore
+  // échouer (pas de bloc `tool_use`, réponse hors schéma, listes tronquées) et rendre
+  // `ok: false` — mais Anthropic a déjà consommé ses tokens. Placer la comptabilité après
+  // les validations ne compterait que les extractions RÉUSSIES, donc sous-estimerait le
+  // coût réel exactement les jours où quelque chose ne va pas.
+  //
+  // `await` plutôt qu'un appel détaché : une promesse orpheline dans une fonction
+  // serverless peut être tuée avant d'écrire.
+  //
+  // ⚠️ ET SOUS UN `try`, MÊME SI L'ÉCRIVAIN PAR DÉFAUT NE LÈVE PAS. La garantie « une panne
+  // de comptabilité ne coûte jamais une extraction » ne doit pas dépendre de QUI est
+  // injecté : écrite seulement dans `enregistrerUsageLlm`, elle disparaîtrait au premier
+  // appelant qui passe le sien. Perdre la mesure d'un appel est regrettable ; perdre
+  // l'analyse d'un CV parce que la comptabilité a hoqueté ne l'est pas.
+  try {
+    await comptabiliser(reponse.usage);
+  } catch (e) {
+    console.error("[cv] comptabilité de l'appel impossible", e);
   }
 
   const bloc = reponse.content.find((c) => c.type === "tool_use");
