@@ -24,3 +24,6 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 | [0008](./0008-poste-de-nuit.md) | « Poste de nuit » : le sombre en identité, l'épure cesse d'être une soustraction | Accepté — révisé le jour même (thème clair retiré) ; supersède la direction du 2026-08-05 ; ADR-0003 tient sur l'ambre |
 | [0009](./0009-profil-pilote-par-le-cv.md) | Le profil sort du code, et le CV le remplit | Accepté — retire `[V3-00]` (CV via Google Drive) |
 | [0010](./0010-sources-lues-par-lapp.md) | Lire les offres depuis l'app : sources candidates, mesure d'accès, extraction | Accepté (Marc, 2026-08-19) — sonde livrée ; aucune ingestion ouverte |
+| [0011](./0011-connecteur-mcp-claude-ai.md) | Un connecteur MCP pour claude.ai, avec écriture | Accepté (Marc, 2026-08-19) |
+| [0012](./0012-tri-par-code-de-profession.md) | Trier le flux du Guichet par le code de profession (NOC 2021) | Proposé — décision Marc « go pour le tri par noc2021 » (2026-08-19) ; volet « filtre, pas note » révisé par ADR-0013 |
+| [0013](./0013-le-domaine-pondere-la-note.md) | Le domaine pondère la note, et le flux entre en entier | Proposé — décisions Marc du 2026-08-20 |

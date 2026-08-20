@@ -166,6 +166,22 @@ export const ProfilSchema = z.object({
    */
   plafondNoteCalculee: z.number().int().min(1).max(100),
 
+  /**
+   * Facteur appliqué à la note d'une offre dont le code de profession (NOC 2021) est LU et
+   * HORS de la liste des métiers retenus (ADR-0013, décision Marc 2026-08-20).
+   *
+   * ⚠️ IL NE S'APPLIQUE QUE SUR UN CODE LU. Une offre SANS code — dépôt Indeed, API
+   * d'entreprise, saisie manuelle — garde 1 : l'absence d'information n'est pas un
+   * hors-domaine, et la traiter comme tel pénaliserait exactement les offres que le barème
+   * sait déjà lire. C'est la règle que `scoreDistance` tient déjà pour une distance inconnue
+   * (« note NEUTRE, jamais 0 — un 0 dirait *c'est loin*, or on ne sait pas »).
+   *
+   * Borné à ]0, 1] : ce facteur ABAISSE ou laisse tel quel. Un facteur > 1 en ferait une
+   * prime au hors-domaine, ce qui n'a aucun sens ; un facteur nul effacerait l'offre alors
+   * que la décision est justement de la garder visible (risque R2 de l'ADR).
+   */
+  facteurHorsDomaine: z.number().gt(0).max(1),
+
   // ── Ce que la veille cherche ─────────────────────────────────────────────
   /**
    * Le bassin de termes interrogés, tiré en rotation.
@@ -202,7 +218,10 @@ export type Profil = z.infer<typeof ProfilSchema>;
  * pas dans un refactor où personne ne le cherchera.
  */
 export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
-  version: 1,
+  // ⚠️ 1 → 2 : ADR-0013 change le barème (facteur de domaine, plancher NOC, vocabulaire
+  // bilingue). Une offre retient la version qui l'a notée — sans le bump, deux barèmes
+  // différents porteraient le même numéro et une note deviendrait inexplicable.
+  version: 2,
   etabliLe: "2026-07-27",
   origine: "defaut",
 
@@ -224,14 +243,38 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
     immigration: 10,
   },
 
+  // ⚠️ ANGLAIS AJOUTÉ LE 2026-08-20 (ADR-0013, volet D4). Le barème rendait `horsSujet` sur
+  // 15 des 53 offres du seed — des `Project Manager` chez ABB, CAE, Baker Hughes, Robotiq.
+  // Ce ne sont pas des offres marginales : c'est le cœur de cible, noté 48 faute de mots.
+  //
+  // ⚠️ DES EXPRESSIONS, JAMAIS UN MOT ISOLÉ, et c'est une MESURE qui l'impose : « supervisor »
+  // nu faisait remonter « supervisor - retail » de 56 à 76. Le facteur NOC l'aurait rabattu
+  // sur le flux du Guichet, mais une offre Indeed « Retail Supervisor » n'a aucune garde —
+  // elle ne porte pas de code. Même raison pour « manager » nu (« assistant manager,
+  // restaurant ») et « superintendent » nu (« building superintendent »).
   motsCoordination: [
     "coordonnateur", "coordinateur", "superviseur", "chef d'équipe", "chargé de projet",
     "chargée de projet", "responsable", "gestionnaire", "chef de projet", "directeur",
+    // Projet — sans ambiguïté possible.
+    "project manager", "project coordinator", "project lead", "project engineering manager",
+    "project planner", "program manager", "team lead",
+    // Supervision QUALIFIÉE.
+    "production supervisor", "maintenance supervisor", "technical supervisor",
+    "operations supervisor", "engineering supervisor", "manufacturing supervisor",
+    // Surintendance QUALIFIÉE.
+    "general superintendent", "plant superintendent", "maintenance superintendent",
+    "production superintendent",
+    // Direction d'exploitation.
+    "plant manager", "operations manager", "maintenance manager", "production manager",
+    "engineering manager", "site manager",
   ],
 
   motsTechnique: [
     "automatisation", "automation", "robotique", "robotic", "mécatronique",
     "électromécanique", "mise en service", "plc", "automate", "vision industrielle",
+    // ADR-0013 D4 — équivalents anglais, même discipline d'expressions.
+    "mechatronics", "commissioning", "scada", "instrumentation", "controls engineer",
+    "industrial engineering", "manufacturing engineering", "process automation",
   ],
 
   motsDisqualifiants: [
@@ -292,6 +335,7 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
   immigrationOrdre: 6,
 
   plafondNoteCalculee: 85,
+  facteurHorsDomaine: 0.5,
 
   // ⚠️ ÉLARGI LE 2026-08-17, ET C'EST UN AJUSTEMENT ASSUMÉ, PAS UN REFACTOR EN PASSANT
   // (demande de Marc : « je veux que ce soit beaucoup plus efficace à trouver des jobs »).

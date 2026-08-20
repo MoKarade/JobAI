@@ -26,6 +26,7 @@
 // numérique plausible, elle ne lèvera plus — elle notera faux, sans rien dire.
 
 import { PROFIL_DEFAUT, type Profil } from "./profil";
+import { codeRetenu, lireCodeNoc } from "./nocProfession";
 
 /** Répartition des points. La somme fait 100 — vérifié par test, pas par confiance. */
 export const PONDERATION = PROFIL_DEFAUT.ponderation;
@@ -123,12 +124,68 @@ export function scoreImmigration(description = "", profil: Profil = PROFIL_DEFAU
   return profil.immigrationLibre;
 }
 
+/**
+ * Le facteur de domaine (ADR-0013, D1). PURE.
+ *
+ * ⚠️ LES DEUX CAS NEUTRES SONT LA DÉCISION, PAS UNE COMMODITÉ.
+ *
+ * `metiers` vide ⇒ 1 : tant que Marc n'a pas choisi ses codes, le mécanisme est INERTE.
+ * C'est ce qui rend le changement de barème sans effet sur l'existant, et c'est ce que
+ * l'audit du 2026-08-20 a vérifié (0 offre du seed ne bouge).
+ *
+ * Code ABSENT ou ILLISIBLE ⇒ 1 : une offre sans code — dépôt Indeed, API d'entreprise,
+ * saisie manuelle — n'est pas hors domaine, elle est de domaine INCONNU. Rendre le facteur
+ * de pénalité ici diviserait par deux tout le suivi actuel, dont aucune offre ne porte de
+ * code. La mutation qui fait exactement ça déplace 53 offres sur 53 : c'est le test qui
+ * prouve que cette ligne travaille.
+ */
+export function facteurDomaine(
+  noc: string | null | undefined,
+  metiers: readonly string[],
+  profil: Profil = PROFIL_DEFAUT,
+): number {
+  if (metiers.length === 0) return 1;
+  const code = lireCodeNoc(noc);
+  if (code === null) return 1;
+  return codeRetenu(code, metiers) ? 1 : profil.facteurHorsDomaine;
+}
+
+/**
+ * Le plancher de rôle posé par le code de profession (ADR-0013, D2). PURE.
+ *
+ * Quand le NOC dit que l'offre EST du métier de Marc, `scoreFitRole` ne peut pas rendre
+ * moins que les points de coordination — même si son vocabulaire ne sait pas lire le titre.
+ * Un classement officiel vaut au moins un mot-clé trouvé dans une annonce.
+ *
+ * ⚠️ IL NE FAIT QUE RELEVER. Une offre dont le titre porte la combinaison recherchée garde
+ * ses points pleins : `Math.max`, jamais une affectation.
+ */
+export function plancherRoleNoc(
+  role: number,
+  noc: string | null | undefined,
+  metiers: readonly string[],
+  profil: Profil = PROFIL_DEFAUT,
+): number {
+  if (metiers.length === 0) return role;
+  const code = lireCodeNoc(noc);
+  if (code === null || !codeRetenu(code, metiers)) return role;
+  return Math.max(role, profil.pointsRole.coordination);
+}
+
 export interface DetailNote {
   /** Note finale, plafonnée si elle est calculée. */
   total: number;
   /** Somme des composantes AVANT plafond — utile pour expliquer un écrêtage. */
   brut: number;
   parts: Record<keyof typeof PONDERATION, number>;
+  /**
+   * Le facteur de domaine appliqué (ADR-0013). 1 quand rien ne l'a abaissé.
+   *
+   * ⚠️ SANS CE CHAMP, UNE NOTE DEVIENT INEXPLICABLE. Une offre à 29 dont les parts
+   * additionnent 58 se lit comme un bug tant qu'on ne voit pas le ×0,5 — et c'est
+   * précisément le cas le plus fréquent une fois le flux du Guichet branché.
+   */
+  facteurDomaine: number;
   /**
    * La version de profil qui a produit cette note.
    *
@@ -150,21 +207,38 @@ export function computeScore(
     description?: string;
     km?: number | null;
     salaireAnnuel?: number | null;
+    /** Code de profession NOC 2021 de l'offre, quand la source en publie un. */
+    noc?: string | null;
   },
   profil: Profil = PROFIL_DEFAUT,
+  /**
+   * Les codes de métier retenus par Marc. Vide par défaut ⇒ le domaine ne pèse RIEN,
+   * et les ~200 appels existants gardent exactement leur note (audit du 2026-08-20).
+   */
+  metiers: readonly string[] = [],
 ): DetailNote {
   const parts = {
-    fitRole: scoreFitRole(input.titre, input.description, profil),
+    fitRole: plancherRoleNoc(
+      scoreFitRole(input.titre, input.description, profil),
+      input.noc,
+      metiers,
+      profil,
+    ),
     distance: scoreDistance(input.km, profil),
     seniorite: scoreSeniorite(input.description, profil),
     salaire: scoreSalaire(input.salaireAnnuel ?? null, profil),
     immigration: scoreImmigration(input.description, profil),
   };
   const brut = Object.values(parts).reduce((a, b) => a + b, 0);
+  const facteur = facteurDomaine(input.noc, metiers, profil);
+  // ⚠️ ARRONDI AVANT LE PLAFOND, et une seule fois : `brut` reste la somme des parts (il
+  // sert à expliquer un écrêtage), c'est le TOTAL qui porte le facteur. Les afficher tous
+  // deux évite la question « pourquoi 29 alors que ça fait 58 ».
   return {
-    total: Math.min(brut, profil.plafondNoteCalculee),
+    total: Math.min(Math.round(brut * facteur), profil.plafondNoteCalculee),
     brut,
     parts,
+    facteurDomaine: facteur,
     profilVersion: profil.version,
   };
 }
