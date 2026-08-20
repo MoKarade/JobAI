@@ -852,8 +852,32 @@
       `lib/metiersMesure.ts` (PUR) fait la lecture du rapport ; une lecture PARTIELLE est
       dite comme telle et jamais presentee comme une mesure. **La dependance a une session
       Claude est supprimee** : c'etait tout l'objet de la demande.
-      ⚠️ Reste ouvert : QUELS codes retenir. C'est la decision de Marc, sur la table
-      mesuree — je ne la prends pas a sa place.
+      ✔ **TABLE MESURÉE le 2026-08-20**, sur une lecture qui va au bout
+      (`fin: "flux-termine"` — seule fin qui autorise à conclure) : 40 911 offres vues,
+      0 illisible, **1 290 régionales**, 5,1 s. **37 classes** à 2 chiffres, **204 codes**
+      à 5 chiffres sur la population régionale.
+      Les dix premières classes pèsent **1 037 offres sur 1 290, soit 80 %**, et leurs
+      titres réels se lisent sans barème : 63 cuisinier/coiffeur (149) · 65 laveur de
+      voitures/aide-cuisine (147) · 72 soudeur/peintre (129) · 62 superviseur de commerce
+      et restauration rapide (125) · 94 opérateur de machine (122) · 95 manœuvre (78) ·
+      85 aménagement paysager (76) · 73 camionneur (73) · 75 aide (71) · 60 gérant de
+      restaurant (67).
+      **Ce qui correspond au profil de Marc tient dans quatre classes, 45 offres, 3,5 %** :
+      **70** cadres des métiers et de la construction (4 — « project manager, construction »,
+      « construction project coordinator », « construction general superintendent ») ·
+      **92** surveillants en transformation (7 — « production supervisor - food and beverage
+      processing », « chemical unit foreman », « production supervisor – plastic
+      manufacturing ») · **22** personnel technique (24) · **21** professionnels en sciences
+      appliquées (10). En lecture large, en ajoutant la coordination administrative
+      (13 : 29, 12 : 14, 10 : 5) et la supervision hors industrie (82 : 4) : **97 offres,
+      7,5 %**.
+      ⚠️ **Recommandation, pas décision** : cocher `70`, `92`, `22`, `21` donne une source
+      qui rend ~45 offres par passe au lieu de 1 290 — c'est le point de [VEILLE-44]. Les
+      classes larges (`13`, `12`) sont à essayer une passe puis à retirer si elles ramènent
+      des adjointes administratives. La décision reste celle de Marc, l'écran est là pour ça.
+      ⚠️ **Une classe à 2 chiffres n'est pas un métier** : `22` mélange technicien réseau,
+      dessinateur et technologue en architecture. Descendre au code à 5 chiffres se fait sur
+      la même table, deuxième tableau de l'écran.
 
 - [x] **[NOC-03]** Brancher le filtre sur l'ingestion du flux Guichet, avec le compte des
       ecartees PAR CODE (compter ne suffit pas, il faut nommer l'objet). ✔ Livre :
@@ -862,28 +886,46 @@
       `ResultatSource.note`. Non-regression : la source est INERTE par defaut (liste vide),
       donc aucune offre existante ne change de note — verifie par test, pas suppose.
 
-- [ ] **[ROUTINE-01]** ⚠️ **NE PAS supprimer la Routine — reponse PARTIELLE, mesuree le
-      2026-08-19.** Ce qu'elle depose, passe au barème lui-meme (268 offres distinctes sur
+- [ ] **[ROUTINE-01]** ⚠️ **Supprimer la Routine est POSSIBLE, et ça coûte la source la
+      plus alignée sur le profil — arbitrage de Marc, mesuré des deux côtés (2026-08-20).**
+      Ce qu'elle dépose, passé au barème lui-même (268 offres distinctes sur
       9 lots) : **54 % coordination seule, 4 % la combinaison visee, 6 % technicien, 5 %
       technique seule, 32 % hors sujet** — donc ~64 % portent une dimension coordination ou
       technique. C'est une source ALIGNEE sur le profil. Titres reels : « Coordonnateur
       Fiabilite Maintenance », « Superviseur de production », « Surintendant ».
-      L'echantillon regional du Guichet, lui, donne *sod layer*, *car washer*, *hairstylist*,
-      *kitchen helper*. Trois employeurs du Guichet cherches dans le suivi : 0/3 presents.
-      ⚠️ **CE QUI MANQUE POUR TRANCHER**, et c'est nomme : (a) mon echantillon Guichet etait
-      les 15 PREMIERES retenues, pas un tirage — le raisonnement sur prefixe m'a deja trompe
-      trois fois aujourd'hui ; (b) **on ne peut PAS comparer les deux populations avec ce
-      barème** : son vocabulaire est francais et les titres du Guichet sont anglais, donc il
-      rendrait « hors sujet » quel que soit le merite. La comparaison honnete passe par la
-      distribution NOC ([NOC-02]), pas par le barème. Conclusion tenable aujourd'hui : la
-      Routine est PRODUCTIVE et reste la seule source alignee ; sa redondance est INCONNUE.
+      L'echantillon regional du Guichet (les 15 PREMIERES retenues — un prefixe, pas un
+      tirage ; confirme depuis par la table complete, voir plus bas) donnait *sod layer*,
+      *car washer*, *hairstylist*, *kitchen helper*. Trois employeurs du Guichet cherches dans le suivi : 0/3 presents.
       ⚠️ **DEMANDE MARC 2026-08-19 : « je veux la supprimer, fais en sorte que je puisse ».**
       Ce que l'app NE PEUT PAS reprendre : la part Indeed (garde-fou n°4 + conditions
-      d'Indeed — la Routine passe par le connecteur officiel, l'app n'y a pas acces).
+      d'Indeed — la Routine passe par le connecteur officiel, l'app n'y a pas accès).
       Supprimer la Routine, c'est donc CHANGER DE SOURCE pour le flux complet du Guichet.
-      Le chemin est ouvert (voir [NOC-03]) ; ce qui reste avant que Marc puisse trancher :
-      l'ecran de [NOC-02], puis [VEILLE-32]/[VEILLE-34] — **le vrai verrou n'est pas le NOC,
-      c'est que le barème est monolingue face a des titres anglais**.
+      **Le chemin est ouvert et livré** ([NOC-03] la source, [NOC-02] l'écran) : Marc peut
+      supprimer la Routine sans que l'app cesse de fonctionner. La question n'est plus
+      « est-ce possible » mais « qu'est-ce qu'on perd ».
+      ✔ **CE QUI MANQUAIT EST MESURÉ (2026-08-20, lecture complète du flux).** Le point (a)
+      est clos : mon échantillon Guichet n'était plus les 15 premières mais les 1 290
+      régionales d'une passe qui va au bout. Le résultat est net et il ne va pas dans le sens
+      que Marc espérait : **45 offres sur 1 290, soit 3,5 %**, tombent dans les classes qui
+      portent son profil ; 80 % de la population régionale est cuisinier, laveur de voitures,
+      soudeur, manœuvre, camionneur (table dans [NOC-02]). Le dépôt de la Routine, lui, était
+      mesuré à **~64 % portant une dimension coordination ou technique**.
+      ⚠️ **Ces deux pourcentages ne sont PAS mesurés au même instrument** — 64 % vient du
+      barème appliqué à des titres français, 3,5 % de la distribution NOC ; le point (b)
+      reste vrai, aucun instrument commun n'existe. **Mais la conclusion n'en dépend pas** :
+      elle tient sur les VOLUMES ABSOLUS et sur des titres réels lisibles sans barème. Une
+      passe du Guichet rend quelques dizaines d'offres du bon domaine, pas quelques
+      centaines.
+      **RÉPONSE : le flux du Guichet est un COMPLÉMENT utile, pas un REMPLAÇANT.** Supprimer
+      la Routine est faisable et ne casse rien ; ça coûte la source la plus alignée sur le
+      profil, contre une source qu'il faut filtrer à 3,5 % pour être lisible. C'est un
+      arbitrage, il appartient à Marc — l'app ne l'empêche plus dans les deux sens.
+      ⚠️ Ce que la mesure NE dit pas : la redondance entre les deux sources reste inconnue
+      (aucune offre du Guichet n'a été retrouvée dans le suivi, mais sur 3 employeurs
+      cherchés — c'est une indication, pas une mesure). Et [VEILLE-32]/[VEILLE-34] restent
+      le vrai verrou pour EXPLOITER le Guichet : **le barème est monolingue face à des
+      titres anglais**, ce que la table complète confirme — les 37 classes rendent des
+      titres anglais y compris sur des offres dont la langue de travail est « Français ».
 
 - [ ] **[VEILLE-44]** ⚠️ **DECISION MARC : 1 300 offres regionales par passe** (mesure sur
       une passe complete), contre quelques dizaines suivies aujourd'hui. L'echantillon reste
@@ -903,6 +945,10 @@
       ajouter `saint-laurent` exclurait aussi `Saint-Laurent-de-l'Ile-d'Orleans`, qui est
       DANS la region. C'est [VEILLE-33]. Le vrai levier est `postalcode` ([VEILLE-43]) :
       une region de tri ne connait pas d'homonyme et ne coute aucune requete.
+      ✔ **RE-MESURE 2026-08-20 sur un flux reconstruit** : 3 310 en « lieu inconnu » sur
+      6 531 québécoises, soit 50,7 % — contre 3 366 / 50,8 % la veille. **La proportion est
+      structurelle, pas un artefact d'un jour** : c'est ce qui justifie d'y mettre le
+      travail de [VEILLE-43] plutôt que d'attendre qu'elle se résorbe.
 
 - [ ] **[VEILLE-40]** Brancher le flux Guichet sur `selectionnerSources`, **après** une
       passe de diagnostic qui rend `flux-termine` (celle du 19 août s'est arrêtée sur

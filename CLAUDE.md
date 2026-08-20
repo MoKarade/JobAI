@@ -1408,6 +1408,21 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   corriger l'outil. Corollaire déjà consigné et re-vécu : un motif à alternation se teste sur
   TOUTES ses branches, jamais sur une seule variante.
 
+- **Deux populations sans instrument commun : mesurer chacune dans SON unité, conclure sur
+  les ORDRES DE GRANDEUR ABSOLUS.** « Le flux du Guichet peut-il remplacer le dépôt de la
+  Routine ? » n'avait pas de réponse comparable : le dépôt se mesure au barème (vocabulaire
+  français, titres français), le flux se mesure par sa distribution NOC (titres anglais, que
+  le barème rendrait « hors sujet » quel que soit leur mérite). Mettre les deux chiffres
+  côte à côte — 64 % contre 3,5 % — aurait été une comparaison FABRIQUÉE : le second n'est
+  pas le même pourcentage de la même chose. La sortie n'est pas de renoncer, c'est de faire
+  porter la conclusion par ce qui NE dépend pas de l'instrument : le VOLUME absolu (45
+  offres du bon domaine par passe) et des titres réels lisibles sans outil (*cook*, *car
+  washer*, *sod layer*). ⚠️ Et il faut le DIRE dans la conclusion, pas seulement le savoir :
+  écrire « ces deux pourcentages ne sont pas mesurés au même instrument, voici ce sur quoi
+  la réponse repose » est ce qui empêche le chiffre d'être re-cité plus tard comme une
+  comparaison. Corollaire déjà payé trois fois ici : une mesure ne conclut que si elle va au
+  bout (`flux-termine`) — sur toute autre fin, chaque compte n'est qu'un préfixe.
+
 - **Un budget plus long que le MUR de sa fonction ne borne rien.** Le même diagnostic tourne
   derrière deux routes : 300 s en HTTP, 60 s en MCP. Y passer les mêmes 120 s ferait couper
   l'appel PAR LE DEHORS sur la seconde — et le client ne verrait qu'un timeout, sans le champ
