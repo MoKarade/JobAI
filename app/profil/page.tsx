@@ -31,6 +31,33 @@ function dateCourte(iso: string): string {
   return iso.slice(0, 10);
 }
 
+/**
+ * Une liste de faits, en pastilles.
+ *
+ * ⚠️ POURQUOI PAS UN `dd` AVEC DES VIRGULES. C'est ce que faisait la page avant, et avec un
+ * CV réel — une vingtaine d'outils, une dizaine de titres — chaque cellule devenait un
+ * paragraphe compact dans une case de grille. Une pastille par valeur se lit d'un coup
+ * d'œil et se replie toute seule sur un écran étroit.
+ *
+ * Une liste VIDE ne rend rien du tout : une rubrique vide n'apprend rien et ajoute du bruit
+ * à une page qui en avait déjà trop.
+ */
+function ListeEtiquettes({ titre, valeurs }: { titre: string; valeurs: readonly string[] }) {
+  if (valeurs.length === 0) return null;
+  return (
+    <div className="profil__groupe">
+      <h3 className="profil__groupe-titre">{titre}</h3>
+      <ul className="profil__etiquettes">
+        {valeurs.map((v) => (
+          <li key={v} className="etiquette">
+            {v}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default async function Profil() {
   const session = await auth();
   if (!session) redirect("/connexion");
@@ -68,6 +95,18 @@ export default async function Profil() {
   // erreur, simplement « sans rien à valider » — indiscernable du cas légitime.
   const ecarts = prop?.ok ? calculerEcarts(profil, prop.extraction) : [];
 
+  // ⚠️ « AUCUN FAIT » SE MESURE SUR LES FAITS, PAS SUR `origine`. Un profil peut porter
+  // `origine: "cv"` et des listes vides si l'extraction n'a rien trouvé d'exploitable —
+  // afficher alors une grille de tirets ferait passer une extraction ratée pour une page
+  // cassée. C'est le contenu qui décide de ce qu'on montre.
+  const f = profil.faits;
+  const aucunFait =
+    f.anneesExperience === null &&
+    f.titresOccupes.length === 0 &&
+    f.outils.length === 0 &&
+    f.diplomes.length === 0 &&
+    f.langues.length === 0;
+
   return (
     <Cadre actif="/profil" titre="Profil">
       <p className="intro-section">
@@ -84,41 +123,104 @@ export default async function Profil() {
       ) : null}
 
       <section className="carte-info">
-        <h2>Profil actif</h2>
+        <h2>Ce que l’app sait de toi</h2>
+
+        {aucunFait ? (
+          /* ⚠️ UN ÉTAT VIDE QUI SE NOMME. Sans lui, une grille de tirets ressemble à une
+             page cassée — or « aucun CV validé » est une situation normale et réparable,
+             et la phrase dit comment la réparer. */
+          <p className="profil__vide">
+            Aucun CV n’a encore été validé. La note utilise le barème par défaut du code —
+            elle fonctionne, mais elle ne sait rien de ton parcours. Dépose un CV ci-dessous.
+          </p>
+        ) : (
+          <>
+            <div className="profil__cles">
+              <div className="profil__cle">
+                <span className="profil__cle-valeur">
+                  {/* « — » plutôt qu'un zéro plausible : non établi n'est pas débutant. */}
+                  {profil.faits.anneesExperience === null
+                    ? "—"
+                    : profil.faits.anneesExperience}
+                </span>
+                <span className="profil__cle-nom">
+                  {profil.faits.anneesExperience === null ? "expérience" : "ans d’expérience"}
+                </span>
+              </div>
+              <div className="profil__cle">
+                <span className="profil__cle-valeur">{profil.faits.titresOccupes.length}</span>
+                <span className="profil__cle-nom">postes occupés</span>
+              </div>
+              <div className="profil__cle">
+                <span className="profil__cle-valeur">{profil.faits.outils.length}</span>
+                <span className="profil__cle-nom">outils et méthodes</span>
+              </div>
+              <div className="profil__cle">
+                <span className="profil__cle-valeur">{profil.faits.diplomes.length}</span>
+                <span className="profil__cle-nom">diplômes</span>
+              </div>
+            </div>
+
+            <ListeEtiquettes titre="Postes occupés" valeurs={profil.faits.titresOccupes} />
+            <ListeEtiquettes titre="Outils et méthodes" valeurs={profil.faits.outils} />
+            <ListeEtiquettes titre="Diplômes" valeurs={profil.faits.diplomes} />
+            <ListeEtiquettes titre="Langues" valeurs={profil.faits.langues} />
+          </>
+        )}
+      </section>
+
+      <section className="carte-info">
+        <h2>Ce que ça change dans tes notes</h2>
+        {/* ⚠️ LA SECTION QUI REND LA PAGE UTILE. Afficher des faits sans dire ce qu'ils
+            font est décoratif : le lien entre « voilà ton parcours » et « voilà pourquoi
+            cette offre est à 68 » est exactement ce qu'on vient chercher ici. */}
+        <p className="profil__aide">
+          Une offre part de 100 points, répartis ainsi. Les mots ci-dessous sont ceux que le
+          barème cherche dans un titre et une description.
+        </p>
+
+        <div className="profil__poids">
+          {(
+            [
+              ["Rôle", profil.ponderation.fitRole],
+              ["Distance", profil.ponderation.distance],
+              ["Expérience exigée", profil.ponderation.seniorite],
+              ["Salaire", profil.ponderation.salaire],
+              ["Statut migratoire", profil.ponderation.immigration],
+            ] as const
+          ).map(([nom, pts]) => (
+            <div key={nom} className="profil__poids-ligne">
+              <span className="profil__poids-nom">{nom}</span>
+              <span className="profil__poids-barre" aria-hidden="true">
+                <span className="profil__poids-part" style={{ width: `${pts}%` }} />
+              </span>
+              <span className="profil__poids-pts">{pts}</span>
+            </div>
+          ))}
+        </div>
+
+        <ListeEtiquettes titre="Mots de coordination" valeurs={profil.motsCoordination} />
+        <ListeEtiquettes titre="Mots techniques" valeurs={profil.motsTechnique} />
+
         <dl className="profil__faits">
           <div>
-            <dt>Origine</dt>
-            <dd>
-              {profil.origine === "defaut"
-                ? "barème par défaut du code"
-                : profil.origine === "cv"
-                  ? "CV validé"
-                  : "saisie manuelle"}{" "}
-              · version {profil.version} · établi le {profil.etabliLe}
-            </dd>
-          </div>
-          <div>
-            <dt>Expérience</dt>
-            {/* « — » plutôt qu'un zéro plausible : non établi n'est pas débutant. */}
-            <dd>
-              {profil.faits.anneesExperience === null
-                ? "—"
-                : `${profil.faits.anneesExperience} ans`}
-            </dd>
-          </div>
-          <div>
-            <dt>Langues</dt>
-            <dd>{profil.faits.langues.join(", ") || "—"}</dd>
-          </div>
-          <div>
-            <dt>Diplômes</dt>
-            <dd>{profil.faits.diplomes.join(", ") || "—"}</dd>
+            <dt>Rayon de recherche</dt>
+            <dd>{profil.rayonMaxKm} km</dd>
           </div>
           <div>
             <dt>Cherché chaque matin</dt>
-            <dd>{profil.recherches.join(" · ")}</dd>
+            <dd>{profil.recherches.join(" · ") || "—"}</dd>
           </div>
         </dl>
+
+        <p className="profil__origine">
+          {profil.origine === "defaut"
+            ? "Barème par défaut du code"
+            : profil.origine === "cv"
+              ? "Établi depuis un CV validé"
+              : "Saisie manuelle"}{" "}
+          · version {profil.version} · établi le {profil.etabliLe}
+        </p>
       </section>
 
       <section className="carte-info">

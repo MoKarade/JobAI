@@ -1690,6 +1690,107 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin: 0.15rem 0 0;
 }
 
+/* ── Le profil, refait le 2026-08-20 ──────────────────────────────────────
+   L'ancienne page aplatissait TOUT en paires terme/valeur. Avec un CV réel — une
+   vingtaine d'outils, une dizaine de titres — chaque cellule devenait un paragraphe
+   compact dans une case de grille. Les listes sortent donc du `dl` et deviennent des
+   pastilles ; les chiffres qui se comparent d'un coup d'œil passent en tête. */
+
+.profil__vide {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.55;
+}
+
+/* Les chiffres qu'on lit en premier. */
+.profil__cles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 1rem;
+  margin: 0 0 1.6rem;
+}
+.profil__cle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.profil__cle-valeur {
+  font-size: var(--t-xl);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.profil__cle-nom {
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+}
+
+.profil__groupe { margin: 0 0 1.2rem; }
+.profil__groupe-titre {
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0 0 0.5rem;
+  font-weight: 500;
+}
+.profil__etiquettes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.profil__aide {
+  margin: 0 0 1.1rem;
+  color: var(--text-soft);
+  font-size: var(--t-s);
+  line-height: 1.5;
+}
+
+/* La répartition des points : une barre par composante, pour que « 40 sur 100 » se voie
+   au lieu de se lire. */
+.profil__poids { display: grid; gap: 0.5rem; margin: 0 0 1.6rem; }
+.profil__poids-ligne {
+  display: grid;
+  grid-template-columns: 11rem 1fr 2.5rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+.profil__poids-nom { font-size: var(--t-s); }
+.profil__poids-barre {
+  height: 0.5rem;
+  border-radius: var(--r-pill);
+  background: var(--survol);
+  overflow: hidden;
+}
+.profil__poids-part {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--r-pill);
+}
+.profil__poids-pts {
+  font-size: var(--t-s);
+  color: var(--text-soft);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* La provenance du barème : vraie, utile au diagnostic, mais pas ce qu'on vient lire. */
+.profil__origine {
+  margin: 1.4rem 0 0;
+  padding-top: 0.9rem;
+  border-top: var(--trait-surface);
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+}
+
+@media (max-width: 40rem) {
+  .profil__poids-ligne { grid-template-columns: 8rem 1fr 2.2rem; }
+}
+
 /* ── Le dépôt ──────────────────────────────────────────────────────────── */
 .depot-cv {
   display: flex;
