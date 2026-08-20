@@ -108,6 +108,51 @@ describe("adresse civique en prose", () => {
       expect(expurgerPII(l).texte).toBe(l);
     }
   });
+
+  it("retire CHAQUE graphie de voie, abréviations ponctuées comprises", () => {
+    // ⚠️ CE TEST EXISTE PARCE QUE DEUX GRAPHIES ÉTAIENT INERTES DEPUIS TOUJOURS, en silence.
+    //
+    // Mesuré le 2026-08-20 sur une vraie annonce dont la voie s'écrivait `Av.` : le motif se
+    // terminait par `\b`, qui ne peut PAS matcher après un point — entre `.` et l'espace
+    // suivant, les deux caractères sont des non-mots, donc il n'y a aucune frontière. `av.`
+    // et `ch.` ne retiraient donc RIEN, et `boul.` ne survivait que par accident (son `?` la
+    // ramène à `boul`, qui finit par une lettre). L'outil ratait ce que `piiGuard` bloque :
+    // le gate a refusé le dépôt du jour, et c'est ainsi que le défaut est apparu.
+    //
+    // La leçon déjà consignée : « un test qui n'éprouve qu'UNE variante d'un motif fait
+    // croire que le motif entier est couvert ». On boucle donc sur TOUTES les graphies.
+    const graphies = [
+      "rue",
+      "Rue",
+      "avenue",
+      "Av.",
+      "av.",
+      "boul.",
+      "boul",
+      "boulevard",
+      "chemin",
+      "ch.",
+      "route",
+      "rang",
+      "place",
+      "montée",
+      "côte",
+    ];
+    for (const g of graphies) {
+      const ligne = `Bureau au 2380 ${g} ${VOIE_PROSE.split(" ").pop()}, Québec`;
+      const r = expurgerPII(ligne);
+      expect(r.retires, `graphie « ${g} »`).toContain("adresse civique en prose");
+      expect(r.texte, `graphie « ${g} »`).toContain("[adresse en prose retirée");
+    }
+  });
+
+  it("une graphie de voie SUIVIE D'UNE LETTRE reste un mot ordinaire", () => {
+    // La négation qui remplace `\b` doit garder cette discrimination : « ruelles » n'est pas
+    // une voie, et un motif qui l'avalerait mutilerait des annonces au lieu de les nettoyer.
+    for (const l of ["Il reste 12 ruelles à déneiger", "Prévoir 3 routiers pour la tournée"]) {
+      expect(expurgerPII(l).texte).toBe(l);
+    }
+  });
 });
 
 describe("personne nommée par une civilité — le trou du 2026-08-19", () => {

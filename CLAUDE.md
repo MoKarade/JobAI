@@ -1380,6 +1380,23 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   ne font ni deux ni cinq chiffres) — la source de vérité est la SAISIE, les codes valides
   s'en dérivent, jamais l'inverse.
 
+- **Un `\b` placé après une alternation dont une branche finit par un POINT ne matche
+  jamais — et la branche est morte en silence.** Mesuré le 2026-08-20 sur une vraie annonce
+  portant un numéro civique suivi de l'abréviation `Av.` : le motif d'adresse civique
+  d'`expurgerPII` se terminait par
+  `\b`, or entre le `.` de `av.` et l'espace qui suit, les deux caractères sont des non-mots
+  — donc aucune frontière, donc aucun match. Les graphies `av.` et `ch.` ne retiraient RIEN
+  depuis toujours ; `boul.` survivait par accident (son `?` la ramène à `boul`, qui finit par
+  une lettre), ce qui masquait le défaut sur un troisième cas. Le remède est
+  `(?![\p{L}\d])` : il accepte une fin de graphie ponctuée tout en gardant la
+  discrimination (« 12 ruelles » n'est pas une adresse). ⚠️ **Ce qui rend la leçon générale,
+  c'est COMMENT le défaut est apparu** : pas par une relecture, mais parce que `piiGuard` a
+  bloqué le gate sur une adresse que l'outil venait de laisser passer. Le couple
+  « l'outil nettoie, la garde refuse » ne protège que si les deux nomment la MÊME chose —
+  quand ils divergent, la garde devient un mur qu'on finit par contourner au lieu de
+  corriger l'outil. Corollaire déjà consigné et re-vécu : un motif à alternation se teste sur
+  TOUTES ses branches, jamais sur une seule variante.
+
 - **Un budget plus long que le MUR de sa fonction ne borne rien.** Le même diagnostic tourne
   derrière deux routes : 300 s en HTTP, 60 s en MCP. Y passer les mêmes 120 s ferait couper
   l'appel PAR LE DEHORS sur la seconde — et le client ne verrait qu'un timeout, sans le champ
