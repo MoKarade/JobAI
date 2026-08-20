@@ -52,6 +52,15 @@ export interface OffreBrute {
    * doit rester neutre, jamais lue comme un hors-domaine.
    */
   noc?: string | null;
+  /**
+   * Type de poste et durée d'emploi, quand la source les publie (ADR-0014 D2).
+   *
+   * Comme `noc`, ce sont des propriétés de l'OFFRE et non des détails de source. Le flux du
+   * Guichet les porte sur ses annonces ; les autres sources non — et leur absence doit
+   * rester neutre à la note, jamais lue comme un défaut du poste.
+   */
+  typePoste?: string | null;
+  dureeEmploi?: string | null;
 }
 
 /** Ce qu'une passe sur UNE source a donné. Un échec est dit, jamais confondu avec un vide. */

@@ -190,6 +190,8 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
       let lieuInconnuIgnore = 0;
       /** Le code lu pour chaque offre retenue, à rattacher après la lecture (ADR-0013). */
       const codesParRef = new Map<string, string | null>();
+      /** Les conditions publiées, rattachées après la lecture comme le code (ADR-0014 D2). */
+      const conditionsParRef = new Map<string, { typePoste: string | null; dureeEmploi: string | null }>();
       let codeIllisible = 0;
       const ecarteesParCode: Record<string, number> = {};
 
@@ -210,6 +212,13 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
             // exacte. Le code repart avec l'offre (ADR-0013) : sans lui, le facteur de
             // domaine n'aurait rien à lire et le barème resterait aveugle à l'anglais.
             codesParRef.set(offre.refSource, code.trim() === "" ? null : code.trim());
+            // Mêmes raison et même endroit que le code : `garder` est le seul point qui voit
+            // le bloc XML brut, et `OffreBrute` est un contrat fermé.
+            const vide = (v: string) => (v.trim() === "" ? null : v.trim());
+            conditionsParRef.set(offre.refSource, {
+              typePoste: vide(lireChamp(brut, "jobtype")),
+              dureeEmploi: vide(lireChamp(brut, "workterm")),
+            });
             const verdict = jugerProfession(code, metiers);
             if (verdict === "code-illisible") {
               // ⚠️ UN CODE ILLISIBLE N'EST PAS UN REFUS DE MÉTIER, et il ne se compte pas
@@ -285,7 +294,11 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
           // ⚠️ LE CODE EST RATTACHÉ ICI, PAS DANS `garder`. Le prédicat DÉCIDE, il ne
           // fabrique pas l'offre : muter son argument ferait dépendre le résultat de
           // l'ordre d'évaluation d'un filtre. On recolle après, quand la lecture est finie.
-          offres: rapport.retenues.map((o) => ({ ...o, noc: codesParRef.get(o.refSource) ?? null })),
+          offres: rapport.retenues.map((o) => ({
+            ...o,
+            noc: codesParRef.get(o.refSource) ?? null,
+            ...(conditionsParRef.get(o.refSource) ?? { typePoste: null, dureeEmploi: null }),
+          })),
           // La date de construction du flux : c'est CE que la source peut offrir de plus
           // frais. Sans elle, un flux figé depuis trois jours se lirait comme un marché calme.
           ...(rapport.construitLe !== null ? { dernierJour: rapport.construitLe } : {}),

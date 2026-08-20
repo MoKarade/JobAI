@@ -17,6 +17,7 @@ import {
   scoreImmigration,
   scoreSalaire,
   scoreSeniorite,
+  scoreConditions,
 } from "../lib/scoring";
 import { PROFIL_DEFAUT } from "../lib/profil";
 
@@ -345,5 +346,59 @@ describe("une exigence d'expérience hors d'atteinte pénalise doucement (ADR-00
     const note = scoreSeniorite("Nous demandons 15 ans d'expérience en gestion.");
     expect(note).toBe(PROFIL_DEFAUT.senioritePlancher);
     expect(note).toBeGreaterThan(0);
+  });
+});
+
+describe("conditions d'emploi (ADR-0014 D2)", () => {
+  const p = PROFIL_DEFAUT.pointsConditions;
+
+  it("permanent ET temps plein vaut le maximum", () => {
+    expect(scoreConditions("Temps plein", "Permanent")).toBe(p.ideal);
+  });
+
+  it("lit l'anglais comme le français — le flux publie les deux", () => {
+    expect(scoreConditions("Full time", "Permanent")).toBe(p.ideal);
+    expect(scoreConditions("full-time", "permanent")).toBe(p.ideal);
+  });
+
+  it("ignore casse et accents — ces champs sont du texte libre chez la source", () => {
+    expect(scoreConditions("TEMPS PLEIN", "Indéterminé")).toBe(p.ideal);
+  });
+
+  it("⚠️ rien de publié vaut NEUTRE, jamais zéro", () => {
+    // Les sources hors Guichet ne publient pas ces champs. Les pénaliser reviendrait à
+    // noter la politique de diffusion de l'employeur, pas le poste.
+    for (const vide of [["", ""], [null, null], [undefined, undefined]] as const) {
+      expect(scoreConditions(vide[0], vide[1])).toBe(p.nonPublie);
+    }
+    expect(p.nonPublie).toBeGreaterThan(0);
+  });
+
+  it("⚠️ le neutre n'est pas le MAXIMUM non plus — sinon le silence serait récompensé", () => {
+    expect(p.nonPublie).toBeLessThan(p.ideal);
+  });
+
+  it("le précaire l'emporte sur le temps plein", () => {
+    // Un contrat de trois mois à temps plein reste un contrat de trois mois.
+    expect(scoreConditions("Temps plein", "Temporaire")).toBe(p.precaire);
+    expect(scoreConditions("Temps partiel", "Permanent")).toBe(p.precaire);
+  });
+
+  it("des champs publiés mais illisibles retombent sur le neutre", () => {
+    // Ni une pénalité ni une prime : on n'a pas su lire, on ne prétend pas savoir.
+    expect(scoreConditions("Modalité inconnue", "Forme inconnue")).toBe(p.nonPublie);
+  });
+
+  it("la somme des pondérations fait toujours 100 — les points sont PRIS, pas ajoutés", () => {
+    const somme = Object.values(PROFIL_DEFAUT.ponderation).reduce((a, b) => a + b, 0);
+    expect(somme).toBe(100);
+    expect(PROFIL_DEFAUT.ponderation.conditions).toBeGreaterThan(0);
+  });
+
+  it("une offre du Guichet permanente bat la même offre temporaire", () => {
+    const base = { titre: "production supervisor", description: "", km: 20, noc: "92010" };
+    const perm = computeScore({ ...base, typePoste: "Temps plein", dureeEmploi: "Permanent" });
+    const temp = computeScore({ ...base, typePoste: "Temps plein", dureeEmploi: "Temporaire" });
+    expect(perm.total).toBeGreaterThan(temp.total);
   });
 });

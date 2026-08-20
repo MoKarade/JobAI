@@ -125,6 +125,56 @@ export function scoreImmigration(description = "", profil: Profil = PROFIL_DEFAU
 }
 
 /**
+ * Les conditions d'emploi publiées par une source (ADR-0014, D2). PURE.
+ *
+ * Marc a demandé que « permanent » et « temps plein » pèsent. Le flux du Guichet publie
+ * `jobtype` et `workterm` ; les autres sources n'en publient aucun.
+ *
+ * ⚠️ RIEN DE PUBLIÉ ⇒ NEUTRE FAVORABLE, jamais zéro. C'est la règle déjà tenue par la
+ * distance inconnue, le salaire non affiché et le code de profession absent : une absence
+ * d'information n'est pas un défaut du POSTE. Et la mettre au maximum serait pire encore —
+ * ça récompenserait le silence de l'employeur.
+ *
+ * La lecture est volontairement TOLÉRANTE sur la forme (français comme anglais, casse et
+ * accents ignorés) : ces champs sont du texte libre chez la source, et un motif trop strict
+ * rendrait « non publié » sur des valeurs parfaitement lisibles — donc un neutre là où on
+ * avait l'information.
+ */
+export function scoreConditions(
+  typePoste: string | null | undefined,
+  dureeEmploi: string | null | undefined,
+  profil: Profil = PROFIL_DEFAUT,
+): number {
+  const net = (v: string | null | undefined) =>
+    typeof v === "string" ? v.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "") : "";
+  const t = net(typePoste);
+  const d = net(dureeEmploi);
+  const p = profil.pointsConditions;
+
+  if (t === "" && d === "") return p.nonPublie;
+
+  // « Temps plein » se dit aussi « full time » / « full-time » dans le flux.
+  const plein = /temps\s*plein|full[\s-]?time/.test(t) || /temps\s*plein|full[\s-]?time/.test(d);
+  const partielHoraire = /temps\s*partiel|part[\s-]?time/.test(t) || /temps\s*partiel|part[\s-]?time/.test(d);
+  const permanent = /permanent|indetermine|regulier/.test(d) || /permanent|indetermine|regulier/.test(t);
+  // ⚠️ `term` EST ANCRÉ, et ce n'est pas une précaution : « indetermine » CONTIENT « term ».
+  // Sans les bornes de mot, un poste permanent annoncé « Indéterminé » était classé
+  // précaire — le piège de sous-chaîne que ce dépôt a déjà payé sur les symboles boursiers
+  // et les noms de fonds. Attrapé par un test, pas par la relecture.
+  const MOTIFS_PRECAIRE =
+    /temporaire|saisonnier|contractuel|contrat|temporary|seasonal|casual|\bterm\b/;
+  const precaire = MOTIFS_PRECAIRE.test(d) || MOTIFS_PRECAIRE.test(t);
+
+  // Le précaire l'emporte sur le reste : un contrat de trois mois à temps plein reste un
+  // contrat de trois mois.
+  if (precaire || partielHoraire) return p.precaire;
+  if (permanent && plein) return p.ideal;
+  if (permanent || plein) return p.partiel;
+  // Des champs publiés mais qu'on ne sait pas lire : neutre, comme s'ils étaient absents.
+  return p.nonPublie;
+}
+
+/**
  * Le facteur de domaine (ADR-0013, D1). PURE.
  *
  * ⚠️ LES DEUX CAS NEUTRES SONT LA DÉCISION, PAS UNE COMMODITÉ.
@@ -209,6 +259,10 @@ export function computeScore(
     salaireAnnuel?: number | null;
     /** Code de profession NOC 2021 de l'offre, quand la source en publie un. */
     noc?: string | null;
+    /** Type de poste publié par la source (« Temps plein », « Full time »…). */
+    typePoste?: string | null;
+    /** Durée d'emploi publiée par la source (« Permanent », « Temporaire »…). */
+    dureeEmploi?: string | null;
   },
   profil: Profil = PROFIL_DEFAUT,
   /**
@@ -228,6 +282,7 @@ export function computeScore(
     seniorite: scoreSeniorite(input.description, profil),
     salaire: scoreSalaire(input.salaireAnnuel ?? null, profil),
     immigration: scoreImmigration(input.description, profil),
+    conditions: scoreConditions(input.typePoste, input.dureeEmploi, profil),
   };
   const brut = Object.values(parts).reduce((a, b) => a + b, 0);
   const facteur = facteurDomaine(input.noc, metiers, profil);

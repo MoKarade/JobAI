@@ -48,6 +48,27 @@ noter la politique de diffusion de l'employeur, pas le poste.
 et un test le vérifie. Gonfler le total à 110 rendrait toutes les notes historiques
 incomparables aux nouvelles sans qu'aucun écran ne le dise.
 
+**Ils sont pris sur le SALAIRE (15 → 10), et c'est une mesure qui le décide.** Aucun appelant
+de `computeScore` ne passe `salaireAnnuel` — ni `distances.ts`, ni `pipeline.ts`, ni
+`renotation.ts`, qui explique même pourquoi (`salaireAffiche` est du texte libre). L'axe rend
+donc `salaireNonAffiche` pour TOUTES les offres : quinze points qui ne départagent rien. En
+retirer cinq ne coûte aucune discrimination.
+
+⚠️ **Pas sur l'immigration**, bien qu'elle soit le candidat évident à dix points. Elle
+DISCRIMINE, et précisément dans la situation de Marc : une annonce qui exige l'Ordre des
+ingénieurs du Québec est un délai réel pour un ingénieur formé en France. Réduire son poids
+rendrait la note moins juste exactement là où elle le concerne.
+
+Les paliers de salaire sont remis à l'échelle dans le même rapport (15/14/12/9 → 10/9/8/6,
+non affiché 9 → 6, plancher 5 → 3), et la valeur neutre des conditions est fixée à 3 sur 5 —
+le même 60 % que le salaire non affiché. Une offre sans condition publiée ne bouge donc
+d'AUCUN point : −3 sur le salaire, +3 sur les conditions. C'est ce que l'audit doit montrer.
+
+**Une découverte à ne pas enterrer** : les quinze points du salaire sont inertes depuis
+toujours. Le flux du Guichet publie pourtant un salaire sur une bonne part de ses offres
+(« $36.00 hourly »). Le lire vaudrait mieux que le laisser constant — ticket séparé, hors de
+ce lot.
+
 ## D3 — Le volet CARRIÈRE est cadré ici, mais PAS livré
 
 Marc veut que la note reflète ce qui est « bien pour la suite de carrière », et il a répondu

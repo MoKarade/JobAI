@@ -303,7 +303,14 @@ export function trier(
     // La note vient du barème, avec `km: null` : la distance ne se déduit pas d'un nom de
     // ville, elle se mesure. Le barème sait déjà traiter l'inconnu (10 points sur 20).
     const note = computeScore(
-      { titre: brute.titre, description: brute.description, km: null, noc: brute.noc },
+      {
+        titre: brute.titre,
+        description: brute.description,
+        km: null,
+        noc: brute.noc,
+        typePoste: brute.typePoste,
+        dureeEmploi: brute.dureeEmploi,
+      },
       undefined,
       metiers,
     );

@@ -107,6 +107,27 @@ export const ProfilSchema = z.object({
     seniorite: z.number().int().min(0),
     salaire: z.number().int().min(0),
     immigration: z.number().int().min(0),
+    /** Conditions d'emploi publiées par la source (ADR-0014 D2). */
+    conditions: z.number().int().min(0),
+  }),
+
+  /**
+   * Points des conditions d'emploi. Sur 5, pris au salaire (voir ADR-0014 D2).
+   *
+   * ⚠️ `nonPublie` est NEUTRE FAVORABLE (3 sur 5, le même 60 % que le salaire non affiché),
+   * jamais zéro. Les sources hors Guichet ne publient pas ces champs : les pénaliser
+   * reviendrait à noter la politique de diffusion de l'employeur, pas le poste. Et le mettre
+   * au MAXIMUM serait pire — ça récompenserait le silence.
+   */
+  pointsConditions: z.object({
+    /** Permanent ET temps plein. */
+    ideal: z.number().int().min(0),
+    /** L'un des deux seulement. */
+    partiel: z.number().int().min(0),
+    /** Temporaire, saisonnier, ou temps partiel. */
+    precaire: z.number().int().min(0),
+    /** La source n'a rien publié. */
+    nonPublie: z.number().int().min(0),
   }),
 
   /** Encadrement d'équipe. Un poste qui en porte vise le haut du barème de rôle. */
@@ -225,7 +246,8 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
   // changent. Une note se relit avec la version qui l'a produite.
   // 3 → 4 : les paliers de distance changent, donc toutes les notes changent.
   // 4 → 5 : ADR-0015 change deux constantes du barème.
-  version: 5,
+  // 5 → 6 : ADR-0014 D2 — les conditions d'emploi entrent, le salaire est remis à l'échelle.
+  version: 6,
   etabliLe: "2026-07-27",
   origine: "defaut",
 
@@ -243,9 +265,17 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
     fitRole: 40,
     distance: 20,
     seniorite: 15,
-    salaire: 15,
+    // ⚠️ 15 → 10 : c'est CE nombre qui finance les conditions, pas seulement les paliers.
+    // Les rescaler sans toucher ici portait la somme à 105 — attrapé par le test, pas par
+    // la relecture.
+    salaire: 10,
     immigration: 10,
+    // ⚠️ 5 POINTS PRIS AU SALAIRE, PAS AJOUTÉS (ADR-0014 D2). La somme fait toujours 100 :
+    // gonfler le total rendrait les notes historiques incomparables aux nouvelles.
+    conditions: 5,
   },
+
+  pointsConditions: { ideal: 5, partiel: 4, precaire: 2, nonPublie: 3 },
 
   // ⚠️ ANGLAIS AJOUTÉ LE 2026-08-20 (ADR-0013, volet D4). Le barème rendait `horsSujet` sur
   // 15 des 53 offres du seed — des `Project Manager` chez ABB, CAE, Baker Hughes, Robotiq.
@@ -358,15 +388,20 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
   // calibrage — deux sources pour la même règle.
   senioritePlancher: 7,
 
+  // ⚠️ REMIS À L'ÉCHELLE 15 → 10 le 2026-08-20 (ADR-0014 D2), dans le même rapport.
+  // Cet axe est INERTE : aucun appelant de `computeScore` ne passe `salaireAnnuel` (voir
+  // `renotation.ts`, qui explique pourquoi — `salaireAffiche` est du texte libre). Il rend
+  // donc `salaireNonAffiche` pour TOUTES les offres. Lui retirer cinq points ne coûte aucune
+  // discrimination, et c'est ce qui finance les conditions d'emploi.
   paliersSalaire: [
     // Du plus généreux au moins généreux : le premier seuil atteint l'emporte.
-    { min: 90_000, points: 15 }, // au-dessus du repère « spécialiste automatisation »
-    { min: 80_000, points: 14 },
-    { min: 70_000, points: 12 },
-    { min: 60_000, points: 9 }, // autour de la médiane « coordonnateur »
+    { min: 90_000, points: 10 }, // au-dessus du repère « spécialiste automatisation »
+    { min: 80_000, points: 9 },
+    { min: 70_000, points: 8 },
+    { min: 60_000, points: 6 }, // autour de la médiane « coordonnateur »
   ],
-  salaireNonAffiche: 9,
-  salairePlancher: 5,
+  salaireNonAffiche: 6,
+  salairePlancher: 3,
 
   immigrationLibre: 10,
   immigrationOrdre: 6,

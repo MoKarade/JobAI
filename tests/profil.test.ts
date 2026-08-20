@@ -83,16 +83,25 @@ describe("le barème d'avant ADR-0009, valeur par valeur", () => {
   });
 
   it("salaire — seuils exacts, non affiché neutre", () => {
-    expect(scoreSalaire(90_000)).toBe(15);
-    expect(scoreSalaire(120_000)).toBe(15);
-    expect(scoreSalaire(89_999)).toBe(14);
-    expect(scoreSalaire(80_000)).toBe(14);
-    expect(scoreSalaire(70_000)).toBe(12);
-    expect(scoreSalaire(60_000)).toBe(9);
-    expect(scoreSalaire(59_999)).toBe(5);
-    expect(scoreSalaire(0)).toBe(5);
+    // ⚠️ DÉRIVÉ DES PALIERS. Les valeurs ont été remises à l'échelle 15 → 10 (ADR-0014 D2)
+    // pour financer les conditions d'emploi ; écrites en dur, elles faisaient tomber ce test
+    // sur un rajustement voulu. Ce qui se vérifie ici, ce sont les BORNES — qu'un seuil
+    // s'applique bien à partir de son montant, et pas un dollar plus loin.
+    const [p1, p2, p3, p4] = PROFIL_DEFAUT.paliersSalaire as unknown as {
+      min: number;
+      points: number;
+    }[];
+    expect(scoreSalaire(p1!.min)).toBe(p1!.points);
+    expect(scoreSalaire(p1!.min + 30_000)).toBe(p1!.points);
+    expect(scoreSalaire(p1!.min - 1)).toBe(p2!.points);
+    expect(scoreSalaire(p2!.min)).toBe(p2!.points);
+    expect(scoreSalaire(p3!.min)).toBe(p3!.points);
+    expect(scoreSalaire(p4!.min)).toBe(p4!.points);
+    expect(scoreSalaire(p4!.min - 1)).toBe(PROFIL_DEFAUT.salairePlancher);
+    expect(scoreSalaire(0)).toBe(PROFIL_DEFAUT.salairePlancher);
     // Non affiché : neutre. Pénaliser reviendrait à noter la communication de l'employeur.
-    expect(scoreSalaire(null)).toBe(9);
+    expect(scoreSalaire(null)).toBe(PROFIL_DEFAUT.salaireNonAffiche);
+    expect(PROFIL_DEFAUT.salaireNonAffiche).toBeGreaterThan(PROFIL_DEFAUT.salairePlancher);
   });
 
   it("immigration — barrière ferme, ordre professionnel, rien", () => {
