@@ -24,7 +24,7 @@ pour décider quoi faire — s'il ment, elle refait du travail déjà fait, ou s
   inexistant est invérifiable — on ne peut plus distinguer « le verrou manque » de « le nom
   est faux ».
 - **`docs/adr/`** — une décision structurante prise dans le diff a-t-elle son ADR ?
-- **Leçons** — le diff a-t-il révélé quelque chose de réutilisable ? Si oui, `CLAUDE.md` §7,
+- **Leçons** — le diff a-t-il révélé quelque chose de réutilisable ? Si oui, `CLAUDE.md` §9,
   dans le MÊME commit. Une leçon notée ailleurs est une leçon perdue.
 
 ## Ce que tu ne fais pas

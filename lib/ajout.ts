@@ -17,7 +17,7 @@
 //      (« 40 $/h+ (~83 k$) », « 52 260 – 120 727 $ ») ; en tirer un annuel exige un parseur
 //      dont les arbitrages — quelle extrémité d'une fourchette ? quel taux horaire annualisé ? —
 //      changent la note d'une offre. C'est une modification de la logique de notation, donc
-//      soumise au protocole de précision du CLAUDE.md §8 (ADR + tableau avant/après sur les
+//      soumise au protocole de précision du CLAUDE.md §11 (ADR + tableau avant/après sur les
 //      38 offres de référence). `scoreSalaire(null)` rend sa valeur NEUTRE, pas zéro : une
 //      offre saisie à la main n'est ni avantagée ni pénalisée sur ce critère.
 

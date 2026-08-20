@@ -9,7 +9,7 @@
 // données PUBLIQUES. Jamais le domicile de Marc ni un lieu personnel : ils ne sortent pas
 // des variables `DOMICILE_LAT` / `DOMICILE_LON` et ne partent vers aucun service tiers.
 // *(Frontière élargie aux entreprises le 2026-07-29, [UX-09] : les épingles par ville
-// étaient jugées inutilisables — voir CLAUDE.md §2.4.)*
+// étaient jugées inutilisables — voir CLAUDE.md §1.4.)*
 //
 // PRÉCISION ASSUMÉE
 // Le point rendu est le centre de la municipalité. Ce n'est PAS la position de l'employeur,

@@ -3,7 +3,7 @@
 // POURQUOI CE SCRIPT VIT ICI, ET PAS DANS UN /tmp
 // Il DOIT importer `expurgerLot` du code de production (`lib/ingest/expurger.ts`). Une copie
 // de la logique d'expurgation ailleurs serait une seconde implémentation de la même règle —
-// et la leçon est écrite en §7 : « deux implémentations d'une règle, c'est une règle et
+// et la leçon est écrite en §9 : « deux implémentations d'une règle, c'est une règle et
 // demie », c'est toujours la moins relue qui garde la version permissive. Un script hors du
 // dépôt ne peut pas importer ce module : il vivrait donc avec sa propre expurgation.
 //

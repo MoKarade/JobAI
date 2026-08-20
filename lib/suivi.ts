@@ -122,7 +122,7 @@ export function resumer(
 
   // ⚠️ `aujourdhui` est un PARAMÈTRE, pas un `new Date()` caché : c'est la seule façon de
   // tester le passage de minuit, et la date se calcule dans le fuseau de Marc chez
-  // l'appelant (leçon §7 — Vercel tourne en UTC, lui vit à UTC−4).
+  // l'appelant (leçon §9 — Vercel tourne en UTC, lui vit à UTC−4).
   const limite = Date.parse(`${aujourdhui}T00:00:00Z`);
   const plancher = Number.isFinite(limite)
     ? limite - FENETRE_NOUVELLES_JOURS * 86_400_000
