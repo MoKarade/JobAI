@@ -119,7 +119,11 @@ export function resumerBilanFlux(b: BilanFlux): string {
       .slice(0, CODES_NOMMES)
       .map(([code, n]) => `${code} (${n})`)
       .join(", ");
-    parts.push(`${ecartees} écartées par métier — surtout ${top}`);
+    // ⚠️ « HORS DOMAINE », PAS « ÉCARTÉES ». Elles ne sont plus refusées depuis le
+    // 2026-08-20 : elles entrent et la note les déclasse. Le mot « écartées » a survécu au
+    // changement de comportement et faisait lire à Marc « 4 462 offres jetées » sur son
+    // rapport de passe, alors qu'aucune ne l'était.
+    parts.push(`${ecartees} hors domaine (notées à la baisse) — surtout ${top}`);
   }
   if (b.horsRegion > 0) parts.push(`${b.horsRegion} hors région`);
   // ⚠️ LES DEUX COMPTES DE LIEUX INCONNUS SE DISENT ENSEMBLE. « 40 rapportés » seul ferait

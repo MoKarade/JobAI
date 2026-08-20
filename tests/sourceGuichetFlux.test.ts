@@ -247,7 +247,7 @@ describe("resumerBilanFlux — la ligne qui distingue « rien à prendre » de �
       ...base,
       ecarteesParCode: { "65200": 402, "75110": 311, "63200": 12 },
     });
-    expect(ligne).toContain("725 écartées par métier");
+    expect(ligne).toContain("725 hors domaine");
     expect(ligne).toContain("65200 (402)");
     expect(ligne).toContain("75110 (311)");
   });
@@ -332,3 +332,42 @@ describe("le code de profession voyage jusqu'à la note (ADR-0013)", () => {
 });
 
 
+
+describe("le plancher de rôle ne refuse plus une offre CODÉE (mesuré en prod)", () => {
+  it("une offre hors domaine AVEC code entre, et la note la déclasse", () => {
+    // ⚠️ CE TEST VIENT D'UNE PASSE RÉELLE. Le 2026-08-20, 1 204 offres régionales sur 1 306
+    // ont été refusées « sous le plancher » : Marc demandait à voir tout le flux, il a vu
+    // 75 offres. Les titres du Guichet sont anglais, donc tous à `horsSujet` (8/40).
+    const brute = {
+      refSource: "x1",
+      titre: "car washer",
+      entreprise: "Employeur",
+      ville: "Québec",
+      lien: "https://www.guichetemplois.gc.ca/offre/x1",
+      description: "",
+      publieeLe: "2026-08-20",
+      noc: "65311",
+    };
+    const tri = trier([brute], new Set(), "2026-08-20", new Map(), ["21", "22", "70", "92"]);
+    expect(tri.souslePlancher).toBe(0);
+    expect(tri.retenues).toHaveLength(1);
+    // Elle entre, mais elle est déclassée — c'est la note qui trie, pas l'ingestion.
+    expect(tri.retenues[0]!.score).toBeLessThan(40);
+  });
+
+  it("SANS code, le plancher juge encore — sinon « Caissier » entrerait", () => {
+    const brute = {
+      refSource: "x2",
+      titre: "Caissier",
+      entreprise: "Employeur",
+      ville: "Québec",
+      lien: "https://exemple.invalid/x2",
+      description: "",
+      publieeLe: "2026-08-20",
+      noc: null,
+    };
+    const tri = trier([brute], new Set(), "2026-08-20", new Map(), ["21", "22", "70", "92"]);
+    expect(tri.souslePlancher).toBe(1);
+    expect(tri.retenues).toHaveLength(0);
+  });
+});

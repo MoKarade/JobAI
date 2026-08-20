@@ -287,7 +287,9 @@ export function fraicheurDepot(depot: RapportVeille["depot"]): FraicheurDepot {
 export const LIBELLE_MOTIF: Record<MotifRefus, string> = {
   "hors-region": "hors région",
   "lieu-inconnu": "lieu inconnu",
-  "sous-le-plancher": "sous le plancher",
+  // ⚠️ Le plancher ne juge plus QUE les offres sans code de profession (2026-08-20) : le
+  // dire évite de lire « 1 204 sous le plancher » comme un refus du flux du Guichet.
+  "sous-le-plancher": "hors sujet (sources sans code de métier)",
   doublon: "déjà connue",
 };
 

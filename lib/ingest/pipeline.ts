@@ -307,7 +307,22 @@ export function trier(
       undefined,
       metiers,
     );
-    if (note.parts.fitRole < FIT_ROLE_PLANCHER) {
+    // ⚠️ LE PLANCHER NE S'APPLIQUE QU'AUX OFFRES SANS CODE DE PROFESSION.
+    //
+    // Mesuré en production le 2026-08-20 : sur une passe réelle, **1 204 offres régionales
+    // sur 1 306** ont été refusées ici. Marc demandait à voir tout le flux ; il a vu 75
+    // offres. Le plancher juge par MOTS-CLÉS, et les titres du Guichet sont anglais — ils
+    // valent tous `horsSujet` (8/40), donc ils tombaient tous.
+    //
+    // La raison d'être du plancher tient toujours pour les sources SANS code : là, le
+    // barème par mots-clés est le seul juge, et sans lui « Caissier » entrerait (son
+    // commentaire d'origine le mesure : les points d'inconnu portent n'importe quel métier
+    // à ~48). Mais une offre qui porte un `noc2021` a été classée par une nomenclature
+    // OFFICIELLE, indépendante de la langue : le facteur de domaine la range déjà — un
+    // hors-domaine tombe à ~28 au lieu de ~56. Le trieur, c'est la NOTE ; l'ingestion n'a
+    // plus à refuser ce que la note sait déclasser.
+    const jugeParLeCode = brute.noc != null && brute.noc.trim() !== "";
+    if (!jugeParLeCode && note.parts.fitRole < FIT_ROLE_PLANCHER) {
       souslePlancher++;
       refusees.push({
         entreprise,
