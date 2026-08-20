@@ -1529,6 +1529,22 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   (`assert s != avant`), sans quoi on conclut « mon test est mauvais » sur une manipulation
   ratée — ou pire, « mon test est bon » sur une mutation fantôme.
 
+- **Un mécanisme de troncature ne protège que la PROFONDEUR qu'il parcourt.** Vécu deux fois
+  ici, et la seconde par ma faute. Le 2026-08-14, une analyse de CV entière était rejetée
+  pour neuf forces au lieu de huit ; le correctif a annoncé les plafonds au modèle et ajouté
+  `bornerListes`, qui ramène chaque liste à sa borne AVANT le schéma. Le 2026-08-20, un CV
+  réel a été rejeté pour onze réalisations sur un poste : `bornerListes` ne regardait que le
+  PREMIER NIVEAU, et le nouveau champ portait une liste dans une liste. La borne n'avait pas
+  la mauvaise valeur, elle n'allait pas assez profond. Toute liste imbriquée ajoutée plus
+  tard doit être bornée dans la même fonction — et le test-garde des plafonds descend
+  désormais lui aussi dans les sous-schémas, parce qu'une garde qui ne voit qu'un étage
+  laisse passer exactement ce qu'elle promet d'attraper.
+  ⚠️ **Et la réponse n'était PAS d'assouplir le schéma.** Mon premier correctif relâchait la
+  borne Zod pour « ne plus échouer » : c'était troquer un échec fort et diagnosticable
+  (`parcours.1.faits`, le champ NOMMÉ) contre une dérive muette. Un test existant l'a réfuté,
+  et il avait raison — la stricture du schéma est la CEINTURE qui signale ce que la
+  troncature a manqué. On répare l'outil qui tronque, jamais la garde qui alerte.
+
 - **Un budget plus long que le MUR de sa fonction ne borne rien.** Le même diagnostic tourne
   derrière deux routes : 300 s en HTTP, 60 s en MCP. Y passer les mêmes 120 s ferait couper
   l'appel PAR LE DEHORS sur la seconde — et le client ne verrait qu'un timeout, sans le champ

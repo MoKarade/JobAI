@@ -16,8 +16,8 @@
 import { describe, it, expect } from "vitest";
 import {
   PLAFONDS,
-  OUTIL_EXTRACTION,
   ReponseExtractionSchema,
+  OUTIL_EXTRACTION,
   bornerListes,
 } from "@/lib/cv/extraction";
 
@@ -125,5 +125,51 @@ describe("un dépassement TRONQUE, il ne rejette pas", () => {
       expect(() => bornerListes(brut)).not.toThrow();
       expect(bornerListes(brut).tronquees).toEqual([]);
     }
+  });
+});
+
+describe("la borne TRONQUE, elle ne rejette pas — y compris imbriquée", () => {
+  it("⚠️ le cas réel du 2026-08-20 : onze réalisations sur un poste", () => {
+    // Ce CV a été REJETÉ en production, avec « parcours.1.faits Array must contain at most
+    // 10 element(s) ». Le CV était valide ; le modèle avait juste été bavard sur un poste.
+    const trop = Array.from({ length: PLAFONDS.faitsParPoste + 1 }, (_, i) => `Réalisation ${i}`);
+    const { valeur, tronquees } = bornerListes({
+      anneesExperience: 3,
+      parcours: [
+        { titre: "Chargé de projet", faits: ["Un seul fait"] },
+        { titre: "Responsable technique", faits: trop },
+      ],
+    });
+
+    // Tronqué, pas rejeté.
+    const p = (valeur as { parcours: { faits: string[] }[] }).parcours;
+    expect(p[1]!.faits).toHaveLength(PLAFONDS.faitsParPoste);
+    expect(p[0]!.faits).toHaveLength(1);
+
+    // ⚠️ ET DIT. Une analyse amputée qui se présenterait comme complète serait pire que
+    // l'échec qu'on vient de retirer.
+    expect(tronquees.some((t) => t.includes("Responsable technique"))).toBe(true);
+
+    // Et surtout : le schéma ACCEPTE le résultat, là où il refusait tout.
+    expect(ReponseExtractionSchema.safeParse(valeur).success).toBe(true);
+  });
+
+  it("⚠️ le schéma reste STRICT : c'est lui qui signale ce que la troncature a manqué", () => {
+    // Ne PAS assouplir cette borne. C'est elle qui a nommé `parcours.1.faits` en production
+    // au lieu de laisser passer une liste trop longue en silence. La troncature évite
+    // l'échec ; la stricture le rend diagnosticable quand la troncature est incomplète.
+    const faits = (n: number) => Array.from({ length: n }, (_, i) => `Fait ${i}`);
+    const brut = { anneesExperience: null, forces: faits(PLAFONDS.forces + 1) };
+    expect(ReponseExtractionSchema.safeParse(brut).success).toBe(false);
+    expect(ReponseExtractionSchema.safeParse(bornerListes(brut).valeur).success).toBe(true);
+  });
+
+  it("un poste sans faits, ou mal formé, traverse sans casser", () => {
+    const { valeur, tronquees } = bornerListes({
+      anneesExperience: null,
+      parcours: [{ titre: "Sans faits" }, null, "pas un objet"],
+    });
+    expect(tronquees).toEqual([]);
+    expect((valeur as { parcours: unknown[] }).parcours).toHaveLength(3);
   });
 });

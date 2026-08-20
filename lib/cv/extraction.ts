@@ -72,6 +72,13 @@ export const FaitSourceSchema = z.object({
  *
  * Une même règle tenue dans deux langages diverge toujours. Ici elle n'est écrite qu'une
  * fois, les deux schémas la lisent, et `tests/cvExtraction.test.ts` refuse qu'ils s'écartent.
+ *
+ * ⚠️ LE SCHÉMA ZOD RESTE STRICT, ET C'EST VOULU. `bornerListes` tronque AVANT lui ; la
+ * stricture de Zod est la ceinture qui DIT quand la troncature a manqué un champ. Le
+ * 2026-08-20, c'est elle qui a nommé `parcours.1.faits` au lieu de laisser passer une liste
+ * trop longue en silence. L'assouplir pour « ne plus échouer » aurait troqué un échec fort
+ * et diagnosticable contre une dérive muette : le défaut était l'aveuglement de la
+ * troncature aux listes IMBRIQUÉES, jamais la sévérité du schéma.
  */
 export const PLAFONDS = {
   langues: 12,
@@ -133,7 +140,14 @@ export type ReponseExtraction = z.infer<typeof ReponseExtractionSchema>;
 
 /** Le résultat d'une extraction : un succès sourcé, ou un échec qui se nomme. */
 export type ResultatExtraction =
-  | { ok: true; faits: Faits; brut: ReponseExtraction; provenances: Record<string, string> }
+  | {
+      ok: true;
+      faits: Faits;
+      brut: ReponseExtraction;
+      provenances: Record<string, string>;
+      /** Ce que les plafonds ont retiré. Vide = rien n'a été tronqué. */
+      troncatures: string[];
+    }
   | { ok: false; raison: string };
 
 /**
@@ -271,10 +285,36 @@ export function bornerListes(brut: unknown): { valeur: unknown; tronquees: strin
   const tronquees: string[] = [];
 
   for (const [champ, plafond] of Object.entries(PLAFONDS)) {
+    // `faitsParPoste` ne borne aucun champ de premier niveau : il borne une liste IMBRIQUÉE,
+    // traitée juste après. Le chercher ici ne trouverait rien et masquerait l'oubli.
+    if (champ === "faitsParPoste") continue;
     const valeur = source[champ];
     if (!Array.isArray(valeur) || valeur.length <= plafond) continue;
     sortie[champ] = valeur.slice(0, plafond);
     tronquees.push(`${champ} ${valeur.length}->${plafond}`);
+  }
+
+  // ⚠️ LE PARCOURS PORTE UNE LISTE DANS UNE LISTE, ET C'EST LÀ QUE LA BORNE A LÂCHÉ.
+  //
+  // Cette fonction ne regardait que le premier niveau. Le 2026-08-20, un CV réel a été
+  // REJETÉ pour onze réalisations sur un poste : la troncature ne voyait pas le champ, le
+  // schéma Zod le refusait, et toute l'analyse était perdue. C'est la deuxième fois que la
+  // même faute frappe ici — le 2026-08-14, neuf forces au lieu de huit — et la deuxième fois
+  // pour une raison de PROFONDEUR, pas de valeur.
+  //
+  // Toute liste imbriquée ajoutée plus tard doit être bornée ICI aussi. Le test-garde des
+  // plafonds descend désormais dans les sous-schémas ; celui-ci descend dans les données.
+  const parcours = sortie.parcours;
+  if (Array.isArray(parcours)) {
+    sortie.parcours = parcours.map((poste, i) => {
+      if (poste === null || typeof poste !== "object" || Array.isArray(poste)) return poste;
+      const p = poste as Record<string, unknown>;
+      const faits = p.faits;
+      if (!Array.isArray(faits) || faits.length <= PLAFONDS.faitsParPoste) return poste;
+      const nom = typeof p.titre === "string" && p.titre !== "" ? p.titre : `poste ${i + 1}`;
+      tronquees.push(`faits de « ${nom} » ${faits.length}->${PLAFONDS.faitsParPoste}`);
+      return { ...p, faits: faits.slice(0, PLAFONDS.faitsParPoste) };
+    });
   }
 
   return { valeur: sortie, tronquees };
@@ -460,5 +500,8 @@ export async function extraireFaits(
     faits,
     brut: propre,
     provenances: { anneesExperience: propre.anneesExperienceProvenance },
+    // ⚠️ COMPTÉ SUR LA RÉPONSE D'ORIGINE, pas sur `propre` : la troncature a déjà eu lieu au
+    // parse, et `propre` ne porte plus la trace de ce qui manque.
+    troncatures: tronquees,
   };
 }
