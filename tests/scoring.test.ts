@@ -18,6 +18,7 @@ import {
   scoreSalaire,
   scoreSeniorite,
 } from "../lib/scoring";
+import { PROFIL_DEFAUT } from "../lib/profil";
 
 describe("pondération", () => {
   it("les composantes totalisent exactement 100", () => {
@@ -47,11 +48,15 @@ describe("fit du rôle", () => {
     expect(coordSeule).toBeGreaterThan(techSeule);
   });
 
-  it("pénalise un poste de technicien sans encadrement", () => {
+  it("ne pénalise PLUS un poste de technicien sans encadrement (ADR-0015)", () => {
+    // ⚠️ CE TEST ENCODAIT LA DÉCISION INVERSE jusqu'au 2026-08-20 : « un recul hiérarchique
+    // par rapport au poste actuel ». La prémisse supposait un poste actuel de niveau
+    // supérieur et lisible dans un titre ; le CV de Marc l'a réfutée, et il a répondu que
+    // les deux niveaux l'intéressent également. Ce n'est donc pas un test qu'on affaiblit
+    // pour faire passer du code — c'est la décision qui a changé, et l'ADR dit pourquoi.
     const technicien = scoreFitRole("Technicien en automatisation");
     const specialiste = scoreFitRole("Spécialiste automatisation");
-    // Même domaine technique, mais un recul hiérarchique par rapport au poste actuel.
-    expect(technicien).toBeLessThan(specialiste);
+    expect(technicien).toBe(specialiste);
   });
 
   it("ne pénalise pas un technicien QUI encadre", () => {
@@ -295,5 +300,50 @@ describe("les paliers de distance couvrent tout le rayon (ADR-0014 D1)", () => {
     expect(dernier.max).toBeLessThan(RAYON_MAX_KM);
     expect(scoreDistance(RAYON_MAX_KM)).toBeGreaterThan(0);
     expect(scoreDistance(RAYON_MAX_KM + 1)).toBe(0);
+  });
+});
+
+describe("un titre de technicien n'est plus puni (ADR-0015)", () => {
+  it("vaut autant qu'un contenu technique sans encadrement", () => {
+    // ⚠️ DÉRIVÉ DES CONSTANTES, pas de leurs valeurs du jour : c'est le RAPPORT entre les
+    // deux qui est la décision, pas le nombre 26.
+    expect(PROFIL_DEFAUT.pointsRole.technicien).toBe(PROFIL_DEFAUT.pointsRole.technique);
+    expect(scoreFitRole("Technicien en automatisation")).toBe(
+      PROFIL_DEFAUT.pointsRole.technique,
+    );
+  });
+
+  it("la branche EXISTE toujours — elle est ré-évaluée, pas supprimée", () => {
+    // Un profil plus avancé voudra peut-être repénaliser. Le test échoue si quelqu'un
+    // retire la branche en croyant simplifier : la valeur redeviendrait réglable, le
+    // comportement non.
+    const punitif = { ...PROFIL_DEFAUT, pointsRole: { ...PROFIL_DEFAUT.pointsRole, technicien: 3 } };
+    expect(scoreFitRole("Technicien en automatisation", "", punitif)).toBe(3);
+  });
+
+  it("un titre de technicien AVEC coordination garde la valeur supérieure", () => {
+    // « Superviseur technique » ne doit pas tomber sur la branche technicien.
+    expect(scoreFitRole("Coordonnateur technicien automatisation")).toBeGreaterThan(
+      PROFIL_DEFAUT.pointsRole.technique,
+    );
+  });
+});
+
+describe("une exigence d'expérience hors d'atteinte pénalise doucement (ADR-0015)", () => {
+  it("le plancher reste au-dessus de la moitié du cas « non précisé »", () => {
+    // « Ça diminue le score mais pas drastiquement » — la borne se dérive du neutre, jamais
+    // d'un nombre écrit ici.
+    expect(PROFIL_DEFAUT.senioritePlancher).toBeGreaterThan(
+      PROFIL_DEFAUT.senioriteNonPrecisee / 2,
+    );
+  });
+
+  it("une annonce très exigeante tombe sur le plancher, pas à zéro", () => {
+    // ⚠️ CE TEST EXISTE PARCE QUE L'AUDIT NE POUVAIT PAS LE FAIRE : aucune offre du seed ne
+    // déclenche le plancher de séniorité, donc le changement n'y bougeait rien. Un
+    // changement qu'aucune mesure n'exerce doit au moins avoir son test.
+    const note = scoreSeniorite("Nous demandons 15 ans d'expérience en gestion.");
+    expect(note).toBe(PROFIL_DEFAUT.senioritePlancher);
+    expect(note).toBeGreaterThan(0);
   });
 });

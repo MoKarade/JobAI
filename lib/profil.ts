@@ -224,7 +224,8 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
   // 2 → 3 : le rayon passe à 300 km, donc les points de distance de toutes les offres
   // changent. Une note se relit avec la version qui l'a produite.
   // 3 → 4 : les paliers de distance changent, donc toutes les notes changent.
-  version: 4,
+  // 4 → 5 : ADR-0015 change deux constantes du barème.
+  version: 5,
   etabliLe: "2026-07-27",
   origine: "defaut",
 
@@ -299,7 +300,17 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
     combinaison: 40,
     coordination: 28,
     technique: 26,
-    technicien: 14,
+    // ⚠️ 14 → 26 le 2026-08-20 (ADR-0015). Cette valeur disait « recul hiérarchique par
+    // rapport au poste actuel » — une règle qui suppose un poste actuel de niveau supérieur,
+    // stable, et lisible dans un titre. Le CV de Marc ne valide aucune des trois : son
+    // dernier titre est technique alors que ses responsabilités incluent l'encadrement.
+    // Interrogé, il a répondu que les DEUX niveaux l'intéressent également.
+    //
+    // La branche n'est pas supprimée : `scoreFitRole` distingue toujours les deux cas, parce
+    // qu'un profil plus avancé voudra peut-être repénaliser un jour. Effacer la branche
+    // rendrait ce réglage impossible sans réécrire la fonction ; changer sa valeur le laisse
+    // à portée d'une constante.
+    technicien: 26,
     horsSujet: 8,
   },
 
@@ -340,7 +351,12 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
     { max: 5, points: 9 },
   ],
   senioriteNonPrecisee: 11,
-  senioritePlancher: 5,
+  // 5 → 7 (ADR-0015) : « ça diminue le score mais pas drastiquement ». L'écart entre
+  // « aucune exigence » (11) et « exigence hors d'atteinte » tombe de 6 à 4 points.
+  // ⚠️ Les PALIERS ne bougent pas : `paliersSenioriteDepuisAnnees` les recalcule depuis les
+  // années réelles dès que le CV est déposé. Les figer ici entrerait en collision avec ce
+  // calibrage — deux sources pour la même règle.
+  senioritePlancher: 7,
 
   paliersSalaire: [
     // Du plus généreux au moins généreux : le premier seuil atteint l'emporte.

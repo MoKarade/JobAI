@@ -71,11 +71,15 @@ describe("le barème d'avant ADR-0009, valeur par valeur", () => {
     expect(scoreSeniorite("2 ans d'expérience")).toBe(15);
     expect(scoreSeniorite("3 ans d'expérience")).toBe(13);
     expect(scoreSeniorite("5 ans d'expérience")).toBe(9);
-    expect(scoreSeniorite("6 ans d'expérience")).toBe(5);
-    expect(scoreSeniorite("10 ans d'expérience")).toBe(5);
+    // ⚠️ LE PLANCHER SE DÉRIVE (7 depuis ADR-0015, 5 avant) : écrit en dur, ce test tombe à
+    // chaque rajustement en donnant l'impression d'une régression du barème.
+    expect(scoreSeniorite("6 ans d'expérience")).toBe(PROFIL_DEFAUT.senioritePlancher);
+    expect(scoreSeniorite("10 ans d'expérience")).toBe(PROFIL_DEFAUT.senioritePlancher);
     // Non précisée : neutre FAVORABLE — une absence d'exigence n'est pas un obstacle.
-    expect(scoreSeniorite("")).toBe(11);
-    expect(scoreSeniorite("on cherche quelqu'un de motivé")).toBe(11);
+    expect(scoreSeniorite("")).toBe(PROFIL_DEFAUT.senioriteNonPrecisee);
+    expect(scoreSeniorite("on cherche quelqu'un de motivé")).toBe(
+      PROFIL_DEFAUT.senioriteNonPrecisee,
+    );
   });
 
   it("salaire — seuils exacts, non affiché neutre", () => {
@@ -99,12 +103,22 @@ describe("le barème d'avant ADR-0009, valeur par valeur", () => {
     expect(scoreImmigration("aucune exigence particulière")).toBe(10);
   });
 
-  it("rôle — la combinaison, puis chaque moitié, puis le recul", () => {
-    expect(scoreFitRole("Coordonnateur automatisation")).toBe(40);
-    expect(scoreFitRole("Chargé(e) de projets")).toBe(28); // écriture inclusive normalisée
-    expect(scoreFitRole("Spécialiste en robotique")).toBe(26);
-    expect(scoreFitRole("Technicien de maintenance")).toBe(14);
-    expect(scoreFitRole("Commis aux ventes")).toBe(8);
+  it("rôle — la combinaison, puis chaque moitié, puis le hors-sujet", () => {
+    // ⚠️ DÉRIVÉ DES CONSTANTES. Les valeurs écrites en dur ont fait tomber ce test à chaque
+    // révision du barème (ADR-0013 puis ADR-0015), en signalant une régression là où il n'y
+    // avait qu'une décision. Ce qui est VÉRIFIÉ ici, c'est que chaque cas tombe sur la bonne
+    // branche — pas la valeur du jour de cette branche.
+    const p = PROFIL_DEFAUT.pointsRole;
+    expect(scoreFitRole("Coordonnateur automatisation")).toBe(p.combinaison);
+    expect(scoreFitRole("Chargé(e) de projets")).toBe(p.coordination); // inclusive normalisée
+    expect(scoreFitRole("Spécialiste en robotique")).toBe(p.technique);
+    expect(scoreFitRole("Technicien de maintenance")).toBe(p.technicien);
+    expect(scoreFitRole("Commis aux ventes")).toBe(p.horsSujet);
+    // L'ORDRE, lui, est la vraie règle et se vérifie : la combinaison domine, le hors-sujet
+    // ferme la marche.
+    expect(p.combinaison).toBeGreaterThan(p.coordination);
+    expect(p.coordination).toBeGreaterThan(p.horsSujet);
+    expect(p.technique).toBeGreaterThan(p.horsSujet);
   });
 
   it("la somme de la pondération fait 100", () => {

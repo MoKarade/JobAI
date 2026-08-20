@@ -28,3 +28,4 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 | [0012](./0012-tri-par-code-de-profession.md) | Trier le flux du Guichet par le code de profession (NOC 2021) | Proposé — décision Marc « go pour le tri par noc2021 » (2026-08-19) ; volet « filtre, pas note » révisé par ADR-0013 |
 | [0013](./0013-le-domaine-pondere-la-note.md) | Le domaine pondère la note, et le flux entre en entier | Proposé — décisions Marc du 2026-08-20 |
 | [0014](./0014-la-note-suit-le-profil.md) | La note suit le profil : distance re-calibree, conditions lues, carriere cadree | Propose — volet carriere BLOQUE tant que le CV n'est pas depose |
+| [0015](./0015-le-bareme-cesse-de-punir-le-technicien.md) | Le bareme cesse de punir le titre de technicien | Propose — debloque le volet D3 d'ADR-0014 |
