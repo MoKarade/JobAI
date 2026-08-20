@@ -10,7 +10,8 @@ son profil, statuts de candidature, détection des réponses de recruteurs, et a
 pour l'analyse d'offres et la rédaction de CV/lettres ciblés.
 
 Stack : **Next.js 15** (App Router, Server Components + Server Actions) · **Neon** (Postgres
-serverless) + **Drizzle** · **Auth.js v5** (Google, mono-adresse) · **Anthropic SDK** ·
+serverless) + **Drizzle** · **Auth.js v5** (`providers: []` — la session vient du hub) ·
+**Anthropic SDK** ·
 **Zod** · **vitest**. Déploiement **Vercel** sur `emploi.hubperso.com`.
 Widget publié au hub perso via `GET /api/hub/summary` (contrat `@mokarade/hub-contract`).
 
@@ -152,6 +153,16 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
 - **La route hub est hors du middleware d'auth utilisateur** : elle porte sa propre
   authentification. L'ajouter au matcher renverrait une redirection HTML au hub, qui
   afficherait « injoignable » en permanence.
+- **`HUB_TOKEN` sert dans LES DEUX SENS.** Entrant : le hub le présente pour lire le summary
+  (ci-dessus). **Sortant** : JobAI le présente au hub sur `POST /api/acces` (`lib/accesHub.ts`)
+  pour demander « cette personne a-t-elle le droit d'entrer ici ? ». C'est ce jeton qui
+  IDENTIFIE JobAI côté hub, donc aucun `appId` n'est envoyé dans le corps. Sans lui, aucun
+  invité n'entre (échec fermé) — seul le propriétaire passe, parce qu'il est vérifié avant,
+  et sans réseau.
+- **`NEXT_PUBLIC_HUB_URL` n'est pas décoratif.** `lib/connexionHub.ts` en tire `URL_HUB`, qui
+  sert à la fois à la redirection de connexion ET de destination à `POST /api/acces`. La
+  pointer ailleurs « pour tester » coupe l'accès de tout le monde sauf le propriétaire,
+  silencieusement (échec fermé → `false`).
 - **Honnêteté** : `status:"building"` tant qu'aucune donnée réelle n'est en base. Le point de
   bascule unique est `getTrackerState()` — `null` = pas encore branché, `throw` = panne.
   **Règle de maintenance** : chaque phase qui rend une métrique réellement disponible la
@@ -1423,6 +1434,20 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   comptabilité vit AU SITE D'APPEL, pas chez ses appelants — deux appelants, c'est déjà « un
   outil qu'on peut oublier d'appeler » ; (e) elle se pose AVANT les validations de la réponse,
   parce que l'appel est facturé même quand le schéma refuse ensuite.
+- **Deux populations sans instrument commun : mesurer chacune dans SON unité, conclure sur
+  les ORDRES DE GRANDEUR ABSOLUS.** « Le flux du Guichet peut-il remplacer le dépôt de la
+  Routine ? » n'avait pas de réponse comparable : le dépôt se mesure au barème (vocabulaire
+  français, titres français), le flux se mesure par sa distribution NOC (titres anglais, que
+  le barème rendrait « hors sujet » quel que soit leur mérite). Mettre les deux chiffres
+  côte à côte — 64 % contre 3,5 % — aurait été une comparaison FABRIQUÉE : le second n'est
+  pas le même pourcentage de la même chose. La sortie n'est pas de renoncer, c'est de faire
+  porter la conclusion par ce qui NE dépend pas de l'instrument : le VOLUME absolu (45
+  offres du bon domaine par passe) et des titres réels lisibles sans outil (*cook*, *car
+  washer*, *sod layer*). ⚠️ Et il faut le DIRE dans la conclusion, pas seulement le savoir :
+  écrire « ces deux pourcentages ne sont pas mesurés au même instrument, voici ce sur quoi
+  la réponse repose » est ce qui empêche le chiffre d'être re-cité plus tard comme une
+  comparaison. Corollaire déjà payé trois fois ici : une mesure ne conclut que si elle va au
+  bout (`flux-termine`) — sur toute autre fin, chaque compte n'est qu'un préfixe.
 
 - **Un budget plus long que le MUR de sa fonction ne borne rien.** Le même diagnostic tourne
   derrière deux routes : 300 s en HTTP, 60 s en MCP. Y passer les mêmes 120 s ferait couper
