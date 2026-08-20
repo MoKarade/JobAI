@@ -8,8 +8,8 @@
 import { describe, it, expect } from "vitest";
 import {
   RAYON_DEFAUT_KM,
-  RAYON_MAX_REGLABLE_KM,
   RAYON_MIN_KM,
+  RAYON_MAX_REGLABLE_KM,
   compterBascules,
   normaliserRayon,
   profilAvecRayon,
@@ -99,17 +99,29 @@ describe("rejugerRegistre — élargir le rayon LIBÈRE, et sans une requête", 
 
 describe("compterBascules — « 0 » a deux sens opposés, l'écran doit pouvoir les distinguer", () => {
   it("compte les verdicts qui changent, pas les entrées", () => {
+    // ⚠️ LES VERDICTS SE DÉRIVENT DU RAYON COURANT, ils ne sont plus écrits à la main. Cette
+    // fixture portait « baie-comeau : hors-region » — vrai à 75 km, faux à 300 : le jour où
+    // le défaut a changé, elle décrivait un registre que l'app n'aurait jamais produit, et
+    // le test échouait sur sa propre prémisse.
+    const auRayon = (km: number | null) => ({
+      verdict: km === null ? ("introuvable" as const) : deciderLieu(km, RAYON_DEFAUT_KM),
+      km,
+      le: "2026-08-10",
+      essais: 1,
+    });
     const registre: RegistreLieux = {
-      levis: juge("dans-la-region", 8),
-      "baie-comeau": juge("hors-region", 250),
-      amos: juge("hors-region", 600),
-      remote: juge("introuvable", null),
+      levis: auRayon(8),
+      "baie-comeau": auRayon(250),
+      amos: auRayon(600),
+      remote: auRayon(null),
     };
-    // À 300 km, seule Baie-Comeau bascule : Lévis était déjà dedans, Amos reste dehors,
-    // l'introuvable n'est pas touché.
-    expect(compterBascules(registre, 300)).toBe(1);
-    // Au rayon courant, rien ne change — et c'est un « 0 » qui ne veut pas dire « vide ».
+    // Au rayon COURANT rien ne bascule : le registre est déjà jugé avec lui. C'est un « 0 »
+    // qui ne veut pas dire « registre vide », et c'est tout l'objet de la fonction.
     expect(compterBascules(registre, RAYON_DEFAUT_KM)).toBe(0);
+    // ⚠️ LE CAS QUI BASCULE SE DÉRIVE DU REGISTRE, pas d'un nombre écrit en dur : un rayon
+    // resserré sous Baie-Comeau la fait sortir, Lévis reste dedans, Amos reste dehors, et
+    // l'introuvable n'est jamais touché.
+    expect(compterBascules(registre, 100)).toBe(1);
     expect(Object.keys(registre).length).toBe(4);
   });
 });
@@ -118,9 +130,15 @@ describe("le rayon réglé atteint AUSSI la note, pas seulement l'acceptation", 
   it("une distance au-delà du rayon vaut zéro, en deçà elle vaut mieux", () => {
     // Sans ça, le réglage ne ferait que la moitié du chemin : la ville entrerait dans la
     // région élargie et l'offre garderait une note de distance nulle.
-    const large = profilAvecRayon(300);
-    expect(scoreDistance(200, PROFIL_DEFAUT)).toBe(0);
-    expect(scoreDistance(200, large)).toBeGreaterThan(0);
+    // ⚠️ LES DEUX RAYONS SE DÉRIVENT DU DÉFAUT, ils ne sont plus écrits en dur. Ce test
+    // codait « 300 » comme le cas large en supposant le défaut plus étroit ; le jour où le
+    // défaut EST passé à 300, il a menti. Un test paramétré par une constante prend ses cas
+    // dans la constante.
+    const etroit = profilAvecRayon(Math.max(RAYON_MIN_KM, Math.round(RAYON_DEFAUT_KM / 4)));
+    const large = profilAvecRayon(RAYON_DEFAUT_KM);
+    const auMilieu = Math.round((etroit.rayonMaxKm + RAYON_DEFAUT_KM) / 2);
+    expect(scoreDistance(auMilieu, etroit)).toBe(0);
+    expect(scoreDistance(auMilieu, large)).toBeGreaterThan(0);
   });
 
   it("ne touche à RIEN d'autre dans le profil", () => {

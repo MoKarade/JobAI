@@ -38,6 +38,12 @@ import { executerPasse } from "./ingest/passe";
 import { CLE_METIERS, METIERS_DEFAUT, normaliserMetiers } from "./metiersRetenus";
 import { villesRefusees } from "./ingest/pipeline";
 import { CLE_RAPPORT, construireRapport, type RapportVeille } from "./rapportVeille";
+import {
+  CLE_HISTORIQUE,
+  ajouterEntree,
+  lireHistorique,
+  type EntreeHistorique,
+} from "./historiqueVeille";
 import { CLE_RAYON, RAYON_DEFAUT_KM } from "./rayon";
 import { recuperer } from "./ingest/sources";
 import { lireEtat, ecrireEtat } from "./etat";
@@ -323,6 +329,33 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
       adressesAnnoncees,
     });
     await ecrireEtat(CLE_RAPPORT, vue);
+
+    // ⚠️ L'HISTORIQUE S'ÉCRIT EN DERNIER, ET SON ÉCHEC NE FAIT RIEN PERDRE. Il vient APRÈS
+    // les offres, le journal et le rapport : c'est une trace, pas une donnée du suivi. Son
+    // propre try/catch parce qu'une trace qui casse la passe serait le comble — on garderait
+    // moins d'offres pour mieux raconter ce qu'on n'a pas gardé.
+    try {
+      const notees = nouvelles.map((o) => o.score).filter((n): n is number => n != null);
+      const entree: EntreeHistorique = {
+        jour,
+        fini: vue.fini,
+        declencheur,
+        trouvees: rapport.trouvees,
+        nouvelles: rapport.nouvelles.length,
+        perimees: rapport.perimees.length,
+        revenues: rapport.revenues.length,
+        enSursis: rapport.enSursis,
+        noteMoyenneNouvelles:
+          notees.length > 0
+            ? Math.round(notees.reduce((a, b) => a + b, 0) / notees.length)
+            : null,
+        suivies: rapport.offres.length,
+      };
+      const avant = lireHistorique(await lireEtat<unknown>(CLE_HISTORIQUE, []));
+      await ecrireEtat(CLE_HISTORIQUE, ajouterEntree(avant, entree));
+    } catch (err) {
+      console.error("[veille] historique non écrit", err);
+    }
 
     return {
       ok: true,

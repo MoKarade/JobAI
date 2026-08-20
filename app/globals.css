@@ -2271,3 +2271,29 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   .metiers__ligne { grid-template-columns: minmax(6rem, auto) 4rem; }
   .metiers__titres { grid-column: 1 / -1; }
 }
+
+/* L'historique des passes. Une table : ce sont des séries de nombres qui se comparent
+   colonne par colonne, et une liste de cartes ferait perdre exactement cette lecture. */
+.histo { overflow-x: auto; }
+.histo__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t-s);
+  font-variant-numeric: tabular-nums;
+}
+.histo__table th,
+.histo__table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.histo__table thead th {
+  color: var(--text-soft);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.histo__num { text-align: right; }
+.histo__quand { font-weight: 500; white-space: nowrap; }
+.histo__heure { color: var(--text-soft); font-weight: 400; }
+.histo__par { color: var(--text-soft); font-weight: 400; font-size: var(--t-xs); }
+.veille__auto { color: var(--text-soft); font-size: var(--t-s); margin-top: 0.6rem; }

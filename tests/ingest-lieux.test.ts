@@ -46,8 +46,11 @@ describe("deciderLieu — la ligne qui décide si une offre entre", () => {
 
   it("refuse au-delà de la marge", () => {
     expect(deciderLieu(rayon + MARGE_LIEU_KM + 0.1, rayon)).toBe("hors-region");
-    // Montréal, Toronto : la mesure les range sans qu'aucune liste ne les nomme.
-    expect(deciderLieu(250, rayon)).toBe("hors-region");
+    // ⚠️ DÉRIVÉ DU RAYON, jamais un nombre choisi. Ce test écrivait « 250 km » comme
+    // exemple de « clairement loin » — vrai tant que le rayon valait 75, faux dès qu'il est
+    // passé à 300, où Montréal entre dans la région. Un cas paramétré par une constante se
+    // dérive de la constante.
+    expect(deciderLieu(rayon + MARGE_LIEU_KM + 100, rayon)).toBe("hors-region");
   });
 
   it("ne rend jamais un verdict géographique sur une distance absurde", () => {
@@ -65,7 +68,13 @@ describe("aJuger — un lieu hors circuit doit avoir un chemin de retour", () =>
   });
 
   it("ne redemande JAMAIS un verdict ferme — une ville ne se rapproche pas", () => {
-    const ferme = { verdict: "hors-region" as const, km: 250, le: "2020-01-01", essais: 1 };
+    const ferme = {
+      verdict: "hors-region" as const,
+      // Loin PAR RAPPORT AU RAYON, pas 250 km en dur : voir le cas ci-dessus.
+      km: PROFIL_DEFAUT.rayonMaxKm + MARGE_LIEU_KM + 100,
+      le: "2020-01-01",
+      essais: 1,
+    };
     expect(aJuger(ferme, "2026-08-17")).toBe(false);
     const proche = { verdict: "dans-la-region" as const, km: 12, le: "2020-01-01", essais: 1 };
     expect(aJuger(proche, "2026-08-17")).toBe(false);
@@ -100,9 +109,13 @@ describe("appliquerJugements — la mesure entre au registre, le reste n'y entre
   const distance = (p: { lat: number; lon: number }) => Math.abs(p.lat) * 10;
 
   it("inscrit un verdict par nom trouvé, et compte les essais", () => {
+    // ⚠️ LA LATITUDE SE DÉRIVE DU RAYON. Le stub rend `|lat| × 10` : « lat: 30 » valait
+    // 300 km, choisi quand le rayon était 75. À 300 km de rayon, ce même point est DANS la
+    // région et le test échouait sur sa propre fixture, pas sur la fonction.
+    const loinKm = PROFIL_DEFAUT.rayonMaxKm + MARGE_LIEU_KM + 100;
     const r = appliquerJugements(
       {},
-      { trouvees: [{ nom: "baie-comeau", lat: 30, lon: -68 }], introuvables: ["remote"] },
+      { trouvees: [{ nom: "baie-comeau", lat: loinKm / 10, lon: -68 }], introuvables: ["remote"] },
       distance,
       PROFIL_DEFAUT.rayonMaxKm,
       "2026-08-17",
@@ -110,7 +123,7 @@ describe("appliquerJugements — la mesure entre au registre, le reste n'y entre
 
     expect(r["baie-comeau"]).toEqual({
       verdict: "hors-region",
-      km: 300,
+      km: loinKm,
       le: "2026-08-17",
       essais: 1,
     });

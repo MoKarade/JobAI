@@ -221,7 +221,9 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
   // ⚠️ 1 → 2 : ADR-0013 change le barème (facteur de domaine, plancher NOC, vocabulaire
   // bilingue). Une offre retient la version qui l'a notée — sans le bump, deux barèmes
   // différents porteraient le même numéro et une note deviendrait inexplicable.
-  version: 2,
+  // 2 → 3 : le rayon passe à 300 km, donc les points de distance de toutes les offres
+  // changent. Une note se relit avec la version qui l'a produite.
+  version: 3,
   etabliLe: "2026-07-27",
   origine: "defaut",
 
@@ -300,7 +302,12 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
     horsSujet: 8,
   },
 
-  rayonMaxKm: 75,
+  // ⚠️ 75 → 300 km (demande Marc 2026-08-20 : « une recherche max 300 km aux alentours »).
+  // 300 est le plafond déjà documenté de ce réglage. Conséquence ASSUMÉE et large : le rayon
+  // ne décide pas que des points de distance, il décide aussi ce qui est « dans la région »
+  // (`deciderLieu`). Montréal est à ~250 km : elle entre désormais. C'est ce qui était
+  // demandé — voir plus d'offres — et le facteur de domaine reste ce qui les range.
+  rayonMaxKm: 300,
   paliersDistanceKm: [
     { max: 5, points: 20 },
     { max: 10, points: 18 },

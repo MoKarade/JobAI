@@ -1,5 +1,16 @@
 // app/api/cron/veille/route.ts — la passe quotidienne, déclenchée par Vercel.
 //
+// ⚠️ POURQUOI 11:00 UTC, ET PAS 12:00 (demande Marc : « à 7 h, avant mon rapport de 8 h »).
+//
+// Vercel planifie en UTC et n'a pas de fuseau. Québec en a deux : UTC−4 l'été, UTC−5
+// l'hiver. Aucune heure UTC ne vaut donc « 7 h » toute l'année, et il faut choisir laquelle
+// des deux dérives on accepte.
+//   · 11:00 UTC → 7 h l'été, 6 h l'hiver — TOUJOURS avant le rapport de 8 h.
+//   · 12:00 UTC → 8 h l'été, 7 h l'hiver — l'été, la passe tombe EN MÊME TEMPS que le
+//     rapport, qui lirait alors les chiffres de la veille sans que rien ne le dise.
+// On prend celle qui est trop tôt plutôt que celle qui est trop tard : une passe en avance
+// ne coûte rien, une passe en retard rend un rapport périmé qui a l'air frais.
+//
 // ⚠️ CETTE ROUTE N'EST PLUS LE SEUL CHEMIN VERS LA PASSE (2026-08-14). Le travail vit dans
 // `lib/veilleComplete.ts` et le cron de géocodage le reprend quand il est en retard — parce
 // que ce cron-ci a cessé d'être appelé par Vercel pendant trois jours sans que rien ne le
@@ -58,7 +69,7 @@ export async function GET(requete: Request) {
     // passe n'a jamais démarré », qui sont les deux hypothèses opposées qu'on cherche
     // justement à départager. Vécu le 2026-08-17 : Marc lance la passe à la main, obtient
     // deux 200, et aucune trace — le verrou fonctionnait, mais rien ne le disait.
-    console.log("[veille] cron-veille — sautée : une passe a déjà eu lieu dans les 20 h");
+    console.log("[veille] cron-veille — sautée : une passe vient d'avoir lieu (verrou anti-chevauchement)");
     return NextResponse.json(
       { ok: true, saute: "une passe de veille a déjà eu lieu récemment" },
       { headers: { "Cache-Control": "no-store" } },
