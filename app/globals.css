@@ -2297,3 +2297,34 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .histo__heure { color: var(--text-soft); font-weight: 400; }
 .histo__par { color: var(--text-soft); font-weight: 400; font-size: var(--t-xs); }
 .veille__auto { color: var(--text-soft); font-size: var(--t-s); margin-top: 0.6rem; }
+
+/* Le bloc de l'analyse de marché. Une règle même minimale : le test de styles refuse une
+   classe du JSX sans règle, et il a raison — une classe orpheline est un style qu'on croit
+   avoir posé. */
+.marche { display: block; }
+
+/* L'analyse de marché : les chiffres CALCULÉS d'un côté, la lecture du modèle de l'autre.
+   Les mélanger laisserait croire que les nombres sortent de la prose. */
+.marche__chiffres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.marche__chiffres dt { color: var(--text-soft); font-size: var(--t-xs); }
+.marche__chiffres dd {
+  margin: 0.15rem 0 0;
+  font-size: var(--t-m);
+  font-variant-numeric: tabular-nums;
+}
+.marche__ref { color: var(--text-soft); font-size: var(--t-xs); }
+.marche__texte {
+  margin: 1rem 0 0;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--border);
+  line-height: 1.55;
+}
+.marche__note { color: var(--text-soft); font-size: var(--t-xs); margin-top: 0.6rem; }
+/* L'échec se DIT en rouge, jamais en gris à côté du reste : « pas de clé API » et
+   « le marché est calme » ne doivent pas se lire pareil. */
+.marche__erreur { color: var(--rouge); margin-top: 0.6rem; }

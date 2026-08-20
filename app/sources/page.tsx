@@ -19,9 +19,15 @@ import { Cadre } from "@/components/Cadre";
 import { BoutonVeille } from "@/components/BoutonVeille";
 import { RapportVeilleVue } from "@/components/RapportVeille";
 import { HistoriqueVeilleVue } from "@/components/HistoriqueVeille";
+import { AnalyseMarcheVue } from "@/components/AnalyseMarche";
 import { lireEtat } from "@/lib/etat";
 import { CLE_RAPPORT, type RapportVeille } from "@/lib/rapportVeille";
 import { CLE_HISTORIQUE, lireHistorique, type EntreeHistorique } from "@/lib/historiqueVeille";
+import {
+  CLE_ANALYSE,
+  lireAnalyseConservee,
+  type AnalyseConservee,
+} from "@/lib/analyseConservee";
 import { RAYON_DEFAUT_KM } from "@/lib/rayon";
 import { classerPanne } from "@/lib/panne";
 
@@ -37,13 +43,16 @@ export default async function Sources() {
 
   let dernier: RapportVeille | null = null;
   let historique: EntreeHistorique[] = [];
+  let analyse: AnalyseConservee | null = null;
   try {
-    const [r, h] = await Promise.all([
+    const [r, h, a] = await Promise.all([
       lireEtat<RapportVeille | null>(CLE_RAPPORT, null),
       lireEtat<unknown>(CLE_HISTORIQUE, []),
+      lireEtat<unknown>(CLE_ANALYSE, null),
     ]);
     dernier = r;
     historique = lireHistorique(h);
+    analyse = lireAnalyseConservee(a);
   } catch (err) {
     // Une base injoignable n'est pas une page cassée : on le dit et on rend le bouton, qui
     // est ce pour quoi on vient.
@@ -80,6 +89,11 @@ export default async function Sources() {
       <section className="cadre-section">
         <h2 className="cadre-section__titre">Historique</h2>
         <HistoriqueVeilleVue entrees={historique} />
+      </section>
+
+      <section className="cadre-section">
+        <h2 className="cadre-section__titre">Comment se comporte le marché</h2>
+        <AnalyseMarcheVue initiale={analyse} />
       </section>
     </Cadre>
   );
