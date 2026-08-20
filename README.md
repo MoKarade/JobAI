@@ -4,7 +4,7 @@ Suivi de recherche d'emploi dans la région de Québec : offres notées selon un
 par le profil, distance depuis le domicile, carte des lieux, statuts de candidature et suivi
 des relances.
 
-App de l'écosystème hub perso, aux côtés de FinanceAI, DriveAI et BatchChef.
+App de l'écosystème hub perso, aux côtés de FinanceAI, DriveAI, BatchChef et CarAI.
 Destination : **`emploi.hubperso.com`**. Widget publié au hub via
 [`@mokarade/hub-contract`](https://github.com/MoKarade/hub-contract).
 

@@ -24,7 +24,7 @@ Diff :
 
 ## Règles de lecture des retours
 
-- **Une violation d'un garde-fou de `CLAUDE.md` §2 est bloquante**, quelle que soit la
+- **Une violation d'un garde-fou de `CLAUDE.md` §1 est bloquante**, quelle que soit la
   qualité du reste. Elle ne se nuance pas.
 - **Un finding est une HYPOTHÈSE**, pas un fait. Vérifie le vrai code avant de coder un
   correctif — un mauvais correctif coûte plus cher que le finding non corrigé.

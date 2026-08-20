@@ -275,7 +275,7 @@ describe("les nouvelles offres publiées au hub", () => {
   });
 
   // ⚠️ Les bornes sont DÉRIVÉES de la constante, jamais de sa valeur du jour : le jour où
-  // la fenêtre passera de sept à dix, ce test suivra au lieu de mentir (leçon §7).
+  // la fenêtre passera de sept à dix, ce test suivra au lieu de mentir (leçon §9).
   it("garde une offre au dernier jour de la fenêtre, et lâche celle d'après", () => {
     const dedans = offre({ id: "dedans", dateReperage: ilYA(FENETRE_NOUVELLES_JOURS - 1) });
     const dehors = offre({ id: "dehors", dateReperage: ilYA(FENETRE_NOUVELLES_JOURS + 1) });

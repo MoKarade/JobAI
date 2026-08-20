@@ -103,7 +103,7 @@ describe("computeScore — le domaine dans la note complète", () => {
   });
 });
 
-describe("non-régression — l'audit §8, rejoué en test", () => {
+describe("non-régression — l'audit §11, rejoué en test", () => {
   it("aucune offre du seed ne bouge, MÊME avec une liste de métiers non vide", () => {
     // La configuration RISQUÉE : liste remplie, offres sans code. Si le facteur fuyait sur
     // l'absence de code, les 53 notes seraient divisées par deux.

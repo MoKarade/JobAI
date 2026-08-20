@@ -1,7 +1,7 @@
 # Leçons — JobAI
 
 > Journal des leçons réutilisables. Une leçon se consigne ici **au moment où on la vit**,
-> et sa règle durable remonte dans la §7 du `CLAUDE.md` **dans le même commit**.
+> et sa règle durable remonte dans la §9 du `CLAUDE.md` **dans le même commit**.
 >
 > Format d'une entrée :
 >

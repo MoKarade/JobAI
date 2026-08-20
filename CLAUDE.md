@@ -1,9 +1,16 @@
 # CLAUDE.md — JobAI
 
 > Mémoire de projet, chargée à chaque session. **Garde ce fichier court et à jour** (plafond
-> assumé : 150 lignes). Le détail vit dans `docs/`, `BACKLOG.md` et `HANDOVER.md`.
-
-## 1. Le projet en une phrase
+> assumé : 150 lignes hors §9). L'état courant vit dans `HANDOVER.md`, le reste à faire dans
+> `BACKLOG.md`, le détail dans `docs/`.
+>
+> Structure imposée par la convention commune aux huit dépôts
+> ([`claude-config/conventions/STRUCTURE-DEPOT.md`](https://github.com/MoKarade/claude-config/blob/main/conventions/STRUCTURE-DEPOT.md)).
+> **Les sections ont été renumérotées le 2026-08-20.** Correspondance :
+> **ancien §2 (garde-fous) → §1** · **ancien §7 (leçons) → §9** · **ancien §8 (protocole) →
+> §11**. Les renvois figés dans les ADR, le `BACKLOG.md` et le `HANDOVER.md` gardent l'ancienne
+> numérotation : ce sont des **récits datés**, et réécrire un récit le falsifie. Les fichiers
+> d'*instruction* (`.claude/agents/`, `.claude/commands/`, `docs/LESSONS.md`), eux, ont suivi.
 
 **JobAI** suit la recherche d'emploi de Marc dans la région de Québec : offres notées selon
 son profil, statuts de candidature, détection des réponses de recruteurs, et assistance IA
@@ -15,7 +22,7 @@ serverless) + **Drizzle** · **Auth.js v5** (`providers: []` — la session vien
 **Zod** · **vitest**. Déploiement **Vercel** sur `emploi.hubperso.com`.
 Widget publié au hub perso via `GET /api/hub/summary` (contrat `@mokarade/hub-contract`).
 
-## 2. Garde-fous NON NÉGOCIABLES
+## 1. Principes non négociables
 
 Format : {l'interdit · l'exception nommée et bornée · le seul fichier autorisé · le verrou}.
 
@@ -90,13 +97,9 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
    + balisage de données (patron `promptSafety` de FinanceAI). Le LLM ne décide jamais seul
    d'une écriture : il propose, le code valide contre un schéma Zod, Marc confirme.
 
-## 3. Conventions de code
+## 2. Conventions de code
 
 - **Langue** : code, commentaires, commits et docs **en français**. UI en français.
-- **Commits** : préfixés par l'ID de tâche du backlog. Ex. `[V1-03] endpoint hub summary`.
-- **Branches** : développement **directement sur `main`** (décision Marc 2026-07-28,
-  ADR-0002). Pas de branche de travail, pas de PR : projet solo, le va-et-vient de revue
-  coûtait plus qu'il ne protégeait.
 - **TypeScript strict** + `noUncheckedIndexedAccess`. Pas de `any` silencieux.
 - **Fonctions pures testées** : la logique (notation, fusion, agrégation, résumé hub) vit
   hors des I/O et des composants. C'est ce qui rend le reste testable.
@@ -106,10 +109,18 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
   dans `BACKLOG.md` et `HANDOVER.md` uniquement.
 - **Discipline de scope** : on livre par phases (voir `BACKLOG.md`). Ne pas anticiper.
 
-## 4. Workflow
+## 3. Workflow git
 
-- **Gate avant chaque commit** : `npm run typecheck && npm run test && npm run build`,
-  plus `npm run lint` (bloquant). Jamais `--no-verify`.
+- **Branches** : développement **directement sur `main`** (décision Marc 2026-07-28,
+  ADR-0002). Pas de branche de travail, pas de PR : projet solo, le va-et-vient de revue
+  coûtait plus qu'il ne protégeait.
+  ⚠️ **Ce n'est plus vrai à 100 %, et l'écrire au singulier induisait en erreur** : une session
+  Claude distante ne peut pas pousser sur `main` protégée, donc elle passe par
+  `claude/<slug>` + PR draft (#9, #10, et celle-ci). Les deux régimes coexistent — direct sur
+  `main` depuis un poste, branche + PR depuis une session distante. Ce qui ne change pas : le
+  gate de §5 avant chaque commit, et `git revert` plutôt qu'une réécriture d'historique.
+- **Commits** : préfixés par l'ID de tâche du backlog. Ex. `[V1-03] endpoint hub summary`.
+- **Le gate est en §5**, et il est obligatoire avant chaque commit. Jamais `--no-verify`.
 - **Push** : commits directs sur `main`. **Il n'y a donc AUCUNE revue pour rattraper une
   erreur** — le gate local est obligatoire avant chaque commit, et la CI est le seul filet
   partagé. Un commit poussé est en ligne : dans le doute, on vérifie avant, pas après.
@@ -127,20 +138,56 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
   courant, lu en premier), `BACKLOG.md` (coché au merge), `docs/LESSONS.md`, `docs/adr/`.
   Doc périmée = pire que pas de doc.
 - **Boucle de leçons** : à chaque push, se demander « qu'ai-je appris ? ». Une leçon durable
-  remonte en §7 ci-dessous, dans le même commit. Rien appris → le dire, jamais sauter en silence.
+  remonte en §9 ci-dessous, dans le même commit. Rien appris → le dire, jamais sauter en silence.
 
-## 5. Commandes utiles
+## 4. Commandes utiles
 
 - `npm run dev` · `npm run typecheck` · `npm run test` · `npm run build` · `npm run lint`
-- `npm run db:generate` / `db:migrate` — migrations Drizzle (appliquées à la main, hors build)
+- `npm run db:generate` — produit le SQL de migration. **L'application est automatique** au
+  premier accès aux données (`lib/migrations.ts`) ; `db:migrate` ne sert qu'à forcer et prouver
+  depuis un poste (voir §5).
 - `/review` — panel d'agents sur le diff courant · `/lesson "…"` — consigne une leçon
 - `/handover` — régénère `HANDOVER.md` à partir de l'état réel
 
-## 6. État du projet
+## 5. Vérifications avant commit
 
-Voir **`HANDOVER.md`** — ne pas dupliquer ici un état qui se périme.
+```bash
+npm run typecheck && npm run test && npm run lint && npm run build
+```
 
-## 6 bis. Intégration Hub
+Les quatre sont bloquants, `lint` compris. Jamais `--no-verify`.
+
+La **CI** (`.github/workflows/`) rejoue ce gate. ⚠️ **Sans PR, rien n'affiche un ✗ dans
+l'interface** : une CI rouge peut passer inaperçue sur plusieurs commits d'affilée — vécu 4×.
+Le push n'est donc pas fini tant que le run n'a pas été **consulté**.
+
+**Les migrations ne se lancent pas à la main.** `npm run db:generate` produit le fichier SQL ;
+c'est `lib/migrations.ts` (`assurerMigrations`) qui l'applique **au premier accès aux données**,
+une fois par processus, Drizzle arbitrant entre instances via `__drizzle_migrations`. Demande
+explicite de Marc le 2026-07-31 : « je veux plus jamais avoir à faire run db migrate, je veux
+full auto ». `npm run db:migrate` (`scripts/migrer.ts`) reste là pour appliquer et **prouver**
+depuis un poste, pas pour la production. Un échec de migration n'éteint pas l'app : les pages
+servent ce que la base a déjà, avec un écran honnête (`lib/panne.ts`) plutôt qu'une page blanche.
+
+## 6. Après un merge : vérifier le DÉPLOIEMENT, pas seulement la CI
+
+**CI verte ne veut pas dire « en ligne ».** Ce sont deux systèmes indépendants : la CI juge le
+code, l'hébergeur construit et sert. Un merge peut passer le gate et ne jamais être déployé — la
+branche reste verte, le site continue de servir l'ancien build, et rien n'est rouge nulle part.
+
+Vécu le 31/07/2026 : quatre projets Vercel ont cessé de créer des déploiements pendant ~3 h.
+JobAI a rattrapé au push suivant ; Hubperso et BatchChef n'en ont pas eu — leur commit d'en-têtes
+de sécurité est resté **cinq jours** en attente sans que personne ne le voie.
+
+Donc, après un commit qui change ce qui est SERVI : vérifier qu'un déploiement de production a
+bien été créé et qu'il est `READY`, puis **contrôler l'effet sur la réponse réelle** — un en-tête
+se lit dans la réponse, il ne se déduit pas du fichier source. Ici, c'est d'autant plus vrai que
+les commits vont directement sur `main` : il n'y a aucune PR dont l'échec sauterait aux yeux.
+
+Corollaire : un commit qui ne change QUE de la doc n'a pas de déploiement à vérifier. Le dire
+plutôt que de laisser croire qu'on a vérifié.
+
+## 7. Intégration hub
 
 JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
 `@mokarade/hub-contract` (pinné par SHA, voir ADR-0001).
@@ -176,7 +223,28 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   (`blocUsage`) pour les deux consommateurs — summary complet et summary « en construction ».
   Période `total`, devise `USD` : le hub somme par période et convertit lui-même.
 
-## 7. Leçons apprises (règles durables)
+## 8. Documentation (où vit quoi)
+
+| Fichier | Contenu |
+|---|---|
+| `HANDOVER.md` | **L'état RÉEL** : ce qui tourne, ce qui reste. À lire en premier — l'état ne se duplique nulle part ailleurs, parce qu'un état recopié se périme dans l'exemplaire le moins relu. |
+| `BACKLOG.md` | Ce qui est décidé mais pas fait. Chaque tâche a un ID, utilisé en préfixe de commit. |
+| `docs/adr/` | Les décisions architecturales, `NNNN-slug.md`. Obligatoire avant toute modif de la notation ou du matching (§11). |
+| `docs/LESSONS.md` | Le journal brut des leçons ; les règles durables remontent en §9. |
+| `docs/DEPLOIEMENT.md` | Déployer, et les variables d'environnement attendues. |
+| `docs/ROUTINE-DEPOT.md` | La routine de dépôt des offres de la veille. |
+| `docs/veille-prompt.md` | Le prompt de la veille et ses garde-fous. |
+
+La structure est commune aux huit dépôts du hub — elle est fixée dans
+[`conventions/STRUCTURE-DEPOT.md`](https://github.com/MoKarade/claude-config/blob/main/conventions/STRUCTURE-DEPOT.md)
+du dépôt `claude-config`, et nulle part ailleurs.
+
+Un fichier **daté** (audit, plan, analyse) est un **récit** : il vit dans `docs/`, sa date dit à
+quoi il correspond, et il **ne se met pas à jour**. Ce qui doit rester vrai va dans un document
+sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `BACKLOG.md` n'ont pas
+été réécrits par la renumérotation (voir l'en-tête) : réécrire un récit, c'est le falsifier.
+
+## 9. Leçons apprises (règles durables)
 
 > N'ajouter ici que ce qui change la façon de coder.
 
@@ -826,7 +894,7 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   (`curl https://emploi.hubperso.com/api/hub/summary` ⇒ 401 propre). Les reverts de conteneur
   la re-provisionnent, donc elle a fini par relire la politique élargie. Ce qu'il faut retenir
   n'est pas « c'est débloqué » — ça peut rebasculer — mais que **l'accès réseau d'une session
-  se MESURE au moment où l'on en a besoin**, jamais depuis une note écrite la veille : la §7
+  se MESURE au moment où l'on en a besoin**, jamais depuis une note écrite la veille : la §9
   affirmait « bloquée » et c'était faux au moment de s'en servir.
 - **Un quota d'API partagé ne se mesure qu'en le heurtant, et il se referme en s'aggravant.**
   Indeed a rendu « Rate limit exceeded, try again in 26 s », puis 29, puis 51 après deux
@@ -1455,7 +1523,18 @@ JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
   qui dit si la lecture était complète. Un budget se dérive du mur de l'appelant, jamais
   d'une constante partagée entre appelants qui n'ont pas le même.
 
-## 8. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
+## 10. Style
+
+Hérité du `CLAUDE.md` global de Marc (`claude-config`) : réponses, commits et docs **en
+français** ; TypeScript strict, pas de `any` silencieux ; nommage clair plutôt que commentaires
+verbeux ; **erreurs honnêtes** — ne pas avaler une panne, ne pas ajouter un `catch` qui cache un
+vrai bug.
+
+Pas d'emoji dans l'UI produit ni dans les commits ; tolérés comme marqueurs de statut dans
+`BACKLOG.md` et `HANDOVER.md`. Ne pas imposer le dark mode : les deux thèmes suivent
+`prefers-color-scheme`.
+
+## 11. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 
 La note de fit est le cœur du produit : elle décide ce que Marc regarde en premier.
 Toute modification de `lib/scoring.ts` ou de la logique de matching offre↔profil exige :

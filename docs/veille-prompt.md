@@ -128,7 +128,7 @@ Vécu le 2026-08-18, en deux heures, dans la MÊME session :
    d'écrire était déjà fausse, et la veille du jour était incomplète.
 
 **La leçon n'est donc pas « ZipRecruiter est disponible » ni « il ne l'est pas » — c'est
-qu'une note d'indisponibilité se périme sans prévenir.** Exactement ce que la §7 du CLAUDE.md
+qu'une note d'indisponibilité se périme sans prévenir.** Exactement ce que la §9 du CLAUDE.md
 dit déjà de l'accès réseau : « l'accès d'une session se MESURE au moment où l'on en a besoin,
 jamais depuis une note écrite la veille ». Ça vaut aussi pour les connecteurs, et ça vaut à
 l'échelle de l'HEURE, pas du jour.
