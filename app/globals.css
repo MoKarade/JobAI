@@ -2198,6 +2198,28 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .metiers__actuels { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
 .metiers__valeur { font-family: var(--mono); font-size: var(--t-s); overflow-wrap: anywhere; }
 .metiers__ligne-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
+/* Le choix du mode d'ingestion du flux (ADR-0013). Chaque option porte son EFFET en
+   toutes lettres : c'est un réglage qui allume une source, il se lit avant de se cliquer. */
+.metiers__mode {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  margin: 0 0 0.9rem;
+}
+.metiers__mode-choix {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.metiers__mode-choix input { margin-top: 0.25rem; flex: none; }
+.metiers__mode-choix strong { color: var(--text); }
 .metiers__champ {
   padding: 0.45rem 0.6rem;
   background: var(--creux);

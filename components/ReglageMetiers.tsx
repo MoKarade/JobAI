@@ -18,7 +18,8 @@
 // journée sur ce dépôt.
 
 import { useState, useTransition } from "react";
-import { reglerMetiers } from "@/lib/actionsMetiers";
+import { reglerMetiers, reglerModeFlux } from "@/lib/actionsMetiers";
+import { MODE_FLUX_LIBELLES, type ModeFlux } from "@/lib/metiersRetenus";
 import { lireMesureMetiers, type LigneMetier, type MesureMetiers } from "@/lib/metiersMesure";
 import { normaliserMetiers } from "@/lib/metiersRetenus";
 
@@ -70,7 +71,14 @@ function Tableau({
   );
 }
 
-export function ReglageMetiers({ metiersInitiaux }: { metiersInitiaux: string[] }) {
+export function ReglageMetiers({
+  metiersInitiaux,
+  modeInitial,
+}: {
+  metiersInitiaux: string[];
+  modeInitial: ModeFlux;
+}) {
+  const [mode, setMode] = useState<ModeFlux>(modeInitial);
   // ⚠️ UNE SEULE SOURCE DE VÉRITÉ : LA SAISIE. Le premier jet gardait un `Set` d'un côté et
   // dérivait le champ texte de lui — donc chaque frappe passait par `normaliserMetiers`, qui
   // jette ce qui n'a pas deux ou cinq chiffres : taper « 21301 » perdait les caractères
@@ -149,19 +157,68 @@ export function ReglageMetiers({ metiersInitiaux }: { metiersInitiaux: string[] 
 
   const gele = enCours || mesureEnCours;
 
+  function choisirMode(suivant: ModeFlux) {
+    setErreur(null);
+    setMessage(null);
+    // ⚠️ OPTIMISTE PUIS CORRIGÉ PAR LE SERVEUR. L'action re-normalise : si elle refuse la
+    // valeur, c'est SA réponse qui fait foi, jamais le clic. Un bouton qui reste allumé sur
+    // un réglage que le serveur n'a pas retenu est un mensonge d'interface.
+    setMode(suivant);
+    demarrer(async () => {
+      const r = await reglerModeFlux(suivant);
+      if (!r.ok) {
+        setMode(modeInitial);
+        setErreur(r.erreur);
+        return;
+      }
+      setMode(r.mode);
+      setMessage(`Flux : ${MODE_FLUX_LIBELLES[r.mode].titre.toLowerCase()}.`);
+    });
+  }
+
   return (
     <div className="metiers">
       <p className="metiers__aide">
         Le flux complet du Guichet publie tout le Canada. Il est trié par code de profession
         (NOC 2021), un classement normalisé — donc lisible même sur des annonces en anglais,
-        là où le barème par mots-clés ne l’est pas. Tant qu’aucun code n’est retenu, ce flux
-        n’est pas interrogé du tout.
+        là où le barème par mots-clés ne l’est pas.
       </p>
+      <p className="metiers__aide">
+        Les codes ci-dessous servent à deux choses selon le mode : en «&nbsp;mon domaine
+        seulement&nbsp;» ils FILTRENT ce qui entre&nbsp;; en «&nbsp;toute la région&nbsp;»
+        ils ne filtrent plus rien et définissent le domaine pour la NOTE — hors d’eux, elle
+        est divisée par deux.
+      </p>
+
+      <fieldset className="metiers__mode">
+        <legend className="metiers__label">Ce que le flux fait entrer</legend>
+        {(Object.keys(MODE_FLUX_LIBELLES) as ModeFlux[]).map((m) => (
+          <label key={m} className="metiers__mode-choix">
+            <input
+              type="radio"
+              name="mode-flux"
+              value={m}
+              checked={mode === m}
+              disabled={gele}
+              onChange={() => choisirMode(m)}
+            />
+            <span>
+              <strong>{MODE_FLUX_LIBELLES[m].titre}</strong>
+              {" — "}
+              {MODE_FLUX_LIBELLES[m].effet}
+            </span>
+          </label>
+        ))}
+      </fieldset>
 
       <div className="metiers__actuels">
         <span className="metiers__label">Retenus</span>
         <span className="metiers__valeur">
-          {enregistres.length === 0 ? "aucun — source éteinte" : enregistres.join(" · ")}
+          {enregistres.length > 0
+            ? enregistres.join(" · ")
+            : mode === "tout"
+              ? "aucun — tout entre, et rien n’est pénalisé par le domaine"
+              : "aucun — source éteinte"}
         </span>
       </div>
 

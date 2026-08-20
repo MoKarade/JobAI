@@ -37,6 +37,31 @@ export type ModeFlux = "eteint" | "domaine" | "tout";
 export const MODE_FLUX_DEFAUT: ModeFlux = "eteint";
 
 /**
+ * Ce que chaque mode fait, en toutes lettres.
+ *
+ * ⚠️ ICI ET PAS DANS LE COMPOSANT. Un réglage qui allume une source doit dire son EFFET
+ * avant d'être cliqué, et l'écrire à côté du bouton le ferait dériver du comportement réel
+ * au premier changement — la classe de défaut que le dépôt a déjà payée avec deux listes de
+ * seuils recopiées. Une règle, un exemplaire.
+ */
+export const MODE_FLUX_LIBELLES: Readonly<Record<ModeFlux, { titre: string; effet: string }>> = {
+  eteint: {
+    titre: "Éteint",
+    effet: "Le flux complet du Guichet n'est pas lu. Seules les sources en rotation alimentent la veille.",
+  },
+  domaine: {
+    titre: "Mon domaine seulement",
+    effet:
+      "Le flux est lu et FILTRÉ par les codes ci-dessous : seules ces offres entrent. Quelques dizaines par passe.",
+  },
+  tout: {
+    titre: "Toute la région",
+    effet:
+      "Toutes les offres régionales entrent (~1 300 par passe) et c'est la NOTE qui les range : hors des codes ci-dessous, elle est divisée par deux.",
+  },
+};
+
+/**
  * Lit un mode venu de l'état — du JSON écrit par une version antérieure, donc suspect.
  *
  * ⚠️ `brut` ABSENT (`null`/`undefined`) N'EST PAS `eteint`, et la nuance est une
