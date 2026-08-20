@@ -223,7 +223,8 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
   // différents porteraient le même numéro et une note deviendrait inexplicable.
   // 2 → 3 : le rayon passe à 300 km, donc les points de distance de toutes les offres
   // changent. Une note se relit avec la version qui l'a produite.
-  version: 3,
+  // 3 → 4 : les paliers de distance changent, donc toutes les notes changent.
+  version: 4,
   etabliLe: "2026-07-27",
   origine: "defaut",
 
@@ -308,15 +309,28 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
   // (`deciderLieu`). Montréal est à ~250 km : elle entre désormais. C'est ce qui était
   // demandé — voir plus d'offres — et le facteur de domaine reste ce qui les range.
   rayonMaxKm: 300,
+  // ⚠️ PROLONGÉS JUSQU'AU RAYON LE 2026-08-20 (ADR-0014 D1). Ils s'arrêtaient à 35 km, donc
+  // tout ce qui était au-delà tombait sur `distancePlancher` : depuis que le rayon est passé
+  // à 300 km, une offre à 40 km et une offre à 250 km valaient EXACTEMENT pareil. La
+  // question « est-ce loin ? » avait cessé d'avoir une réponse graduée au moment même où
+  // l'espace qu'elle jugeait quadruplait.
+  //
+  // La cassure est à 50 km (6 → 3), sur la réponse de Marc : « ~50 km, au-delà ça chute
+  // vite ». La queue continue de descendre pour que 80 km et 250 km ne se vaillent pas.
   paliersDistanceKm: [
     { max: 5, points: 20 },
     { max: 10, points: 18 },
     { max: 15, points: 15 },
     { max: 25, points: 11 },
     { max: 35, points: 8 },
+    { max: 50, points: 6 },
+    { max: 80, points: 3 },
+    { max: 150, points: 2 },
   ],
   distanceInconnue: 10,
-  distancePlancher: 5,
+  // 5 → 1 : dans un rayon de 300 km, « au bout du rayon » ne mérite plus le cinquième des
+  // points d'une offre à 5 km.
+  distancePlancher: 1,
 
   // Calibrés sur « environ 3 ans d'expérience » : une annonce qui en demande 2 est
   // pleinement atteignable, 3 l'est de justesse, 5 est un étirement.

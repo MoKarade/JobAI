@@ -52,9 +52,14 @@ describe("le barème d'avant ADR-0009, valeur par valeur", () => {
     // exactement le genre d'offre qu'on voulait faire entrer. Des « 50 » figés ici auraient
     // fait tomber ce test sur un changement légitime, en donnant l'impression d'une
     // régression du BARÈME alors que c'est le RAYON qui a bougé.
+    // ⚠️ ET LE PLANCHER SE DÉRIVE AUSSI. Écrit « 5 », il est tombé le jour où les paliers ont
+    // été prolongés jusqu'au rayon (ADR-0014) et le plancher abaissé à 1 — même piège que
+    // les bornes ci-dessus, une case plus loin.
     const R = PROFIL_DEFAUT.rayonMaxKm;
-    expect(scoreDistance(36)).toBe(5);
-    expect(scoreDistance(R)).toBe(5);
+    const dernierPalier = PROFIL_DEFAUT.paliersDistanceKm[PROFIL_DEFAUT.paliersDistanceKm.length - 1]!;
+    expect(scoreDistance(dernierPalier.max)).toBe(dernierPalier.points);
+    expect(scoreDistance(dernierPalier.max + 0.1)).toBe(PROFIL_DEFAUT.distancePlancher);
+    expect(scoreDistance(R)).toBe(PROFIL_DEFAUT.distancePlancher);
     // Hors rayon : zéro.
     expect(scoreDistance(R + 0.1)).toBe(0);
     // Inconnue : NEUTRE. Un zéro dirait « c'est loin » — or on ne sait pas.
@@ -148,13 +153,14 @@ describe("un profil modifié change la note", () => {
     expect(dansLeRayon(dehors)).toBe(false);
     expect(dansLeRayon(dehors, large)).toBe(true);
     expect(scoreDistance(dehors)).toBe(0);
-    expect(scoreDistance(dehors, large)).toBe(5);
+    expect(scoreDistance(dehors, large)).toBe(PROFIL_DEFAUT.distancePlancher);
   });
 
   it("des paliers de distance resserrés baissent la note d'une offre lointaine", () => {
     const strict = variante({ paliersDistanceKm: [{ max: 5, points: 20 }] });
     expect(scoreDistance(12)).toBe(15);
-    expect(scoreDistance(12, strict)).toBe(5); // au-delà du seul palier : plancher
+    // Au-delà du seul palier : le plancher — DÉRIVÉ, pas écrit en dur (il est passé de 5 à 1).
+    expect(scoreDistance(12, strict)).toBe(PROFIL_DEFAUT.distancePlancher);
   });
 
   it("plus d'expérience rend une annonce exigeante atteignable", () => {

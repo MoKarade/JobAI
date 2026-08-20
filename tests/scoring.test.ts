@@ -266,3 +266,34 @@ describe("paliers de distance — la table EST le barème", () => {
     expect(bornes[bornes.length - 1]!).toBeLessThan(RAYON_MAX_KM);
   });
 });
+
+describe("les paliers de distance couvrent tout le rayon (ADR-0014 D1)", () => {
+  it("ne REMONTE jamais quand la distance augmente", () => {
+    // ⚠️ L'INVARIANT QUI COMPTE. Un palier mal ordonné produirait un barème où s'éloigner
+    // rapporte des points — sans erreur visible, sans test rouge ailleurs, et avec des
+    // notes parfaitement plausibles.
+    let precedent = Number.POSITIVE_INFINITY;
+    for (let km = 0; km <= RAYON_MAX_KM + 20; km++) {
+      const p = scoreDistance(km);
+      expect(p, `${km} km`).toBeLessThanOrEqual(precedent);
+      precedent = p;
+    }
+  });
+
+  it("distingue encore les distances au-delà du dernier palier court", () => {
+    // C'est le défaut corrigé : à 35 km de dernier palier, 40 km et 250 km valaient pareil.
+    expect(scoreDistance(40)).toBeGreaterThan(scoreDistance(100));
+    expect(scoreDistance(100)).toBeGreaterThan(scoreDistance(250));
+  });
+
+  it("chute nettement après ~50 km — la réponse de Marc, pas un réglage arbitraire", () => {
+    expect(scoreDistance(50)).toBeGreaterThanOrEqual(2 * scoreDistance(80));
+  });
+
+  it("le dernier palier reste DANS le rayon, et au-delà du rayon vaut zéro", () => {
+    const dernier = PALIERS_DISTANCE_KM[PALIERS_DISTANCE_KM.length - 1]!;
+    expect(dernier.max).toBeLessThan(RAYON_MAX_KM);
+    expect(scoreDistance(RAYON_MAX_KM)).toBeGreaterThan(0);
+    expect(scoreDistance(RAYON_MAX_KM + 1)).toBe(0);
+  });
+});
