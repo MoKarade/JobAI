@@ -927,6 +927,34 @@
       titres anglais**, ce que la table complète confirme — les 37 classes rendent des
       titres anglais y compris sur des offres dont la langue de travail est « Français ».
 
+- [x] **[NOTE-01/02/03]** ⚠️ **DEMANDE MARC 2026-08-20 : « je veux que la note de chaque
+      offre soit plus précise, comme ça ça me propose jamais une offre pas de mon domaine
+      avec une bonne note »**, et « je veux voir toutes les offres dispos, genre 1 300 ».
+      **ADR-0013** (D1 facteur de domaine · D2 plancher NOC · D3 mode d'ingestion à trois
+      états · D4 vocabulaire bilingue), protocole §8 tenu : ADR, puis audit, puis code.
+      Le défaut MESURÉ : `scoreFitRole` rendait `horsSujet` — 8 sur 40, CONSTAMMENT — sur
+      tout titre anglais, donc 40 % du barème inerte et un classement décidé par la distance.
+      Avant : `supervisor - retail` 59 > `construction project coordinator` 53 >
+      `production supervisor` 49. Après : 28 · 73 · 69.
+      Audit : D1+D2 déplacent **0 offre sur 53** (mutation : 53/53) ; D4 en déplace 7
+      (`Project Manager` 48 → 68), zéro dépassement de note manuelle, zéro faux positif.
+      ⚠️ **L'audit a corrigé la décision** : « supervisor » nu faisait remonter
+      `supervisor - retail` à 76 — les termes ont été qualifiés avant toute ligne de code.
+      ⚠️ **Ce qui n'est PAS réglé** : `Project Engineer`, `Mechanical Engineer`,
+      `Ingénieur intégrateur` restent à 48. C'est CORRECT (un ingénieur n'est pas un poste de
+      coordination) mais le barème reste muet sur cette part du seed, par construction.
+      ⚠️ **Reste à faire côté Marc** : allumer « toute la région » dans `/sources` et cocher
+      ses codes. Rien ne se déclenche tout seul — le défaut reste `eteint`.
+
+- [ ] **[NOTE-04]** ⚠️ **Le mode « toute la région » n'a JAMAIS tourné en vrai.** Les bornes
+      sont posées (plafond 1 600, `maxDuration` 300 s, insertions par lots de 200) et le
+      raisonnement est écrit, mais aucune passe réelle n'a encore ingéré 1 300 offres. Ce qui
+      reste à VÉRIFIER sur la première passe, et qu'aucun test ne peut prouver : la durée
+      réelle de la fonction, le comportement de la péremption quand la population décuple, et
+      le géocodage de ~1 300 employeurs à 1,1 s vers Nominatim — qui s'étalera sur des jours
+      et n'a pas de raison d'être un problème, mais n'a jamais été observé à cette échelle.
+      Lire le compte rendu de `/sources` après la première passe en mode « tout ».
+
 - [ ] **[VEILLE-44]** ⚠️ **DECISION MARC : 1 300 offres regionales par passe** (mesure sur
       une passe complete), contre quelques dizaines suivies aujourd'hui. L'echantillon reste
       domine par des postes peu qualifies. Brancher la source telle quelle noierait le
