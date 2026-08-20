@@ -9,7 +9,6 @@ import {
   HUB_TOKEN_HEADER,
   validateSummary,
 } from "@mokarade/hub-contract";
-import { hubTokenValid } from "../lib/hubToken";
 import { GET } from "../app/api/hub/summary/route";
 import { APP, construireSummary } from "../lib/hubSummary";
 import { resumer } from "../lib/suivi";
@@ -34,42 +33,6 @@ async function withHubToken(value: string | undefined, fn: () => Promise<void>) 
     else process.env.HUB_TOKEN = before;
   }
 }
-
-describe("hubTokenValid", () => {
-  it("accepte le bon jeton, refuse le reste", () => {
-    expect(hubTokenValid(JETON, JETON)).toBe(true);
-    expect(hubTokenValid("autre", JETON)).toBe(false);
-    expect(hubTokenValid(null, JETON)).toBe(false);
-    expect(hubTokenValid("", JETON)).toBe(false);
-  });
-
-  it("tolère les espaces de bord, des DEUX côtés", () => {
-    // Le hub applique déjà `.trim()` à son jeton. Sans le même traitement ici, un espace
-    // ou un retour à la ligne collé par erreur dans une variable d'environnement donne un
-    // 401 permanent entre deux valeurs qui paraissent identiques à l'écran.
-    expect(hubTokenValid(` ${JETON}`, JETON)).toBe(true);
-    expect(hubTokenValid(`${JETON}\n`, JETON)).toBe(true);
-    expect(hubTokenValid(JETON, ` ${JETON} `)).toBe(true);
-    expect(hubTokenValid(`  ${JETON}  `, `\n${JETON}\n`)).toBe(true);
-  });
-
-  it("ne relâche rien d'autre : le jeton est comparé en entier", () => {
-    expect(hubTokenValid(JETON.slice(0, -1), JETON)).toBe(false);
-    expect(hubTokenValid(`${JETON}x`, JETON)).toBe(false);
-    // La casse compte : un jeton base64url n'est pas insensible à la casse.
-    expect(hubTokenValid(JETON.toUpperCase(), JETON)).toBe(false);
-    // Un espace INTERNE n'est pas un espace de bord.
-    expect(hubTokenValid(JETON.replace("-", " "), JETON)).toBe(false);
-  });
-
-  it("échoue fermé quand le jeton attendu est vide ou composé d'espaces", () => {
-    // Le cas dangereux : HUB_TOKEN non configuré. Deux chaînes vides ne doivent pas
-    // « correspondre » et ouvrir l'endpoint.
-    expect(hubTokenValid("", "")).toBe(false);
-    expect(hubTokenValid("   ", "   ")).toBe(false);
-    expect(hubTokenValid(JETON, "   ")).toBe(false);
-  });
-});
 
 describe("GET /api/hub/summary", () => {
   // ADR-0001 : 503 et non 500 — l'app fonctionne, c'est l'intégration qui n'est pas branchée.

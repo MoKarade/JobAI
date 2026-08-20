@@ -16,38 +16,32 @@
 // sa propre auth par jeton. L'ajouter au matcher renverrait au hub une redirection HTML vers
 // la page de connexion au lieu du JSON attendu — le widget afficherait « injoignable » en
 // permanence. C'était le défaut n°1 du squelette du 27/07.
+//
+// ── LE 503/401/405 EST DÉLÉGUÉ, LE 200-SUR-PANNE NE L'EST PAS ────────────────────────
+//
+// La mécanique commune (trio 503/401/405, jeton comparé en temps constant, `no-store`,
+// validation avant émission) vient de `serveSummary` (`@mokarade/hub-contract/endpoint`),
+// écrite une fois pour toutes les apps.
+//
+// MAIS `serveSummary` répond **500 si son `build` JETTE**, et ce n'est PAS le contrat de
+// JobAI : l'ADR-0001 fige « panne en lisant l'état → 200 + status "error" ». C'est pourquoi
+// `construireResume` ci-dessous **n'a pas le droit de jeter** — son `catch` est ce qui
+// préserve le contrat. Le supprimer en croyant que le helper s'en charge transformerait un
+// widget honnête (« état illisible ») en « injoignable » qui accuse le réseau.
 
-import {
-  HUB_TOKEN_HEADER,
-  buildingSummary,
-  type HubSummary,
-} from "@mokarade/hub-contract";
-import { hubTokenValid } from "@/lib/hubToken";
+import { buildingSummary, type HubSummary } from "@mokarade/hub-contract";
+import { HUB_TOKEN_HEADER, serveSummary } from "@mokarade/hub-contract/endpoint";
 import { APP, alertesCout, blocUsage, construireSummary } from "@/lib/hubSummary";
 import { getTrackerState } from "@/lib/trackerState";
 import { lireCoutPublie } from "@/lib/coutLlmStore";
 
-const NO_STORE = { "Cache-Control": "no-store" } as const;
-
 // Jamais de cache statique : le hub veut l'état courant à chaque appel.
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request): Promise<Response> {
-  const expected = process.env.HUB_TOKEN ?? "";
-  if (!expected) {
-    return Response.json(
-      { error: "Intégration hub non configurée (HUB_TOKEN absent)." },
-      { status: 503, headers: NO_STORE },
-    );
-  }
-
-  if (!hubTokenValid(request.headers.get(HUB_TOKEN_HEADER), expected)) {
-    return Response.json(
-      { error: `Header ${HUB_TOKEN_HEADER} absent ou invalide.` },
-      { status: 401, headers: NO_STORE },
-    );
-  }
-
+/**
+ * ⚠️ NE JETTE JAMAIS — voir l'en-tête. Toute panne est convertie en summary `status: "error"`.
+ */
+async function construireResume(): Promise<HubSummary> {
   let summary: HubSummary;
   try {
     // Deux lectures indépendantes : l'état du suivi et la comptabilité des appels de
@@ -83,5 +77,13 @@ export async function GET(request: Request): Promise<Response> {
     };
   }
 
-  return Response.json(summary, { headers: NO_STORE });
+  return summary;
+}
+
+export async function GET(request: Request): Promise<Response> {
+  const { status, headers, body } = await serveSummary(
+    { method: "GET", token: request.headers.get(HUB_TOKEN_HEADER) },
+    { expectedToken: process.env.HUB_TOKEN, build: construireResume },
+  );
+  return new Response(body, { status, headers });
 }
