@@ -972,6 +972,21 @@
       « Honeywell, Alstom, AMETEK et Domtar publient en anglais dans la région ». On cherche
       donc en anglais, on trouve en anglais, et le barème jette le résultat faute de le
       comprendre.
+      ⚠️ **ÉLARGI LE 2026-08-20, ET LE TROU N'EST PAS QUE BILINGUE — IL EST AUSSI FRANÇAIS.**
+      Mesuré sur les 82 offres uniques de la veille du jour, en classant chaque titre par
+      `scoreFitRole` : 29 titres notent 28 (le barème les reconnaît), 53 notent 8 ou 14. Or
+      **21 des titres à 8 sont clairement de la supervision ou de la gestion de projet** —
+      et quatre graphies FRANÇAISES courantes manquent à `motsCoordination` :
+      `surintendant`, `gérant`, `contremaître`, `chef de production`. À elles seules elles
+      couvrent 15 des 21. Les 6 autres sont anglaises (`project manager`, `coordinator`,
+      `director`, `supervisor`, `process lead`). Exemples réels du jour, tous notés 8 :
+      Davie « Contremaître » (90-95 k$, gestion d'une équipe syndiquée), Manpower
+      « Surintendant civil senior » (150-250 k$), Volvo/Prevost « Gérant(e) —
+      Industrialisation », ELEM « Process engineer – project manager ».
+      Conséquence directe : le plancher de note se prononce sur des titres qu'il ne SAIT PAS
+      lire, et c'est indiscernable d'un jugement du poste. Ajouter ces quatre mots français
+      est le geste le moins cher du lot — mais il touche `lib/scoring.ts`, donc **protocole
+      §8 : ADR d'abord, audit sur les 38 offres du seed, puis code**.
       **Chiffré, pas supposé — 6 des 16 refus « sous le plancher » du 18 août** basculent
       de `fitRole 8` à `28` en ajoutant les équivalents anglais (`project manager`, `manager`,
       `supervisor`, `superintendent`, `coordinator`, `team lead`, `lead engineer`, `director`)

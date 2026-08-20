@@ -106,8 +106,25 @@ const MOTIFS: readonly Motif[] = [
     // Elle est retirée d'ICI parce que l'exemption de `piiGuard` ne couvre QUE cette clé :
     // la même adresse répétée dans la description fait échouer le gate (vécu le 2026-08-12).
     categorie: "adresse civique en prose",
+    // ⚠️ `(?![\p{L}\d])` ET NON `\b`, ET C'EST UN CORRECTIF, PAS UN GOÛT (mesuré le
+    // 2026-08-20 sur une vraie annonce dont le lieu s'écrivait avec l'abréviation `Av.`).
+    //
+    // Un `\b` après cette alternation ne peut PAS matcher quand la graphie se termine par un
+    // point : entre `.` et l'espace qui suit, il n'y a aucune frontière de mot — les deux
+    // sont des non-mots. Les formes abrégées `av.` et `ch.` étaient donc INERTES depuis
+    // toujours, silencieusement. `boul.` survivait par accident, son `?` la ramenant à
+    // `boul`, ce qui masquait le défaut sur un troisième cas.
+    //
+    // Conséquence concrète : l'outil ratait ce que `piiGuard` bloque, et le gate refusait le
+    // dépôt du jour. Un outil et sa garde doivent nommer la MÊME chose, sinon la garde
+    // devient un mur qu'on finit par contourner.
+    //
+    // La négation garde la protection contre les faux positifs (« 12 ruelles » n'est pas une
+    // adresse : `rue` y est suivi d'une lettre), tout en acceptant une fin de graphie
+    // ponctuée. Chaque graphie est verrouillée une par une par le test — une seule variante
+    // éprouvée fait croire que le motif entier est couvert.
     regex:
-      /\b\d{1,5}[,\s]+(?:rue|avenue|av\.|boul\.?|boulevard|chemin|ch\.|route|rang|place|montée|côte)\b[^.;\n]*/giu,
+      /\b\d{1,5}[,\s]+(?:rue|avenue|av\.|boul\.?|boulevard|chemin|ch\.|route|rang|place|montée|côte)(?![\p{L}\d])[^.;\n]*/giu,
     remplacement: "[adresse en prose retirée — voir le champ `adresse`]",
   },
 ];
