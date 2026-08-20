@@ -11,6 +11,8 @@ import {
   METIERS_DEFAUT,
   metiersRedondants,
   normaliserMetiers,
+  normaliserModeFlux,
+  MODE_FLUX_DEFAUT,
 } from "../lib/metiersRetenus";
 import { codeRetenu, lireCodeNoc } from "../lib/nocProfession";
 
@@ -89,5 +91,35 @@ describe("metiersRedondants — dire ce qui ne sert à rien plutôt que de le re
 
   it("ne signale rien quand le préfixe est absent", () => {
     expect(metiersRedondants(["21301", "72201"])).toEqual([]);
+  });
+});
+
+describe("normaliserModeFlux — l'absence de mode n'éteint pas une source allumée", () => {
+  it("lit une valeur explicite telle quelle, y compris « eteint »", () => {
+    expect(normaliserModeFlux("tout", ["70"])).toBe("tout");
+    expect(normaliserModeFlux("domaine", ["70"])).toBe("domaine");
+    // Explicite : éteint MALGRÉ une liste remplie. C'est ce qui permet de couper la source
+    // sans avoir à vider ses réglages.
+    expect(normaliserModeFlux("eteint", ["70"])).toBe("eteint");
+  });
+
+  it("sans mode enregistré, une liste NON VIDE vaut « domaine » — le comportement d'avant", () => {
+    // ⚠️ LA RÉTROCOMPATIBILITÉ. Avant ADR-0013 il n'y avait pas de mode : une liste remplie
+    // suffisait à allumer la source filtrée. Rabattre l'absence sur « eteint » couperait en
+    // silence une source que Marc avait allumée.
+    for (const absent of [null, undefined, "", "n'importe quoi", 42]) {
+      expect(normaliserModeFlux(absent, ["70", "92"])).toBe("domaine");
+    }
+  });
+
+  it("sans mode enregistré et liste VIDE, c'est « eteint » — le défaut sûr", () => {
+    for (const absent of [null, undefined, "bidon"]) {
+      expect(normaliserModeFlux(absent, [])).toBe("eteint");
+    }
+  });
+
+  it("le défaut du paramètre `metiers` ne rallume rien", () => {
+    expect(normaliserModeFlux(null)).toBe(MODE_FLUX_DEFAUT);
+    expect(MODE_FLUX_DEFAUT).toBe("eteint");
   });
 });

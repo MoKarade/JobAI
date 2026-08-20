@@ -47,6 +47,20 @@ export const ID_SOURCE_FLUX_GUICHET = "guichet-flux";
 export const MAX_RETENUES_FLUX = 200;
 
 /**
+ * Plafond en mode « tout » (ADR-0013, D3).
+ *
+ * La mesure du 2026-08-20 donne **1 290 régionales** sur une lecture complète. 1 600 laisse
+ * la marge d'une bonne journée sans plafonner en silence — et `plafond-retenues` reste dit
+ * dans la note quand il est atteint, parce qu'une passe partielle qui se présenterait comme
+ * complète ferait croire que le marché s'est vidé.
+ *
+ * ⚠️ CE PLAFOND N'EST PAS LE VRAI MUR. Le vrai mur est la durée de la fonction : la route du
+ * cron passe à 300 s et les insertions se font par LOTS, sans quoi 1 300 allers-retours
+ * séquentiels vers la base épuiseraient le budget avant la fin de l'ingestion.
+ */
+export const MAX_RETENUES_FLUX_TOUT = 1_600;
+
+/**
  * Offres au lieu INCONNU laissées passer par passe.
  *
  * ⚠️ CE N'EST PAS UNE TOLÉRANCE, C'EST CE QUI EMPÊCHE LE FILTRE DE S'AUTO-AVEUGLER.
@@ -79,6 +93,20 @@ export interface OptionsSourceFlux {
   recuperer?: typeof fetch;
   budgetMs?: number;
   maxRetenues?: number;
+  /**
+   * Ce que la source fait des offres HORS des métiers retenus (ADR-0013, D3).
+   *
+   * `"domaine"` (défaut) — elles sont refusées à la lecture. C'est le comportement d'origine,
+   * et il reste le défaut sûr : une option qui n'a pas été réglée ne doit pas ouvrir les
+   * vannes.
+   *
+   * `"tout"` — elles sont RETENUES, avec leur code, et c'est la NOTE qui les range
+   * (facteur de domaine). Décision Marc du 2026-08-20 : « je veux voir toutes les offres
+   * dispos ». ⚠️ Le compte des écartées par code continue d'être tenu dans les deux modes :
+   * il dit ce que le filtre AURAIT retiré, ce qui reste l'information utile pour régler la
+   * liste.
+   */
+  mode?: "domaine" | "tout";
 }
 
 /** Ce que la lecture a refusé, et pourquoi. Rendu en une ligne lisible. */
@@ -168,8 +196,12 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
     verdicts = new Map(),
     recuperer = fetch,
     budgetMs = BUDGET_MS_DEFAUT,
-    maxRetenues = MAX_RETENUES_FLUX,
+    mode = "domaine",
   } = options;
+  // Le plafond suit le MODE : filtrer rend quelques dizaines d'offres, tout ingérer en rend
+  // plus de mille. Un plafond unique servirait mal les deux.
+  const maxRetenues =
+    options.maxRetenues ?? (mode === "tout" ? MAX_RETENUES_FLUX_TOUT : MAX_RETENUES_FLUX);
 
   let dernierBilan: BilanFlux | null = null;
 
@@ -181,6 +213,8 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
       let regionales = 0;
       let lieuInconnuRapporte = 0;
       let lieuInconnuIgnore = 0;
+      /** Le code lu pour chaque offre retenue, à rattacher après la lecture (ADR-0013). */
+      const codesParRef = new Map<string, string | null>();
       let codeIllisible = 0;
       const ecarteesParCode: Record<string, number> = {};
 
@@ -196,7 +230,13 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
             }
 
             const code = lireChamp(brut, "noc2021");
+            // ⚠️ ENREGISTRÉ ICI PARCE QUE C'EST LE SEUL ENDROIT QUI VOIT LE BLOC BRUT.
+            // `OffreBrute` est un contrat fermé et `garder` reçoit le bloc pour cette raison
+            // exacte. Le code repart avec l'offre (ADR-0013) : sans lui, le facteur de
+            // domaine n'aurait rien à lire et le barème resterait aveugle à l'anglais.
+            codesParRef.set(offre.refSource, code.trim() === "" ? null : code.trim());
             const verdict = jugerProfession(code, metiers);
+            const garderQuandMeme = mode === "tout";
             if (verdict === "code-illisible") {
               // ⚠️ UN CODE ILLISIBLE N'EST PAS UN REFUS DE MÉTIER, et il ne se compte pas
               // avec eux. C'est un défaut de la SOURCE — et le jour où le Guichet cesserait
@@ -204,12 +244,16 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
               // par métier » resterait à zéro. Les mélanger ferait passer une panne de flux
               // pour un tri qui fonctionne.
               codeIllisible++;
-              return false;
-            }
-            if (verdict === "ecartee") {
+              // ⚠️ EN MODE « TOUT », UN CODE ILLISIBLE NE REFUSE PLUS — mais il se compte
+              // toujours. L'offre part avec `noc: null`, donc un domaine INCONNU, donc un
+              // facteur neutre : elle ne sera ni pénalisée ni favorisée par un défaut de la
+              // source. C'est la même règle que partout ailleurs — une ignorance n'est pas
+              // un refus.
+              if (!garderQuandMeme) return false;
+            } else if (verdict === "ecartee") {
               const cle = code.trim() === "" ? "(vide)" : code.trim();
               ecarteesParCode[cle] = (ecarteesParCode[cle] ?? 0) + 1;
-              return false;
+              if (!garderQuandMeme) return false;
             }
 
             // ⚠️ LE MÉTIER EST JUGÉ AVANT LE LIEU INCONNU, ET C'EST CE QUI BORNE LE QUOTA.
@@ -246,7 +290,10 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
         return {
           ok: true,
           source: ID_SOURCE_FLUX_GUICHET,
-          offres: rapport.retenues,
+          // ⚠️ LE CODE EST RATTACHÉ ICI, PAS DANS `garder`. Le prédicat DÉCIDE, il ne
+          // fabrique pas l'offre : muter son argument ferait dépendre le résultat de
+          // l'ordre d'évaluation d'un filtre. On recolle après, quand la lecture est finie.
+          offres: rapport.retenues.map((o) => ({ ...o, noc: codesParRef.get(o.refSource) ?? null })),
           // La date de construction du flux : c'est CE que la source peut offrir de plus
           // frais. Sans elle, un flux figé depuis trois jours se lirait comme un marché calme.
           ...(rapport.construitLe !== null ? { dernierJour: rapport.construitLe } : {}),

@@ -22,6 +22,37 @@
 /** Clé sous laquelle les métiers retenus sont conservés. */
 export const CLE_METIERS = "veille-metiers";
 
+/** Clé d'état du mode d'ingestion du flux (ADR-0013, D3). */
+export const CLE_MODE_FLUX = "veille-flux-mode";
+
+/**
+ * Les trois états du flux du Guichet. Le binaire d'avant — liste vide = source éteinte,
+ * liste remplie = source filtrée — n'avait pas de place pour « tout », que Marc a demandé
+ * le 2026-08-20 (« je veux voir toutes les offres dispos »).
+ *
+ * ⚠️ `eteint` reste le DÉFAUT. Un réglage qu'on n'a pas encore touché ne doit pas faire
+ * entrer 1 300 offres à la première passe.
+ */
+export type ModeFlux = "eteint" | "domaine" | "tout";
+export const MODE_FLUX_DEFAUT: ModeFlux = "eteint";
+
+/**
+ * Lit un mode venu de l'état — du JSON écrit par une version antérieure, donc suspect.
+ *
+ * ⚠️ `brut` ABSENT (`null`/`undefined`) N'EST PAS `eteint`, et la nuance est une
+ * rétrocompatibilité, pas une subtilité. Avant ADR-0013, il n'y avait pas de mode : une
+ * liste de métiers non vide SUFFISAIT à allumer la source, filtrée. Rabattre l'absence sur
+ * `eteint` ÉTEINDRAIT une source que Marc avait allumée, sans rien dire. L'absence se lit
+ * donc à travers la liste : non vide ⇒ `domaine` (ce qu'elle voulait dire), vide ⇒ `eteint`.
+ *
+ * Une valeur EXPLICITE, elle, fait foi — y compris `eteint`, qui doit pouvoir éteindre une
+ * source dont la liste reste remplie.
+ */
+export function normaliserModeFlux(brut: unknown, metiers: readonly string[] = []): ModeFlux {
+  if (brut === "domaine" || brut === "tout" || brut === "eteint") return brut;
+  return metiers.length > 0 ? "domaine" : MODE_FLUX_DEFAUT;
+}
+
 /** Rien tant que Marc n'a pas choisi. Voir l'en-tête : le vide éteint la source. */
 export const METIERS_DEFAUT: readonly string[] = [];
 

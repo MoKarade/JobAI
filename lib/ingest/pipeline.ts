@@ -251,6 +251,11 @@ export function trier(
    * vide = comportement d'avant, à la ligne près.
    */
   lieuxResolus: ReadonlyMap<string, "dans-la-region" | "hors-region"> = new Map(),
+  /**
+   * Les codes de métier retenus par Marc (ADR-0013). Vide = le domaine ne pèse rien, et le
+   * tri se comporte exactement comme avant — c'est ce qui rend l'ajout non régressif.
+   */
+  metiers: readonly string[] = [],
 ): Tri {
   const retenues: Offre[] = [];
   const vues = new Set<string>();
@@ -297,7 +302,11 @@ export function trier(
 
     // La note vient du barème, avec `km: null` : la distance ne se déduit pas d'un nom de
     // ville, elle se mesure. Le barème sait déjà traiter l'inconnu (10 points sur 20).
-    const note = computeScore({ titre: brute.titre, description: brute.description, km: null });
+    const note = computeScore(
+      { titre: brute.titre, description: brute.description, km: null, noc: brute.noc },
+      undefined,
+      metiers,
+    );
     if (note.parts.fitRole < FIT_ROLE_PLANCHER) {
       souslePlancher++;
       refusees.push({

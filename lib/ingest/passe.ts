@@ -148,7 +148,12 @@ export function selectionnerSources(
   // absences périment. Le mettre dans la rotation reviendrait à périmer par intermittence
   // ce qu'on vient d'ingérer — un faux positif de péremption dont la cause serait l'horaire.
   const hors: Source[] = [depot];
-  if (flux !== undefined && flux.metiers.length > 0) {
+  // ⚠️ DEUX CHEMINS D'ALLUMAGE, ET C'EST LE POINT DE D3 (ADR-0013). Une liste de métiers
+  // non vide construit la source FILTRÉE — le comportement d'origine. Le mode « tout » la
+  // construit AUSSI avec une liste vide : là, la liste ne filtre plus rien, elle définit le
+  // domaine pour la NOTE. Sans ce second chemin, « voir toutes les offres » serait
+  // impossible à exprimer, puisque vider la liste éteignait la source.
+  if (flux !== undefined && (flux.metiers.length > 0 || flux.mode === "tout")) {
     hors.push(sourceGuichetFlux(flux).source);
   }
 
@@ -196,13 +201,18 @@ export async function executerPasse(
     ) => Promise<{ registre: RegistreLieux; juges: number; introuvables: number }>;
   },
   /**
-   * Le flux complet du Guichet, si Marc a choisi des métiers.
+   * Le flux complet du Guichet, si Marc l'a allumé.
    *
    * Séparé de `lieux` parce que ce sont deux décisions indépendantes : on peut mesurer les
    * lieux sans lire le flux, et l'inverse. Optionnel : sans lui, la passe se comporte
    * exactement comme avant.
+   *
+   * ⚠️ `metiers` ne veut plus dire la même chose selon le `mode` (ADR-0013). En `domaine`
+   * il FILTRE l'ingestion ; en `tout` il ne filtre plus rien et définit le domaine pour la
+   * NOTE. C'est le même tableau, lu par deux mécanismes — d'où le `mode` à côté, qui dit
+   * lequel travaille.
    */
-  flux?: { metiers: readonly string[]; recuperer?: typeof fetch },
+  flux?: { metiers: readonly string[]; recuperer?: typeof fetch; mode?: "domaine" | "tout" },
 ): Promise<RapportPasse> {
   // ⚠️ LE PRÉ-FILTRE RÉGIONAL DU FLUX VOIT LE REGISTRE D'AVANT LA MESURE, ET C'EST INHÉRENT.
   // Les sources sont interrogées AVANT que la mesure des lieux n'ait tourné (elle apprend
@@ -291,7 +301,13 @@ export async function executerPasse(
     }
   }
 
-  const tri = trier(brutes, dejaSuivies, aujourdhui, verdictsFermes(mesure.registre));
+  const tri = trier(
+    brutes,
+    dejaSuivies,
+    aujourdhui,
+    verdictsFermes(mesure.registre),
+    flux?.metiers ?? [],
+  );
 
   // Ce que le balayage a VU : les nouvelles retenues, et les offres déjà suivies qu'une
   // source vient de re-publier. Les secondes sont le signal qui remet leur compteur

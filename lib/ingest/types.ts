@@ -43,6 +43,15 @@ export interface OffreBrute {
   description: string;
   /** Date de publication annoncée (AAAA-MM-JJ), ou null si la source n'en donne pas. */
   publieeLe: string | null;
+  /**
+   * Code de profession NOC 2021, quand la source en publie un (ADR-0013).
+   *
+   * ⚠️ C'est une propriété de l'OFFRE, pas un détail de source : la note s'en sert pour
+   * pondérer le domaine, et elle est la seule information de métier qui ne dépende pas de
+   * la LANGUE du titre. Absent partout ailleurs que le flux du Guichet — et son absence
+   * doit rester neutre, jamais lue comme un hors-domaine.
+   */
+  noc?: string | null;
 }
 
 /** Ce qu'une passe sur UNE source a donné. Un échec est dit, jamais confondu avec un vide. */

@@ -24,8 +24,16 @@ import { autoriserCron } from "@/lib/cronAuth";
 import { executerVeilleComplete } from "@/lib/veilleComplete";
 
 export const dynamic = "force-dynamic";
-/** La passe interroge une douzaine de sources en parallèle : il lui faut de la marge. */
-export const maxDuration = 60;
+/**
+ * La passe interroge une douzaine de sources en parallèle : il lui faut de la marge.
+ *
+ * ⚠️ 60 → 300 (ADR-0013, D3). En mode « tout », le flux du Guichet rend ~1 300 offres au
+ * lieu de quelques dizaines, et chacune coûte un tri, une note et parfois une insertion.
+ * Les routes de diagnostic tournent déjà à 300 s : le plan le permet. Laisser 60 aurait
+ * fait couper la fonction PAR LE DEHORS au milieu de l'ingestion — et une coupure au milieu
+ * ne se distingue pas d'un marché calme dans les journaux.
+ */
+export const maxDuration = 300;
 
 export async function GET(requete: Request) {
   const refus = autoriserCron(requete);

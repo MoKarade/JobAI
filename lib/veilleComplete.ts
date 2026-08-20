@@ -35,7 +35,14 @@ import { EPOQUE_A_RETENTER } from "./travaux";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "./synchro";
 import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
 import { executerPasse } from "./ingest/passe";
-import { CLE_METIERS, METIERS_DEFAUT, normaliserMetiers } from "./metiersRetenus";
+import {
+  CLE_METIERS,
+  CLE_MODE_FLUX,
+  METIERS_DEFAUT,
+  normaliserMetiers,
+  normaliserModeFlux,
+  type ModeFlux,
+} from "./metiersRetenus";
 import { villesRefusees } from "./ingest/pipeline";
 import { CLE_RAPPORT, construireRapport, type RapportVeille } from "./rapportVeille";
 import { CLE_RAYON, RAYON_DEFAUT_KM } from "./rayon";
@@ -44,6 +51,17 @@ import { lireEtat, ecrireEtat } from "./etat";
 import type { JournalVeille } from "./veille";
 
 export const CLE_JOURNAL = "veille-journal";
+
+/**
+ * Offres insérées par requête.
+ *
+ * ⚠️ PAS « le plus grand possible ». Une requête d'insertion porte un paramètre par colonne
+ * et par ligne, et les pilotes Postgres plafonnent à 65 535 paramètres. À ~20 colonnes,
+ * 200 lignes tiennent largement sous la limite tout en divisant par 200 le nombre
+ * d'allers-retours. Monter à 1 000 ferait échouer la requête ENTIÈRE — donc perdre la passe
+ * — pour gagner quelques dizaines de millisecondes.
+ */
+const TAILLE_LOT_INSERTION = 200;
 const CLE_CURSEUR = "veille-curseur";
 
 /**
@@ -84,13 +102,29 @@ export type ResultatVeille =
  * Quand deux chemins peuvent lancer la même passe, savoir LEQUEL l'a lancée est la première
  * question qu'on se pose en cas d'anomalie — et la seule qu'un journal muet ne répond pas.
  */
+/**
+ * Traduit l'état (liste + mode) en ce que la passe attend, ou `undefined`.
+ *
+ * ⚠️ `eteint` DOIT rendre `undefined`, pas un mode. La passe ne construit la source que si
+ * on lui passe cet objet : c'est le seul endroit où « éteint » devient réellement éteint,
+ * quelle que soit la liste. Le traduire en `{ mode: "domaine" }` rallumerait la source dès
+ * que la liste est non vide — soit exactement l'inverse de ce que Marc aurait demandé.
+ */
+function fluxDemande(
+  codes: string[],
+  mode: ModeFlux,
+): { metiers: readonly string[]; mode: "domaine" | "tout" } | undefined {
+  if (mode === "eteint") return undefined;
+  return { metiers: codes, mode };
+}
+
 export async function executerVeilleComplete(declencheur: string): Promise<ResultatVeille> {
   if (!process.env.DATABASE_URL) {
     return { ok: false, statut: 503, erreur: "base non configurée" };
   }
 
   try {
-    const [connues, journal, curseur, lieux, rayonMaxKm, metiers] = await Promise.all([
+    const [connues, journal, curseur, lieux, rayonMaxKm, metiers, modeBrut] = await Promise.all([
       lireOffres(),
       lireEtat<JournalVeille>(CLE_JOURNAL, {}),
       lireEtat<number>(CLE_CURSEUR, 0),
@@ -102,6 +136,10 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
       // Les métiers retenus pour le flux complet du Guichet. Vide ⇒ la source n'est pas
       // construite du tout : tant que Marc n'a pas choisi, la veille se comporte comme avant.
       lireEtat<string[]>(CLE_METIERS, [...METIERS_DEFAUT]),
+      // Le mode d'ingestion du flux (ADR-0013, D3). Lu ICI, avec le reste de l'état, pour
+      // qu'une seule lecture commande la passe entière — deux lectures séparées finiraient
+      // par diverger, comme le rayon l'avait montré.
+      lireEtat<string | null>(CLE_MODE_FLUX, null),
     ]);
 
     if (connues === null) {
@@ -120,18 +158,28 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
     // ⚠️ RE-NORMALISÉ ICI AUSSI. L'état est du JSON écrit par une version antérieure : rien
     // ne garantit qu'il porte encore des codes lisibles, et un code mal formé ne retient
     // rien (`codeRetenu`) — la source tournerait alors à vide sans qu'on sache pourquoi.
-    { metiers: normaliserMetiers(metiers).codes });
+    fluxDemande(normaliserMetiers(metiers).codes, normaliserModeFlux(modeBrut, normaliserMetiers(metiers).codes)));
 
     // Les nouvelles offres d'abord : si l'écriture du journal échoue ensuite, on aura
     // gagné des offres et rejoué une passe, pas perdu du travail.
     const nouvelles = rapport.offres.filter((o) => rapport.nouvelles.includes(o.id));
-    for (const o of nouvelles) {
-      await db.insert(offers).values({ ...colonnesOffre(o), majLe: new Date() });
-      if (o.raisons.length > 0) {
-        await db.insert(offerReasons).values(
-          o.raisons.map((r, i) => ({ offerId: o.id, ton: r.ton, texte: r.texte, ordre: i })),
-        );
-      }
+    // ⚠️ PAR LOTS, ET C'EST UNE CONTRAINTE DE DURÉE, PAS UN CONFORT (ADR-0013, D3).
+    //
+    // Une insertion par offre coûtait un aller-retour vers la base par offre. Sur les
+    // quelques dizaines que rendaient les sources en rotation, ça ne se voyait pas. En mode
+    // « tout », la première passe en apporte ~1 300 : à quelques dizaines de millisecondes
+    // l'aller-retour, ce seul point dépasse le budget de la fonction — et la coupure
+    // arriverait AVANT l'écriture du journal, donc la passe entière serait rejouée à
+    // l'identique le lendemain, sans jamais finir.
+    //
+    // Les raisons partent en UN lot pour toutes les offres du paquet, pour la même raison.
+    for (let i = 0; i < nouvelles.length; i += TAILLE_LOT_INSERTION) {
+      const paquet = nouvelles.slice(i, i + TAILLE_LOT_INSERTION);
+      await db.insert(offers).values(paquet.map((o) => ({ ...colonnesOffre(o), majLe: new Date() })));
+      const raisons = paquet.flatMap((o) =>
+        o.raisons.map((r, k) => ({ offerId: o.id, ton: r.ton, texte: r.texte, ordre: k })),
+      );
+      if (raisons.length > 0) await db.insert(offerReasons).values(raisons);
     }
 
     // Le rattrapage des villes manquantes : une offre déjà suivie que la source republie

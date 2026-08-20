@@ -22,6 +22,7 @@ import {
   type BilanFlux,
 } from "../lib/ingest/sourceGuichetFlux";
 import { selectionnerSources } from "../lib/ingest/passe";
+import { trier } from "../lib/ingest/pipeline";
 import { normaliserLieu } from "../lib/ingest/region";
 import { ID_SOURCE_DEPOT, type Recuperateur } from "../lib/ingest/types";
 
@@ -68,8 +69,12 @@ const recuperateurInterdit: Recuperateur = async () => {
   throw new Error("le flux ne doit pas passer par le Recuperateur (130 Mo en mémoire)");
 };
 
-async function interroger(corps: string, metiers: readonly string[]) {
-  const { source, bilan } = sourceGuichetFlux({ metiers, recuperer: sert(corps) });
+async function interroger(
+  corps: string,
+  metiers: readonly string[],
+  mode?: "domaine" | "tout",
+) {
+  const { source, bilan } = sourceGuichetFlux({ metiers, recuperer: sert(corps), mode });
   const r = await source.interroger(recuperateurInterdit);
   return { r, bilan: bilan() };
 }
@@ -280,5 +285,73 @@ describe("selectionnerSources — le flux est construit seulement si Marc a choi
       expect(ids).toContain(ID_SOURCE_FLUX_GUICHET);
       expect(ids).toContain(ID_SOURCE_DEPOT);
     }
+  });
+});
+
+describe("le code de profession voyage jusqu'à la note (ADR-0013)", () => {
+  it("rattache le code lu à l'offre rendue", async () => {
+    const flux = `<source>${offre({ ref: "1", ville: "Québec", noc: "22301" })}</source>`;
+    const { r } = await interroger(flux, ["22"]);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.offres[0]?.noc).toBe("22301");
+  });
+
+  it("rend `null` — jamais undefined — quand l'offre n'a pas de code lisible", async () => {
+    // Une source qui n'en publie pas doit donner une ABSENCE explicite : c'est ce que
+    // `facteurDomaine` lit comme « domaine inconnu », donc neutre.
+    const flux = `<source>${offre({ ref: "1", ville: "Québec", noc: "" })}</source>`;
+    const { r } = await interroger(flux, [], "tout");
+    if (!r.ok) return;
+    expect(r.offres.length).toBeGreaterThan(0);
+    for (const o of r.offres) expect(o.noc).toBeNull();
+  });
+
+  it("le facteur de domaine s'applique RÉELLEMENT à une offre du flux", async () => {
+    // ⚠️ LE TEST QUI COMPTE. Sans ce chemin, le barème d'ADR-0013 serait branché et inerte :
+    // le facteur existerait, personne ne lui passerait de code, et rien ne le dirait.
+    const flux = `<source>${offre({ ref: "1", ville: "Québec", noc: "65311", titre: "car washer" })}</source>`;
+    const { r } = await interroger(flux, [], "tout");
+    if (!r.ok) return;
+    const brute = r.offres[0];
+    expect(brute?.noc).toBe("65311");
+
+    const dansLeDomaine = trier([brute!], new Set(), "2026-08-20", new Map(), ["65"]);
+    const horsDomaine = trier([brute!], new Set(), "2026-08-20", new Map(), ["70", "92"]);
+    // Retenue dans les deux cas (le plancher de rôle ne dépend pas du domaine), mais notée
+    // différemment — c'est le facteur qui parle.
+    const noteDedans = dansLeDomaine.retenues[0]?.score ?? 0;
+    const noteDehors = horsDomaine.retenues[0]?.score ?? 0;
+    expect(noteDehors).toBeLessThan(noteDedans);
+  });
+});
+
+describe("mode « tout » (ADR-0013, D3) — voir toute la région, laisser la note trier", () => {
+  const regionale = (ref: string, noc: string, titre: string) =>
+    offre({ ref, ville: "Québec", noc, titre });
+
+  it("en mode « domaine », le hors-liste est REFUSÉ — le comportement d'origine", async () => {
+    const flux = `<source>${regionale("1", "65311", "car washer")}${regionale("2", "70010", "coordo")}</source>`;
+    const { r, bilan } = await interroger(flux, ["70"]);
+    if (!r.ok) return;
+    expect(r.offres).toHaveLength(1);
+    expect(bilan?.ecarteesParCode["65311"]).toBe(1);
+  });
+
+  it("en mode « tout », le hors-liste est RETENU — et toujours COMPTÉ", async () => {
+    const flux = `<source>${regionale("1", "65311", "car washer")}${regionale("2", "70010", "coordo")}</source>`;
+    const { r, bilan } = await interroger(flux, ["70"], "tout");
+    if (!r.ok) return;
+    expect(r.offres).toHaveLength(2);
+    // Le compte de ce que le filtre AURAIT retiré reste tenu : c'est lui qui sert à régler
+    // la liste. Le mode change le sort de l'offre, jamais la mesure.
+    expect(bilan?.ecarteesParCode["65311"]).toBe(1);
+  });
+
+  it("le défaut est « domaine » — une option non réglée n'ouvre pas les vannes", async () => {
+    const flux = `<source>${regionale("1", "65311", "car washer")}</source>`;
+    const { r } = await interroger(flux, ["70"]);
+    if (!r.ok) return;
+    expect(r.offres).toHaveLength(0);
   });
 });
