@@ -2429,3 +2429,38 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 /* L'échec se DIT en rouge, jamais en gris à côté du reste : « pas de clé API » et
    « le marché est calme » ne doivent pas se lire pareil. */
 .marche__erreur { color: var(--rouge); margin-top: 0.6rem; }
+
+/* ── Le parcours ──────────────────────────────────────────────────────────
+   Une liste de postes qu'on relit avant une entrevue : la période et l'employeur se
+   repèrent d'un coup d'œil, les réalisations se lisent ligne à ligne. */
+.parcours { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.5rem; }
+.parcours__poste {
+  padding-left: 1rem;
+  border-left: 2px solid var(--border);
+}
+.parcours__tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.9rem;
+}
+.parcours__titre { font-size: var(--t-m); margin: 0; }
+.parcours__periode {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+}
+.parcours__employeur {
+  margin: 0.15rem 0 0;
+  font-size: var(--t-s);
+  color: var(--text-soft);
+}
+.parcours__faits {
+  margin: 0.6rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+  font-size: var(--t-s);
+  line-height: 1.5;
+}
+.parcours__vide { margin: 0; color: var(--text-soft); line-height: 1.55; }

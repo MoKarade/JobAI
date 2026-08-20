@@ -74,6 +74,26 @@ export const FaitsSchema = z.object({
   outils: z.array(z.string().min(1)).max(60),
   /** Intitulés déjà occupés : la meilleure source de termes de recherche qui existe. */
   titresOccupes: z.array(z.string().min(1)).max(30),
+  /**
+   * Le parcours détaillé, du plus récent au plus ancien.
+   *
+   * ⚠️ IL VIT ICI, PAS DANS LE CODE. Il porte des noms d'employeurs et des dates : le dépôt
+   * est PUBLIC, et `tests/piiGuard.test.ts` refuse ce genre de contenu dans un fichier
+   * versionné. Le défaut est donc VIDE, et il se remplit au dépôt du CV — comme le reste
+   * des faits.
+   */
+  parcours: z
+    .array(
+      z.object({
+        titre: z.string().min(1).max(120),
+        employeur: z.string().max(120).default(""),
+        debut: z.string().max(40).default(""),
+        fin: z.string().max(40).default(""),
+        faits: z.array(z.string().min(1).max(300)).max(10).default([]),
+      }),
+    )
+    .max(12)
+    .default([]),
 });
 export type Faits = z.infer<typeof FaitsSchema>;
 
@@ -259,6 +279,7 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
     diplomes: [],
     outils: [],
     titresOccupes: [],
+    parcours: [],
   },
 
   ponderation: {

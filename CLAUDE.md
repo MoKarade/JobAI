@@ -1517,6 +1517,18 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   comparaison. Corollaire déjà payé trois fois ici : une mesure ne conclut que si elle va au
   bout (`flux-termine`) — sur toute autre fin, chaque compte n'est qu'un préfixe.
 
+- **`git checkout <fichier>` pour défaire UNE mutation efface TOUT le travail non commité du
+  fichier.** Vécu le 2026-08-20 : après avoir prouvé qu'un test-garde discriminait, un
+  `git checkout lib/cv/extraction.ts` a rendu le fichier à `HEAD` — schéma, outil, consigne
+  et nettoyage du parcours, tous effacés d'un coup, quatorze erreurs de typage plus tard. La
+  leçon était DÉJÀ écrite ailleurs dans ce dépôt et je l'ai reprise quand même : pour une
+  campagne de mutations, `cp` du fichier AVANT, `cp` de retour APRÈS — jamais git, qui ne
+  connaît que le dernier commit. Corollaire du même passage : **une mutation qui ne
+  s'applique pas ressemble EXACTEMENT à un test qui ne discrimine pas** (49 verts dans les
+  deux cas). Toute mutation s'écrit avec une assertion qu'elle a bien changé le fichier
+  (`assert s != avant`), sans quoi on conclut « mon test est mauvais » sur une manipulation
+  ratée — ou pire, « mon test est bon » sur une mutation fantôme.
+
 - **Un budget plus long que le MUR de sa fonction ne borne rien.** Le même diagnostic tourne
   derrière deux routes : 300 s en HTTP, 60 s en MCP. Y passer les mêmes 120 s ferait couper
   l'appel PAR LE DEHORS sur la seconde — et le client ne verrait qu'un timeout, sans le champ

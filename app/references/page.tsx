@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Cadre } from "@/components/Cadre";
 import { Panneaux } from "@/components/Panneaux";
+import { Parcours } from "@/components/Parcours";
 import { profilActif } from "@/lib/cv/depot";
 import { PROFIL_DEFAUT } from "@/lib/profil";
 
@@ -49,10 +50,10 @@ export default async function References() {
   return (
     <Cadre actif="/references" titre="Références">
       <p className="intro-section">
-        Le barème qui produit les notes, les entreprises visées, les repères de salaire du
-        marché et la lecture de position. Chaque repère porte sa source et son année : un
-        chiffre de marché sans provenance n’est plus utilisable en négociation six mois plus
-        tard.
+        Ton parcours et tes compétences, tels que ton CV les porte — de quoi préparer une
+        entrevue sans rouvrir le document. Puis les repères du marché, chacun avec sa source
+        et son année : un chiffre sans provenance n’est plus utilisable en négociation six
+        mois plus tard.
       </p>
       {profilEnPanne ? (
         <p className="revue__retour revue__retour--echec">
@@ -60,6 +61,7 @@ export default async function References() {
           pas ton profil validé. Va dans Profil pour voir le détail.
         </p>
       ) : null}
+      <Parcours profil={profil} />
       <Panneaux profil={profil} />
     </Cadre>
   );

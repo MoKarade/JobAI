@@ -43,21 +43,43 @@ describe("les plafonds sont ANNONCÉS au modèle", () => {
     // `as unknown` d'abord : le type littéral du schéma d'outil ne recouvre pas la forme
     // générique qu'on veut interroger, et c'est justement parce qu'il est LITTÉRAL que ce
     // test a de la valeur — il lit les vraies valeurs, pas une déclaration parallèle.
-    const proprietes = OUTIL_EXTRACTION.input_schema.properties as unknown as Record<
-      string,
-      { type?: string; maxItems?: number }
-    >;
+    type Noeud = {
+      type?: string;
+      maxItems?: number;
+      properties?: Record<string, Noeud>;
+      items?: Noeud;
+    };
+    // ⚠️ LE SCAN DESCEND DANS LES SOUS-SCHÉMAS. Il ne regardait que le premier niveau, et
+    // ratait donc tout plafond porté par un champ IMBRIQUÉ — `parcours[].faits` en est un.
+    // Une garde qui ne voit qu'un étage laisse passer exactement ce qu'elle promet
+    // d'attraper dès que la forme des données se complique.
+    function aplatir(n: Noeud, dedans: Record<string, Noeud> = {}): Record<string, Noeud> {
+      for (const [cle, val] of Object.entries(n.properties ?? {})) {
+        dedans[cle] = val;
+        aplatir(val, dedans);
+        if (val.items) aplatir(val.items, dedans);
+      }
+      return dedans;
+    }
+    const proprietes = aplatir(
+      OUTIL_EXTRACTION.input_schema as unknown as Noeud,
+    ) as unknown as Record<string, { type?: string; maxItems?: number }>;
 
     // Volume prouvé : un test qui ne trouve aucune liste passerait à vide.
     expect(Object.keys(PLAFONDS).length).toBeGreaterThanOrEqual(7);
 
+    // Le nom du plafond ne coïncide pas toujours avec celui du champ : `faitsParPoste`
+    // borne `parcours[].faits`. La correspondance est DÉCLARÉE, jamais devinée.
+    const CHAMP_DU_PLAFOND: Readonly<Record<string, string>> = { faitsParPoste: "faits" };
+
     for (const [champ, plafond] of Object.entries(PLAFONDS)) {
-      const decrit = proprietes[champ];
-      expect(decrit, `le schéma d'outil ne décrit pas « ${champ} »`).toBeDefined();
-      expect(decrit?.type, `« ${champ} » n'est pas un tableau côté outil`).toBe("array");
+      const nom = CHAMP_DU_PLAFOND[champ] ?? champ;
+      const decrit = proprietes[nom];
+      expect(decrit, `le schéma d'outil ne décrit pas « ${nom} »`).toBeDefined();
+      expect(decrit?.type, `« ${nom} » n'est pas un tableau côté outil`).toBe("array");
       expect(
         decrit?.maxItems,
-        `« ${champ} » ne dit pas sa limite au modèle : il ne peut pas la respecter`,
+        `« ${nom} » ne dit pas sa limite au modèle : il ne peut pas la respecter`,
       ).toBe(plafond);
     }
   });

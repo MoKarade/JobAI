@@ -87,6 +87,34 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
     });
   }
 
+  // ── Le parcours ──────────────────────────────────────────────────────────
+  // ⚠️ COMPARÉ PAR SIGNATURE, PAS PAR ÉGALITÉ D'OBJETS. Deux extractions du même CV peuvent
+  // reformuler une phrase de `faits` sans que le POSTE ait changé ; un diff sur l'objet
+  // entier afficherait alors un écart à chaque analyse, et Marc finirait par cocher sans
+  // lire — ce qui est la validation en apparence et l'acceptation aveugle en pratique.
+  // La signature retient ce qui identifie un poste : intitulé, employeur, période.
+  const signature = (e: { titre: string; employeur: string; debut: string; fin: string }) =>
+    `${e.titre}|${e.employeur}|${e.debut}|${e.fin}`.toLowerCase();
+  const memeParcours =
+    courant.faits.parcours.length === extraction.parcours.length &&
+    courant.faits.parcours.every((e, i) => signature(e) === signature(extraction.parcours[i]!));
+  // Un parcours vide proposé n'efface rien, pour la même raison que les listes plus bas :
+  // le modèle qui n'a rien trouvé ne prouve pas que Marc n'a rien.
+  if (!memeParcours && extraction.parcours.length > 0) {
+    ecarts.push({
+      cle: "faits.parcours",
+      libelle: "Parcours",
+      nature: "fait",
+      avant:
+        courant.faits.parcours.length === 0
+          ? "non établi"
+          : `${courant.faits.parcours.length} poste(s)`,
+      apres: extraction.parcours.map((e) => e.titre).join(" · "),
+      provenance: "",
+      valeur: extraction.parcours,
+    });
+  }
+
   const listes: readonly {
     cle: keyof Profil["faits"];
     libelle: string;

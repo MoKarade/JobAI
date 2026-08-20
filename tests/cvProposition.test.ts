@@ -27,6 +27,7 @@ import type { Offre } from "@/lib/types";
 const EXTRACTION_VIDE: ReponseExtraction = {
   anneesExperience: null,
   anneesExperienceProvenance: "",
+  parcours: [],
   langues: [],
   diplomes: [],
   outils: [],

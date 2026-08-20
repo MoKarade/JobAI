@@ -81,7 +81,31 @@ export const PLAFONDS = {
   recherchesSuggerees: 20,
   forces: 8,
   manques: 8,
+  /** Postes du parcours. Un CV en porte rarement plus ; au-delà, c'est du remplissage. */
+  parcours: 12,
+  /** Réalisations retenues par poste. Assez pour préparer une entrevue, pas un roman. */
+  faitsParPoste: 10,
 } as const;
+
+/**
+ * Un poste du parcours.
+ *
+ * ⚠️ LES DATES SONT DU TEXTE, PAS DES DATES. Un CV écrit « Avril 2024 », « 2023 »,
+ * « Présent », parfois rien. Les convertir obligerait à DEVINER un jour et un mois — donc à
+ * fabriquer une précision que le document ne porte pas, et à afficher « 01/04/2024 » là où
+ * le CV dit « Avril 2024 ». On garde ce qui est écrit.
+ *
+ * `employeur` peut être vide : certains CV décrivent une mission sans nommer le client.
+ */
+export const ExperienceSchema = z.object({
+  titre: z.string().min(1).max(120),
+  employeur: z.string().max(120).default(""),
+  debut: z.string().max(40).default(""),
+  fin: z.string().max(40).default(""),
+  /** Ce que le poste a comporté, tel que le CV le formule. */
+  faits: z.array(z.string().min(1).max(300)).max(PLAFONDS.faitsParPoste).default([]),
+});
+export type Experience = z.infer<typeof ExperienceSchema>;
 
 export const ReponseExtractionSchema = z.object({
   anneesExperience: z.number().finite().min(0).max(60).nullable(),
@@ -96,6 +120,14 @@ export const ReponseExtractionSchema = z.object({
   forces: z.array(z.string().min(1).max(300)).max(PLAFONDS.forces).default([]),
   /** Ce que le CV révèle comme manque OBJECTIF (une compétence absente, pas un jugement). */
   manques: z.array(z.string().min(1).max(300)).max(PLAFONDS.manques).default([]),
+  /**
+   * Le parcours, du plus récent au plus ancien.
+   *
+   * ⚠️ `default([])` et non requis : un CV illisible sur ce point ne doit pas faire échouer
+   * l'extraction entière. Un parcours vide se DIT à l'écran ; une extraction refusée ferait
+   * re-téléverser le même fichier en boucle.
+   */
+  parcours: z.array(ExperienceSchema).max(PLAFONDS.parcours).default([]),
 });
 export type ReponseExtraction = z.infer<typeof ReponseExtractionSchema>;
 
@@ -146,6 +178,14 @@ const CONSIGNE = [
   "Dans anneesExperienceProvenance, cite l'endroit exact du CV qui justifie le nombre",
   "(intitulé de section et dates). Si tu as supposé, laisse la provenance vide.",
   "",
+  "parcours : les postes occupés, du plus RÉCENT au plus ancien. Pour chacun, recopie",
+  "l'intitulé, l'employeur et les dates TELS QU'ÉCRITS — « Avril 2023 », « Présent ».",
+  "Ne convertis pas en dates : le CV ne porte pas toujours le jour, et l'inventer donnerait",
+  "une précision fausse. Un champ absent du CV reste une chaîne vide, jamais une supposition.",
+  "Dans faits, reprends ce que le poste comportait, dans les termes du CV. N'ajoute rien",
+  "que le document ne dit pas, et ne reformule pas en mieux : ces phrases serviront à",
+  "préparer une entrevue, où c'est le CV qui fera foi.",
+  "",
   "forces : ce que le CV ÉTABLIT et qui joue en faveur d'une candidature.",
   "manques : une compétence ou une exigence courante du métier que le CV ne montre PAS.",
   "Ce sont des constats sur le document, pas des conseils de carrière.",
@@ -182,6 +222,29 @@ export const OUTIL_EXTRACTION = {
         items: { type: "string" },
         maxItems: PLAFONDS.recherchesSuggerees,
         description: "Intitulés de poste à rechercher, déduits du parcours.",
+      },
+      parcours: {
+        type: "array",
+        maxItems: PLAFONDS.parcours,
+        description:
+          "Les postes occupés, du plus récent au plus ancien. Recopie ce que le CV écrit ; " +
+          "n'invente ni date ni employeur manquant.",
+        items: {
+          type: "object" as const,
+          properties: {
+            titre: { type: "string", description: "L'intitulé du poste, tel qu'écrit." },
+            employeur: { type: "string", description: "Le nom de l'employeur, ou une chaîne vide." },
+            debut: { type: "string", description: "Tel qu'écrit : « Avril 2023 », « 2023 », ou vide." },
+            fin: { type: "string", description: "Tel qu'écrit : « Présent », « Février 2025 », ou vide." },
+            faits: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: PLAFONDS.faitsParPoste,
+              description: "Ce que le poste comportait, tel que le CV le formule.",
+            },
+          },
+          required: ["titre"],
+        },
       },
       forces: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.forces },
       manques: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.manques },
@@ -366,6 +429,20 @@ export async function extraireFaits(
     outils: netto(brut.outils),
     titresOccupes: netto(brut.titresOccupes),
     recherchesSuggerees: netto(brut.recherchesSuggerees),
+    // ⚠️ CHAQUE CHAÎNE DU PARCOURS PASSE PAR LE MÊME NETTOYAGE. Un poste porte un employeur
+    // et des phrases tirées du CV : c'est là que des coordonnées se glissent le plus
+    // volontiers. Un objet imbriqué ne dispense pas du traitement, il le rend juste plus
+    // facile à oublier.
+    parcours: brut.parcours
+      .map((e) => ({
+        titre: nettoUn(e.titre).slice(0, 120),
+        employeur: nettoUn(e.employeur).slice(0, 120),
+        debut: nettoUn(e.debut).slice(0, 40),
+        fin: nettoUn(e.fin).slice(0, 40),
+        faits: netto(e.faits).map((f) => f.slice(0, 300)),
+      }))
+      // Un poste sans titre n'est pas un poste : le garder afficherait une carte vide.
+      .filter((e) => e.titre.length > 0),
     forces: netto(brut.forces),
     manques: netto(brut.manques),
   };
