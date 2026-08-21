@@ -292,6 +292,24 @@ code {
 .page--pleine .onglets {
   margin: var(--pas-2) 0 var(--pas);
 }
+/* ⚠️ MÊME RESSERREMENT, MÊME RAISON (« rends la map plus grande de base », mesuré
+   2026-08-21 : sur 1366×768/1280×720, le plancher de `.plan-ecran` (26rem) restait la
+   valeur QUI S'APPLIQUAIT, pas un filet — la barre de filtres (18 boutons) + les trois
+   lignes de compte devant la carte ne laissaient plus de reste à lui donner. Rien n'est
+   supprimé ni cliqué : chaque compte reste sur l'écran, juste sans la respiration d'une
+   page de lecture, qui n'a pas sa place ici. */
+.page--pleine .controles {
+  gap: 0.35rem;
+}
+.page--pleine .geocodage {
+  margin-bottom: 0.4rem;
+}
+.page--pleine .controles__compte {
+  margin: 0.35rem 0;
+}
+.page--pleine .carte__compte {
+  margin-bottom: 0.2rem;
+}
 .page--pleine main {
   flex: 1 1 auto;
   min-height: 0;
