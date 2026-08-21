@@ -6,6 +6,26 @@
 
 ---
 
+## Session 2026-08-21 (suite 3) — la carte se recale enfin, capture à l'appui
+
+Marc a envoyé une capture d'écran : deux cartes Google superposées (Québec en haut,
+Michigan en bas), un grand vide entre les deux. Cause trouvée — `defaultBounds` ne
+calcule qu'UNE fois au montage, et Google Maps ne réécoute JAMAIS le CSS de son
+conteneur tout seul. Les resserrements `[CARTE-J]` (pourtant mesurés et réels côté
+CSS) n'atteignaient donc jamais l'écran : Google dessinait sur son ancien canevas.
+
+`SuivreRedimensionnement` (`components/CarteGoogle.tsx`) observe le `<div>` réel de
+la carte (`ResizeObserver`) et déclenche `google.maps.event.trigger(map, "resize")`
++ un `fitBounds` sur le cadrage courant (via une ref, pas une fermeture figée) à
+chaque changement de taille. Gate complet vert.
+
+**Webhook Vercel manqué DEUX fois d'affilée** (record sur ce dépôt — d'habitude un
+seul commit vide suffit) : `dd494bc`… non, ici `99d8fc1` puis `b4ef411` n'ont produit
+AUCUN déploiement plusieurs minutes durant. Un second commit vide (`8d3765a`) a fini
+par passer, mais le build lui-même a pris ~70 s au lieu des ~10-40 s habituels — à
+surveiller si ça recommence. `emploi.hubperso.com` sert `8d3765a`, confirmé `READY`.
+
+
 ## Session 2026-08-21 (suite 2) — 403 élargi, map écrasée MESURÉE, tri de la liste
 
 Marc, après le lot `[CARTE-H]` : « jai encore erreur 403, rends la map plus grande de
