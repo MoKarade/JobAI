@@ -30,6 +30,18 @@ seulement, plancher `min-height: 26rem` sur `.plan-ecran` + `main` qui absorbe u
 **Tri de la liste** (note/distance/nom) ajouté dans `lib/carte.ts` (pur, testé) +
 `ListeCarte.tsx` (devient client). Gate complet vert (81 fichiers, 1398 tests).
 
+**Déploiement : webhook GitHub→Vercel manqué une 4ᵉ fois, remède appliqué.** CI verte sur
+`dd494bc` (run 300), mais six minutes après le push, `list_deployments` ET `get_deployment`
+montraient tous deux `9ffa65b` ([CARTE-H], le commit PRÉCÉDENT) comme dernier `READY` —
+aucune entrée pour `dd494bc`. Récidive du pattern déjà consigné §9 (2026-07-31, 08-12,
+08-14). Remède : commit vide `d742025` (pousse un nouvel événement de push, sans toucher
+au code — `dd494bc` était déjà bon). Vérifié : `emploi.hubperso.com` sert désormais
+`dpl_CyDPhkXE1oPmZn1q4he1gMLRWwpG`, sha `d742025` (donc le contenu de `dd494bc` + rien de
+plus), `readyState: READY`. **Ce qui reste À VÉRIFIER PAR MARC** : le 403 doit encore se
+corriger côté console Google (activer « Geocoding API » et « Places API (New) », en plus
+de Routes déjà fait, dans les restrictions de la clé serveur, projet hubperso) — le code ne
+peut rien de plus ici, le message le dit exactement.
+
 
 ## Session 2026-08-21 (suite) — quatre retours de test réels sur la carte, mesurés
 
