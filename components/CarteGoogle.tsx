@@ -34,7 +34,7 @@ import type { Epingle } from "@/lib/carte";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { obtenirTrajet, type ResultatTrajet } from "@/lib/actionsTrajet";
-import { formaterDistance, formaterDuree } from "@/lib/trajetRoutes";
+import { BANDES_DUREE_MIN, bandeDuree, formaterDistance, formaterDuree } from "@/lib/trajetRoutes";
 
 /**
  * L'identifiant de style Google. `DEMO_MAP_ID` est un identifiant que Google accepte pour
@@ -313,13 +313,35 @@ export function CarteGoogle({
                       couleur seul obligeait à cliquer pour savoir si ça vaut le détour.
                       Une épingle approximative est plus petite et grisée : deux niveaux de
                       certitude ne doivent pas se ressembler. */}
-                  <Pin
-                    background={approx ? couleurNote(null) : couleurNote(note)}
-                    borderColor={encreSurNote()}
-                    glyphColor={encreSurNote()}
-                    scale={approx ? 0.85 : 1.1}
-                    glyph={approx ? String(e.entreprises.length) : String(note ?? "—")}
-                  />
+                  {(() => {
+                    // La durée du groupe : la plus COURTE des entreprises de l'épingle —
+                    // c'est elle qui répond à « est-ce à portée ? ».
+                    const dureeS = approx
+                      ? null
+                      : (e.entreprises
+                          .map((x) => dureesParNom.get(x.nom)?.dureeS)
+                          .filter((d): d is number => d !== undefined)
+                          .sort((x, y) => x - y)[0] ?? null);
+                    return (
+                      <div className="epingle">
+                        <span
+                          className={`epingle__pastille${approx ? " epingle__pastille--approx" : ""}`}
+                          style={
+                            approx
+                              ? undefined
+                              : { background: couleurNote(note), color: encreSurNote() }
+                          }
+                        >
+                          {approx ? e.entreprises.length : (note ?? "—")}
+                        </span>
+                        {dureeS !== null ? (
+                          <span className={`epingle__duree epingle__duree--b${bandeDuree(dureeS)}`}>
+                            {formaterDuree(dureeS)}
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
                 </AdvancedMarker>
               );
             })}
@@ -340,6 +362,15 @@ export function CarteGoogle({
             ) : null}
 
             {trajet ? <TraceTrajet polyline={trajet.polyline} /> : null}
+
+            {dureesParNom.size > 0 ? (
+              <div className="carte-legende" aria-hidden="true">
+                <span className="epingle__duree epingle__duree--b1">≤ {BANDES_DUREE_MIN[0]} min</span>
+                <span className="epingle__duree epingle__duree--b2">≤ {BANDES_DUREE_MIN[1]} min</span>
+                <span className="epingle__duree epingle__duree--b3">≤ {BANDES_DUREE_MIN[2]} min</span>
+                <span className="epingle__duree epingle__duree--b4">au-delà</span>
+              </div>
+            ) : null}
 
             {selection?.type === "epingle" && epingles[selection.index] ? (
               <InfoWindow

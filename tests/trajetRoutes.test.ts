@@ -3,6 +3,8 @@
 
 import { describe, it, expect, vi } from "vitest";
 import {
+  BANDES_DUREE_MIN,
+  bandeDuree,
   TOLERANCE_POSITION_DEG,
   appelerMatrice,
   appelerRoutes,
@@ -128,5 +130,16 @@ describe("appelerMatrice — N destinations, les inatteignables NOMMÉES", () =>
     const r = await appelerMatrice(maison, [], "cle", f as never);
     expect(r).toEqual({ ok: true, elements: [], inatteignables: [] });
     expect(f).not.toHaveBeenCalled();
+  });
+});
+
+describe("bandeDuree — les bornes sont INCLUSIVES et dérivées des constantes", () => {
+  it("classe aux bornes exactes, dérivées de BANDES_DUREE_MIN", () => {
+    const [b1, b2, b3] = BANDES_DUREE_MIN;
+    expect(bandeDuree(b1 * 60)).toBe(1);
+    expect(bandeDuree(b1 * 60 + 1)).toBe(2);
+    expect(bandeDuree(b2 * 60)).toBe(2);
+    expect(bandeDuree(b3 * 60)).toBe(3);
+    expect(bandeDuree(b3 * 60 + 1)).toBe(4);
   });
 });

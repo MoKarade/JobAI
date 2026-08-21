@@ -216,3 +216,22 @@ export async function appelerMatrice(
   }
   return { ok: true, elements, inatteignables };
 }
+
+/**
+ * Les bornes des bandes de durée (minutes), pour la carte (ADR-0016, lot E).
+ *
+ * ⚠️ EN MINUTES DE ROUTE, PAS EN KILOMÈTRES : un rayon kilométrique est un cercle, un
+ * rayon de trajet est une forme — et c'est la seconde qui décide si Marc postule. Les
+ * bornes suivent sa réponse du 2026-08-20 (« ~50 km, au-delà ça chute vite ») transposée
+ * en temps de route.
+ */
+export const BANDES_DUREE_MIN = [15, 30, 50] as const;
+
+/** La bande d'une durée : 1 (toute proche) à 4 (au-delà de la dernière borne). PURE. */
+export function bandeDuree(dureeS: number): 1 | 2 | 3 | 4 {
+  const minutes = dureeS / 60;
+  if (minutes <= BANDES_DUREE_MIN[0]) return 1;
+  if (minutes <= BANDES_DUREE_MIN[1]) return 2;
+  if (minutes <= BANDES_DUREE_MIN[2]) return 3;
+  return 4;
+}
