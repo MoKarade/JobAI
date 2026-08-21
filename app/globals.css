@@ -2505,3 +2505,26 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   color: var(--text-soft);
 }
 .plan-ecran__repli code { font-family: var(--mono); }
+
+/* Le trajet dans la fiche (ADR-0016, lot B). L'InfoWindow est sur fond blanc : encre
+   foncée en dur, comme le reste de la fiche. */
+.carte-fiche__trajet { margin: 0.45rem 0 0; font-weight: 600; }
+.carte-fiche__bouton-trajet {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid oklch(0.55 0.15 250);
+  border-radius: 0.4rem;
+  background: oklch(0.97 0.01 250);
+  color: oklch(0.35 0.12 250);
+  cursor: pointer;
+  font: inherit;
+}
+.carte-fiche__bouton-trajet:disabled { opacity: 0.6; cursor: default; }
+/* Un refus (plafond, position approximative) se lit en AMBRE, pas en rouge : rien n'est
+   cassé, une règle a mordu et elle se nomme. */
+.carte-fiche__trajet-erreur {
+  margin: 0.35rem 0 0;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.35rem;
+  background: oklch(0.93 0.06 80);
+  color: oklch(0.4 0.1 70);
+}

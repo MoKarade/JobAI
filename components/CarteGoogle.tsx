@@ -26,10 +26,13 @@ import {
   InfoWindow,
   Map,
   Pin,
+  useMap,
 } from "@vis.gl/react-google-maps";
 import type { Epingle } from "@/lib/carte";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
+import { obtenirTrajet, type ResultatTrajet } from "@/lib/actionsTrajet";
+import { formaterDistance, formaterDuree } from "@/lib/trajetRoutes";
 
 /**
  * L'identifiant de style Google. `DEMO_MAP_ID` est un identifiant que Google accepte pour
@@ -37,6 +40,36 @@ import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
  * stylé dans la console, une seule constante change.
  */
 const MAP_ID = "DEMO_MAP_ID";
+
+/** Un trajet obtenu du serveur, prêt à tracer. */
+interface TrajetAffiche {
+  nom: string;
+  dureeS: number;
+  distanceM: number;
+  polyline: string;
+  duCache: boolean;
+}
+
+/**
+ * Trace la polyligne du trajet sur la carte. Composant sans rendu : la Polyline est un
+ * objet Google impératif, pas un nœud React — on la crée dans un effet et on la RETIRE au
+ * démontage, sinon chaque trajet demandé empilerait son tracé sur le précédent.
+ */
+function TraceTrajet({ polyline }: { polyline: string }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !google.maps.geometry?.encoding) return;
+    const trace = new google.maps.Polyline({
+      path: google.maps.geometry.encoding.decodePath(polyline),
+      map,
+      strokeColor: "oklch(0.55 0.15 250)",
+      strokeWeight: 5,
+      strokeOpacity: 0.85,
+    });
+    return () => trace.setMap(null);
+  }, [map, polyline]);
+  return null;
+}
 
 /** Ce qui est sélectionné sur le plan : une épingle, la maison, ou rien. */
 type Selection = { type: "epingle"; index: number } | { type: "domicile" } | null;
@@ -51,7 +84,20 @@ function MeilleureNote(entreprises: Epingle["entreprises"]): number | null {
   return meilleure;
 }
 
-function FicheEpingle({ epingle }: { epingle: Epingle }) {
+function FicheEpingle({
+  epingle,
+  demanderTrajet,
+  trajet,
+  erreurTrajet,
+  trajetEnCours,
+}: {
+  epingle: Epingle;
+  /** `null` quand le trajet n'est pas disponible (domicile non configuré). */
+  demanderTrajet: ((nom: string) => void) | null;
+  trajet: TrajetAffiche | null;
+  erreurTrajet: string | null;
+  trajetEnCours: boolean;
+}) {
   return (
     <div className="carte-fiche">
       {epingle.precision === "ville" ? (
@@ -110,6 +156,28 @@ function FicheEpingle({ epingle }: { epingle: Epingle }) {
               </>
             ) : null}
           </p>
+          {demanderTrajet && epingle.precision === "exacte" ? (
+            <p className="carte-fiche__trajet">
+              {trajet?.nom === e.nom ? (
+                <span>
+                  {formaterDuree(trajet.dureeS)} ({formaterDistance(trajet.distanceM)}) en
+                  voiture, sans trafic{trajet.duCache ? " — du cache" : ""}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="carte-fiche__bouton-trajet"
+                  disabled={trajetEnCours}
+                  onClick={() => demanderTrajet(e.nom)}
+                >
+                  {trajetEnCours ? "Calcul…" : "Tracer le trajet depuis chez moi"}
+                </button>
+              )}
+            </p>
+          ) : null}
+          {erreurTrajet && trajet === null ? (
+            <p className="carte-fiche__trajet-erreur">{erreurTrajet}</p>
+          ) : null}
         </div>
       ))}
     </div>
@@ -130,6 +198,31 @@ export function CarteGoogle({
 }) {
   const [selection, setSelection] = useState<Selection>(null);
   const [agrandie, setAgrandie] = useState(false);
+  const [trajet, setTrajet] = useState<TrajetAffiche | null>(null);
+  const [erreurTrajet, setErreurTrajet] = useState<string | null>(null);
+  const [trajetEnCours, setTrajetEnCours] = useState(false);
+
+  // ⚠️ GARDE ANTI-RAFALE CÔTÉ CLIENT, en plus du plafond serveur : un double-clic ne doit
+  // pas partir en deux appels facturés. Le disabled du bouton la matérialise, ce flag la
+  // tient même si le bouton se re-rend entre les deux clics.
+  async function demanderTrajet(nom: string) {
+    if (trajetEnCours) return;
+    setTrajetEnCours(true);
+    setErreurTrajet(null);
+    try {
+      const r: ResultatTrajet = await obtenirTrajet(nom);
+      if (r.ok) setTrajet({ nom, ...r });
+      else {
+        setTrajet(null);
+        setErreurTrajet(r.raison);
+      }
+    } catch {
+      setTrajet(null);
+      setErreurTrajet("Le calcul du trajet a échoué — réessaie.");
+    } finally {
+      setTrajetEnCours(false);
+    }
+  }
 
   // Échap réduit la carte — même geste que le rendu Leaflet, pour que le changement de
   // fond ne change pas les habitudes.
@@ -173,7 +266,7 @@ export function CarteGoogle({
         </button>
       </div>
       <div className={`carte-offres${agrandie ? " carte-offres--agrandie" : ""}`}>
-        <APIProvider apiKey={cle}>
+        <APIProvider apiKey={cle} libraries={["geometry"]}>
           <Map
             mapId={MAP_ID}
             defaultBounds={bornes}
@@ -224,6 +317,8 @@ export function CarteGoogle({
               </AdvancedMarker>
             ) : null}
 
+            {trajet ? <TraceTrajet polyline={trajet.polyline} /> : null}
+
             {selection?.type === "epingle" && epingles[selection.index] ? (
               <InfoWindow
                 position={{
@@ -233,7 +328,13 @@ export function CarteGoogle({
                 onCloseClick={() => setSelection(null)}
                 maxWidth={340}
               >
-                <FicheEpingle epingle={epingles[selection.index]!} />
+                <FicheEpingle
+                  epingle={epingles[selection.index]!}
+                  demanderTrajet={domicile ? demanderTrajet : null}
+                  trajet={trajet}
+                  erreurTrajet={erreurTrajet}
+                  trajetEnCours={trajetEnCours}
+                />
               </InfoWindow>
             ) : null}
             {selection?.type === "domicile" && domicile ? (

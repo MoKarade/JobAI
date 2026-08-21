@@ -406,6 +406,37 @@ export const entreprisesLieux = pgTable(
  * la valeur reste différente de la cible : le passage suivant reprend au lieu de croire
  * l'affaire réglée.
  */
+/**
+ * Le cache des trajets domicile → entreprise (ADR-0016, lot B).
+ *
+ * ⚠️ C'EST UNE CONTRAINTE DE COÛT, PAS UNE OPTIMISATION. Routes API est facturée à
+ * l'appel : sans ce cache, un trajet recalculé à chaque affichage multiplierait la facture
+ * par le nombre de visites de la page. Un trajet ne se recalcule que si l'entreprise a
+ * BOUGÉ (ses coordonnées au moment du calcul sont conservées pour le détecter) ou si le
+ * domicile a changé.
+ *
+ * La durée est SANS trafic (TRAFFIC_UNAWARE), et c'est délibéré : une durée « avec trafic »
+ * mise en cache des jours serait un mensonge daté — l'itinéraire temps réel vit dans le
+ * lien Google Maps externe, où Google le calcule au moment du départ.
+ */
+export const trajets = pgTable("trajets", {
+  /** Le nom de l'entreprise, tel qu'`entreprisesLieux` le porte. */
+  destinationNom: text("destination_nom").primaryKey(),
+  /** La position de l'entreprise AU MOMENT du calcul — l'invalidation compare à l'actuelle. */
+  lat: real("lat").notNull(),
+  lon: real("lon").notNull(),
+  /** Le domicile au moment du calcul — un déménagement invalide tout. */
+  origineLat: real("origine_lat").notNull(),
+  origineLon: real("origine_lon").notNull(),
+  dureeS: integer("duree_s").notNull(),
+  distanceM: integer("distance_m").notNull(),
+  /** La polyligne ENCODÉE de Google — décodée côté client par la bibliothèque geometry. */
+  polyline: text("polyline").notNull(),
+  calculeLe: timestamp("calcule_le").notNull(),
+});
+
+export type TrajetRow = typeof trajets.$inferSelect;
+
 export const syncState = pgTable("sync_state", {
   cle: text("cle").primaryKey(),
   valeur: text("valeur").notNull(),
