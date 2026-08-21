@@ -279,7 +279,10 @@ code {
   flex-direction: column;
   height: 100dvh;
   padding-bottom: 0;
-  padding-top: clamp(0.9rem, 0.6rem + 1vw, 1.5rem);
+  /* Resserré une seconde fois (2026-08-21, [CARTE-J]) : mesuré à 65 px encore sous le
+     plancher de .plan-ecran sur 1366×768 après le premier tour de resserrement — le
+     padding d'une page de lecture n'a toujours pas sa place ici. */
+  padding-top: clamp(0.3rem, 0.15rem + 0.4vw, 0.7rem);
   overflow: hidden;
 }
 /* ⚠️ ONGLETS RESSERRÉS, ICI SEULEMENT (pas globalement) : leur rythme normal
@@ -290,7 +293,17 @@ code {
    16 filtres, deux lignes de compte) laissait à peine assez de place pour le PLANCHER de
    la carte plus bas — chaque pixel repris ici profite directement au plan. */
 .page--pleine .onglets {
-  margin: var(--pas-2) 0 var(--pas);
+  margin: 0.3rem 0 0.15rem;
+}
+/* Le sous-titre du logo (« Coordination technique et automatisation · rayon 50 km »)
+   est une signature de marque, pas une information dont cette page a besoin — les
+   onglets et le titre caché (lecteur d'écran) disent déjà où l'on est. Masqué ICI
+   SEULEMENT : ailleurs, c'est un choix d'identité délibéré qui reste. */
+.page--pleine .entete__sous {
+  display: none;
+}
+.page--pleine .entete {
+  gap: 0;
 }
 /* ⚠️ MÊME RESSERREMENT, MÊME RAISON (« rends la map plus grande de base », mesuré
    2026-08-21 : sur 1366×768/1280×720, le plancher de `.plan-ecran` (26rem) restait la
@@ -304,11 +317,20 @@ code {
 .page--pleine .geocodage {
   margin-bottom: 0.4rem;
 }
-.page--pleine .controles__compte {
-  margin: 0.35rem 0;
-}
+/* ⚠️ TROIS `<p>` DEVIENNENT UNE SEULE LIGNE DE STATUT (ICI SEULEMENT) — rien n'est
+   retiré, chaque fait reste écrit (« ce qui est masqué se dit, toujours » vaut pour
+   les ENTREPRISES qu'un filtre écarte, pas pour la mise en page de ce qui le dit).
+   Empilés en blocs, ils coûtaient chacun leur propre ligne — `display:inline` les
+   laisse s'écouler comme du texte continu et ne retomber à la ligne suivante que si
+   la largeur l'exige vraiment, au lieu de l'imposer par défaut. */
+.page--pleine .controles__compte,
 .page--pleine .carte__compte {
-  margin-bottom: 0.2rem;
+  display: inline;
+  margin: 0;
+}
+.page--pleine .controles__compte::after,
+.page--pleine .carte__compte::after {
+  content: " ";
 }
 .page--pleine main {
   flex: 1 1 auto;
