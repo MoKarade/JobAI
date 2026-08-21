@@ -19,7 +19,7 @@
 // reste interdit : ces coordonnées dans un fichier VERSIONNÉ, ou servies à une requête non
 // authentifiée.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   APIProvider,
   AdvancedMarker,
@@ -75,6 +75,50 @@ function TraceTrajet({ polyline }: { polyline: string }) {
     });
     return () => trace.setMap(null);
   }, [map, polyline]);
+  return null;
+}
+
+/**
+ * Recale la carte quand son CONTENEUR change de taille — pas quand ELLE le décide.
+ *
+ * ⚠️ POURQUOI CE COMPOSANT EXISTE (bug Marc 2026-08-21, capture à l'appui) : Google Maps
+ * ne réécoute JAMAIS le CSS de son `<div>` tout seul. `defaultBounds` ne fait le calcul
+ * qu'UNE fois, au montage — et au montage, le flex de la page n'a pas fini de se résoudre :
+ * la carte se cadre sur une taille qui n'est pas la taille finale. Aucun redimensionnement
+ * ultérieur (resserrement du chrome, bascule « Agrandir », simple réouverture d'onglet à une
+ * autre fenêtre) ne la corrige — Google continue de dessiner sur l'ANCIEN canevas, et ce
+ * qui déborde du nouveau `<div>` reste soit vide, soit rempli de tuiles d'un zoom qui n'a
+ * plus de rapport avec le cadrage voulu (la capture de Marc montrait le Michigan sous le
+ * Québec — deux niveaux de zoom, un seul et même canevas mal recalé).
+ *
+ * `ResizeObserver` sur le `<div>` RÉEL de la carte (`map.getDiv()`, pas un `<div>` React à
+ * nous — Google en pose un lui-même) + `google.maps.event.trigger(map, "resize")` (l'event
+ * qui force Google à relire sa propre taille) + un `fitBounds` immédiat après (le `resize`
+ * seul ne recadre pas, il redimensionne juste le canevas autour du centre qu'il avait déjà,
+ * qui n'a plus de sens une fois la taille changée).
+ */
+function SuivreRedimensionnement({
+  bornes,
+}: {
+  bornes: { north: number; south: number; east: number; west: number };
+}) {
+  const map = useMap();
+  // Lu par le callback du `ResizeObserver`, jamais par un rendu : une ref évite de reposer
+  // l'observateur à chaque frappe de filtre (qui change `bornes`) tout en lui donnant
+  // toujours la valeur COURANTE — une fermeture sur `bornes` figerait celle du montage.
+  const bornesRef = useRef(bornes);
+  bornesRef.current = bornes;
+
+  useEffect(() => {
+    if (!map) return;
+    const conteneur = map.getDiv();
+    const observateur = new ResizeObserver(() => {
+      google.maps.event.trigger(map, "resize");
+      map.fitBounds(bornesRef.current);
+    });
+    observateur.observe(conteneur);
+    return () => observateur.disconnect();
+  }, [map]);
   return null;
 }
 
@@ -428,6 +472,8 @@ export function CarteGoogle({
                 />
               </AdvancedMarker>
             ) : null}
+
+            <SuivreRedimensionnement bornes={bornes} />
 
             {trajet ? <TraceTrajet polyline={trajet.polyline} /> : null}
 
