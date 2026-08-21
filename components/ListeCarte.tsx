@@ -16,22 +16,6 @@ import { palier } from "@/lib/scoring";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { Fait } from "./Icone";
 import { libelleBorne, libelleDistanceBorne } from "@/lib/bornes";
-import { ADRESSE_ABSENTE, mentionSource } from "@/lib/adresse";
-
-/**
- * N'accepte un lien QUE s'il est http/https — même garde que `lienSur` (`CarteOffre.tsx`,
- * `app/offre/[id]/page.tsx`, `CarteOffres.tsx`) : `x.siteWeb` vient de Google Place
- * Details, pas d'une saisie de Marc, mais rien n'exige que Google ne publie jamais autre
- * chose qu'une URL propre.
- */
-function lienSur(brut: string): string | null {
-  try {
-    const u = new URL(brut);
-    return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
-  } catch {
-    return null;
-  }
-}
 
 export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
   return (
@@ -49,28 +33,9 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                   {e.precision === "ville" ? " · position approximative" : ""}
                 </span>
               </h2>
-              {/* L'ADRESSE d'abord : c'est ce qu'on cherche quand on prépare un
-                  déplacement ou une candidature. Absente, on le DIT — une entreprise posée
-                  au centre de sa ville n'a pas d'adresse connue, et en afficher une
-                  plausible serait pire que le silence. */}
-              <p className="carte-liste__adresse">
-                {x.adresse ?? ADRESSE_ABSENTE}
-                {/* LA SOURCE, quand il y a une adresse. Un domicile légal tiré du registre
-                    n'est pas un lieu de travail : les afficher pareil enverrait Marc à la
-                    mauvaise porte. Le texte vit dans `lib/adresse.ts`, une seule fois. */}
-                {x.adresse && x.adresseSource ? (
-                  <span className="carte-liste__source">
-                    {" "}
-                    ({mentionSource(x.adresseSource)})
-                  </span>
-                ) : null}
-              </p>
-              {/* ⚠️ MOINS DE TEXTE, PAS MOINS D'INFORMATION (demande de Marc, 2026-08-06).
-                  « 26,4 km du domicile (mesuré) » devient une icône et « 26,4 km » : ce que
-                  la phrase disait en plus — d'où on mesure, et que c'est mesuré — est vrai
-                  de TOUTES les lignes, donc le répéter partout n'apprenait rien. L'icône
-                  porte son nom au lecteur d'écran (`components/Icone.tsx`), sans quoi
-                  couper la phrase couperait aussi le sens. */}
+              {/* L'adresse et sa source ont été RETIRÉES d'ici (demande Marc 2026-08-21 :
+                  « moins de texte sur le côté ») : la fiche de l'épingle les porte déjà —
+                  la liste sert à balayer, pas à relire. */}
               <p className="carte-liste__faits">
                 <Fait genre="route" discret={x.km === null}>
                   {x.km === null ? "—" : `${String(x.km).replace(".", ",")} km`}
@@ -93,13 +58,6 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
               {/* Fiche enrichie par Google Places — [CARTE-03-PLACES]. Même contenu que la
                   fenêtre de l'épingle (`CarteOffres.tsx`) : les trois champs sont
                   indépendants, `null` = pas de `placeGoogleId` ou pas encore interrogé. */}
-              {x.siteWeb && lienSur(x.siteWeb) ? (
-                <p className="carte-liste__site">
-                  <a href={lienSur(x.siteWeb)!} target="_blank" rel="noopener noreferrer">
-                    Site web ↗
-                  </a>
-                </p>
-              ) : null}
               {x.telephone ? <p className="carte-liste__telephone">{x.telephone}</p> : null}
               {x.horaires && x.horaires.length > 0 ? (
                 <ul className="carte-liste__horaires">

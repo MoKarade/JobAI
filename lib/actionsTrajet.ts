@@ -10,12 +10,12 @@
 // compteur (une lecture), et l'appel facturé en DERNIER. Inverser cache et compteur
 // ferait « mordre » le plafond sur des trajets déjà payés.
 
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { entreprisesLieux, trajets } from "./db/schema";
 import { exigerSession } from "./session";
 import { domicile } from "./domicile";
-import { appelerRoutes, appelerTournee, cacheValide } from "./trajetRoutes";
+import { appelerRoutes, cacheValide } from "./trajetRoutes";
 import { consommerBudgetRoutes } from "./budgetRoutes";
 
 export type ResultatTrajet =
@@ -122,52 +122,3 @@ export async function obtenirTrajet(nomEntreprise: string): Promise<ResultatTraj
   return { ok: true, dureeS: r.dureeS, distanceM: r.distanceM, polyline: r.polyline, duCache: false };
 }
 
-export type ResultatTourneeAction =
-  | { ok: true; dureeS: number; distanceM: number; polyline: string; ordre: string[] }
-  | { ok: false; raison: string };
-
-/**
- * La tournée : domicile → entreprises cochées (ordre optimisé) → domicile (ADR-0016, F).
- *
- * Le budget compte les ÉTAPES : une tournée de quatre entreprises pèse quatre éléments —
- * approximation CONSERVATRICE de la facturation « Routes avancé », documentée plutôt
- * qu'exacte : mieux vaut un frein qui mord un peu tôt qu'un compteur qui sous-estime.
- */
-export async function obtenirTournee(noms: string[]): Promise<ResultatTourneeAction> {
-  try {
-    await exigerSession();
-  } catch {
-    return { ok: false, raison: "Authentification requise." };
-  }
-  if (noms.length < 2 || noms.length > 8) {
-    return { ok: false, raison: "Une tournée va de deux à huit étapes." };
-  }
-
-  const maison = await domicile();
-  if (!maison) return { ok: false, raison: "Domicile non configuré." };
-  const cle = process.env.GOOGLE_MAPS_API_KEY?.trim();
-  if (!cle) return { ok: false, raison: "GOOGLE_MAPS_API_KEY absente." };
-
-  const lieux = await db
-    .select()
-    .from(entreprisesLieux)
-    .where(inArray(entreprisesLieux.nom, noms));
-  const exacts = lieux.filter((l) => l.precision === "exacte");
-  if (exacts.length < noms.length) {
-    const manquants = noms.filter((n) => !exacts.some((l) => l.nom === n));
-    // Nommer ce qui manque : « certaines étapes » ne se corrige pas, une liste si.
-    return {
-      ok: false,
-      raison: `Étape(s) sans position exacte : ${manquants.join(", ")} — une tournée vers un centre-ville mentirait.`,
-    };
-  }
-
-  const budget = await consommerBudgetRoutes(noms.length);
-  if (!budget.ok) return budget;
-
-  return appelerTournee(
-    maison,
-    exacts.map((l) => ({ nom: l.nom, lat: l.lat, lon: l.lon })),
-    cle,
-  );
-}
