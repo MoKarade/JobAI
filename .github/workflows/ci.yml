@@ -20,6 +20,9 @@ permissions:
 
 jobs:
   gate:
+    # Plafond : sans lui, un job fige tourne SIX HEURES avant d'echouer (vecu sur
+    # DriveAI le 19/08/2026). Calibre sur la duree reelle — 1 min 41 s observe.
+    timeout-minutes: 15
     name: Gate (typecheck · tests · lint · build)
     runs-on: ubuntu-latest
     steps:
