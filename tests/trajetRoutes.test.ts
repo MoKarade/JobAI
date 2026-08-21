@@ -4,6 +4,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   TOLERANCE_POSITION_DEG,
+  appelerMatrice,
   appelerRoutes,
   cacheValide,
   formaterDistance,
@@ -82,5 +83,50 @@ describe("appelerRoutes — fetch injecté, échecs NOMMÉS", () => {
     expect(masque).not.toContain("*");
     // Et la préférence SANS trafic : c'est ce qui rend la durée cachable.
     expect(String(init.body)).toContain("TRAFFIC_UNAWARE");
+  });
+});
+
+describe("appelerMatrice — N destinations, les inatteignables NOMMÉES", () => {
+  const dests = [
+    { nom: "Alpha Industries", lat: 46.8, lon: -71.2 },
+    { nom: "Beta Fabrication", lat: 46.9, lon: -71.1 },
+  ];
+  const reponse = (corps: unknown) => new Response(JSON.stringify(corps));
+
+  it("rattache chaque élément à son nom par l'index", async () => {
+    const r = await appelerMatrice(maison, dests, "cle", vi.fn(async () =>
+      reponse([
+        { originIndex: 0, destinationIndex: 1, condition: "ROUTE_EXISTS", duration: "600s", distanceMeters: 9000 },
+        { originIndex: 0, destinationIndex: 0, condition: "ROUTE_EXISTS", duration: "1200s", distanceMeters: 18000 },
+      ]),
+    ));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // L'ordre de la réponse n'est PAS celui des destinations : c'est l'index qui fait foi.
+    expect(r.elements).toContainEqual({ nom: "Alpha Industries", dureeS: 1200, distanceM: 18000 });
+    expect(r.elements).toContainEqual({ nom: "Beta Fabrication", dureeS: 600, distanceM: 9000 });
+  });
+
+  it("⚠️ un élément sans ROUTE_EXISTS est écarté ET nommé — jamais un zéro plausible", async () => {
+    const r = await appelerMatrice(maison, dests, "cle", vi.fn(async () =>
+      reponse([
+        { originIndex: 0, destinationIndex: 0, condition: "ROUTE_EXISTS", duration: "600s", distanceMeters: 9000 },
+        // ⚠️ CAS DÉGÉNÉRÉ FORGÉ, et c'est voulu : une durée PRÉSENTE sous un statut qui la
+        // désavoue. Sans lui, ce test ne sépare pas « pas de ROUTE_EXISTS » de « pas de
+        // durée » — la première mutation l'a prouvé en passant VERTE : l'élément de test
+        // n'avait ni l'un ni l'autre, et les deux gardes se masquaient mutuellement.
+        { originIndex: 0, destinationIndex: 1, condition: "ROUTE_NOT_FOUND", duration: "5s", distanceMeters: 10 },
+      ]),
+    ));
+    if (!r.ok) return;
+    expect(r.elements).toHaveLength(1);
+    expect(r.inatteignables).toEqual(["Beta Fabrication"]);
+  });
+
+  it("zéro destination = zéro appel — le fetch n'est jamais touché", async () => {
+    const f = vi.fn();
+    const r = await appelerMatrice(maison, [], "cle", f as never);
+    expect(r).toEqual({ ok: true, elements: [], inatteignables: [] });
+    expect(f).not.toHaveBeenCalled();
   });
 });

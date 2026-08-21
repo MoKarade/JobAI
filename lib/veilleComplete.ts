@@ -48,6 +48,7 @@ import { CLE_RAYON, RAYON_DEFAUT_KM } from "./rayon";
 import { recuperer } from "./ingest/sources";
 import { lireEtat, ecrireEtat } from "./etat";
 import type { JournalVeille } from "./veille";
+import { remplirDureesTrajet } from "./trajetMatrice";
 
 export const CLE_JOURNAL = "veille-journal";
 
@@ -298,6 +299,18 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
       console.error("[cron] localisation impossible", err);
       localisation = "échec — voir les journaux";
     }
+    // Les durées de trajet (ADR-0016, lot C) : APRÈS la localisation, dans son propre try —
+    // une panne Routes ne doit jamais coûter la passe, et son résultat (ou son refus) se
+    // DIT dans les journaux comme le reste du travail de fond.
+    try {
+      const m = await remplirDureesTrajet();
+      if (m.remplies > 0 || !m.resume.startsWith("à jour")) {
+        console.log(`[trajets] ${m.resume}`);
+      }
+    } catch (err) {
+      console.error("[trajets] remplissage impossible", err);
+    }
+
     await ecrireEtat(CLE_CURSEUR, curseur + rapport.sources.length);
 
     // ⚠️ LE RAPPORT S'ÉCRIT ICI, ET NON DANS LE BOUTON. C'est le seul endroit que TOUS les

@@ -15,15 +15,8 @@ import { db } from "./db";
 import { entreprisesLieux, trajets } from "./db/schema";
 import { exigerSession } from "./session";
 import { domicile } from "./domicile";
-import { lireEtat, ecrireEtat } from "./etat";
-import {
-  ROUTES_MAX_PAR_JOUR,
-  appelerRoutes,
-  cacheValide,
-} from "./trajetRoutes";
-
-/** Clé d'état du compteur journalier d'appels Routes. */
-const CLE_COMPTEUR = "routes-compteur";
+import { appelerRoutes, cacheValide } from "./trajetRoutes";
+import { consommerBudgetRoutes } from "./budgetRoutes";
 
 export type ResultatTrajet =
   | {
@@ -35,15 +28,6 @@ export type ResultatTrajet =
       duCache: boolean;
     }
   | { ok: false; raison: string };
-
-function aujourdhuiQuebec(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Toronto",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
 
 /** Le trajet vers une entreprise PLACÉE. Cache d'abord, plafond ensuite, appel en dernier. */
 export async function obtenirTrajet(nomEntreprise: string): Promise<ResultatTrajet> {
@@ -80,7 +64,10 @@ export async function obtenirTrajet(nomEntreprise: string): Promise<ResultatTraj
   }
 
   const [enCache] = await db.select().from(trajets).where(eq(trajets.destinationNom, lieu.nom));
-  if (enCache && cacheValide(enCache, lieu, maison)) {
+  // ⚠️ LE CACHE NE SUFFIT QUE S'IL PORTE UN TRACÉ. Une ligne venue de la MATRICE (lot C)
+  // a la durée sans la polyligne — pour TRACER, il faut l'appel complet, qui complètera la
+  // ligne au passage. Rendre la durée seule ferait un bouton « tracer » qui ne trace rien.
+  if (enCache && enCache.polyline !== null && cacheValide(enCache, lieu, maison)) {
     return {
       ok: true,
       dureeS: enCache.dureeS,
@@ -95,19 +82,10 @@ export async function obtenirTrajet(nomEntreprise: string): Promise<ResultatTraj
     return { ok: false, raison: "GOOGLE_MAPS_API_KEY absente : le calcul de trajet est désactivé." };
   }
 
-  // Le compteur journalier — le filet anti-emballement. Incrémenté AVANT l'appel : un appel
-  // parti est facturé même si sa réponse est illisible, la comptabilité LLM tient déjà
-  // cette règle et elle vaut ici aussi.
-  const jour = aujourdhuiQuebec();
-  const compteur = await lireEtat<{ jour: string; n: number }>(CLE_COMPTEUR, { jour, n: 0 });
-  const n = compteur.jour === jour ? compteur.n : 0;
-  if (n >= ROUTES_MAX_PAR_JOUR) {
-    return {
-      ok: false,
-      raison: `Plafond de ${ROUTES_MAX_PAR_JOUR} appels Routes/jour atteint — demain, ou le lien Google Maps.`,
-    };
-  }
-  await ecrireEtat(CLE_COMPTEUR, { jour, n: n + 1 });
+  // Le frein partagé (lib/budgetRoutes.ts) : consommé AVANT l'appel, refus nommé. Un
+  // computeRoutes vaut UN élément.
+  const budget = await consommerBudgetRoutes(1);
+  if (!budget.ok) return budget;
 
   const r = await appelerRoutes(maison, { lat: lieu.lat, lon: lieu.lon }, cle);
   if (!r.ok) return r;

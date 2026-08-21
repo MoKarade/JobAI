@@ -24,7 +24,9 @@ import {
   APIProvider,
   AdvancedMarker,
   InfoWindow,
-  Map,
+  // ⚠️ Renommé : le composant s'appelle `Map` et MASQUERAIT le Map natif du langage —
+  // `new Map(durees)` construirait alors un composant React, et le typage l'a attrapé.
+  Map as FondGoogle,
   Pin,
   useMap,
 } from "@vis.gl/react-google-maps";
@@ -90,8 +92,10 @@ function FicheEpingle({
   trajet,
   erreurTrajet,
   trajetEnCours,
+  dureesParNom,
 }: {
   epingle: Epingle;
+  dureesParNom: ReadonlyMap<string, { dureeS: number; distanceM: number }>;
   /** `null` quand le trajet n'est pas disponible (domicile non configuré). */
   demanderTrajet: ((nom: string) => void) | null;
   trajet: TrajetAffiche | null;
@@ -163,6 +167,20 @@ function FicheEpingle({
                   {formaterDuree(trajet.dureeS)} ({formaterDistance(trajet.distanceM)}) en
                   voiture, sans trafic{trajet.duCache ? " — du cache" : ""}
                 </span>
+              ) : dureesParNom.has(e.nom) ? (
+                <span>
+                  {formaterDuree(dureesParNom.get(e.nom)!.dureeS)} (
+                  {formaterDistance(dureesParNom.get(e.nom)!.distanceM)}) en voiture, sans
+                  trafic{" · "}
+                  <button
+                    type="button"
+                    className="carte-fiche__bouton-trajet"
+                    disabled={trajetEnCours}
+                    onClick={() => demanderTrajet(e.nom)}
+                  >
+                    {trajetEnCours ? "Calcul…" : "Tracer"}
+                  </button>
+                </span>
               ) : (
                 <button
                   type="button"
@@ -189,18 +207,22 @@ export function CarteGoogle({
   epingles,
   cadre,
   domicile,
+  durees = [],
 }: {
   cle: string;
   epingles: readonly Epingle[];
   cadre: { latMin: number; latMax: number; lonMin: number; lonMax: number } | null;
   /** Les coordonnées du domicile, ou `null` si elles ne sont pas configurées. */
   domicile: { lat: number; lon: number } | null;
+  /** Les durées du cache nocturne (lot C), affichées d'office dans les fiches. */
+  durees?: [string, { dureeS: number; distanceM: number }][];
 }) {
   const [selection, setSelection] = useState<Selection>(null);
   const [agrandie, setAgrandie] = useState(false);
   const [trajet, setTrajet] = useState<TrajetAffiche | null>(null);
   const [erreurTrajet, setErreurTrajet] = useState<string | null>(null);
   const [trajetEnCours, setTrajetEnCours] = useState(false);
+  const dureesParNom = useMemo(() => new Map(durees), [durees]);
 
   // ⚠️ GARDE ANTI-RAFALE CÔTÉ CLIENT, en plus du plafond serveur : un double-clic ne doit
   // pas partir en deux appels facturés. Le disabled du bouton la matérialise, ce flag la
@@ -267,7 +289,7 @@ export function CarteGoogle({
       </div>
       <div className={`carte-offres${agrandie ? " carte-offres--agrandie" : ""}`}>
         <APIProvider apiKey={cle} libraries={["geometry"]}>
-          <Map
+          <FondGoogle
             mapId={MAP_ID}
             defaultBounds={bornes}
             gestureHandling="greedy"
@@ -331,6 +353,7 @@ export function CarteGoogle({
                 <FicheEpingle
                   epingle={epingles[selection.index]!}
                   demanderTrajet={domicile ? demanderTrajet : null}
+                  dureesParNom={dureesParNom}
                   trajet={trajet}
                   erreurTrajet={erreurTrajet}
                   trajetEnCours={trajetEnCours}
@@ -348,7 +371,7 @@ export function CarteGoogle({
                 </div>
               </InfoWindow>
             ) : null}
-          </Map>
+          </FondGoogle>
         </APIProvider>
       </div>
     </div>

@@ -430,8 +430,15 @@ export const trajets = pgTable("trajets", {
   origineLon: real("origine_lon").notNull(),
   dureeS: integer("duree_s").notNull(),
   distanceM: integer("distance_m").notNull(),
-  /** La polyligne ENCODÉE de Google — décodée côté client par la bibliothèque geometry. */
-  polyline: text("polyline").notNull(),
+  /**
+   * La polyligne ENCODÉE de Google — décodée côté client par la bibliothèque geometry.
+   *
+   * ⚠️ NULLABLE, et c'est une distinction honnête : la MATRICE (lot C, remplissage
+   * nocturne) rend durée et distance sans tracé ; le clic « tracer » (lot B) fait l'appel
+   * complet et pose la polyligne. `null` = « durée connue, tracé jamais demandé » — une
+   * chaîne vide ferait passer l'absence pour un tracé cassé.
+   */
+  polyline: text("polyline"),
   calculeLe: timestamp("calcule_le").notNull(),
 });
 

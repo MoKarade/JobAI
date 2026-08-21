@@ -10,16 +10,6 @@ import { z } from "zod";
 import type { TrajetRow } from "./db/schema";
 
 /**
- * Plafond d'appels Routes par jour — le même filet anti-emballement que le frein LLM de
- * DriveAI : il ne se désactive jamais, il se dit quand il mord.
- *
- * Cinquante : le stock d'entreprises placées tient dedans en deux jours au pire, et une
- * boucle accidentelle (re-render qui appelle en rafale) est coupée avant de coûter plus
- * qu'un café.
- */
-export const ROUTES_MAX_PAR_JOUR = 50;
-
-/**
  * En deçà de cet écart (en degrés, ≈ 110 m en latitude), une position est « la même ».
  *
  * Un géocodage re-passé rend rarement le mètre près : invalider le cache pour trois
@@ -136,4 +126,93 @@ export async function appelerRoutes(
     distanceM: r.distanceMeters,
     polyline: r.polyline.encodedPolyline,
   };
+}
+
+/** Une destination de matrice : le nom sert à rattacher l'élément à sa ligne de cache. */
+export interface DestinationMatrice {
+  nom: string;
+  lat: number;
+  lon: number;
+}
+
+/**
+ * La réponse computeRouteMatrix : un tableau d'ÉLÉMENTS indexés, pas de routes. La
+ * `condition` compte : un élément sans `ROUTE_EXISTS` (île sans pont, position aberrante)
+ * n'a pas de durée à conserver — l'écarter vaut mieux qu'un zéro plausible.
+ */
+const ReponseMatriceSchema = z.array(
+  z.object({
+    originIndex: z.number().int(),
+    destinationIndex: z.number().int(),
+    condition: z.string().optional(),
+    duration: z
+      .string()
+      .regex(/^\d+(\.\d+)?s$/)
+      .transform((d) => Math.round(Number.parseFloat(d)))
+      .optional(),
+    distanceMeters: z.number().int().nonnegative().optional(),
+  }),
+);
+
+export type ResultatMatrice =
+  | {
+      ok: true;
+      /** Les destinations atteignables, avec leur durée. Les autres sont NOMMÉES à part. */
+      elements: { nom: string; dureeS: number; distanceM: number }[];
+      inatteignables: string[];
+    }
+  | { ok: false; raison: string };
+
+/**
+ * UNE origine vers N destinations, en UN appel HTTP — mais N ÉLÉMENTS facturés : c'est à
+ * l'appelant d'avoir réservé N sur le budget AVANT (lib/budgetRoutes.ts).
+ */
+export async function appelerMatrice(
+  origine: { lat: number; lon: number },
+  destinations: readonly DestinationMatrice[],
+  cle: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ResultatMatrice> {
+  if (destinations.length === 0) return { ok: true, elements: [], inatteignables: [] };
+
+  let reponse: Response;
+  try {
+    reponse = await fetchFn("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": cle,
+        "X-Goog-FieldMask": "originIndex,destinationIndex,duration,distanceMeters,condition",
+      },
+      body: JSON.stringify({
+        origins: [
+          { waypoint: { location: { latLng: { latitude: origine.lat, longitude: origine.lon } } } },
+        ],
+        destinations: destinations.map((d) => ({
+          waypoint: { location: { latLng: { latitude: d.lat, longitude: d.lon } } },
+        })),
+        travelMode: "DRIVE",
+        routingPreference: "TRAFFIC_UNAWARE",
+      }),
+    });
+  } catch (e) {
+    return { ok: false, raison: `Matrice injoignable : ${e instanceof Error ? e.message : e}` };
+  }
+  if (!reponse.ok) return { ok: false, raison: `Matrice a répondu ${reponse.status}` };
+
+  const analyse = ReponseMatriceSchema.safeParse(await reponse.json().catch(() => null));
+  if (!analyse.success) return { ok: false, raison: "Réponse matrice hors schéma." };
+
+  const elements: { nom: string; dureeS: number; distanceM: number }[] = [];
+  const inatteignables: string[] = [];
+  for (const e of analyse.data) {
+    const dest = destinations[e.destinationIndex];
+    if (!dest) continue;
+    if (e.condition !== "ROUTE_EXISTS" || e.duration === undefined || e.distanceMeters === undefined) {
+      inatteignables.push(dest.nom);
+      continue;
+    }
+    elements.push({ nom: dest.nom, dureeS: e.duration, distanceM: e.distanceMeters });
+  }
+  return { ok: true, elements, inatteignables };
 }

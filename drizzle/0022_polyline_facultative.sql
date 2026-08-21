@@ -1,0 +1,1 @@
+ALTER TABLE "trajets" ALTER COLUMN "polyline" DROP NOT NULL;

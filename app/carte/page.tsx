@@ -25,7 +25,7 @@ import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { entreprisesLieux } from "@/lib/db/schema";
+import { entreprisesLieux, trajets } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import type { PositionEntreprise } from "@/lib/carte";
 import { ENTREPRISES_CIBLES } from "@/lib/reference";
@@ -67,12 +67,19 @@ export default async function PageCarte() {
   // Le domicile, DANS le try : son échec (géocodage, base) ne doit pas éteindre la carte —
   // sans lui elle rend exactement ce qu'elle rendait avant ADR-0016.
   let maison: { lat: number; lon: number } | null = null;
+  let durees: [string, { dureeS: number; distanceM: number }][] = [];
 
   try {
     maison = await domicile();
     offres = await lireOffres();
     if (offres !== null) {
       const lignes = await db.select().from(entreprisesLieux);
+      // Les durées du cache (remplies la nuit, lot C) : lues en bloc, sérialisées comme
+      // les positions — une Map ne traverse pas la frontière serveur→client.
+      durees = (await db.select().from(trajets)).map((t) => [
+        t.destinationNom,
+        { dureeS: t.dureeS, distanceM: t.distanceM },
+      ]);
       lieux = lignes;
       positions = new Map(
         lignes.map((l) => [
@@ -256,6 +263,7 @@ export default async function PageCarte() {
         ciblesManquantes={ciblesManquantes}
         cleGoogle={process.env.NEXT_PUBLIC_GOOGLE_MAPS_CLIENT_KEY?.trim() || null}
         domicile={maison}
+        durees={durees}
       />
     </Cadre>
   );

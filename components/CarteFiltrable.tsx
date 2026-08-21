@@ -53,6 +53,7 @@ export function CarteFiltrable({
   metiers = [],
   cleGoogle = null,
   domicile = null,
+  durees = [],
 }: {
   offres: Offre[];
   /** Les métiers du domaine — la catégorie s'en sert, comme la note. */
@@ -69,6 +70,8 @@ export function CarteFiltrable({
   cleGoogle?: string | null;
   /** Le domicile, ou `null` s'il n'est pas configuré. Garde-fou n°1 v3 (ADR-0016). */
   domicile?: { lat: number; lon: number } | null;
+  /** Durées de trajet du cache nocturne, sérialisées (une Map ne traverse pas). */
+  durees?: [string, { dureeS: number; distanceM: number }][];
 }) {
   const [filtres, setFiltres] = useState<EtatFiltres>(FILTRES_VIDES);
 
@@ -193,7 +196,13 @@ export function CarteFiltrable({
             une grille exige de vérifier ce qu'il rend À SA RACINE, jamais de le supposer. */}
         <div className="plan-ecran__plan">
           {cleGoogle ? (
-            <CarteGoogle cle={cleGoogle} epingles={epingles} cadre={cadre} domicile={domicile} />
+            <CarteGoogle
+              cle={cleGoogle}
+              epingles={epingles}
+              cadre={cadre}
+              domicile={domicile}
+              durees={durees}
+            />
           ) : (
             <>
               {/* Le repli SE DIT. Sans cette ligne, « pourquoi ma carte est-elle encore
