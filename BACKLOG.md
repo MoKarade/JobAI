@@ -1579,3 +1579,41 @@ RESTE — à observer sur les prochaines passes (rien à coder) :
       Aucune modification de `lib/scoring.ts` ni de la logique de matching : protocole §11
       non déclenché — mise en page et affichage seulement. Gate complet vert (81 fichiers,
       1386 tests).
+
+## Chantier — 403 encore, map trop petite, tri de la liste
+
+- [x] 🔧 **`[CARTE-I]`** **Retours de test de Marc, 2026-08-21 (suite)** : « jai encore
+      erreur 403, rends la map plus grande de base, jai aussi encore beaucoup le soucis de
+      scroll sous la map, corrige. aussi pour les offres a droite de la map, laisse moi les
+      classer (note, distance, etc) ». ✅ 2026-08-21.
+      · **403, source élargie** — `[CARTE-H]` ne traduisait le 403 QUE pour Routes.
+        La clé serveur est restreinte par API (ADR-0016) : Geocoding, Places et Routes se
+        refusent chacune INDÉPENDAMMENT tant qu'elles ne sont pas TOUTES activées et
+        listées. `lib/geocodage.ts` (Google Maps Geocoding, Places Autocomplete, Place
+        Details) rendait un `HTTP 403` générique, sans dire LAQUELLE des trois manquait
+        encore — exactement ce qui a pu maintenir le 403 après que Marc n'a activé que
+        Routes. Les trois nomment maintenant l'API et le geste console, comme Routes.
+      · **Map trop petite / scroll persistant, MESURÉ, pas supposé** — un harnais
+        Playwright avec la VRAIE barre de filtres (16 boutons + le bloc `BoutonSituer`) a
+        montré la vraie cause : `.plan-ecran{min-height:0}` laissait le plan s'écraser à
+        **39,7 px** sur 1280×720 dès que les filtres prenaient deux ou trois lignes — un
+        plan visible mais inutilisable, pas un défilement. Trois correctifs mesurés :
+        (a) `BoutonSituer` replie sa note explicative (~124 px, toujours visible) dans un
+        `<details>` — l'info reste accessible, sa place permanente non ;
+        (b) `.page--pleine` resserre SPÉCIFIQUEMENT le rythme des onglets et le padding du
+        haut sur cette page (pas globalement — le rythme normal reste un choix ailleurs) ;
+        (c) `.plan-ecran` gagne un PLANCHER (`min-height: 26rem`, pas 0) : le plan ne
+        s'écrase plus, `main` absorbe un éventuel écart résiduel par un défilement interne
+        CONTENU (`overflow-y: auto`, un filet, pas le mécanisme) plutôt que de rendre le bas
+        de la carte inatteignable en silence. Mesuré après coup : 1440×900 et 1920×1080
+        sans aucun défilement (plan à 373 et 553 px) ; 1280×720 garde un défilement interne
+        de ~150 px dans `main` — un plan à 345 px garanti valait mieux qu'un plan à 40 px.
+      · **Tri de la liste à droite** (`lib/carte.ts` : `aplatirEntreprises`,
+        `trierEntreprisesListees`, PUR, testé — 9 tests) : note (moyenne décroissante,
+        même règle que la pastille de l'épingle et les groupes de l'accueil — jamais zéro
+        pour une entreprise non jugée), distance (croissante), nom (alphabétique
+        français). Non mesuré passe toujours en DERNIER, jamais trié comme zéro ni comme
+        l'infini. `ListeCarte.tsx` devient client (`useState` du critère), même style de
+        boutons que les filtres (`.filtre`/`.filtre--actif`).
+      Gate complet vert (81 fichiers, 1398 tests). Aucune modification de `lib/scoring.ts`
+      ni de la logique de matching : protocole §11 non déclenché.

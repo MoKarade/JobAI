@@ -1,3 +1,5 @@
+"use client";
+
 // components/ListeCarte.tsx — la carte, LISIBLE AU CLAVIER ET AU LECTEUR D'ÉCRAN.
 //
 // Une carte de tuiles ne s'explore pas autrement. Sans cette liste, la page serait
@@ -8,20 +10,61 @@
 //
 // Extraite de `app/carte/page.tsx` quand la carte est passée côté client pour ses filtres :
 // la laisser dans la page aurait obligé à la recopier, et une copie diverge.
+//
+// ⚠️ TRIABLE (demande de Marc, 2026-08-21 : « laisse-moi les classer »). `"use client"`
+// depuis que le tri est un ÉTAT propre à cette liste — le plan n'a pas à le connaître, un
+// changement de tri ne redemande rien au serveur. Le classement lui-même est PUR et testé
+// (`lib/carte.ts`, `trierEntreprisesListees`) : ce composant choisit le critère, il ne
+// décide d'aucun ordre lui-même.
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Epingle } from "@/lib/carte";
+import {
+  aplatirEntreprises,
+  trierEntreprisesListees,
+  type Epingle,
+  type TriListeCarte,
+} from "@/lib/carte";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { palier } from "@/lib/scoring";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { Fait } from "./Icone";
 import { libelleBorne, libelleDistanceBorne } from "@/lib/bornes";
 
+const CRITERES: readonly { valeur: TriListeCarte; libelle: string }[] = [
+  { valeur: "note", libelle: "Note" },
+  { valeur: "distance", libelle: "Distance" },
+  { valeur: "nom", libelle: "Nom" },
+];
+
 export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
+  const [tri, setTri] = useState<TriListeCarte>("note");
+  const triees = useMemo(
+    () => trierEntreprisesListees(aplatirEntreprises(epingles), tri),
+    [epingles, tri],
+  );
+
   return (
-    <ul className="carte-liste">
-      {epingles.flatMap((e) =>
-        e.entreprises.map((x) => {
+    <div className="carte-liste-colonne">
+      {/* Le MÊME geste que les filtres (`.filtre`/`.filtre--actif`) : classer la liste
+          n'est pas une action différente d'un filtre, ça ne s'invente pas un style. */}
+      <div className="carte-liste__tri" role="group" aria-label="Classer par">
+        <span className="carte-liste__tri-etiquette">Classer par</span>
+        {CRITERES.map((c) => (
+          <button
+            key={c.valeur}
+            type="button"
+            className={`filtre${tri === c.valeur ? " filtre--actif" : ""}`}
+            aria-pressed={tri === c.valeur}
+            onClick={() => setTri(c.valeur)}
+          >
+            {c.libelle}
+          </button>
+        ))}
+      </div>
+
+      <ul className="carte-liste">
+        {triees.map(({ epingle: e, entreprise: x }) => {
           // La ville de l'entreprise est connue ici : elle rend le lien Maps sans ambiguïté.
           const trajet = lienTrajetGoogleMaps(x.nom, undefined, x.ville);
           return (
@@ -107,8 +150,8 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
               ) : null}
             </li>
           );
-        }),
-      )}
-    </ul>
+        })}
+      </ul>
+    </div>
   );
 }

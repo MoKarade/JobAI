@@ -279,14 +279,32 @@ code {
   flex-direction: column;
   height: 100dvh;
   padding-bottom: 0;
+  padding-top: clamp(0.9rem, 0.6rem + 1vw, 1.5rem);
   overflow: hidden;
+}
+/* ⚠️ ONGLETS RESSERRÉS, ICI SEULEMENT (pas globalement) : leur rythme normal
+   (`var(--pas-3) 0 var(--pas-2)`, 36 + 21,6 px) est un choix d'espace délibéré ailleurs
+   dans l'app — cette page-ci a un objectif différent (« rends la map plus grande de
+   base ») et n'a pas à porter le même rythme qu'une page de lecture. Mesuré : sur un
+   écran de portable courant (1280×720, 1366×768), le chrome (en-tête, onglets, barre de
+   16 filtres, deux lignes de compte) laissait à peine assez de place pour le PLANCHER de
+   la carte plus bas — chaque pixel repris ici profite directement au plan. */
+.page--pleine .onglets {
+  margin: var(--pas-2) 0 var(--pas);
 }
 .page--pleine main {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* ⚠️ FILET, PAS LE MÉCANISME PRINCIPAL. `.plan-ecran` a son propre plancher de hauteur
+     (plus bas) : dans l'usage normal, tout tient et ce défilement ne se déclenche jamais.
+     Il n'existe que pour l'écran très bas où la barre de filtres (16 boutons + le détail
+     replié) et ce plancher, ENSEMBLE, dépasseraient la fenêtre — `hidden` aurait alors
+     rendu le bas de la carte INATTEIGNABLE, en silence. `auto` le rend accessible par un
+     court défilement au lieu de le faire disparaître. */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 /* ⚠️ ÉCHAPPATOIRE QUAND LA CARTE EST « AGRANDIE » (`.carte-offres--agrandie`, `82vh` posé
    plus bas) : cette carte-là a TOUJOURS voulu dépasser ce que la page normale lui
@@ -1043,7 +1061,14 @@ code {
   align-items: stretch;
   margin: var(--pas-2) 0;
   flex: 1 1 auto;
-  min-height: 0;
+  /* ⚠️ UN PLANCHER, PAS 0 (demande de Marc, 2026-08-21 : « rends la map plus grande de
+     base »). `min-height: 0` laissait le plan s'écraser jusqu'à quelques dizaines de
+     pixels dès que la barre de filtres (16 boutons répartis en 4 groupes) prenait deux ou
+     trois lignes sur un écran de portable — mesuré : 39,7 px de carte sur 1280×720. Ce
+     plancher garantit un plan UTILISABLE ; s'il ne tient pas avec le reste sur un écran
+     très bas, `main` (plus haut) prend le relais avec un court défilement plutôt que
+     d'écraser la carte à néant. */
+  min-height: 26rem;
 }
 /* La colonne du plan porte la barre d'outils ET le plan : `CarteOffres` rend un
    fragment, donc c'est cette enveloppe qui en fait UN élément de grille. Étirée par
@@ -1057,13 +1082,35 @@ code {
 /* Carte agrandie : elle reprend toute la largeur, la liste passe dessous. Sans ça,
    « agrandir » donnerait un plan très haut coincé dans une colonne étroite. */
 .plan-ecran:has(.carte-offres--agrandie) { grid-template-columns: 1fr; }
-/* La liste devient une surface au même titre que le plan : étirée par la grille à la
-   même hauteur que lui (voir `.plan-ecran`), elle défile SEULE quand elle dépasse. */
-.plan-ecran .carte-liste {
+/* La colonne de droite devient une surface au même titre que le plan : étirée par la
+   grille à la même hauteur que lui (voir `.plan-ecran`). Elle porte maintenant DEUX
+   choses — la barre de tri, puis la liste — d'où ce conteneur flex : la barre garde sa
+   taille naturelle, la liste absorbe tout le reste et défile SEULE quand elle dépasse
+   (même patron que `.plan-ecran__plan` / `.carte-offres`, juste à côté). */
+.plan-ecran .carte-liste-colonne {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  min-height: 0;
+}
+.carte-liste-colonne .carte-liste {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   background: var(--surface);
   border-radius: var(--r-carte);
   margin: 0;
+}
+.carte-liste__tri {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.carte-liste__tri-etiquette {
+  font-size: var(--t-xs);
+  color: var(--text-soft);
 }
 
 /* ── Carte des offres ─────────────────────────────────────────────────────
@@ -1180,6 +1227,17 @@ code {
 .geocodage { margin-bottom: var(--pas-2); }
 .geocodage__message { font-size: var(--t-s); margin-top: 0.4rem; }
 .geocodage__note { font-size: var(--t-xs); color: var(--text-soft); margin-top: 0.35rem; max-width: 62ch; }
+/* Repliée par défaut (voir le composant) : le `<summary>` seul, sur une ligne, prend la
+   même petite taille discrète que la note qu'il révèle. */
+.geocodage__details { margin-top: 0.4rem; }
+.geocodage__details summary {
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  cursor: pointer;
+  width: fit-content;
+}
+.geocodage__details summary:hover { color: var(--text); }
+.geocodage__details summary:focus-visible { outline: 2px solid var(--ambre-texte); outline-offset: 2px; }
 
 .carte-legende {
   display: flex;

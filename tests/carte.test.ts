@@ -9,13 +9,17 @@
 import { describe, it, expect } from "vitest";
 import {
   LONGUEUR_MIN_APPARIEMENT,
+  aplatirEntreprises,
   apparier,
   cadrage,
   centreDuCadrage,
   compterEntreprises,
   construireVue,
   filtrerAdresseConnue,
+  trierEntreprisesListees,
   villeDeLEntreprise,
+  type Epingle,
+  type EntrepriseListee,
   type PositionEntreprise,
 } from "../lib/carte";
 import { ENTREPRISES_CIBLES } from "../lib/reference";
@@ -570,5 +574,109 @@ describe("« je veux pas si y'a pas au moins l'adresse de l'entreprise »", () =
 
   it("rend un tableau vide sans lever", () => {
     expect(filtrerAdresseConnue([])).toEqual([]);
+  });
+});
+
+describe("trierEntreprisesListees — le tri de la liste à droite de la carte", () => {
+  // ⚠️ AUCUN EMPLOYEUR RÉEL : le dépôt est public, piiGuard ne distingue pas une
+  // illustration d'une vraie donnée.
+
+  /** Une entreprise minimale, avec juste ce que le tri regarde. */
+  function entreprise(nom: string, km: number | null, notes: (number | null)[] = []): EntrepriseListee["entreprise"] {
+    return {
+      nom,
+      ville: "Québec",
+      km,
+      adresse: null,
+      adresseSource: null,
+      bornes: null,
+      siteWeb: null,
+      telephone: null,
+      horaires: null,
+      lecture: "",
+      offres: notes.map((score, i) => ({
+        id: `${nom}-${i}`,
+        entreprise: nom,
+        poste: "Poste",
+        score,
+        km,
+        statut: "Identifiee" as Offre["statut"],
+      })),
+    };
+  }
+
+  const epingleDe = (entreprise: EntrepriseListee["entreprise"]): Epingle => ({
+    lat: 46.8,
+    lon: -71.2,
+    precision: "exacte",
+    ville: "Québec",
+    entreprises: [entreprise],
+  });
+
+  function paire(entreprise: EntrepriseListee["entreprise"]): EntrepriseListee {
+    return { epingle: epingleDe(entreprise), entreprise };
+  }
+
+  it("trie par note DÉCROISSANTE — la meilleure moyenne d'abord", () => {
+    const paires = [
+      paire(entreprise("Alpha", null, [50])),
+      paire(entreprise("Beta", null, [80, 70])),
+    ];
+    const triees = trierEntreprisesListees(paires, "note");
+    expect(triees.map((p) => p.entreprise.nom)).toEqual(["Beta", "Alpha"]);
+  });
+
+  it("⚠️ une entreprise SANS aucune note passe en DERNIER, jamais premier ni comptée zéro", () => {
+    const paires = [paire(entreprise("Zeta", null, [])), paire(entreprise("Alpha", null, [10]))];
+    const triees = trierEntreprisesListees(paires, "note");
+    expect(triees.map((p) => p.entreprise.nom)).toEqual(["Alpha", "Zeta"]);
+  });
+
+  it("trie par distance CROISSANTE — la plus proche d'abord", () => {
+    const paires = [paire(entreprise("Loin", 40, [60])), paire(entreprise("Proche", 5, [60]))];
+    const triees = trierEntreprisesListees(paires, "distance");
+    expect(triees.map((p) => p.entreprise.nom)).toEqual(["Proche", "Loin"]);
+  });
+
+  it("⚠️ une distance NON MESURÉE passe en dernier — jamais triée comme zéro ni l'infini pris pour argent comptant", () => {
+    const paires = [paire(entreprise("SansDistance", null, [])), paire(entreprise("Mesuree", 12, []))];
+    const triees = trierEntreprisesListees(paires, "distance");
+    expect(triees.map((p) => p.entreprise.nom)).toEqual(["Mesuree", "SansDistance"]);
+  });
+
+  it("trie par nom, alphabétique français", () => {
+    const paires = [paire(entreprise("Zoo", null, [])), paire(entreprise("Été", null, []))];
+    const triees = trierEntreprisesListees(paires, "nom");
+    expect(triees.map((p) => p.entreprise.nom)).toEqual(["Été", "Zoo"]);
+  });
+
+  it("départage une égalité par le nom — jamais un tirage au sort selon l'ordre d'arrivée", () => {
+    const entree = [paire(entreprise("Beta", null, [60])), paire(entreprise("Alpha", null, [60]))];
+    const a = trierEntreprisesListees(entree, "note").map((p) => p.entreprise.nom);
+    const b = trierEntreprisesListees([...entree].reverse(), "note").map((p) => p.entreprise.nom);
+    expect(a).toEqual(b);
+  });
+
+  it("ne mute pas le tableau reçu", () => {
+    const paires = [paire(entreprise("Beta", null, [60])), paire(entreprise("Alpha", null, [80]))];
+    const avant = [...paires];
+    trierEntreprisesListees(paires, "note");
+    expect(paires).toEqual(avant);
+  });
+
+  it("aplatirEntreprises garde l'épingle qui porte chaque entreprise", () => {
+    const e1 = entreprise("Alpha", null, []);
+    const e2 = entreprise("Beta", null, []);
+    const epingle1 = epingleDe(e1);
+    const aplati = aplatirEntreprises([epingle1, epingleDe(e2)]);
+    expect(aplati).toEqual([
+      { epingle: epingle1, entreprise: e1 },
+      { epingle: epingleDe(e2), entreprise: e2 },
+    ]);
+  });
+
+  it("rend un tableau vide sur une entrée vide", () => {
+    expect(trierEntreprisesListees([], "note")).toEqual([]);
+    expect(aplatirEntreprises([])).toEqual([]);
   });
 });

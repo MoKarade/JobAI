@@ -610,6 +610,17 @@ export async function geocoderEntrepriseGoogle(
     signal: AbortSignal.timeout(DELAI_MAX_REQUETE_MS),
   });
   if (!reponse.ok) {
+    // ⚠️ LE 403 SE TRADUIT, COMME POUR ROUTES (`lib/trajetRoutes.ts`) : la clé SERVEUR est
+    // restreinte par API (ADR-0016), et Geocoding, Places et Routes se refusent chacune
+    // INDÉPENDAMMENT tant qu'elles ne sont pas toutes les trois activées et listées. « a
+    // répondu 403 » seul ne dit pas LAQUELLE des trois manque encore.
+    if (reponse.status === 403) {
+      throw new Error(
+        `Geocoding refuse la clé (403) pour « ${nom} ». Console Google, projet hubperso : ` +
+          "« Geocoding API » doit être ACTIVÉE (Library) ET listée dans les restrictions " +
+          "d'API de la clé serveur.",
+      );
+    }
     throw new Error(`Google Maps Geocoding a répondu HTTP ${reponse.status} pour « ${nom} »`);
   }
 
@@ -686,6 +697,12 @@ export async function chercherEntreprisesGoogle(
     signal: AbortSignal.timeout(DELAI_MAX_REQUETE_MS),
   });
   if (!reponse.ok) {
+    if (reponse.status === 403) {
+      throw new Error(
+        "Places refuse la clé (403). Console Google, projet hubperso : « Places API (New) » " +
+          "doit être ACTIVÉE (Library) ET listée dans les restrictions d'API de la clé serveur.",
+      );
+    }
     throw new Error(`Google Places Autocomplete a répondu HTTP ${reponse.status}`);
   }
   return lireReponseAutocomplete(await reponse.json());
@@ -749,6 +766,12 @@ export async function detailsEntrepriseGoogle(
     },
   );
   if (!reponse.ok) {
+    if (reponse.status === 403) {
+      throw new Error(
+        "Places refuse la clé (403). Console Google, projet hubperso : « Places API (New) » " +
+          "doit être ACTIVÉE (Library) ET listée dans les restrictions d'API de la clé serveur.",
+      );
+    }
     throw new Error(
       `Google Place Details a répondu HTTP ${reponse.status} pour « ${placeId} »`,
     );

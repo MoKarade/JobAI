@@ -6,6 +6,31 @@
 
 ---
 
+## Session 2026-08-21 (suite 2) — 403 élargi, map écrasée MESURÉE, tri de la liste
+
+Marc, après le lot `[CARTE-H]` : « jai encore erreur 403, rends la map plus grande de
+base, jai aussi encore beaucoup le soucis de scroll sous la map, corrige. aussi pour les
+offres a droite de la map, laisse moi les classer (note, distance, etc) ». Détail complet
+au BACKLOG `[CARTE-I]`.
+
+**Le 403 avait une deuxième source, jamais traduite.** `[CARTE-H]` ne traduisait le 403
+QUE pour Routes ; `lib/geocodage.ts` (Geocoding, Places Autocomplete, Place Details)
+rendait un HTTP 403 générique. Si Marc n'a activé que Routes dans la console, Geocoding
+ou Places pouvaient encore refuser la clé sans qu'aucun message ne le dise. Les trois
+nomment maintenant l'API et le geste console.
+
+**Le vrai bug du « scroll persistant » : la carte s'écrasait, MESURÉ avec un harnais
+Playwright fidèle** (la vraie barre de filtres — 16 boutons — pas une maquette simplifiée) :
+39,7 px de carte sur 1280×720. Ce n'était pas un défilement qui revenait, c'était un plan
+sans plancher qui perdait la bataille contre une barre de filtres généreuse. Corrigé par
+trois gestes mesurés (note de `BoutonSituer` repliée, rythme resserré SUR CETTE PAGE
+seulement, plancher `min-height: 26rem` sur `.plan-ecran` + `main` qui absorbe un éventuel
+écart résiduel par un défilement interne CONTENU, jamais celui de toute la page).
+
+**Tri de la liste** (note/distance/nom) ajouté dans `lib/carte.ts` (pur, testé) +
+`ListeCarte.tsx` (devient client). Gate complet vert (81 fichiers, 1398 tests).
+
+
 ## Session 2026-08-21 (suite) — quatre retours de test réels sur la carte, mesurés
 
 Marc, après avoir testé la carte en vrai : « je veux pas pouvoir scroll sous la map…

@@ -289,6 +289,17 @@ describe("Google Maps Geocoding — géocoder UNE entreprise", () => {
     ).rejects.toThrow(/500/);
   });
 
+  it("⚠️ un 403 se TRADUIT — nomme Geocoding, pas un HTTP générique", async () => {
+    const recuperer = (async () => ({
+      ok: false,
+      status: 403,
+      json: async () => ({}),
+    })) as unknown as typeof fetch;
+    await expect(
+      geocoderEntrepriseGoogle("Laserax", "Lévis", "cle", { recuperer }),
+    ).rejects.toThrow(/Geocoding API/);
+  });
+
   it("capture le `place_id` — [CARTE-03-PLACES] : c'est lui qui permettra l'enrichissement", () => {
     expect(
       lireReponseGoogle({
@@ -378,6 +389,13 @@ describe("Google Places Autocomplete — chercher des entreprises", () => {
     const recuperer = (async () => ({ ok: false, status: 429 })) as unknown as typeof fetch;
     await expect(chercherEntreprisesGoogle("Laser", "cle", { recuperer })).rejects.toThrow(/429/);
   });
+
+  it("⚠️ un 403 se TRADUIT — nomme Places, pas un HTTP générique", async () => {
+    const recuperer = (async () => ({ ok: false, status: 403 })) as unknown as typeof fetch;
+    await expect(chercherEntreprisesGoogle("Laser", "cle", { recuperer })).rejects.toThrow(
+      /Places API/,
+    );
+  });
 });
 
 describe("Google Place Details — lecture de la réponse", () => {
@@ -422,6 +440,13 @@ describe("Google Place Details — récupérer les détails d'un lieu", () => {
     await expect(
       detailsEntrepriseGoogle("ChIJ-inconnu", "cle", { recuperer }),
     ).rejects.toThrow(/404/);
+  });
+
+  it("⚠️ un 403 se TRADUIT — nomme Places, pas un HTTP générique", async () => {
+    const recuperer = (async () => ({ ok: false, status: 403 })) as unknown as typeof fetch;
+    await expect(detailsEntrepriseGoogle("ChIJ-exemple", "cle", { recuperer })).rejects.toThrow(
+      /Places API/,
+    );
   });
 });
 

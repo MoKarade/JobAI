@@ -422,3 +422,76 @@ export function filtrerAdresseConnue(epingles: readonly Epingle[]): Epingle[] {
 export function compterEntreprises(epingles: readonly Epingle[]): number {
   return epingles.reduce((n, e) => n + e.entreprises.length, 0);
 }
+
+/**
+ * Une entreprise de la liste, avec l'épingle qui la porte — c'est CETTE paire qu'on trie,
+ * jamais l'épingle seule : deux entreprises d'une même épingle (position approximative)
+ * peuvent avoir des offres très différemment notées, et un tri par épingle les garderait
+ * artificiellement groupées.
+ */
+export interface EntrepriseListee {
+  epingle: Epingle;
+  entreprise: EntrepriseSurCarte;
+}
+
+/** Aplatit les épingles en paires épingle/entreprise, dans l'ordre reçu — le tri vient après. */
+export function aplatirEntreprises(epingles: readonly Epingle[]): EntrepriseListee[] {
+  return epingles.flatMap((epingle) =>
+    epingle.entreprises.map((entreprise) => ({ epingle, entreprise })),
+  );
+}
+
+/**
+ * Le critère de tri de la liste à droite de la carte (demande de Marc, 2026-08-21 :
+ * « laisse-moi les classer »).
+ */
+export type TriListeCarte = "note" | "distance" | "nom";
+
+/**
+ * La note d'une entreprise pour le tri : la MOYENNE de ses offres notées — la même règle
+ * que la pastille de son épingle (`noteEpingle`, `CarteGoogle.tsx`) et que les groupes de
+ * l'accueil (`lib/groupesEntreprise.ts`). `null` quand aucune de ses offres n'est notée :
+ * pas jugée n'est pas mauvaise, elle ne vaut jamais zéro.
+ */
+function noteMoyenneEntreprise(x: EntrepriseSurCarte): number | null {
+  const notes = x.offres.map((o) => o.score).filter((n): n is number => typeof n === "number");
+  if (notes.length === 0) return null;
+  return notes.reduce((a, b) => a + b, 0) / notes.length;
+}
+
+/**
+ * Trie les paires épingle/entreprise selon le critère choisi. PURE, rend un NOUVEAU
+ * tableau. `null` (note absente, distance non mesurée) va toujours en DERNIER — jamais
+ * trié comme zéro (première place usurpée) ni comme l'infini pris pour argent comptant.
+ * À égalité, ou pour le tri « nom », le nom départage : un ordre reproductible, jamais un
+ * tirage au sort dépendant de l'ordre d'arrivée.
+ */
+export function trierEntreprisesListees(
+  paires: readonly EntrepriseListee[],
+  tri: TriListeCarte,
+): EntrepriseListee[] {
+  const copie = [...paires];
+  copie.sort((a, b) => {
+    const nomA = a.entreprise.nom;
+    const nomB = b.entreprise.nom;
+    if (tri === "nom") return nomA.localeCompare(nomB, "fr");
+    if (tri === "distance") {
+      const ka = a.entreprise.km;
+      const kb = b.entreprise.km;
+      if (ka === null && kb === null) return nomA.localeCompare(nomB, "fr");
+      if (ka === null) return 1;
+      if (kb === null) return -1;
+      if (ka !== kb) return ka - kb;
+      return nomA.localeCompare(nomB, "fr");
+    }
+    // "note" : la meilleure moyenne d'abord.
+    const na = noteMoyenneEntreprise(a.entreprise);
+    const nb = noteMoyenneEntreprise(b.entreprise);
+    if (na === null && nb === null) return nomA.localeCompare(nomB, "fr");
+    if (na === null) return 1;
+    if (nb === null) return -1;
+    if (na !== nb) return nb - na;
+    return nomA.localeCompare(nomB, "fr");
+  });
+  return copie;
+}

@@ -72,11 +72,20 @@ export function BoutonSituer({ restantes }: { restantes: number }) {
         {enCours ? "Localisation en cours…" : message}
       </p>
 
-      <p className="geocodage__note">
-        Les positions viennent d’OpenStreetMap (Nominatim), une requête par seconde, quelques
-        entreprises par passe. Une entreprise absente d’OpenStreetMap est posée au centre de
-        sa ville — et la carte le dit, plutôt que d’inventer une adresse.
-      </p>
+      {/* ⚠️ REPLIÉE PAR DÉFAUT (demande de Marc, 2026-08-21 : « rends la map plus grande
+          de base ») — cette explication ne bougeait jamais, mais elle prenait à elle
+          seule ~4 lignes en PERMANENCE sur une page dont l'objectif est de laisser le
+          plus de place possible au plan. `<details>` la garde entièrement accessible
+          (lecteur d'écran, clavier), juste repliée : l'information n'a pas disparu, sa
+          PLACE PERMANENTE oui. */}
+      <details className="geocodage__details">
+        <summary>Comment ça marche</summary>
+        <p className="geocodage__note">
+          Les positions viennent d’OpenStreetMap (Nominatim), une requête par seconde,
+          quelques entreprises par passe. Une entreprise absente d’OpenStreetMap est posée
+          au centre de sa ville — et la carte le dit, plutôt que d’inventer une adresse.
+        </p>
+      </details>
     </div>
   );
 }
