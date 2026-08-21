@@ -35,6 +35,7 @@ import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { obtenirTournee, obtenirTrajet, type ResultatTrajet } from "@/lib/actionsTrajet";
 import { BANDES_DUREE_MIN, bandeDuree, formaterDistance, formaterDuree } from "@/lib/trajetRoutes";
+import { poidsEpingle, rayonDensiteM } from "@/lib/densite";
 
 /**
  * L'identifiant de style Google. `DEMO_MAP_ID` est un identifiant que Google accepte pour
@@ -70,6 +71,30 @@ function TraceTrajet({ polyline }: { polyline: string }) {
     });
     return () => trace.setMap(null);
   }, [map, polyline]);
+  return null;
+}
+
+/**
+ * Un cercle de densité (lot G). Impératif comme la Polyline : créé dans un effet, retiré
+ * au démontage — le toggle qui l'éteint doit vraiment l'éteindre.
+ */
+function CercleDensite({ lat, lon, rayonM }: { lat: number; lon: number; rayonM: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || rayonM <= 0) return;
+    const cercle = new google.maps.Circle({
+      map,
+      center: { lat, lng: lon },
+      radius: rayonM,
+      fillColor: "oklch(0.65 0.14 150)",
+      fillOpacity: 0.13,
+      strokeColor: "oklch(0.55 0.12 150)",
+      strokeOpacity: 0.3,
+      strokeWeight: 1,
+      clickable: false,
+    });
+    return () => cercle.setMap(null);
+  }, [map, lat, lon, rayonM]);
   return null;
 }
 
@@ -226,6 +251,7 @@ export function CarteGoogle({
 
   // ── La tournée (ADR-0016, lot F) ────────────────────────────────────────
   const [modeTournee, setModeTournee] = useState(false);
+  const [densite, setDensite] = useState(false);
   const [etapes, setEtapes] = useState<string[]>([]);
   const [tournee, setTournee] = useState<{
     dureeS: number;
@@ -318,6 +344,14 @@ export function CarteGoogle({
           onClick={() => setAgrandie((a) => !a)}
         >
           {agrandie ? "Réduire la carte (Échap)" : "Agrandir la carte"}
+        </button>
+        <button
+          type="button"
+          className="bouton"
+          aria-pressed={densite}
+          onClick={() => setDensite((d) => !d)}
+        >
+          {densite ? "Masquer la densité" : "Densité des bonnes offres"}
         </button>
         {domicile ? (
           <button
@@ -422,6 +456,17 @@ export function CarteGoogle({
             ) : trajet ? (
               <TraceTrajet polyline={trajet.polyline} />
             ) : null}
+
+            {densite
+              ? epingles
+                  .filter((e) => e.precision === "exacte")
+                  .map((e, i) => {
+                    const r = rayonDensiteM(poidsEpingle(e));
+                    return r > 0 ? (
+                      <CercleDensite key={`d${e.lat},${e.lon},${i}`} lat={e.lat} lon={e.lon} rayonM={r} />
+                    ) : null;
+                  })
+              : null}
 
             {dureesParNom.size > 0 ? (
               <div className="carte-legende" aria-hidden="true">

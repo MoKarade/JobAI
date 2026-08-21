@@ -955,7 +955,7 @@
       et n'a pas de raison d'être un problème, mais n'a jamais été observé à cette échelle.
       Lire le compte rendu de `/sources` après la première passe en mode « tout ».
 
-- [ ] **[CARTE-G]** ⚠️ **Plan carte Google (ADR-0016), 7 lots — decisions Marc 2026-08-21,
+- [x] **[CARTE-G]** ⚠️ **Plan carte Google (ADR-0016), 7 lots — decisions Marc 2026-08-21,
       cles posees (2 cles, perimetres separes).** A: fond Google + approximatives VISIBLES
       (epingle distincte) + domicile + repli Leaflet DIT. B: trajet au clic (Routes,
       serveur, cache en base). C: matrice de durees nocturne (badge minutes par epingle).
@@ -967,6 +967,14 @@
       cle serveur, Places DEJA paye reutilise (placeGoogleId/siteWeb/horaires en base).
       « Toutes les API » NON : on reste sur les 4 des cles restreintes — chaque API en plus
       est une surface d'abus en plus.
+      ✔ LIVRE le 2026-08-21, six lots en six commits (A f6b795c, B 9ed50a7, C 3997555,
+      E f0b7c8f, F 8b72f9f, G ci-dessous). D etait DEJA livre par l'existant (CarteFiltrable
+      applique les filtres de l'accueil) — verifie avant de coder, pas recode. Ecarts
+      assumes et ecrits : pas de clustering (40 epingles), pas de cache de tournee (geste
+      ponctuel, borne par le budget), bandes de duree au lieu d'isochrones (Routes n'en
+      fait pas ; meme decision pour un cout nul). ⚠️ RESTE A VERIFIER EN PROD, par Marc :
+      la carte charge avec la cle client, le trajet trace au clic, la matrice remplit les
+      durees a la prochaine passe. Rien de tout ca n'a tourne contre les vraies cles.
 
 - [ ] **[VEILLE-44]** ⚠️ **DECISION MARC : 1 300 offres regionales par passe** (mesure sur
       une passe complete), contre quelques dizaines suivies aujourd'hui. L'echantillon reste
