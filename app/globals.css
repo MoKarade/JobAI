@@ -981,7 +981,7 @@ code {
 /* La liste devient une surface au même titre que le plan, et défile toute seule
    quand elle dépasse : la page ne s'allonge plus au rythme du nombre de lieux. */
 .plan-ecran .carte-liste {
-  max-height: clamp(28rem, calc(100vh - 22rem), 56rem);
+  max-height: clamp(28rem, calc(100vh - 13rem), 80rem);
   overflow-y: auto;
   background: var(--surface);
   border-radius: var(--r-carte);
@@ -999,7 +999,10 @@ code {
   /* La hauteur suit la FENÊTRE, pas une valeur fixe : sur un grand écran le plan doit
      remplir la place disponible, sinon on regarde une région de 50 km dans un timbre-poste
      entouré de vide. Le plancher garde un plan utilisable sur un portable. */
-  height: clamp(28rem, calc(100vh - 22rem), 56rem);
+  /* 22rem → 13rem de réserve : la légende texte et les paragraphes sous la carte sont
+     partis (2026-08-21), la carte reprend leur place — l'objectif est que la page carte
+     TIENNE dans l'écran, sans défilement sous le plan. */
+  height: clamp(28rem, calc(100vh - 13rem), 80rem);
   margin: 0;
   border: var(--trait-surface);
   border-radius: var(--r-carte);
@@ -2570,8 +2573,11 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .epingle__duree--b3 { background: oklch(0.9 0.08 75); color: oklch(0.4 0.09 70); }
 .epingle__duree--b4 { background: oklch(0.85 0.07 30); color: oklch(0.38 0.1 30); }
 
-/* La légende des bandes, dans le coin du plan. */
-.carte-legende {
+/* La légende des bandes, dans le coin du plan.
+   ⚠️ RENOMMÉE carte-bandes : elle s'appelait carte-legende — le nom d'une classe qui
+   EXISTAIT déjà (l'ancienne légende texte de la page) — et son position:absolute arrachait
+   cette dernière de son flux. Deux règles du même nom ne cohabitent pas, elles se battent. */
+.carte-bandes {
   position: absolute;
   bottom: 1.4rem;
   left: 0.6rem;
@@ -2583,29 +2589,11 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   background: oklch(1 0 0 / 0.85);
 }
 
-/* ── La tournée (ADR-0016, lot F) ─────────────────────────────────────────── */
-.tournee {
-  margin-top: 0.6rem;
-  padding: 0.7rem 0.9rem;
-  border: var(--trait-surface);
-  border-radius: var(--r-carte);
-  background: var(--surface);
+/* L'aveu du calque de densité : toggle actif, zéro cercle possible. Sans lui, « rien ne
+   s'affiche » et « rien à montrer » se confondent — c'est le bug qu'on vient de vivre. */
+.carte-densite-vide {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  align-self: center;
 }
-.tournee__aide { margin: 0; color: var(--text-soft); font-size: var(--t-s); }
-.tournee__etapes { margin: 0 0 0.5rem; font-size: var(--t-s); line-height: 1.5; }
-.tournee__actions { margin: 0; display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
-.tournee__total { font-weight: 600; font-variant-numeric: tabular-nums; }
-.tournee__erreur {
-  margin: 0.5rem 0 0;
-  padding: 0.3rem 0.5rem;
-  border-radius: 0.35rem;
-  background: oklch(0.93 0.06 80);
-  color: oklch(0.4 0.1 70);
-}
-/* Une étape cochée se voit de loin : anneau bleu épais, la couleur du domicile — c'est
-   SA tournée, le lien visuel est voulu. */
-.epingle__pastille--choisie {
-  border-color: oklch(0.55 0.15 250);
-  border-width: 3px;
-  box-shadow: 0 0 0 2px oklch(0.72 0.12 250 / 0.5), 0 1px 4px oklch(0 0 0 / 0.35);
-}
+

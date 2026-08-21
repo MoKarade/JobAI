@@ -110,8 +110,17 @@ export async function appelerRoutes(
   }
 
   if (!reponse.ok) {
-    // Le statut se DIT : un 403 (clé mal restreinte) et un 429 (quota) appellent des gestes
-    // opposés, et « ça n'a pas marché » n'en permet aucun.
+    // Le statut se DIT, et le 403 se TRADUIT : mesuré en prod le 2026-08-21, il veut dire
+    // que la CLÉ n'a pas le droit d'appeler Routes — soit l'API n'est pas activée dans le
+    // projet (Library), soit elle manque aux restrictions de la clé SERVEUR. « Routes a
+    // répondu 403 » seul a envoyé Marc chercher au mauvais endroit.
+    if (reponse.status === 403) {
+      return {
+        ok: false,
+        raison:
+          "Routes refuse la clé (403). Console Google, projet hubperso : « Routes API » doit être ACTIVÉE (Library) ET listée dans les restrictions d'API de la clé serveur.",
+      };
+    }
     return { ok: false, raison: `Routes a répondu ${reponse.status}` };
   }
 
@@ -198,7 +207,16 @@ export async function appelerMatrice(
   } catch (e) {
     return { ok: false, raison: `Matrice injoignable : ${e instanceof Error ? e.message : e}` };
   }
-  if (!reponse.ok) return { ok: false, raison: `Matrice a répondu ${reponse.status}` };
+  if (!reponse.ok) {
+    if (reponse.status === 403) {
+      return {
+        ok: false,
+        raison:
+          "Matrice refusée (403) : « Routes API » doit être activée et dans les restrictions de la clé serveur.",
+      };
+    }
+    return { ok: false, raison: `Matrice a répondu ${reponse.status}` };
+  }
 
   const analyse = ReponseMatriceSchema.safeParse(await reponse.json().catch(() => null));
   if (!analyse.success) return { ok: false, raison: "Réponse matrice hors schéma." };
@@ -236,94 +254,3 @@ export function bandeDuree(dureeS: number): 1 | 2 | 3 | 4 {
   return 4;
 }
 
-/** La réponse d'une tournée : l'ordre OPTIMISÉ arrive en indices des étapes envoyées. */
-const ReponseTourneeSchema = z.object({
-  routes: z
-    .array(
-      z.object({
-        duration: z
-          .string()
-          .regex(/^\d+(\.\d+)?s$/)
-          .transform((d) => Math.round(Number.parseFloat(d))),
-        distanceMeters: z.number().int().nonnegative(),
-        polyline: z.object({ encodedPolyline: z.string().min(1) }),
-        optimizedIntermediateWaypointIndex: z.array(z.number().int()).optional(),
-      }),
-    )
-    .min(1),
-});
-
-export type ResultatTournee =
-  | {
-      ok: true;
-      dureeS: number;
-      distanceM: number;
-      polyline: string;
-      /** Les étapes dans l'ordre OPTIMISÉ par Google — les noms envoyés, réordonnés. */
-      ordre: string[];
-    }
-  | { ok: false; raison: string };
-
-/**
- * Une tournée : domicile → étapes (ordre optimisé par Google) → domicile.
- *
- * ⚠️ PAS DE CACHE EN BASE, et c'est un écart assumé au plan d'ADR-0016 : une tournée est
- * un GESTE ponctuel — l'ensemble d'étapes change à chaque fois, un cache par combinaison
- * ne servirait à peu près jamais. Ce qui borne le coût : l'appel ne part QUE sur un clic
- * explicite, et le budget d'éléments le précède.
- */
-export async function appelerTournee(
-  domicile: { lat: number; lon: number },
-  etapes: readonly DestinationMatrice[],
-  cle: string,
-  fetchFn: typeof fetch = fetch,
-): Promise<ResultatTournee> {
-  if (etapes.length < 2) {
-    return { ok: false, raison: "Une tournée demande au moins deux étapes." };
-  }
-
-  let reponse: Response;
-  try {
-    reponse = await fetchFn("https://routes.googleapis.com/directions/v2:computeRoutes", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": cle,
-        "X-Goog-FieldMask":
-          "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.optimizedIntermediateWaypointIndex",
-      },
-      body: JSON.stringify({
-        origin: { location: { latLng: { latitude: domicile.lat, longitude: domicile.lon } } },
-        destination: { location: { latLng: { latitude: domicile.lat, longitude: domicile.lon } } },
-        intermediates: etapes.map((e) => ({
-          location: { latLng: { latitude: e.lat, longitude: e.lon } },
-        })),
-        travelMode: "DRIVE",
-        routingPreference: "TRAFFIC_UNAWARE",
-        optimizeWaypointOrder: true,
-      }),
-    });
-  } catch (e) {
-    return { ok: false, raison: `Tournée injoignable : ${e instanceof Error ? e.message : e}` };
-  }
-  if (!reponse.ok) return { ok: false, raison: `Tournée : Routes a répondu ${reponse.status}` };
-
-  const analyse = ReponseTourneeSchema.safeParse(await reponse.json().catch(() => null));
-  if (!analyse.success) return { ok: false, raison: "Réponse de tournée hors schéma." };
-
-  const r = analyse.data.routes[0]!;
-  // Sans indice d'optimisation, l'ordre envoyé EST l'ordre — le dire tel quel plutôt que
-  // d'inventer une permutation.
-  const indices = r.optimizedIntermediateWaypointIndex ?? etapes.map((_, i) => i);
-  const ordre = indices
-    .map((i) => etapes[i]?.nom)
-    .filter((n): n is string => n !== undefined);
-
-  return {
-    ok: true,
-    dureeS: r.duration,
-    distanceM: r.distanceMeters,
-    polyline: r.polyline.encodedPolyline,
-    ordre,
-  };
-}

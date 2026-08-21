@@ -233,21 +233,9 @@ export function CarteFiltrable({
         )}
       </div>
 
-      {vue.aSituer.length > 0 ? (
-        <p className="carte__manquants">
-          {/* La phrase disait en trois lignes ce que la liste dit déjà : ces entreprises
-              n'ont pas de position. Le fait utile — ça se règle tout seul — tient en trois
-              mots, et les noms suffisent au reste. */}
-          Sans position (se complète seule) : {vue.aSituer.join(", ")}.
-        </p>
-      ) : null}
-
-      {vue.sansLieu.length > 0 ? (
-        <p className="carte__manquants">
-          Hors de la carte faute de ville annoncée par la source : {vue.sansLieu.join(", ")}.
-          Aucune passe n’y changera rien — la ville doit venir de l’offre.
-        </p>
-      ) : null}
+      {/* Les paragraphes « sans position » / « hors carte » ont été RETIRÉS (demande Marc
+          2026-08-21) : le géocodage se complète seul, et la liste latérale porte déjà les
+          positions approximatives. La page ne doit plus défiler sous le plan. */}
     </>
   );
 }

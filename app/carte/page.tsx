@@ -32,7 +32,6 @@ import { ENTREPRISES_CIBLES } from "@/lib/reference";
 import { classerPanne, type Panne } from "@/lib/panne";
 import { Cadre } from "@/components/Cadre";
 import { domicile } from "@/lib/domicile";
-import { couleurNote } from "@/lib/couleurNote";
 import { CarteFiltrable } from "@/components/CarteFiltrable";
 import { resteDuTravail, type LieuTravail } from "@/lib/travaux";
 import { mesurerDistances, passeGeocodage } from "@/lib/actions";
@@ -233,26 +232,9 @@ export default async function PageCarte() {
 
   return (
     <Cadre actif="/carte" titre="Carte des offres">
-      {/* ⚠️ UNE LÉGENDE, PAS UN MODE D'EMPLOI (demande de Marc, 2026-08-06 : « des
-          légendes simples au lieu de texte inutile »). Le paragraphe d'avant expliquait en
-          quatre lignes ce que l'épingle montre maintenant elle-même : depuis qu'elle PORTE
-          son score, il n'y a plus de code couleur à décoder. Reste ce qui ne se devine
-          pas — que le pointillé veut dire « au centre de la ville, faute d'adresse ». */}
-      <p className="carte-legende">
-        <span>
-          <span className="carte-legende__pastille" style={{ background: couleurNote(90) }} />
-          proche de 100
-        </span>
-        <span>
-          <span className="carte-legende__pastille" style={{ background: couleurNote(50) }} />
-          plus bas
-        </span>
-        <span>
-          <span className="carte-legende__pastille carte-legende__pastille--approx" />
-          position approximative
-        </span>
-      </p>
-
+      {/* La légende texte a été RETIRÉE (demande Marc 2026-08-21 : « moins de texte ») :
+          l'épingle porte sa note, la pastille approximative est pointillée, et la légende
+          des bandes de durée vit SUR le plan. Un texte qui répète l'écran est du bruit. */}
       {/* Le filtrage et l'assemblage des épingles vivent côté client : c'est ce qui rend
           les filtres instantanés ET identiques à ceux de la liste (`construireVue` est
           pure, elle tourne aussi bien ici que sur le serveur). */}

@@ -33,7 +33,7 @@ import {
 import type { Epingle } from "@/lib/carte";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
-import { obtenirTournee, obtenirTrajet, type ResultatTrajet } from "@/lib/actionsTrajet";
+import { obtenirTrajet, type ResultatTrajet } from "@/lib/actionsTrajet";
 import { BANDES_DUREE_MIN, bandeDuree, formaterDistance, formaterDuree } from "@/lib/trajetRoutes";
 import { poidsEpingle, rayonDensiteM } from "@/lib/densite";
 
@@ -65,7 +65,11 @@ function TraceTrajet({ polyline }: { polyline: string }) {
     const trace = new google.maps.Polyline({
       path: google.maps.geometry.encoding.decodePath(polyline),
       map,
-      strokeColor: "oklch(0.55 0.15 250)",
+      // ⚠️ HEX, PAS oklch : les objets google.maps (Polyline, Circle) passent la couleur au
+      // rendu vectoriel de la carte, qui ne garantit pas les espaces de couleur CSS
+      // récents — un oklch non compris dessine invisible, sans erreur. Le DOM des épingles
+      // (Pin, pastilles) reste en oklch : lui est du CSS ordinaire.
+      strokeColor: "#4d79cc",
       strokeWeight: 5,
       strokeOpacity: 0.85,
     });
@@ -86,9 +90,9 @@ function CercleDensite({ lat, lon, rayonM }: { lat: number; lon: number; rayonM:
       map,
       center: { lat, lng: lon },
       radius: rayonM,
-      fillColor: "oklch(0.65 0.14 150)",
+      fillColor: "#4caf7d",
       fillOpacity: 0.13,
-      strokeColor: "oklch(0.55 0.12 150)",
+      strokeColor: "#3d8f66",
       strokeOpacity: 0.3,
       strokeWeight: 1,
       clickable: false,
@@ -101,14 +105,20 @@ function CercleDensite({ lat, lon, rayonM }: { lat: number; lon: number; rayonM:
 /** Ce qui est sélectionné sur le plan : une épingle, la maison, ou rien. */
 type Selection = { type: "epingle"; index: number } | { type: "domicile" } | null;
 
-function MeilleureNote(entreprises: Epingle["entreprises"]): number | null {
-  let meilleure: number | null = null;
+/**
+ * La note d'une épingle : la MOYENNE de ses offres notées (demande Marc 2026-08-21 —
+ * la même règle que les groupes d'entreprises de l'accueil). Les non-notées sont EXCLUES
+ * du calcul, jamais comptées zéro : pas jugée n'est pas mauvaise.
+ */
+function noteEpingle(entreprises: Epingle["entreprises"]): number | null {
+  const notes: number[] = [];
   for (const e of entreprises) {
     for (const o of e.offres) {
-      if (o.score !== null && (meilleure === null || o.score > meilleure)) meilleure = o.score;
+      if (o.score !== null) notes.push(o.score);
     }
   }
-  return meilleure;
+  if (notes.length === 0) return null;
+  return Math.round(notes.reduce((a, b) => a + b, 0) / notes.length);
 }
 
 function FicheEpingle({
@@ -248,40 +258,18 @@ export function CarteGoogle({
   const [erreurTrajet, setErreurTrajet] = useState<string | null>(null);
   const [trajetEnCours, setTrajetEnCours] = useState(false);
   const dureesParNom = useMemo(() => new Map(durees), [durees]);
-
-  // ── La tournée (ADR-0016, lot F) ────────────────────────────────────────
-  const [modeTournee, setModeTournee] = useState(false);
+  /** Le calque de densité (lot G) — un toggle, tout local, zéro appel. */
   const [densite, setDensite] = useState(false);
-  const [etapes, setEtapes] = useState<string[]>([]);
-  const [tournee, setTournee] = useState<{
-    dureeS: number;
-    distanceM: number;
-    polyline: string;
-    ordre: string[];
-  } | null>(null);
-  const [erreurTournee, setErreurTournee] = useState<string | null>(null);
-  const [tourneeEnCours, setTourneeEnCours] = useState(false);
+  // Combien de cercles le calque peut dessiner : seules les positions EXACTES portant au
+  // moins une bonne offre (palier B) en produisent un. Zéro cercle avec le toggle actif
+  // doit se DIRE — sinon « densité marche pas » est indiscernable de « rien à montrer ».
+  const nbCercles = useMemo(
+    () =>
+      epingles.filter((e) => e.precision === "exacte" && rayonDensiteM(poidsEpingle(e)) > 0)
+        .length,
+    [epingles],
+  );
 
-  function basculerEtape(nom: string) {
-    setTournee(null);
-    setErreurTournee(null);
-    setEtapes((xs) => (xs.includes(nom) ? xs.filter((x) => x !== nom) : [...xs, nom]));
-  }
-
-  async function calculerTournee() {
-    if (tourneeEnCours || etapes.length < 2) return;
-    setTourneeEnCours(true);
-    setErreurTournee(null);
-    try {
-      const r = await obtenirTournee(etapes);
-      if (r.ok) setTournee(r);
-      else setErreurTournee(r.raison);
-    } catch {
-      setErreurTournee("Le calcul de la tournée a échoué — réessaie.");
-    } finally {
-      setTourneeEnCours(false);
-    }
-  }
 
   // ⚠️ GARDE ANTI-RAFALE CÔTÉ CLIENT, en plus du plafond serveur : un double-clic ne doit
   // pas partir en deux appels facturés. Le disabled du bouton la matérialise, ce flag la
@@ -353,32 +341,23 @@ export function CarteGoogle({
         >
           {densite ? "Masquer la densité" : "Densité des bonnes offres"}
         </button>
-        {domicile ? (
-          <button
-            type="button"
-            className="bouton"
-            aria-pressed={modeTournee}
-            onClick={() => {
-              setModeTournee((m) => !m);
-              setEtapes([]);
-              setTournee(null);
-              setErreurTournee(null);
-            }}
-          >
-            {modeTournee ? "Quitter la tournée" : "Préparer une tournée"}
-          </button>
+        {densite && nbCercles === 0 ? (
+          <span className="carte-densite-vide">
+            Aucun cercle : aucune offre au palier B sur une position exacte.
+          </span>
         ) : null}
       </div>
       <div className={`carte-offres${agrandie ? " carte-offres--agrandie" : ""}`}>
         <APIProvider apiKey={cle} libraries={["geometry"]}>
           <FondGoogle
             mapId={MAP_ID}
+            colorScheme="DARK"
             defaultBounds={bornes}
             gestureHandling="greedy"
             style={{ width: "100%", height: "100%" }}
           >
             {epingles.map((e, i) => {
-              const note = MeilleureNote(e.entreprises);
+              const note = noteEpingle(e.entreprises);
               const approx = e.precision === "ville";
               return (
                 <AdvancedMarker
@@ -389,11 +368,7 @@ export function CarteGoogle({
                       ? `${e.ville} — position approximative (${e.entreprises.length} entreprise${e.entreprises.length > 1 ? "s" : ""})`
                       : e.entreprises[0]?.nom
                   }
-                  onClick={() =>
-                    modeTournee && !approx && e.entreprises[0]
-                      ? basculerEtape(e.entreprises[0].nom)
-                      : setSelection({ type: "epingle", index: i })
-                  }
+                  onClick={() => setSelection({ type: "epingle", index: i })}
                 >
                   {/* Le SCORE dans la pastille, comme sur le rendu Leaflet : un cercle de
                       couleur seul obligeait à cliquer pour savoir si ça vaut le détour.
@@ -411,11 +386,7 @@ export function CarteGoogle({
                     return (
                       <div className="epingle">
                         <span
-                          className={`epingle__pastille${approx ? " epingle__pastille--approx" : ""}${
-                            !approx && e.entreprises[0] && etapes.includes(e.entreprises[0].nom)
-                              ? " epingle__pastille--choisie"
-                              : ""
-                          }`}
+                          className={`epingle__pastille${approx ? " epingle__pastille--approx" : ""}`}
                           style={
                             approx
                               ? undefined
@@ -451,11 +422,7 @@ export function CarteGoogle({
               </AdvancedMarker>
             ) : null}
 
-            {tournee ? (
-              <TraceTrajet polyline={tournee.polyline} />
-            ) : trajet ? (
-              <TraceTrajet polyline={trajet.polyline} />
-            ) : null}
+            {trajet ? <TraceTrajet polyline={trajet.polyline} /> : null}
 
             {densite
               ? epingles
@@ -469,7 +436,7 @@ export function CarteGoogle({
               : null}
 
             {dureesParNom.size > 0 ? (
-              <div className="carte-legende" aria-hidden="true">
+              <div className="carte-bandes" aria-hidden="true">
                 <span className="epingle__duree epingle__duree--b1">≤ {BANDES_DUREE_MIN[0]} min</span>
                 <span className="epingle__duree epingle__duree--b2">≤ {BANDES_DUREE_MIN[1]} min</span>
                 <span className="epingle__duree epingle__duree--b3">≤ {BANDES_DUREE_MIN[2]} min</span>
@@ -511,47 +478,6 @@ export function CarteGoogle({
         </APIProvider>
       </div>
 
-      {modeTournee ? (
-        <div className="tournee">
-          {etapes.length === 0 ? (
-            <p className="tournee__aide">
-              Clique les épingles à visiter (deux à huit, positions exactes seulement — un
-              centre-ville n’est pas une étape).
-            </p>
-          ) : (
-            <>
-              <p className="tournee__etapes">
-                {tournee
-                  ? // L'ordre OPTIMISÉ, numéroté : c'est lui qu'on suit, pas l'ordre des clics.
-                    tournee.ordre.map((n, i) => `${i + 1}. ${n}`).join(" → ")
-                  : etapes.join(" · ")}
-              </p>
-              <p className="tournee__actions">
-                <button
-                  type="button"
-                  className="bouton"
-                  disabled={etapes.length < 2 || tourneeEnCours}
-                  onClick={calculerTournee}
-                >
-                  {tourneeEnCours
-                    ? "Calcul…"
-                    : tournee
-                      ? "Recalculer"
-                      : `Calculer la tournée (${etapes.length} étape${etapes.length > 1 ? "s" : ""})`}
-                </button>
-                {tournee ? (
-                  <span className="tournee__total">
-                    {formaterDuree(tournee.dureeS)} au total (
-                    {formaterDistance(tournee.distanceM)}), départ et retour au domicile,
-                    sans trafic
-                  </span>
-                ) : null}
-              </p>
-            </>
-          )}
-          {erreurTournee ? <p className="tournee__erreur">{erreurTournee}</p> : null}
-        </div>
-      ) : null}
     </div>
   );
 }
