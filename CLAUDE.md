@@ -114,6 +114,8 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
 - **Pas d'emoji** dans l'UI produit ni dans les commits. Tolérés comme marqueurs de statut
   dans `BACKLOG.md` et `HANDOVER.md` uniquement.
 - **Discipline de scope** : on livre par phases (voir `BACKLOG.md`). Ne pas anticiper.
+- **Ne pas imposer le dark mode** : les deux thèmes suivent `prefers-color-scheme`. (Règle de
+  PRODUIT — elle vivait en §10 avant que la §10 ne devienne un renvoi.)
 
 ## 3. Workflow git
 
@@ -1557,35 +1559,25 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   qui dit si la lecture était complète. Un budget se dérive du mur de l'appelant, jamais
   d'une constante partagée entre appelants qui n'ont pas le même.
 
-## 10. Style
+## 10. Style et compte-rendu
 
-Hérité du `CLAUDE.md` global de Marc (`claude-config`) : réponses, commits et docs **en
-français** ; TypeScript strict, pas de `any` silencieux ; nommage clair plutôt que commentaires
-verbeux ; **erreurs honnêtes** — ne pas avaler une panne, ne pas ajouter un `catch` qui cache un
-vrai bug.
+> 📣 Forme des comptes-rendus, des commits, des PR et des docs générées :
+> [convention commune aux neuf dépôts](https://github.com/MoKarade/claude-config/blob/main/conventions/COMPTE-RENDU.md).
+> Elle régit **la forme** ; ce fichier garde **le contenu métier**. Sur la forme, c'est la
+> convention qui gagne ; sur le métier, c'est ce fichier.
 
-Pas d'emoji dans l'UI produit ni dans les commits ; tolérés comme marqueurs de statut dans
-`BACKLOG.md` et `HANDOVER.md`. Ne pas imposer le dark mode : les deux thèmes suivent
-`prefers-color-scheme`.
+@docs/COMPTE-RENDU.md
 
-### Règles de travail (source : `claude-config`)
+⚠️ **Pourquoi une COPIE et pas seulement un lien.** Un `CLAUDE.md` ne charge rien hors de son
+propre arbre : le lien ci-dessus est lisible par un humain, il n'arrive jamais dans la session.
+C'est exactement le mode de panne du 20/08/2026 — les règles de cadrage écrites dans un
+`~/.claude/CLAUDE.md` local ne descendaient nulle part, et Marc constatait « je ne vois pas la
+différence » alors que rien n'était jamais arrivé. `docs/COMPTE-RENDU.md` est donc une copie
+**synchronisée**, importée ci-dessus, et la CI échoue si elle a dérivé de la source.
 
-Copie des trois règles de cadrage de Marc. Le texte qui **fait foi** est celui du
-[`CLAUDE.md` global](https://github.com/MoKarade/claude-config/blob/main/CLAUDE.md) — en cas
-de divergence, c'est lui qui gagne.
-
-- **Avant de coder : TOUTES les questions de cadrage d'un coup**, en un seul batch — y
-  compris ce qui définit « fini » et l'objectif exact. Pas de questions au compte-gouttes.
-- **Une fois que tu as tout ce qu'il te faut : exécute en continu** jusqu'à atteindre
-  l'objectif, puis arrête-toi. Ni avant, ni au-delà.
-- **Sur le technique, assume ton expertise** : sois ferme sur les faits, très réfléchi. Une
-  recommandation molle qui renvoie la décision à Marc ne l'aide pas — et si tu t'es trompé,
-  corrige-toi franchement.
-
-⚠️ Ces règles se chargent au DÉMARRAGE d'une session, depuis un dépôt cloné. Les écrire dans
-un `~/.claude/CLAUDE.md` local sans pousser ne les fait pas descendre dans une session
-distante — vécu le 20/08/2026, où Marc constatait « je ne vois pas la différence » alors que
-rien n'était jamais arrivé jusqu'à la session.
+Pour changer la convention : la changer dans `claude-config`, propager les huit copies, mettre
+à jour les huit empreintes. La friction est le garde-fou — une copie qu'on peut modifier sur
+place redevient huit conventions différentes en trois mois.
 
 ## 11. Protocole de précision (toute modification de la NOTATION ou du MATCHING)
 
