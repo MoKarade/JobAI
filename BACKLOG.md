@@ -1533,3 +1533,49 @@ RESTE — à observer sur les prochaines passes (rien à coder) :
       téléphone, horaires) que la fiche de la carte affiche déjà — la demande de Marc lisait
       « voir toutes les offres avec notes » comme le contenu du dépliage, pas une fiche
       d'entreprise enrichie séparée. À confirmer si Marc en veut plus.
+
+## Chantier — quatre retours de test réels sur la carte Google
+
+- [x] 🔧 **`[CARTE-H]`** **Quatre correctifs mesurés sur la carte, demande de Marc
+      2026-08-21** : « je veux pas pouvoir scroll sous la map… les entreprises sont
+      toujours écrites 1 au lieu de la moyenne des notes des offres… les boutons sont
+      moches et mauvaise couleur… je veux pouvoir cliquer sur la carte pour désélectionner
+      la sélection ». ✅ 2026-08-21.
+      · **Défilement sous le plan** — l'ancien correctif posait `height: calc(100vh -
+        13rem)`, un chiffre DEVINÉ pour « tout ce qu'il y a au-dessus » qui a re-dérivé dès
+        qu'une barre d'outils s'est ajoutée (la classe de bug que ce dépôt nomme partout
+        « un commentaire qui reste faux après que la valeur a changé »). Remplacé par un
+        remplissage FLEX qui ne devine rien : `Cadre` gagne un prop `pleinEcran`, l'en-tête
+        et les onglets gardent leur taille naturelle, `<main>` puis `.plan-ecran` absorbent
+        tout le reste — le calcul est fait par le moteur de mise en page. `.plan-ecran
+        :has(.carte-offres--agrandie)` reste une échappatoire au défilement normal (le mode
+        « agrandir » a toujours voulu dépasser l'espace disponible ; les deux comportements
+        entraient en conflit sinon). Sous 56 rem, `.page--pleine` s'efface : un empilement
+        mobile dépasse presque toujours un écran, le figer aurait rendu le bas de liste
+        INATTEIGNABLE. **Vérifié par un harnais Playwright** (page HTML statique, la vraie
+        feuille de style, 59 lignes de test) — mesuré, pas supposé : desktop 900/900 sans
+        défilement de page, liste interne qui défile (6608/493) ; mobile 375×812 redevient
+        un flux normal (page 9234, défilement de page) ; agrandie restaure l'ancien 82vh au
+        pixel près ET redonne le défilement de page.
+      · **Note « 1 » au lieu de la moyenne** — trouvé dans `CarteGoogle.tsx` : la pastille
+        d'une épingle APPROXIMATIVE affichait `e.entreprises.length` (un compte
+        d'entreprises) au lieu de la note — et la quasi-totalité des points flous ne
+        portent qu'UNE entreprise, d'où le « toujours 1 ». La distinction floue/exacte reste
+        dite par le STYLE (petite, grisée, pointillée), plus par un chiffre différent :
+        la pastille montre désormais `note ?? "—"` dans tous les cas.
+      · **Boutons moches, mauvaise couleur** — `.bouton` est le style du BOUTON DE
+        CONNEXION (`--accent`, un violet hérité du gabarit `app-template`, jamais destiné à
+        cet écran) ; les boutons « Agrandir la carte » / « Densité des bonnes offres »
+        l'utilisaient par erreur. La carte Leaflet portait déjà la bonne règle en
+        commentaire (« même allure que les filtres, ils n'ont pas à s'inventer un style ») —
+        elle ne l'avait simplement pas traversée jusqu'à la carte Google. Remplacé par
+        `.filtre`/`.filtre--actif` + `aria-pressed`, la même convention que partout ailleurs.
+      · **Cliquer sur la carte pour désélectionner** — `onClick` posé sur `<FondGoogle>`
+        (`Map` de `@vis.gl/react-google-maps`) appelle `setSelection(null)`. Sans risque
+        de refermer la fiche qu'on vient d'ouvrir : l'événement `click` de la carte (Maps
+        JS natif) et le `gmp-click` d'un `AdvancedMarker` sont deux canaux SÉPARÉS — cliquer
+        une épingle ne déclenche jamais aussi le clic de fond (vérifié dans les typings de
+        la bibliothèque : `AdvancedMarkerClickEvent` ≠ `MapMouseEvent`).
+      Aucune modification de `lib/scoring.ts` ni de la logique de matching : protocole §11
+      non déclenché — mise en page et affichage seulement. Gate complet vert (81 fichiers,
+      1386 tests).

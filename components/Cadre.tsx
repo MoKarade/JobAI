@@ -32,6 +32,7 @@ export const ONGLETS: readonly Onglet[] = [
 export function Cadre({
   actif,
   titre,
+  pleinEcran = false,
   children,
 }: {
   /** `href` de l'onglet courant, ou `null` pour une page hors onglets (le détail d'une offre). */
@@ -47,10 +48,18 @@ export function Cadre({
    * Omis quand la page porte son propre `<h1>` (le détail d'une offre : l'entreprise).
    */
   titre?: string;
+  /**
+   * La page REMPLIT l'écran, sans défilement en dehors de son propre contenu scrollable
+   * (demande de Marc, 2026-08-21 : « je veux pas pouvoir scroll sous la map »). Seule la
+   * carte s'en sert : l'en-tête et les onglets gardent leur taille NATURELLE, `<main>`
+   * absorbe tout le reste en flex — aucun chiffre de réserve à deviner, qui dériverait au
+   * premier ajout de barre d'outils (vécu : `100vh - 13rem` était déjà trop court).
+   */
+  pleinEcran?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className="page">
+    <div className={`page${pleinEcran ? " page--pleine" : ""}`}>
       <header className="entete">
         <Link href="/" className="entete__marque">
           {/* Le même motif que `app/icon.svg` : l'invite `>_`. Ici il est DESSINÉ plutôt

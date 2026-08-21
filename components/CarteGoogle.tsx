@@ -323,11 +323,17 @@ export function CarteGoogle({
   }
 
   return (
-    <div>
+    <>
       <div className={`carte-outils${agrandie ? " carte-outils--collante" : ""}`}>
+        {/* MÊME STYLE QUE LES FILTRES ET LE REPLI LEAFLET (`.filtre`) — ces boutons
+            portaient `.bouton`, le style du BOUTON DE CONNEXION (accent violet du
+            gabarit, hérité de app-template, jamais destiné à cet écran). « Même
+            allure que les filtres, ils n'ont pas à s'inventer un style » — la règle
+            existait déjà pour la carte Leaflet, elle ne l'avait simplement pas
+            traversée jusqu'ici. */}
         <button
           type="button"
-          className="bouton"
+          className={`filtre${agrandie ? " filtre--actif" : ""}`}
           aria-pressed={agrandie}
           onClick={() => setAgrandie((a) => !a)}
         >
@@ -335,7 +341,7 @@ export function CarteGoogle({
         </button>
         <button
           type="button"
-          className="bouton"
+          className={`filtre${densite ? " filtre--actif" : ""}`}
           aria-pressed={densite}
           onClick={() => setDensite((d) => !d)}
         >
@@ -355,6 +361,7 @@ export function CarteGoogle({
             defaultBounds={bornes}
             gestureHandling="greedy"
             style={{ width: "100%", height: "100%" }}
+            onClick={() => setSelection(null)}
           >
             {epingles.map((e, i) => {
               const note = noteEpingle(e.entreprises);
@@ -393,7 +400,7 @@ export function CarteGoogle({
                               : { background: couleurNote(note), color: encreSurNote() }
                           }
                         >
-                          {approx ? e.entreprises.length : (note ?? "—")}
+                          {note ?? "—"}
                         </span>
                         {dureeS !== null ? (
                           <span className={`epingle__duree epingle__duree--b${bandeDuree(dureeS)}`}>
@@ -477,7 +484,6 @@ export function CarteGoogle({
           </FondGoogle>
         </APIProvider>
       </div>
-
-    </div>
+    </>
   );
 }

@@ -264,6 +264,63 @@ code {
   padding: clamp(1.5rem, 1rem + 2vw, 2.5rem) clamp(1rem, 0.5rem + 2vw, 2rem) 4rem;
 }
 
+/* ⚠️ « PLEINE » : LA PAGE REMPLIT L'ÉCRAN, ET RIEN NE DÉFILE EN DEHORS DE SON PROPRE
+   CONTENU (demande de Marc, 2026-08-21 : « je veux pas pouvoir scroll sous la map »).
+   Seule /carte s'en sert. L'ANCIEN correctif posait `height: calc(100vh - 13rem)` sur la
+   carte — un chiffre DEVINÉ pour « tout ce qu'il y a au-dessus » (en-tête, onglets,
+   filtres, compteurs, barre d'outils). Il a re-dérivé dès qu'une ligne s'est ajoutée
+   au-dessus, exactement la classe de bug que ce dépôt nomme ailleurs « un commentaire qui
+   reste faux après que la valeur a changé ». Ici, RIEN n'est deviné : l'en-tête et les
+   onglets gardent leur taille NATURELLE (`flex: none` par défaut), `<main>` absorbe tout
+   le reste (`flex: 1 1 auto`), et c'est `.plan-ecran` qui reçoit ce qui reste À SON TOUR —
+   le calcul est fait par le moteur de mise en page, jamais par une constante écrite ici. */
+.page--pleine {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+.page--pleine main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* ⚠️ ÉCHAPPATOIRE QUAND LA CARTE EST « AGRANDIE » (`.carte-offres--agrandie`, `82vh` posé
+   plus bas) : cette carte-là a TOUJOURS voulu dépasser ce que la page normale lui
+   laisserait — c'est tout son but — et empiler la liste sous elle en même temps que le
+   « no-scroll » du reste de la page les ferait entrer en CONFLIT (le remplissage figé
+   écraserait la carte agrandie à la place qu'il reste, l'exact inverse de « agrandir »).
+   `:has()` (déjà utilisé plus bas pour la même bascule) rend la page à un flux normal,
+   défilable, le temps que la carte est agrandie — exactement le comportement d'avant ce
+   correctif, qu'on ne change pas. */
+.page--pleine:has(.carte-offres--agrandie) {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+}
+.page--pleine:has(.carte-offres--agrandie) main {
+  overflow: visible;
+}
+/* Sous 56 rem, le plan et la liste s'empilent déjà (règle plus bas) — un empilement
+   dépasse presque toujours un seul écran, et le figer sans défilement rendrait le bas de
+   liste INATTEIGNABLE. La contrainte de hauteur n'a de sens que côte à côte : elle
+   s'efface ici, la page redevient un flux normal, comme partout ailleurs dans l'app. */
+@media (max-width: 56rem) {
+  .page--pleine {
+    display: block;
+    height: auto;
+    overflow: visible;
+    padding-bottom: 4rem;
+  }
+  .page--pleine main {
+    display: block;
+    overflow: visible;
+  }
+}
+
 .entete { display: flex; flex-direction: column; gap: 0.15rem; }
 .entete__marque {
   display: inline-flex;
@@ -972,34 +1029,41 @@ code {
    Empilés, il fallait faire défiler pour relier une épingle à sa fiche : le plan
    sortait de l'écran au moment précis où on lisait ce qu'il montre. Sous 56 rem,
    la colonne repasse dessous — sur un téléphone, l'empilement est le bon choix,
-   et deux colonnes de 10 rem ne servent personne. */
+   et deux colonnes de 10 rem ne servent personne.
+   ⚠️ `.plan-ecran` est aussi l'élément qui REÇOIT le remplissage de `.page--pleine` :
+   `flex: 1 1 auto` absorbe tout ce que `<main>` lui laisse, et `grid-template-rows:
+   minmax(0, 1fr)` fait de sa ligne unique une hauteur DÉFINIE — c'est elle qui étire
+   ensuite le plan et la liste (`align-items: stretch`, plus `start`) à la MÊME hauteur
+   réelle, sans qu'aucun des deux n'ait à connaître un chiffre de fenêtre. */
 .plan-ecran {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(24rem, 30rem);
+  grid-template-rows: minmax(0, 1fr);
   gap: 0.75rem;
-  align-items: start;
+  align-items: stretch;
   margin: var(--pas-2) 0;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 /* La colonne du plan porte la barre d'outils ET le plan : `CarteOffres` rend un
-   fragment, donc c'est cette enveloppe qui en fait UN élément de grille. */
-.plan-ecran__plan { min-width: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+   fragment, donc c'est cette enveloppe qui en fait UN élément de grille. Étirée par
+   `.plan-ecran` à la hauteur de la ligne, elle a besoin de `min-height: 0` pour que
+   `.carte-offres`, à l'intérieur, puisse réellement grandir jusque-là (sinon un
+   conteneur flex garde le `min-height: auto` de son contenu, et `flex: 1` ne fait rien). */
+.plan-ecran__plan { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 0.6rem; }
 @media (max-width: 56rem) {
   .plan-ecran { grid-template-columns: 1fr; }
 }
 /* Carte agrandie : elle reprend toute la largeur, la liste passe dessous. Sans ça,
    « agrandir » donnerait un plan très haut coincé dans une colonne étroite. */
 .plan-ecran:has(.carte-offres--agrandie) { grid-template-columns: 1fr; }
-/* La liste devient une surface au même titre que le plan, et défile toute seule
-   quand elle dépasse : la page ne s'allonge plus au rythme du nombre de lieux. */
+/* La liste devient une surface au même titre que le plan : étirée par la grille à la
+   même hauteur que lui (voir `.plan-ecran`), elle défile SEULE quand elle dépasse. */
 .plan-ecran .carte-liste {
-  max-height: clamp(28rem, calc(100vh - 13rem), 80rem);
   overflow-y: auto;
   background: var(--surface);
   border-radius: var(--r-carte);
   margin: 0;
-}
-@media (max-width: 56rem) {
-  .plan-ecran .carte-liste { max-height: none; }
 }
 
 /* ── Carte des offres ─────────────────────────────────────────────────────
@@ -1007,17 +1071,24 @@ code {
    d'écran. La liste sous elle porte exactement la même information — c'est
    elle, l'accès réel, pas un pis-aller. */
 .carte-offres {
-  /* La hauteur suit la FENÊTRE, pas une valeur fixe : sur un grand écran le plan doit
-     remplir la place disponible, sinon on regarde une région de 50 km dans un timbre-poste
-     entouré de vide. Le plancher garde un plan utilisable sur un portable. */
-  /* 22rem → 13rem de réserve : la légende texte et les paragraphes sous la carte sont
-     partis (2026-08-21), la carte reprend leur place — l'objectif est que la page carte
-     TIENNE dans l'écran, sans défilement sous le plan. */
-  height: clamp(28rem, calc(100vh - 13rem), 80rem);
+  /* ⚠️ ELLE REMPLIT `.plan-ecran__plan`, ELLE NE DEVINE PLUS SA HAUTEUR. L'ancien
+     `clamp(28rem, calc(100vh - 13rem), 80rem)` était un chiffre écrit à la main pour
+     « tout ce qu'il y a au-dessus » — il a re-dérivé au premier ajout de barre d'outils
+     (exactement la classe de bug déjà nommée ailleurs dans ce dépôt : un commentaire qui
+     reste faux après que la valeur a changé). `flex: 1 1 auto` prend tout ce que la
+     colonne lui laisse une fois la barre d'outils posée — calculé par la mise en page,
+     jamais deviné. Sous 56 rem, la page redevient un flux normal (page--pleine s'efface) :
+     un plancher fixe évite qu'elle s'écrase à zéro dans un conteneur qui, là, n'est plus
+     contraint en hauteur. */
+  flex: 1 1 auto;
+  min-height: 0;
   margin: 0;
   border: var(--trait-surface);
   border-radius: var(--r-carte);
   background: var(--surface);
+}
+@media (max-width: 56rem) {
+  .carte-offres { flex: none; min-height: 28rem; height: 28rem; }
 }
 
 /* ── Les tuiles ──────────────────────────────────────────────────────────

@@ -6,6 +6,32 @@
 
 ---
 
+## Session 2026-08-21 (suite) — quatre retours de test réels sur la carte, mesurés
+
+Marc, après avoir testé la carte en vrai : « je veux pas pouvoir scroll sous la map…
+les entreprises sont toujours écrites 1 au lieu de la moyenne des notes des offres…
+les boutons sont moches et mauvaise couleur… je veux pouvoir cliquer sur la carte pour
+désélectionner la sélection ». Détail complet au BACKLOG `[CARTE-H]`. En bref :
+
+1. **Défilement** — l'ancien `calc(100vh - 13rem)` était un chiffre deviné, il a
+   re-dérivé. Remplacé par un remplissage FLEX (nouveau prop `pleinEcran` sur `Cadre`) qui
+   ne devine rien — **vérifié par un harnais Playwright** (page statique, la vraie feuille
+   de style) avant de committer : desktop sans défilement de page, mobile redevient un
+   flux normal, le mode « agrandir » garde son 82vh et son défilement.
+2. **Note « 1 »** — la pastille d'une épingle APPROXIMATIVE affichait un compte
+   d'entreprises, pas la note. Corrigé : `note ?? "—"` partout, la distinction reste dans
+   le style (petite, grisée, pointillée).
+3. **Boutons moches** — ils utilisaient `.bouton`, le style du bouton de CONNEXION (violet
+   du gabarit). Passés à `.filtre`/`.filtre--actif`, la convention déjà en place partout
+   ailleurs (dont la carte Leaflet, qui portait déjà la règle en commentaire).
+4. **Clic pour désélectionner** — `onClick` sur le fond de la carte Google appelle
+   `setSelection(null)`. Sans risque avec les clics d'épingle : deux canaux d'événements
+   séparés (`click` du fond vs `gmp-click` du marqueur), vérifié dans les typings.
+
+Gate complet vert (81 fichiers, 1386 tests). Rien à vérifier en prod que Marc n'ait pas
+déjà signalé — ce sont ses propres retours qui ont guidé ce lot.
+
+
 ## Session 2026-08-21 — accueil regroupé par entreprise (+ où en est la carte Google)
 
 **Trois choses distinctes se sont passées le 2026-08-21**, et elles ne sont pas au même

@@ -231,7 +231,7 @@ export default async function PageCarte() {
   }
 
   return (
-    <Cadre actif="/carte" titre="Carte des offres">
+    <Cadre actif="/carte" titre="Carte des offres" pleinEcran>
       {/* La légende texte a été RETIRÉE (demande Marc 2026-08-21 : « moins de texte ») :
           l'épingle porte sa note, la pastille approximative est pointillée, et la légende
           des bandes de durée vit SUR le plan. Un texte qui répète l'écran est du bruit. */}
