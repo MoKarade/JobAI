@@ -2464,3 +2464,44 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   line-height: 1.5;
 }
 .parcours__vide { margin: 0; color: var(--text-soft); line-height: 1.55; }
+
+/* ── La carte Google (ADR-0016, lot A) ──────────────────────────────────────
+   La fiche d'une épingle vit dans une InfoWindow Google, qui pose un fond BLANC
+   qu'on ne contrôle pas : l'encre est donc FONCÉE en dur ici, indépendante du
+   thème sombre de l'app — hériter de var(--text) rendrait du blanc sur blanc. */
+.carte-fiche { color: oklch(0.25 0.02 265); font-size: 0.85rem; line-height: 1.45; max-width: 320px; }
+.carte-fiche__entreprise { margin-bottom: 0.6rem; }
+.carte-fiche__nom { margin: 0 0 0.2rem; font-size: 0.95rem; color: oklch(0.2 0.02 265); }
+.carte-fiche__adresse { margin: 0; color: oklch(0.45 0.02 265); }
+.carte-fiche__km { margin: 0.1rem 0 0; font-variant-numeric: tabular-nums; color: oklch(0.45 0.02 265); }
+.carte-fiche__offres { margin: 0.45rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.3rem; }
+.carte-fiche__offres a { color: oklch(0.4 0.12 265); }
+.carte-fiche__note {
+  display: inline-block;
+  min-width: 2em;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.carte-fiche__liens { margin: 0.5rem 0 0; }
+.carte-fiche__liens a { color: oklch(0.4 0.12 265); }
+/* L'approximation se dit en PREMIER et en ambre : une épingle au centre-ville prise
+   pour l'usine est exactement l'erreur que cette ligne empêche. */
+.carte-fiche__approx {
+  margin: 0 0 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.35rem;
+  background: oklch(0.93 0.06 80);
+  color: oklch(0.4 0.1 70);
+}
+
+/* Le repli Leaflet SE DIT : une variable d'env manquante se cherche des heures quand
+   l'écran n'en parle pas. */
+.plan-ecran__repli {
+  margin: 0 0 0.6rem;
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+}
+.plan-ecran__repli code { font-family: var(--mono); }

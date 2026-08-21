@@ -8,10 +8,13 @@
 // recherche libre parcourt. Même session, même navigateur, et l'accueil le fait déjà : ce
 // n'est pas une exposition nouvelle — mais c'est à dire, pas à taire.
 //
-// GARDE-FOU N°1 : le domicile de Marc n'entre JAMAIS dans cette page. Ni en props, ni dans
-// le cadrage — qui se déduit des seules entreprises. Le TRAJET passe par un lien Google
-// Maps qui ne porte que la destination (`lib/lienTrajet.ts`) : l'origine est proposée par
-// Google, côté compte de Marc, jamais par l'app.
+// GARDE-FOU N°1, VERSION 3 (ADR-0016, décision Marc 2026-08-21) : le domicile ENTRE dans
+// cette page — épingle et cadrage — parce qu'elle vit derrière la session mono-adresse :
+// le « client » est Marc, et lui cacher sa propre maison protégeait le principe, pas la
+// personne. Ce qui reste ABSOLU : aucune coordonnée dans un fichier versionné (elles
+// viennent de `domicile()`, env + base), et rien de servi à une requête non authentifiée —
+// la garde de session ci-dessous n'est donc plus une politesse, c'est le mur.
+// Le lien Google Maps externe (`lib/lienTrajet.ts`) reste : il ne porte que la destination.
 //
 // HONNÊTETÉ DES POSITIONS : une épingle pleine est l'entreprise elle-même (trouvée dans
 // OpenStreetMap) ; une épingle en pointillé est un REPLI au centre de sa ville, et la page
@@ -28,6 +31,7 @@ import type { PositionEntreprise } from "@/lib/carte";
 import { ENTREPRISES_CIBLES } from "@/lib/reference";
 import { classerPanne, type Panne } from "@/lib/panne";
 import { Cadre } from "@/components/Cadre";
+import { domicile } from "@/lib/domicile";
 import { couleurNote } from "@/lib/couleurNote";
 import { CarteFiltrable } from "@/components/CarteFiltrable";
 import { resteDuTravail, type LieuTravail } from "@/lib/travaux";
@@ -60,8 +64,12 @@ export default async function PageCarte() {
   // `bornesLe`, que la forme d'affichage ne porte pas (et n'a pas à porter).
   let lieux: LieuTravail[] = [];
   let panne: Panne | null = null;
+  // Le domicile, DANS le try : son échec (géocodage, base) ne doit pas éteindre la carte —
+  // sans lui elle rend exactement ce qu'elle rendait avant ADR-0016.
+  let maison: { lat: number; lon: number } | null = null;
 
   try {
+    maison = await domicile();
     offres = await lireOffres();
     if (offres !== null) {
       const lignes = await db.select().from(entreprisesLieux);
@@ -246,6 +254,8 @@ export default async function PageCarte() {
         cibles={[...ENTREPRISES_CIBLES]}
         positions={[...positions.entries()]}
         ciblesManquantes={ciblesManquantes}
+        cleGoogle={process.env.NEXT_PUBLIC_GOOGLE_MAPS_CLIENT_KEY?.trim() || null}
+        domicile={maison}
       />
     </Cadre>
   );

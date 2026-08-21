@@ -37,12 +37,18 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
    l'historique de refus et des noms de personnes tierces (conseillers RH). *Interdit* : tout
    commit portant l'un de ces éléments. *Exception* : aucune. Les coordonnées du domicile
    vivent dans `DOMICILE_LAT` / `DOMICILE_LON` (variables d'environnement) ; les noms de
-   tiers ne sont jamais persistés dans un fichier versionné. Le domicile n'est ni affiché
-   ni envoyé au navigateur — le TRAJET vers une entreprise passe par un lien Google Maps
-   qui ne porte que la destination (`lib/lienTrajet.ts`) : l'origine est fournie par
-   Google, côté compte de Marc, jamais par l'app. *(Une révision ADR-0004 avait assoupli
-   cette règle pour une carte Google ; le chantier a été annulé le jour même — la règle
-   stricte est rétablie, et le lien trajet la rend inutile à assouplir.)*
+   tiers ne sont jamais persistés dans un fichier versionné. **Version 3 (ADR-0016,
+   décision Marc 2026-08-21)** : le domicile PEUT être affiché et envoyé au navigateur —
+   derrière la session mono-adresse, le « client » est Marc, et lui cacher sa propre
+   maison protégeait le principe, pas la personne. Ce qui reste ABSOLU et ne se
+   re-négociera pas dans une phrase groupée : (a) aucune coordonnée du domicile ni d'un
+   lieu personnel dans un fichier VERSIONNÉ ; (b) rien de servi à une requête NON
+   authentifiée. ⚠️ Leçon des trois versions : « le domicile ne sort jamais » protégeait
+   DEUX choses différentes — le dépôt public (invariant) et le navigateur de Marc
+   (politique). Écrites dans la même phrase, elles sont tombées ensemble (ADR-0004),
+   remontées ensemble (annulation), retombées ensemble (ADR-0016) — alors qu'une seule
+   bougeait à chaque fois. Le lien Google Maps externe (`lib/lienTrajet.ts`) reste, en
+   repli et pour l'itinéraire « avec trafic » côté compte Google.
    *Verrou* : `tests/piiGuard.test.ts` — scan des fichiers **réellement versionnés**
    (`git ls-files`), volume prouvé, discrimination prouvée motif par motif. Sa **portée est
    écrite dans le test** : il détecte des FORMES (adresse municipale, coordonnées, civilité,

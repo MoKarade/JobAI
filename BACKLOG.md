@@ -955,6 +955,19 @@
       et n'a pas de raison d'être un problème, mais n'a jamais été observé à cette échelle.
       Lire le compte rendu de `/sources` après la première passe en mode « tout ».
 
+- [ ] **[CARTE-G]** ⚠️ **Plan carte Google (ADR-0016), 7 lots — decisions Marc 2026-08-21,
+      cles posees (2 cles, perimetres separes).** A: fond Google + approximatives VISIBLES
+      (epingle distincte) + domicile + repli Leaflet DIT. B: trajet au clic (Routes,
+      serveur, cache en base). C: matrice de durees nocturne (badge minutes par epingle).
+      D: filtres de l'accueil sur la carte. E: bandes de duree (pas d'isochrone vraie :
+      Routes n'en fait pas, une grille couterait des centaines d'appels — les bandes donnent
+      la meme decision pour presque rien). F: tournee multi-entreprises (waypoints
+      optimises). G: densite ponderee par note (local, zero API). Gardes : cache en base
+      pour TOUT appel Routes, compteur d'appels/jour avec refus DIT, test anti-fuite de la
+      cle serveur, Places DEJA paye reutilise (placeGoogleId/siteWeb/horaires en base).
+      « Toutes les API » NON : on reste sur les 4 des cles restreintes — chaque API en plus
+      est une surface d'abus en plus.
+
 - [ ] **[VEILLE-44]** ⚠️ **DECISION MARC : 1 300 offres regionales par passe** (mesure sur
       une passe complete), contre quelques dizaines suivies aujourd'hui. L'echantillon reste
       domine par des postes peu qualifies. Brancher la source telle quelle noierait le

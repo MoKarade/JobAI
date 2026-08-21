@@ -41,6 +41,7 @@ import {
 } from "@/lib/filtres";
 import { CompteFiltre, Filtres } from "./Filtres";
 import { CarteOffres } from "./CarteOffres";
+import { CarteGoogle } from "./CarteGoogle";
 import { ListeCarte } from "./ListeCarte";
 import { BoutonSituer } from "./BoutonSituer";
 
@@ -50,6 +51,8 @@ export function CarteFiltrable({
   positions,
   ciblesManquantes,
   metiers = [],
+  cleGoogle = null,
+  domicile = null,
 }: {
   offres: Offre[];
   /** Les métiers du domaine — la catégorie s'en sert, comme la note. */
@@ -59,6 +62,13 @@ export function CarteFiltrable({
   positions: [string, PositionEntreprise][];
   /** Ce que le bouton « Situer » peut réellement traiter — les cibles, pas les employeurs. */
   ciblesManquantes: number;
+  /**
+   * La clé CLIENT Google Maps, ou `null`. Absente ⇒ repli Leaflet, DIT à l'écran : une
+   * carte dégradée sans explication serait indiscernable d'une panne (ADR-0016, D1).
+   */
+  cleGoogle?: string | null;
+  /** Le domicile, ou `null` s'il n'est pas configuré. Garde-fou n°1 v3 (ADR-0016). */
+  domicile?: { lat: number; lon: number } | null;
 }) {
   const [filtres, setFiltres] = useState<EtatFiltres>(FILTRES_VIDES);
 
@@ -182,7 +192,20 @@ export function CarteFiltrable({
             la seconde (21 rem), et la liste retombait à la ligne. Mettre un composant dans
             une grille exige de vérifier ce qu'il rend À SA RACINE, jamais de le supposer. */}
         <div className="plan-ecran__plan">
-          <CarteOffres epingles={epingles} cadre={cadre} />
+          {cleGoogle ? (
+            <CarteGoogle cle={cleGoogle} epingles={epingles} cadre={cadre} domicile={domicile} />
+          ) : (
+            <>
+              {/* Le repli SE DIT. Sans cette ligne, « pourquoi ma carte est-elle encore
+                  l'ancienne ? » n'a pas de réponse à l'écran — et une variable d'env
+                  manquante se cherche des heures. */}
+              <p className="plan-ecran__repli">
+                Fond Google inactif — la clé <code>NEXT_PUBLIC_GOOGLE_MAPS_CLIENT_KEY</code>{" "}
+                n’est pas configurée. La carte utilise le repli OpenStreetMap.
+              </p>
+              <CarteOffres epingles={epingles} cadre={cadre} />
+            </>
+          )}
         </div>
 
         {epingles.length === 0 ? (
