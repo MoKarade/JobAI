@@ -6,6 +6,49 @@
 
 ---
 
+## Session 2026-08-21 — accueil regroupé par entreprise (+ où en est la carte Google)
+
+**Trois choses distinctes se sont passées le 2026-08-21**, et elles ne sont pas au même
+stade — à ne pas confondre en reprenant la session.
+
+1. **Carte Google (ADR-0016), six lots A/B/C/E/F/G — LIVRÉ sur `main`.** Voir `[CARTE-G]`
+   au BACKLOG pour le détail. Reste à Marc : vérifier en prod contre les vraies clés.
+2. **Correctifs de retours de test réels sur cette carte — PR `#14`, EN ATTENTE DE MERGE,
+   PAS ENCORE SUR `main`.** Sept correctifs (403 Routes traduit en geste console, fond
+   sombre, note = moyenne des offres du groupe, tournée retirée, densité en couleurs HEX
+   au lieu d'oklch — les objets `google.maps` ne rendent rien avec oklch, en SILENCE —,
+   texte sous la carte retiré, plus de défilement). Gate vert, CI verte. ⚠️ Tentative de
+   merge bloquée par un rate-limit de l'API GitHub (`update_pull_request` → « API rate
+   limit already exceeded ») — pas un problème de code, à retenter.
+3. **Accueil regroupé par entreprise — LIVRÉ sur `main`, ce commit-ci.** Demande de Marc :
+   « regrouper toutes les offres par entreprise, mettre l'entreprise avec la meilleure note
+   en moyenne en premier, permettre de cliquer sur la carte entreprise pour avoir plus
+   d'info sur l'entreprise et voir toutes les offres avec notes, possible de cliquer chaque
+   offre pour avoir la même carte que les offres actuelles ». Détail au BACKLOG
+   `[ACCUEIL-01]`. En bref : `lib/groupesEntreprise.ts` (déjà en place, socle testé)
+   regroupe et classe ; nouveau `components/CarteEntreprise.tsx` réutilise `CarteOffre` telle
+   quelle pour chaque offre dépliée — même geste « clic agrandit, ça ne navigue pas ».
+   `components/ListeOffres.tsx` groupe le résultat FILTRÉ, pas l'inverse : le compte affiché
+   reste un compte d'offres (demande du 2026-08-19), le regroupement est un second fait, en
+   dessous.
+
+### ⚠️ Le conteneur a RE-REVERTI en cours de session
+
+`main` local est retombé à `[BORNE-02]` (sept commits en retard sur `origin/main`), et
+`node_modules` avait de nouveau perdu ses paquets récents (`unpdf`). Aucun travail non
+commité n'a été perdu cette fois — la réparation habituelle a suffi : refspec de `main`
+manquante (`git config --add remote.origin.fetch …`), `git fetch` + `checkout -B main
+FETCH_HEAD`, `npm ci`, vérification du paquet par code de sortie.
+
+### Reste ouvert
+
+- Merger la PR `#14` dès que le rate-limit GitHub se libère.
+- La fiche entreprise de l'accueil n'expose PAS les champs Google Places (adresse,
+  téléphone, horaires) que porte la fiche de la carte — la demande de Marc lisait « voir
+  toutes les offres avec notes » comme le contenu du dépliage. À confirmer si Marc en veut
+  plus.
+
+
 ## Session 2026-08-19 — « peut-on supprimer la Routine ? », réponse partielle MESURÉE
 
 **Non.** Et ce n'est pas une prudence, c'est un chiffre.

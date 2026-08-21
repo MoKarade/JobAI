@@ -504,9 +504,20 @@ code {
   color: var(--text-soft);
   margin: 1.1rem 0 0.6rem;
 }
+/* La phrase secondaire (« regroupées en N entreprises ») : plus discrète que le compte
+   d'offres, qu'elle ne doit jamais concurrencer — c'est lui que Marc a demandé de voir. */
+.controles__compte--secondaire {
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  margin: -0.3rem 0 0.6rem;
+}
 
 /* ── Cartes d'offre ──────────────────────────────────────────────────────── */
 .liste { display: flex; flex-direction: column; gap: 0.95rem; }
+/* Les offres D'UNE ENTREPRISE, dépliées sous sa carte : un peu plus serrées que la liste
+   du haut niveau, pour qu'on lise « ce sont les détails d'un même groupe », pas une liste
+   sœur. */
+.liste--groupee { gap: 0.6rem; }
 /* Un CONTOUR, pas d'ombre, pas de liseré de palier (ADR-0008). Le trait rend aux
    cartes le relief que la seule différence de clarté ne porte plus sur fond
    sombre ; l'ombre et le liseré restent bannis — c'est leur EMPILEMENT qui avait

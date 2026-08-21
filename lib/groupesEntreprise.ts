@@ -52,6 +52,28 @@ function moyenneDesNotes(offres: readonly Offre[]): number | null {
 }
 
 /**
+ * Trie les offres D'UN GROUPE : meilleure note d'abord, non notées en dernier — puis, à
+ * note égale, distance croissante, non mesurées en dernier — puis le poste, pour la
+ * stabilité. Sans ce tri, la meilleure offre de l'entreprise ne serait pas la première
+ * qu'on voit en dépliant sa carte : le même défaut que trierait un tri par `null` comme zéro.
+ */
+function trierOffresDuGroupe(offres: readonly Offre[]): Offre[] {
+  return [...offres].sort((a, b) => {
+    if (a.score !== b.score) {
+      if (a.score === null) return 1;
+      if (b.score === null) return -1;
+      return b.score - a.score;
+    }
+    if (a.km !== b.km) {
+      if (a.km === null) return 1;
+      if (b.km === null) return -1;
+      return a.km - b.km;
+    }
+    return a.poste.localeCompare(b.poste, "fr");
+  });
+}
+
+/**
  * Regroupe les offres par employeur et classe les groupes par mérite.
  *
  * L'ordre : la meilleure moyenne d'abord ; à moyenne égale, la meilleure note ; puis le
@@ -77,7 +99,7 @@ export function grouperParEntreprise(offres: readonly Offre[]): GroupeEntreprise
     const kms = liste.map((o) => o.km).filter((n): n is number => typeof n === "number");
     return {
       nom,
-      offres: liste,
+      offres: trierOffresDuGroupe(liste),
       noteMoyenne: moyenneDesNotes(liste),
       meilleureNote: notes.length > 0 ? Math.max(...notes) : null,
       notees: notes.length,

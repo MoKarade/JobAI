@@ -95,6 +95,19 @@ describe("grouperParEntreprise — la meilleure moyenne d'abord", () => {
     expect(grouperParEntreprise([offre("Beta Fabrication", 60, null)])[0]!.kmMin).toBeNull();
   });
 
+  it("trie les offres D'UN GROUPE : meilleure note d'abord, puis distance croissante, non mesurées en dernier", () => {
+    const g = grouperParEntreprise([
+      offre("Alpha Industries", 60, 40),
+      offre("Alpha Industries", 80, null),
+      offre("Alpha Industries", null, 5),
+      offre("Alpha Industries", 60, 10),
+    ]);
+    expect(g[0]!.offres.map((o) => o.score)).toEqual([80, 60, 60, null]);
+    // À note égale (60), la plus proche d'abord — jamais l'ordre d'arrivée.
+    expect(g[0]!.offres[1]!.km).toBe(10);
+    expect(g[0]!.offres[2]!.km).toBe(40);
+  });
+
   it("rend une liste vide sur une entrée vide", () => {
     expect(grouperParEntreprise([])).toEqual([]);
   });

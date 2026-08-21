@@ -1498,3 +1498,38 @@ RESTE — à observer sur les prochaines passes (rien à coder) :
   DriveAI et les 4 de FinanceAI l'épinglent encore. JobAI épingle **22** (`.nvmrc`), la
   version réellement utilisée en développement — épingler 20 aurait créé un écart dev/CI
   non testé. À réévaluer pour les autres dépôts.
+
+## Chantier — accueil regroupé par entreprise
+
+- [x] 🔧 **`[ACCUEIL-01]`** **Accueil regroupé par entreprise** (demande de Marc,
+      2026-08-21 : « regrouper toutes les offres par entreprise, mettre l'entreprise avec
+      la meilleure note en moyenne en premier, permettre de cliquer sur la carte entreprise
+      pour avoir plus d'info sur l'entreprise et voir toutes les offres avec notes, possible
+      de cliquer chaque offre pour avoir la même carte que les offres actuelles »). ✅
+      2026-08-21.
+      · `lib/groupesEntreprise.ts` (déjà en place) fournit `grouperParEntreprise` — même
+        règle d'appariement que la carte (`apparier`), classement par moyenne décroissante,
+        groupes SANS aucune note toujours en DERNIER (jamais zéro, une entreprise non jugée
+        n'est pas une mauvaise entreprise). Ajouté ici : le TRI DES OFFRES à l'intérieur
+        d'un groupe (meilleure note d'abord, distance croissante à égalité, non mesurées en
+        dernier) — sinon la première offre visible en dépliant n'aurait pas été la
+        meilleure.
+      · `components/CarteEntreprise.tsx` (nouveau) : même geste que `CarteOffre` — clic
+        agrandit, ça ne navigue pas. Dépliée, elle rend CHAQUE offre du groupe avec
+        `CarteOffre` telle quelle : aucune seconde implémentation de carte d'offre, qui
+        aurait fini par diverger.
+      · `components/ListeOffres.tsx` : le filtrage produit les offres visibles EXACTEMENT
+        comme avant — le compte affiché reste un compte d'OFFRES (ce que Marc a demandé de
+        voir en premier, 2026-08-19) — et c'est SUR ce résultat filtré que le regroupement
+        se construit : un filtre qui écarte une offre l'écarte aussi du groupe, jamais
+        l'inverse. Une phrase secondaire, discrète, dit en combien d'entreprises ça se
+        regroupe.
+      · Tests : `tests/groupesEntreprise.test.ts` (+1, le tri intra-groupe, discriminant :
+        note décroissante puis distance croissante, non mesurées en dernier). Gate complet
+        vert (81 fichiers, 1390 tests). Aucune modification de `lib/scoring.ts` ni de la
+        logique de matching : protocole §11 non déclenché — regroupement et affichage
+        seulement, zéro recalcul de note.
+      Reste ouvert : la fiche entreprise ne porte PAS les champs Google Places (adresse,
+      téléphone, horaires) que la fiche de la carte affiche déjà — la demande de Marc lisait
+      « voir toutes les offres avec notes » comme le contenu du dépliage, pas une fiche
+      d'entreprise enrichie séparée. À confirmer si Marc en veut plus.
