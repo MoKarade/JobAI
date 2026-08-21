@@ -33,7 +33,7 @@ import {
 import type { Epingle } from "@/lib/carte";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
-import { obtenirTrajet, type ResultatTrajet } from "@/lib/actionsTrajet";
+import { obtenirTournee, obtenirTrajet, type ResultatTrajet } from "@/lib/actionsTrajet";
 import { BANDES_DUREE_MIN, bandeDuree, formaterDistance, formaterDuree } from "@/lib/trajetRoutes";
 
 /**
@@ -224,6 +224,39 @@ export function CarteGoogle({
   const [trajetEnCours, setTrajetEnCours] = useState(false);
   const dureesParNom = useMemo(() => new Map(durees), [durees]);
 
+  // ── La tournée (ADR-0016, lot F) ────────────────────────────────────────
+  const [modeTournee, setModeTournee] = useState(false);
+  const [etapes, setEtapes] = useState<string[]>([]);
+  const [tournee, setTournee] = useState<{
+    dureeS: number;
+    distanceM: number;
+    polyline: string;
+    ordre: string[];
+  } | null>(null);
+  const [erreurTournee, setErreurTournee] = useState<string | null>(null);
+  const [tourneeEnCours, setTourneeEnCours] = useState(false);
+
+  function basculerEtape(nom: string) {
+    setTournee(null);
+    setErreurTournee(null);
+    setEtapes((xs) => (xs.includes(nom) ? xs.filter((x) => x !== nom) : [...xs, nom]));
+  }
+
+  async function calculerTournee() {
+    if (tourneeEnCours || etapes.length < 2) return;
+    setTourneeEnCours(true);
+    setErreurTournee(null);
+    try {
+      const r = await obtenirTournee(etapes);
+      if (r.ok) setTournee(r);
+      else setErreurTournee(r.raison);
+    } catch {
+      setErreurTournee("Le calcul de la tournée a échoué — réessaie.");
+    } finally {
+      setTourneeEnCours(false);
+    }
+  }
+
   // ⚠️ GARDE ANTI-RAFALE CÔTÉ CLIENT, en plus du plafond serveur : un double-clic ne doit
   // pas partir en deux appels facturés. Le disabled du bouton la matérialise, ce flag la
   // tient même si le bouton se re-rend entre les deux clics.
@@ -286,6 +319,21 @@ export function CarteGoogle({
         >
           {agrandie ? "Réduire la carte (Échap)" : "Agrandir la carte"}
         </button>
+        {domicile ? (
+          <button
+            type="button"
+            className="bouton"
+            aria-pressed={modeTournee}
+            onClick={() => {
+              setModeTournee((m) => !m);
+              setEtapes([]);
+              setTournee(null);
+              setErreurTournee(null);
+            }}
+          >
+            {modeTournee ? "Quitter la tournée" : "Préparer une tournée"}
+          </button>
+        ) : null}
       </div>
       <div className={`carte-offres${agrandie ? " carte-offres--agrandie" : ""}`}>
         <APIProvider apiKey={cle} libraries={["geometry"]}>
@@ -307,7 +355,11 @@ export function CarteGoogle({
                       ? `${e.ville} — position approximative (${e.entreprises.length} entreprise${e.entreprises.length > 1 ? "s" : ""})`
                       : e.entreprises[0]?.nom
                   }
-                  onClick={() => setSelection({ type: "epingle", index: i })}
+                  onClick={() =>
+                    modeTournee && !approx && e.entreprises[0]
+                      ? basculerEtape(e.entreprises[0].nom)
+                      : setSelection({ type: "epingle", index: i })
+                  }
                 >
                   {/* Le SCORE dans la pastille, comme sur le rendu Leaflet : un cercle de
                       couleur seul obligeait à cliquer pour savoir si ça vaut le détour.
@@ -325,7 +377,11 @@ export function CarteGoogle({
                     return (
                       <div className="epingle">
                         <span
-                          className={`epingle__pastille${approx ? " epingle__pastille--approx" : ""}`}
+                          className={`epingle__pastille${approx ? " epingle__pastille--approx" : ""}${
+                            !approx && e.entreprises[0] && etapes.includes(e.entreprises[0].nom)
+                              ? " epingle__pastille--choisie"
+                              : ""
+                          }`}
                           style={
                             approx
                               ? undefined
@@ -361,7 +417,11 @@ export function CarteGoogle({
               </AdvancedMarker>
             ) : null}
 
-            {trajet ? <TraceTrajet polyline={trajet.polyline} /> : null}
+            {tournee ? (
+              <TraceTrajet polyline={tournee.polyline} />
+            ) : trajet ? (
+              <TraceTrajet polyline={trajet.polyline} />
+            ) : null}
 
             {dureesParNom.size > 0 ? (
               <div className="carte-legende" aria-hidden="true">
@@ -405,6 +465,48 @@ export function CarteGoogle({
           </FondGoogle>
         </APIProvider>
       </div>
+
+      {modeTournee ? (
+        <div className="tournee">
+          {etapes.length === 0 ? (
+            <p className="tournee__aide">
+              Clique les épingles à visiter (deux à huit, positions exactes seulement — un
+              centre-ville n’est pas une étape).
+            </p>
+          ) : (
+            <>
+              <p className="tournee__etapes">
+                {tournee
+                  ? // L'ordre OPTIMISÉ, numéroté : c'est lui qu'on suit, pas l'ordre des clics.
+                    tournee.ordre.map((n, i) => `${i + 1}. ${n}`).join(" → ")
+                  : etapes.join(" · ")}
+              </p>
+              <p className="tournee__actions">
+                <button
+                  type="button"
+                  className="bouton"
+                  disabled={etapes.length < 2 || tourneeEnCours}
+                  onClick={calculerTournee}
+                >
+                  {tourneeEnCours
+                    ? "Calcul…"
+                    : tournee
+                      ? "Recalculer"
+                      : `Calculer la tournée (${etapes.length} étape${etapes.length > 1 ? "s" : ""})`}
+                </button>
+                {tournee ? (
+                  <span className="tournee__total">
+                    {formaterDuree(tournee.dureeS)} au total (
+                    {formaterDistance(tournee.distanceM)}), départ et retour au domicile,
+                    sans trafic
+                  </span>
+                ) : null}
+              </p>
+            </>
+          )}
+          {erreurTournee ? <p className="tournee__erreur">{erreurTournee}</p> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

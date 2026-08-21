@@ -8,6 +8,7 @@ import {
   TOLERANCE_POSITION_DEG,
   appelerMatrice,
   appelerRoutes,
+  appelerTournee,
   cacheValide,
   formaterDistance,
   formaterDuree,
@@ -141,5 +142,58 @@ describe("bandeDuree — les bornes sont INCLUSIVES et dérivées des constantes
     expect(bandeDuree(b2 * 60)).toBe(2);
     expect(bandeDuree(b3 * 60)).toBe(3);
     expect(bandeDuree(b3 * 60 + 1)).toBe(4);
+  });
+});
+
+describe("appelerTournee — l'ordre OPTIMISÉ, pas l'ordre des clics", () => {
+  const etapes = [
+    { nom: "Alpha Industries", lat: 46.8, lon: -71.2 },
+    { nom: "Beta Fabrication", lat: 46.9, lon: -71.1 },
+    { nom: "Gamma Robotique", lat: 46.7, lon: -71.3 },
+  ];
+  const corps = (extra: object = {}) =>
+    new Response(
+      JSON.stringify({
+        routes: [
+          {
+            duration: "7200s",
+            distanceMeters: 90000,
+            polyline: { encodedPolyline: "xyz" },
+            ...extra,
+          },
+        ],
+      }),
+    );
+
+  it("⚠️ remappe les indices d'optimisation sur les NOMS — une permutation, pas l'identité", async () => {
+    const r = await appelerTournee(maison, etapes, "cle", vi.fn(async () =>
+      corps({ optimizedIntermediateWaypointIndex: [2, 0, 1] }),
+    ));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.ordre).toEqual(["Gamma Robotique", "Alpha Industries", "Beta Fabrication"]);
+  });
+
+  it("sans indices, l'ordre envoyé EST l'ordre — jamais une permutation inventée", async () => {
+    const r = await appelerTournee(maison, etapes, "cle", vi.fn(async () => corps()));
+    if (!r.ok) return;
+    expect(r.ordre).toEqual(etapes.map((e) => e.nom));
+  });
+
+  it("refuse moins de deux étapes SANS toucher le réseau", async () => {
+    const f = vi.fn();
+    const r = await appelerTournee(maison, [etapes[0]!], "cle", f as never);
+    expect(r.ok).toBe(false);
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("demande l'optimisation et le retour au domicile dans la requête", async () => {
+    const f = vi.fn(async () => corps({ optimizedIntermediateWaypointIndex: [0, 1, 2] }));
+    await appelerTournee(maison, etapes, "cle", f);
+    const [, init] = f.mock.calls[0]! as unknown as [string, RequestInit];
+    const body = String(init.body);
+    expect(body).toContain('"optimizeWaypointOrder":true');
+    // Origine ET destination = domicile : une journée d'entrevues part de chez soi et y revient.
+    expect(body.match(/46\.81/g)!.length).toBeGreaterThanOrEqual(2);
   });
 });

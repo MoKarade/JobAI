@@ -2582,3 +2582,30 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   border-radius: 0.4rem;
   background: oklch(1 0 0 / 0.85);
 }
+
+/* ── La tournée (ADR-0016, lot F) ─────────────────────────────────────────── */
+.tournee {
+  margin-top: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border: var(--trait-surface);
+  border-radius: var(--r-carte);
+  background: var(--surface);
+}
+.tournee__aide { margin: 0; color: var(--text-soft); font-size: var(--t-s); }
+.tournee__etapes { margin: 0 0 0.5rem; font-size: var(--t-s); line-height: 1.5; }
+.tournee__actions { margin: 0; display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+.tournee__total { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tournee__erreur {
+  margin: 0.5rem 0 0;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.35rem;
+  background: oklch(0.93 0.06 80);
+  color: oklch(0.4 0.1 70);
+}
+/* Une étape cochée se voit de loin : anneau bleu épais, la couleur du domicile — c'est
+   SA tournée, le lien visuel est voulu. */
+.epingle__pastille--choisie {
+  border-color: oklch(0.55 0.15 250);
+  border-width: 3px;
+  box-shadow: 0 0 0 2px oklch(0.72 0.12 250 / 0.5), 0 1px 4px oklch(0 0 0 / 0.35);
+}
