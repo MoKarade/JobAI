@@ -1122,6 +1122,15 @@ code {
 /* Carte agrandie : elle reprend toute la largeur, la liste passe dessous. Sans ça,
    « agrandir » donnerait un plan très haut coincé dans une colonne étroite. */
 .plan-ecran:has(.carte-offres--agrandie) { grid-template-columns: 1fr; }
+/* ⚠️ SANS CE PLANCHER, LA LISTE DICTE LA HAUTEUR DE LA PAGE (bug Marc 2026-08-21 : « un
+   grand espace vide sous la carte »). Passée à une seule colonne, `.carte-liste-colonne`
+   n'est plus étirée par la grille (une ligne implicite se dimensionne à son contenu) —
+   avec ~1600 offres, son contenu naturel fait plusieurs écrans de haut. Elle défile déjà
+   SEULE en interne (`.carte-liste{overflow-y:auto}`, patron identique au mode côte à
+   côte) : il ne manquait qu'une hauteur explicite pour que ce défilement interne serve à
+   quelque chose. `82vh`, comme la carte juste au-dessus (`.carte-offres--agrandie`) —
+   les deux occupent la même part de fenêtre, l'une après l'autre. */
+.plan-ecran:has(.carte-offres--agrandie) .carte-liste-colonne { height: 82vh; }
 /* La colonne de droite devient une surface au même titre que le plan : étirée par la
    grille à la même hauteur que lui (voir `.plan-ecran`). Elle porte maintenant DEUX
    choses — la barre de tri, puis la liste — d'où ce conteneur flex : la barre garde sa
