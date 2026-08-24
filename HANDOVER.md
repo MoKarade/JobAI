@@ -6,6 +6,26 @@
 
 ---
 
+## Session 2026-08-24 — la vraie cause du grand vide : la liste, pas la carte
+
+Marc a fini par trouver lui-même : « quand j'agrandi la map, les offres se mettent
+en dessous. il y a 1600 offres du coup ça demande un grand espace ». Le CARTE-K de
+la session précédente (recalage Google Maps) était juste — mais le vrai coupable du
+« grand espace vide » était ailleurs : en mode agrandi, `.plan-ecran` passe à une
+seule colonne et `.carte-liste-colonne` n'est plus étirée par la grille — sa ligne
+implicite se dimensionne à son contenu, ~1600 offres de haut.
+
+`[CARTE-L]` (`app/globals.css`) : `.carte-liste-colonne` reçoit `height: 82vh` en
+mode agrandi, comme la carte juste au-dessus — la liste défilait déjà seule en
+interne (`overflow-y:auto`), il ne manquait qu'une hauteur explicite pour que ce
+défilement serve à quelque chose. Gate complet vert, déployé (`d1169bb`, `READY`),
+webhook Vercel sans accroc cette fois.
+
+**Reste à confirmer par Marc** : que la carte agrandie ne laisse plus d'espace vide
+sous elle. Si le symptôme persiste, il reste un candidat non exploré — la carte
+« Michigan » du HANDOVER précédent pourrait ne pas être entièrement expliquée par
+CARTE-K seul.
+
 ## Session 2026-08-21 (suite 3) — la carte se recale enfin, capture à l'appui
 
 Marc a envoyé une capture d'écran : deux cartes Google superposées (Québec en haut,
