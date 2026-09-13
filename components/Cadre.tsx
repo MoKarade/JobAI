@@ -1,33 +1,22 @@
-// components/Cadre.tsx — l'en-tête et les onglets, partagés par les pages de session.
+// components/Cadre.tsx — l'en-tête et la navigation, partagés par les pages de session.
 //
-// Les onglets sont de vraies ROUTES, pas un état client (ADR-0003) : chaque onglet a une
-// URL, donc il se met en signet, le bouton Retour fonctionne, et chaque page ne charge que
-// ce qu'elle affiche. Un onglet en `useState` aurait imposé de tout rendre pour n'en
+// Les destinations sont de vraies ROUTES, pas un état client (ADR-0003) : chaque onglet a
+// une URL, donc il se met en signet, le bouton Retour fonctionne, et chaque page ne charge
+// que ce qu'elle affiche. Un onglet en `useState` aurait imposé de tout rendre pour n'en
 // montrer qu'un.
 //
-// La page de connexion n'utilise PAS ce cadre : hors session, il n'y a aucun onglet à
+// ⚠️ LA NAVIGATION A QUITTÉ CE FICHIER (refonte téléphone, 2026-09-13) : elle vit dans
+// `BarreNav`, fixée en bas de l'écran sur téléphone et remontée en haut sur grand écran.
+// Ce qui reste ici est le CADRE au sens strict — la marque, le titre pour lecteur d'écran,
+// et `<main>`.
+//
+// La page de connexion n'utilise PAS ce cadre : hors session, il n'y a aucune destination à
 // proposer, et en afficher donnerait l'illusion d'un accès.
 
 import Link from "next/link";
+import { BarreNav } from "./BarreNav";
 
-export interface Onglet {
-  href: string;
-  libelle: string;
-}
-
-export const ONGLETS: readonly Onglet[] = [
-  { href: "/", libelle: "Suivi" },
-  { href: "/carte", libelle: "Carte" },
-  { href: "/references", libelle: "Références" },
-  // Le profil vient EN DERNIER : on l'ouvre quelques fois par an (un CV change rarement),
-  // alors que le suivi s'ouvre tous les jours. L'ordre des onglets suit la fréquence
-  // d'usage, jamais l'ordre dans lequel les pages ont été écrites.
-  { href: "/profil", libelle: "Profil" },
-  // Même règle, appliquée jusqu'au bout : les sources s'ouvrent encore moins souvent que le
-  // profil — quelques fois pour lancer le balayage des pages carrières, puis presque jamais.
-  // Elles sont pourtant la seule réponse à « pourquoi si peu d'offres aujourd'hui ? ».
-  { href: "/sources", libelle: "Sources" },
-];
+export { ONGLETS } from "@/lib/navigation";
 
 export function Cadre({
   actif,
@@ -51,9 +40,9 @@ export function Cadre({
   /**
    * La page REMPLIT l'écran, sans défilement en dehors de son propre contenu scrollable
    * (demande de Marc, 2026-08-21 : « je veux pas pouvoir scroll sous la map »). Seule la
-   * carte s'en sert : l'en-tête et les onglets gardent leur taille NATURELLE, `<main>`
-   * absorbe tout le reste en flex — aucun chiffre de réserve à deviner, qui dériverait au
-   * premier ajout de barre d'outils (vécu : `100vh - 13rem` était déjà trop court).
+   * carte s'en sert : l'en-tête garde sa taille NATURELLE, `<main>` absorbe tout le reste
+   * en flex — aucun chiffre de réserve à deviner, qui dériverait au premier ajout de barre
+   * d'outils (vécu : `100vh - 13rem` était déjà trop court).
    */
   pleinEcran?: boolean;
   children: React.ReactNode;
@@ -87,30 +76,19 @@ export function Cadre({
             JOB<span className="entete__accent">_</span>AI
           </span>
         </Link>
-        <p className="entete__sous">Coordination technique et automatisation · rayon 50 km</p>
       </header>
 
-      {/* `aria-current="page"` et non une simple classe : c'est ce qui annonce l'onglet
-          courant à un lecteur d'écran. La couleur seule ne porte jamais l'information. */}
-      <nav className="onglets" aria-label="Sections">
-        {ONGLETS.map((o) => (
-          <Link
-            key={o.href}
-            href={o.href}
-            className={`onglet${actif === o.href ? " onglet--actif" : ""}`}
-            aria-current={actif === o.href ? "page" : undefined}
-          >
-            {o.libelle}
-          </Link>
-        ))}
-      </nav>
-
       {/* `<main>` ne contient QUE le contenu de l'onglet : l'en-tête et la navigation
-          restent en dehors, pour que « aller au contenu principal » saute bien les onglets. */}
+          restent en dehors, pour que « aller au contenu principal » saute bien la barre. */}
       <main>
         {titre ? <h1 className="hors-ecran">{titre}</h1> : null}
         {children}
       </main>
+
+      {/* En DERNIER dans le DOM, même si elle s'affiche en bas de l'écran : l'ordre de
+          tabulation suit le DOM, et personne ne veut traverser cinq onglets avant
+          d'atteindre la liste qu'il est venu lire. */}
+      <BarreNav actif={actif} />
     </div>
   );
 }

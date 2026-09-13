@@ -19,6 +19,7 @@ import {
   type EtatFiltres,
 } from "@/lib/filtres";
 import { CATEGORIES, CATEGORIE_LIBELLES } from "@/lib/categorie";
+import { Depliant } from "./Depliant";
 
 /** Les bascules, dans l'ordre où elles se lisent. Le seuil de distance est à part. */
 const BASCULES: readonly { cle: BasculeFiltre; libelle: string }[] = [
@@ -64,22 +65,36 @@ export function Filtres({
         onChange={(e) => onChange({ ...filtres, texte: e.target.value })}
       />
 
-      {BASCULES.map(({ cle, libelle }) => (
-        <button
-          key={cle}
-          type="button"
-          className={`filtre${filtres[cle] ? " filtre--actif" : ""}`}
-          aria-pressed={filtres[cle]}
-          onClick={() => onChange({ ...filtres, [cle]: !filtres[cle] })}
-        >
-          {libelle}
-        </button>
-      ))}
+      <span className="controles__bascules">
+        {BASCULES.map(({ cle, libelle }) => (
+          <button
+            key={cle}
+            type="button"
+            className={`filtre${filtres[cle] ? " filtre--actif" : ""}`}
+            aria-pressed={filtres[cle]}
+            onClick={() => onChange({ ...filtres, [cle]: !filtres[cle] })}
+          >
+            {libelle}
+          </button>
+        ))}
+      </span>
 
-      {/* Le seuil de NOTE : mêmes paliers que le barème, même geste que la distance. Un
-          second clic sur le palier actif le retire — sinon il n'y aurait aucun moyen de
-          revenir à « toutes ». */}
-      <span className="controles__groupe" role="group" aria-label="Note minimale">
+      {children}
+
+      {/* ⚠️ LES QUATRE SEUILS PASSENT SOUS UN PLI (refonte téléphone, 2026-09-13).
+          Mesuré sur le rendu réel à 375 px AVANT la refonte : les groupes de seuils
+          faisaient 472 px de large — ils débordaient l'écran de près de cent pixels, et
+          c'est la cause n°1 du défilement latéral que Marc signalait. Les laisser se
+          replier en lignes aurait échangé ce défaut contre une barre de huit lignes
+          au-dessus de chaque liste.
+          ⚠️ L'INDICE DIT CE QUI EST ACTIF, et c'est ce qui rend le pli honnête : un filtre
+          qui agit sans se montrer fait chercher un bug dans les données. */}
+      <Depliant titre="Affiner" indice={resumerSeuils(filtres)}>
+        <div className="controles__seuils">
+          {/* Le seuil de NOTE : mêmes paliers que le barème, même geste que la distance. Un
+              second clic sur le palier actif le retire — sinon il n'y aurait aucun moyen de
+              revenir à « toutes ». */}
+          <span className="controles__groupe" role="group" aria-label="Note minimale">
         {PALIERS_NOTE.map((note) => {
           const actif = filtres.noteMinimale === note;
           return (
@@ -152,11 +167,29 @@ export function Filtres({
             </button>
           );
         })}
-      </span>
-
-      {children}
+          </span>
+        </div>
+      </Depliant>
     </div>
   );
+}
+
+/**
+ * Ce que le pli « Affiner » contient d'ACTIF, dit sur sa ligne repliée.
+ *
+ * PURE et exportée : c'est ce qui la rend vérifiable par un test plutôt qu'à l'œil, sur
+ * l'écran qu'on n'a pas rouvert. « aucun » quand rien n'est posé — jamais une chaîne vide,
+ * qui laisserait croire que l'indice est cassé.
+ */
+export function resumerSeuils(filtres: EtatFiltres): string {
+  const actifs: string[] = [];
+  if (filtres.noteMinimale !== null) actifs.push(`note ≥ ${filtres.noteMinimale}`);
+  if (filtres.distanceMaxKm !== null) actifs.push(`≤ ${filtres.distanceMaxKm} km`);
+  if (filtres.jours !== null) {
+    actifs.push(filtres.jours === 1 ? "aujourd’hui" : `${filtres.jours} derniers jours`);
+  }
+  if (filtres.categorie !== null) actifs.push(CATEGORIE_LIBELLES[filtres.categorie]);
+  return actifs.length === 0 ? "aucun" : actifs.join(" · ");
 }
 
 /**
@@ -187,24 +220,18 @@ export function CompteFiltre({
   /** « offre » ou « entreprise » — le compte doit nommer ce qu'il compte. */
   nom: string;
 }) {
+  // ⚠️ LA PHRASE A ÉTÉ COUPÉE, PAS L'INFORMATION (demande de Marc, 2026-09-13 : « moins de
+  // texte »). Elle disait « 3 sans distance mesurée, donc hors du seuil — la mesure se fait
+  // toute seule, au fil des passages » : deux lignes de réassurance qu'on ne lit qu'une
+  // fois, tous les jours, sur l'écran le plus consulté. Les deux FAITS restent — combien
+  // sont écartées, et pour laquelle des deux raisons, qui appellent des gestes opposés
+  // (attendre une passe, ou baisser le seuil). C'est l'explication qui part.
   return (
     <p className="controles__compte" role="status">
-      {affichees} {nom}
-      {affichees > 1 ? "s" : ""} affichée{affichees > 1 ? "s" : ""} sur {total}
-      {sansDistance > 0 ? (
-        <>
-          {" · "}
-          {sansDistance} sans distance mesurée, donc hors du seuil — la mesure se fait toute
-          seule, au fil des passages.
-        </>
-      ) : null}
-      {sansNote > 0 ? (
-        <>
-          {" · "}
-          {sansNote} pas encore notée{sansNote > 1 ? "s" : ""}, donc hors du seuil — une note
-          absente n&apos;est pas une mauvaise note.
-        </>
-      ) : null}
+      {affichees} sur {total} {nom}
+      {total > 1 ? "s" : ""}
+      {sansDistance > 0 ? ` · ${sansDistance} sans distance` : ""}
+      {sansNote > 0 ? ` · ${sansNote} sans note` : ""}
     </p>
   );
 }

@@ -29,27 +29,32 @@
 :root {
   /* ⚠️ L'APP EST SOMBRE, TOUJOURS (ADR-0008, révisé le 2026-08-13 — décision de
      Marc). Il n'y a plus de thème clair, et ce n'est donc plus un « mode sombre » :
-     ce sont LES couleurs. « Poste de nuit » EST l'identité ; un système réglé en
-     clair servait un pendant fade que personne n'avait choisi, et l'écart entre ce
-     qui avait été validé sur maquette et ce qui s'affichait venait de là.
+     ce sont LES couleurs. Un système réglé en clair servait un pendant fade que
+     personne n'avait choisi, et l'écart entre ce qui avait été validé sur maquette
+     et ce qui s'affichait venait de là.
 
      `color-scheme: dark` n'est pas décoratif : il dit au navigateur d'habiller en
      sombre ce que le CSS ne contrôle pas — barres de défilement, contrôles de
      formulaire natifs, sélecteurs de date. Sans lui, ces éléments restent blancs
      et trahissent le reste.
 
-     Neutre CHAUD (~90°), jamais le bleu-noir habituel : c'est sur une teinte tiède
-     que l'ambre publiée au hub devient lumineuse au lieu de jurer. Trois niveaux
-     qui s'éclairent en montant (fond → carte → relief) : c'est cette montée, et le
-     contour, qui répondent au « c'est plat » — pas des marges plus grandes. */
+     ⚠️ LES NEUTRES ONT CHANGÉ DE TEMPÉRATURE (refonte téléphone, 2026-09-13).
+     Ils étaient CHAUDS (~90°), au motif qu'une teinte tiède rendrait l'ambre
+     lumineuse. Vrai, mais au prix d'une PARENTÉ : l'ambre et le fond partageaient
+     la même famille, donc l'accent se fondait au lieu de trancher. Les neutres
+     passent au FROID (~255°) : même charbon à l'œil, mais l'ambre y devient un
+     signal chaud sur un fond froid — c'est le contraste de TEMPÉRATURE qui la
+     fait exister, pas sa saturation. Et les deux extrémités s'écartent (fond plus
+     profond, texte plus clair) : sur un téléphone, en plein jour, dans la rue,
+     c'est le contraste qui décide de ce qui est lisible. */
   color-scheme: dark;
-  --bg: oklch(18.2% 0.017 97);
-  --surface: oklch(22.2% 0.017 92);
+  --bg: oklch(15.5% 0.012 255);
+  --surface: oklch(20.5% 0.014 255);
   /* Creux : survol, offre dépliée, pastilles neutres, fonds de faits. */
-  --creux: oklch(26.5% 0.020 90);
-  --text: oklch(93.8% 0.021 89);
-  --text-soft: oklch(70.1% 0.033 88);
-  --border: oklch(30.2% 0.025 91);
+  --creux: oklch(26% 0.016 255);
+  --text: oklch(96% 0.004 255);
+  --text-soft: oklch(74% 0.014 255);
+  --border: oklch(32% 0.018 255);
   --accent: oklch(66% 0.17 275);
 
   /* Deux voix. Les variables viennent de `next/font` (app/layout.tsx) : les
@@ -58,13 +63,30 @@
   --mono: var(--police-mesure), ui-monospace, "SF Mono", Menlo, monospace;
 
   /* ÉCHELLE TYPOGRAPHIQUE — six degrés, pas vingt-deux. L'œil reconnaît le
-     rythme d'un écran à l'autre. */
-  --t-2xs: 0.7rem;
-  --t-xs: 0.78rem;
-  --t-s: 0.875rem;
+     rythme d'un écran à l'autre.
+
+     ⚠️ ELLE PART DU TÉLÉPHONE, PAS DE L'ÉCRAN DE BUREAU (refonte 2026-09-13).
+     Mesuré sur le rendu réel à 390 px avant la refonte : SEPT éléments rendus à
+     11,2 px et CINQ à 12,5 px — des mentions, des motifs de relance, des comptes,
+     c'est-à-dire précisément ce qu'on lit en diagonale. Sur un écran de bureau à
+     60 cm, 11 px passe ; sur un téléphone tenu à bout de bras, non. Le plancher
+     est désormais 13 px, et le corps courant 16 px — la taille en dessous de
+     laquelle iOS zoome tout seul sur un champ de saisie, ce qui déplace la page
+     et donne exactement le défilement latéral que cette refonte supprime. */
+  --t-2xs: 0.8125rem;
+  --t-xs: 0.875rem;
+  --t-s: 0.9375rem;
   --t-m: 1rem;
-  --t-l: 1.25rem;
-  --t-xl: 1.6rem;
+  --t-l: 1.1875rem;
+  --t-xl: 1.5rem;
+  --t-2xl: 2rem;
+
+  /* ⚠️ LA CIBLE TACTILE EST UN JETON, PAS UN PADDING CHOISI AU CAS PAR CAS.
+     Mesuré avant la refonte : 26 contrôles sous 44 px sur l'accueil, dont les
+     seize boutons de filtre (40 px) et les liens de relance (26 px). 48 px plutôt
+     que le minimum de 44 : Marc a demandé « gros boutons », et un pouce ne vise
+     pas un rectangle, il l'écrase. */
+  --touche: 3rem;
 }
 
 *,
@@ -81,10 +103,21 @@ body {
   color: var(--text);
   font-family: var(--font);
   font-weight: 500;
-  /* 1.65 : une interligne un peu plus large se lit sensiblement mieux sur des paragraphes
-     de justification, qui sont partout dans cette app. */
-  line-height: 1.65;
+  /* 1.55 : l'interligne se resserre d'un cran à la refonte téléphone. Sur une colonne de
+     375 px, 1,65 étirait les listes sur une hauteur qu'il fallait parcourir au pouce ;
+     sur des lignes courtes, une interligne large n'aide plus à retrouver la suivante. */
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  /* ⚠️ FILET, PAS LE CORRECTIF (demande de Marc, 2026-09-13 : « pas de scroll sur le
+     côté »). Le vrai travail est plus bas : les groupes de filtres se replient, la
+     navigation ne s'aligne plus en une rangée de cinq, les tableaux ont leur propre
+     conteneur défilant. Ce `clip` est le dernier rempart pour ce qui ÉCHAPPERAIT à ces
+     règles — un mot trop long, un nom d'entreprise à rallonge, une saisie collée.
+     `clip` et non `hidden` : `hidden` sur `body` casse `position: sticky` en silence,
+     et le bandeau de résumé de l'accueil en dépend.
+     Le test `tests/mobile.test.ts` mesure la CAUSE (largeur intrinsèque des blocs), pas
+     l'effet : un filet qui masque le symptôme rendrait le garde vert pour rien. */
+  overflow-x: clip;
 }
 
 .shell {
@@ -145,13 +178,18 @@ code {
    est réservée au widget du hub, où elle identifie l'app parmi les autres. */
 .bouton {
   margin-top: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: var(--touche);
   padding: 0.7rem 1.25rem;
   font: inherit;
   font-weight: 600;
   color: var(--surface);
   background: var(--accent);
   border: 1px solid transparent;
-  border-radius: 0.5rem;
+  border-radius: var(--r-champ);
   cursor: pointer;
 }
 
@@ -215,11 +253,23 @@ code {
   --survol: oklch(100% 0 0 / 0.06);
   --actif: oklch(78% 0.14 75 / 0.18);
 
-  /* Rondeur « douce et sobre » (choix de Marc) : 12 px sur les surfaces, pilule
-     sur ce qui se clique, 10 px sur ce qui se saisit. */
+  /* Rondeur « douce et sobre » (choix de Marc) : pilule sur ce qui se clique.
+     ⚠️ Les rayons montent d'un cran à la refonte téléphone : sur un petit écran,
+     une carte occupe toute la largeur, et c'est son rayon — pas sa marge — qui dit
+     que c'est un objet posé sur la page plutôt qu'une bande collée au bord. */
   --r-pill: 999px;
-  --r-carte: 16px;
-  --r-champ: 10px;
+  --r-carte: 20px;
+  --r-champ: 14px;
+
+  /* ⚠️ LA BARRE DE NAVIGATION EST FIXÉE EN BAS SUR TÉLÉPHONE : sa hauteur est un
+     jeton parce que TROIS endroits doivent la connaître — la réserve de bas de
+     page (sinon la barre recouvre la dernière offre), la hauteur de la page
+     pleine (`/carte`), et la barre elle-même. Un chiffre recopié trois fois est
+     exactement ce que ce dépôt a déjà payé quatre fois sur des listes de colonnes.
+     `env(safe-area-inset-bottom)` : sur un iPhone sans bouton, la barre système
+     mange le bas de l'écran — sans cette réserve, le dernier onglet est sous le
+     trait d'accueil et ne se touche pas. */
+  --barre-h: calc(4.25rem + env(safe-area-inset-bottom, 0px));
 
   /* ⚠️ LE CONTOUR REVIENT SUR LES SURFACES, ET C'EST UN REVIREMENT ASSUMÉ
      (ADR-0008 ; le 2026-08-05 les avait tous retirés).
@@ -260,8 +310,18 @@ code {
      sur le conteneur, qui porte aussi des listes et un plan. */
   max-width: 120rem;
   margin: 0 auto;
-  /* Plus large en haut et sur les côtés : l'espace EST le style. */
-  padding: clamp(1.5rem, 1rem + 2vw, 2.5rem) clamp(1rem, 0.5rem + 2vw, 2rem) 4rem;
+  /* Gouttières serrées sur téléphone (12 px) : chaque pixel repris sur le bord va au
+     contenu, et c'est le rayon des cartes qui dit « objet posé », pas la marge.
+     ⚠️ LE BAS RÉSERVE LA HAUTEUR DE LA BARRE : sans ça, la barre fixée recouvrirait la
+     dernière offre de la liste — et on ne le voit qu'en descendant jusqu'en bas, donc
+     jamais pendant qu'on développe. */
+  padding: var(--pas-2) 0.75rem calc(var(--barre-h) + var(--pas-2));
+}
+@media (min-width: 56rem) {
+  .page {
+    /* Sur grand écran la barre remonte dans le flux, en haut : plus rien à réserver. */
+    padding: clamp(1.5rem, 1rem + 2vw, 2.5rem) clamp(1rem, 0.5rem + 2vw, 2rem) 4rem;
+  }
 }
 
 /* ⚠️ « PLEINE » : LA PAGE REMPLIT L'ÉCRAN, ET RIEN NE DÉFILE EN DEHORS DE SON PROPRE
@@ -277,7 +337,12 @@ code {
 .page--pleine {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  /* ⚠️ LA BARRE FIXÉE MANGE LE BAS DE L'ÉCRAN, DONC ELLE SORT DE LA HAUTEUR (refonte
+     2026-09-13). `100dvh` tout court laisserait la barre recouvrir le bas du plan — et
+     comme le plan n'a pas de fin visible, personne ne s'en apercevrait avant de vouloir
+     cliquer une épingle qui n'y répond pas. Sur grand écran la barre est dans le flux :
+     la soustraction n'a plus lieu d'être, et la règle est levée plus bas. */
+  height: calc(100dvh - var(--barre-h));
   padding-bottom: 0;
   /* Resserré une seconde fois (2026-08-21, [CARTE-J]) : mesuré à 65 px encore sous le
      plancher de .plan-ecran sur 1366×768 après le premier tour de resserrement — le
@@ -285,25 +350,22 @@ code {
   padding-top: clamp(0.3rem, 0.15rem + 0.4vw, 0.7rem);
   overflow: hidden;
 }
-/* ⚠️ ONGLETS RESSERRÉS, ICI SEULEMENT (pas globalement) : leur rythme normal
-   (`var(--pas-3) 0 var(--pas-2)`, 36 + 21,6 px) est un choix d'espace délibéré ailleurs
-   dans l'app — cette page-ci a un objectif différent (« rends la map plus grande de
-   base ») et n'a pas à porter le même rythme qu'une page de lecture. Mesuré : sur un
-   écran de portable courant (1280×720, 1366×768), le chrome (en-tête, onglets, barre de
-   16 filtres, deux lignes de compte) laissait à peine assez de place pour le PLANCHER de
-   la carte plus bas — chaque pixel repris ici profite directement au plan. */
-.page--pleine .onglets {
-  margin: 0.3rem 0 0.15rem;
+@media (min-width: 56rem) {
+  .page--pleine { height: 100dvh; }
 }
-/* Le sous-titre du logo (« Coordination technique et automatisation · rayon 50 km »)
-   est une signature de marque, pas une information dont cette page a besoin — les
-   onglets et le titre caché (lecteur d'écran) disent déjà où l'on est. Masqué ICI
-   SEULEMENT : ailleurs, c'est un choix d'identité délibéré qui reste. */
-.page--pleine .entete__sous {
-  display: none;
+/* ⚠️ BARRE RESSERRÉE, ICI SEULEMENT (pas globalement) : sur grand écran elle est dans le
+   flux et porte son rythme normal (`var(--pas-2)`), qui est un choix d'espace délibéré
+   ailleurs dans l'app. Cette page-ci a un objectif différent (« rends la map plus grande
+   de base ») : chaque pixel repris au-dessus du plan lui profite directement. Sur
+   téléphone la barre est FIXÉE, donc hors du flux — cette règle ne l'atteint pas, et c'est
+   la hauteur de page (`--barre-h`, juste au-dessus) qui lui réserve sa place. */
+@media (min-width: 56rem) {
+  .page--pleine .barre {
+    margin: 0.3rem 0 0.15rem;
+  }
 }
 .page--pleine .entete {
-  gap: 0;
+  margin-bottom: 0.2rem;
 }
 /* ⚠️ MÊME RESSERREMENT, MÊME RAISON (« rends la map plus grande de base », mesuré
    2026-08-21 : sur 1366×768/1280×720, le plancher de `.plan-ecran` (26rem) restait la
@@ -379,10 +441,26 @@ code {
   }
 }
 
-.entete { display: flex; flex-direction: column; gap: 0.15rem; }
+/* ⚠️ L'EN-TÊTE A MAIGRI (refonte téléphone, 2026-09-13). Elle portait la marque ET un
+   sous-titre — « Coordination technique et automatisation · rayon 50 km ». C'est une
+   signature, pas une information : le rayon se règle sur la page Sources, et personne ne
+   relit deux fois une phrase qui ne change jamais. Elle coûtait deux lignes en haut de
+   CHAQUE écran, sur l'appareil où la hauteur est le plus rare. La page Carte la masquait
+   déjà dans son coin — ce qu'un écran masque pour se sauver, les autres n'en avaient pas
+   besoin non plus. */
+.entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pas);
+  margin-bottom: var(--pas-2);
+}
 .entete__marque {
   display: inline-flex;
   align-items: center;
+  /* La marque est aussi le lien de retour à l'accueil : elle se touche, donc elle a la
+     hauteur d'une cible. Mesuré à 29 px avant la refonte. */
+  min-height: var(--touche);
   gap: 0.5rem;
   /* Le mot-symbole garde le mono — c'est une invite de terminal, c'est le logo. Le RESTE
      de l'interface passe à la typographie du système : lisible, pas technique. */
@@ -408,40 +486,142 @@ code {
   filter: drop-shadow(0 0 8px color-mix(in oklab, var(--ambre) 55%, transparent));
 }
 .entete__accent { color: var(--ambre); }
-.entete__sous {
-  font-size: var(--t-s);
-  color: var(--text-soft);
-  margin-top: 0.15rem;
-}
 
-/* ── Onglets ──────────────────────────────────────────────────────────────
-   De vraies routes, pas un état client : chaque onglet a une URL. L'onglet
-   courant se signale par `aria-current="page"` ET par un trait — la couleur
-   seule ne porte jamais l'information (WCAG 1.4.1). */
-.onglets {
+/* ── Barre de navigation ──────────────────────────────────────────────────
+   De vraies routes, pas un état client : chaque destination a une URL. La
+   destination courante se signale par `aria-current="page"` ET par la couleur
+   PLUS le fond — la couleur seule ne porte jamais l'information (WCAG 1.4.1).
+
+   ⚠️ FIXÉE EN BAS SUR TÉLÉPHONE (choix de Marc, 2026-09-13). Mesuré sur le rendu
+   réel AVANT la refonte : cinq onglets alignés en haut faisaient 431 px de large
+   sur un écran de 375 — l'app s'ouvrait donc sur un défilement latéral, et chaque
+   cible était à l'endroit le plus éloigné du pouce. En bas, trois cibles pleine
+   hauteur ; le reste derrière « Plus ».
+
+   Sur grand écran (≥ 56 rem), la MÊME barre remonte dans le flux, en haut, et
+   déplie ses cinq destinations : `display: contents` fait rejoindre la rangée aux
+   secondaires sans changer le DOM. Deux implémentations de la même navigation
+   auraient divergé au premier onglet ajouté. */
+.barre {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 60;
   display: flex;
+  align-items: stretch;
   gap: 0.25rem;
-  margin: var(--pas-3) 0 var(--pas-2);
-  /* Plus de trait sous les onglets : l'état actif se porte par la pastille elle-même. */
+  padding: 0.35rem 0.5rem env(safe-area-inset-bottom, 0px);
+  background: color-mix(in oklab, var(--bg) 88%, transparent);
+  /* Le flou détache la barre du contenu qui défile dessous SANS poser un bandeau
+     opaque : on continue de voir qu'il y a une page, donc qu'il reste à lire. */
+  backdrop-filter: blur(14px);
+  border-top: var(--trait-surface);
 }
-.onglet {
-  padding: 0.55rem 1.1rem;
-  font-size: var(--t-m);
+.barre__lien {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  /* La cible fait toute la hauteur de la barre : on vise la zone, pas le libellé. */
+  min-height: var(--touche);
+  padding: 0.4rem 0.25rem;
+  font: inherit;
+  font-size: var(--t-2xs);
+  font-weight: 600;
   color: var(--text-soft);
   text-decoration: none;
-  border-radius: var(--r-pill);
-  transition: background-color 120ms ease, color 120ms ease;
+  background: none;
+  border: 0;
+  border-radius: var(--r-champ);
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
 }
-.onglet:hover { color: var(--text); background: var(--survol); }
-/* L'onglet courant prend la SURFACE, comme une carte : il appartient au même
-   monde que le contenu qu'il ouvre. Le fond suffit à le désigner — et
-   `aria-current="page"` porte l'information pour qui ne voit pas la nuance. */
-.onglet--actif {
-  color: var(--text);
+.barre__lien:hover { color: var(--text); background: var(--survol); }
+.barre__lien--actif {
+  color: var(--ambre-texte);
+  background: var(--actif);
+}
+.barre__lien:focus-visible { outline: 2px solid var(--ambre); outline-offset: -2px; }
+.barre__icone {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+}
+.barre__libelle {
+  /* Un libellé qui déborde de sa cible la ferait grandir et casserait la rangée :
+     il s'efface au lieu de pousser. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Le panneau « Plus » : au-dessus de la barre, jamais par-dessus la page entière.
+   Un voile plein écran pour trois liens serait une porte blindée sur un placard. */
+.barre__secondaires {
+  position: absolute;
+  inset: auto 0.5rem 100% auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 12rem;
+  margin-bottom: 0.4rem;
+  padding: 0.35rem;
   background: var(--surface);
-  font-weight: 700;
+  border: var(--trait-surface);
+  border-radius: var(--r-carte);
+  box-shadow: var(--ombre-2);
 }
-.onglet:focus-visible { outline: 2px solid var(--ambre); outline-offset: -2px; }
+.barre__secondaires[data-ouvert="non"] { display: none; }
+/* Dans le panneau, les liens redeviennent des lignes : une icône à gauche, le
+   libellé à droite — c'est la forme d'un menu, pas d'un onglet. */
+.barre__secondaires .barre__lien {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  font-size: var(--t-s);
+}
+.barre__plus { flex: 1 1 0; }
+
+@media (min-width: 56rem) {
+  .barre {
+    position: static;
+    justify-content: flex-start;
+    gap: 0.35rem;
+    margin: var(--pas-2) 0;
+    padding: 0;
+    background: none;
+    backdrop-filter: none;
+    border-top: 0;
+  }
+  /* Les secondaires rejoignent la rangée : le conteneur disparaît de la mise en
+     page, ses enfants prennent sa place. */
+  .barre__secondaires {
+    display: contents;
+  }
+  .barre__lien {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0.5rem 1rem;
+    font-size: var(--t-m);
+    font-weight: 500;
+    border-radius: var(--r-pill);
+  }
+  .barre__lien--actif {
+    color: var(--text);
+    background: var(--surface);
+    font-weight: 700;
+  }
+  .barre__icone { width: 1.15rem; height: 1.15rem; }
+  /* Sur grand écran, tout est déjà visible : un bouton qui n'ouvre rien induirait
+     en erreur. */
+  .barre__plus { display: none; }
+}
 
 /* Retire du rendu VISUEL sans retirer du DOM ni de l'arbre d'accessibilité.
    Surtout pas `display: none` ni `visibility: hidden` : les deux retirent l'élément des
@@ -565,11 +745,29 @@ code {
 }
 
 /* ── Contrôles ───────────────────────────────────────────────────────────── */
-.controles { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+/* ⚠️ LA BARRE DE FILTRES PART DU TÉLÉPHONE (refonte 2026-09-13). Elle était une rangée de
+   seize boutons qui ne se repliait pas : mesuré à 375 px, ses groupes de seuils faisaient
+   472 px de large — la cause n°1 du défilement latéral. Ici, tout s'empile par défaut et
+   c'est la LARGEUR DISPONIBLE, pas un compte de boutons, qui décide du reste. */
+.controles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+@media (min-width: 56rem) {
+  .controles { flex-direction: row; flex-wrap: wrap; align-items: center; }
+}
+/* Les trois bascules tiennent sur une ligne et se replient toutes seules si le libellé
+   s'allonge : `wrap` plutôt qu'un défilement horizontal, qui est précisément ce qu'on
+   supprime. */
+.controles__bascules { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+/* Sous le pli « Affiner » : un groupe de seuils par ligne, chacun replié à sa largeur. */
+.controles__seuils { display: flex; flex-direction: column; gap: 0.6rem; }
 .controles__recherche {
   flex: 1 1 16rem;
   max-width: 28rem;
-  padding: 0.7rem 1.15rem;
+  padding: 0.85rem 1.15rem;
   font: inherit;
   font-size: var(--t-m);
   color: var(--text);
@@ -587,19 +785,31 @@ code {
    conteneur en ligne : ses trois boutons pouvaient se couper en fin de ligne alors qu'ils
    forment UNE question (« jusqu'où ? ») et se lisent ensemble. Trouvé par
    `tests/styles.test.ts` — la classe était posée dans le JSX et n'existait nulle part ici. */
-.controles__groupe { display: inline-flex; gap: 0.3rem; align-items: center; }
+.controles__groupe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  /* ⚠️ `inline-flex` SANS `wrap` était la cause exacte du débordement : le groupe gardait
+     la largeur de ses boutons mis bout à bout, quelle que soit celle de l'écran. Il se
+     replie désormais — la question (« jusqu'où ? ») reste lisible d'un bloc parce que ses
+     boutons restent voisins, pas parce qu'ils tiennent sur une ligne. */
+}
 
 .filtre {
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1.1rem;
   font: inherit;
   font-size: var(--t-s);
+  font-weight: 600;
   color: var(--text-soft);
   background: var(--surface);
   border: 0;
   border-radius: var(--r-pill);
   cursor: pointer;
-  /* Cible tactile confortable : au moins 40 px de haut sur mobile. */
-  min-height: 2.5rem;
+  /* ⚠️ LA CIBLE VIENT DU JETON, PAS D'UN CHIFFRE ÉCRIT ICI (demande de Marc : « gros
+     boutons »). Mesuré avant la refonte : ces boutons faisaient 40 px de haut, sous le
+     minimum de 44 px, et il y en avait seize. */
+  min-height: var(--touche);
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 .filtre:hover { background: var(--creux); color: var(--text); }
@@ -628,6 +838,105 @@ code {
 }
 
 /* ── Cartes d'offre ──────────────────────────────────────────────────────── */
+/* ── Le bandeau de résumé ─────────────────────────────────────────────────
+   Trois chiffres, en tête de l'accueil (choix de Marc, 2026-09-13). Il remplace
+   quatre blocs empilés qui repoussaient la première offre à un écran et demi du
+   haut — mesuré sur le rendu réel à 390 px avant la refonte. */
+.resume {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: var(--pas-2);
+}
+.resume__case {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-width: 0;
+  padding: 0.85rem 0.5rem;
+  background: var(--surface);
+  border: var(--trait-surface);
+  border-radius: var(--r-carte);
+  text-align: center;
+}
+/* ⚠️ UN SEUL DES TROIS PEUT S'ALLUMER, et c'est ce qui le rend lisible : « à relancer »
+   est le seul chiffre du bandeau qui appelle un geste. Un bandeau où tout est coloré ne
+   signale plus rien — la leçon déjà payée ici quand trois signaux empilés sur chaque
+   offre ne hiérarchisaient plus rien. */
+.resume__case--alerte {
+  border-color: color-mix(in oklab, var(--ambre) 45%, transparent);
+  background: var(--actif);
+}
+.resume__n {
+  font-family: var(--mono);
+  font-size: var(--t-xl);
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--text);
+}
+.resume__case--alerte .resume__n { color: var(--ambre-texte); }
+.resume__l {
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+  /* Le libellé ne casse pas la case : il s'efface plutôt que de pousser ses voisines. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Dépliants ────────────────────────────────────────────────────────────
+   `<details>` natif : aucun JavaScript au chargement, donc rien à télécharger
+   pour un bloc que la plupart des ouvertures ne dérouleront pas. */
+.depliant {
+  margin-bottom: var(--pas-2);
+  background: var(--surface);
+  border: var(--trait-surface);
+  border-radius: var(--r-carte);
+}
+.depliant__tete {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  /* La ligne entière est la cible : on ouvre en visant n'importe où, pas le triangle. */
+  min-height: var(--touche);
+  padding: 0.6rem 0.9rem;
+  cursor: pointer;
+  /* Le triangle natif du navigateur est remplacé par notre chevron : deux marqueurs
+     diraient la même chose deux fois. */
+  list-style: none;
+}
+.depliant__tete::-webkit-details-marker { display: none; }
+.depliant__tete:focus-visible { outline: 2px solid var(--ambre); outline-offset: -2px; border-radius: var(--r-carte); }
+.depliant__titre { font-weight: 700; font-size: var(--t-s); }
+.depliant__indice {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.depliant__chevron {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+  color: var(--text-soft);
+  transition: transform 160ms ease;
+}
+.depliant[open] .depliant__chevron { transform: rotate(180deg); }
+.depliant__corps {
+  padding: 0 0.9rem 0.9rem;
+  /* Le trait sépare l'ouvert de sa poignée : sans lui, le contenu a l'air de flotter
+     sous un titre qui ne le tient pas. */
+  border-top: var(--trait-surface);
+  padding-top: 0.9rem;
+}
+
 .liste { display: flex; flex-direction: column; gap: 0.95rem; }
 /* Les offres D'UNE ENTREPRISE, dépliées sous sa carte : un peu plus serrées que la liste
    du haut niveau, pour qu'on lise « ce sont les détails d'un même groupe », pas une liste
@@ -642,12 +951,18 @@ code {
   background: var(--surface);
   border: var(--trait-surface);
   border-radius: var(--r-carte);
-  padding: 1.5rem 1.8rem;
+  /* ⚠️ RESSERRÉ SUR TÉLÉPHONE (refonte 2026-09-13) : 1,8 rem de marge intérieure de chaque
+     côté, c'est 58 px pris sur les 375 d'un écran — un septième de la largeur dépensé en
+     vide, sur l'élément le plus répété de l'app. Le grand écran garde le geste ample. */
+  padding: 1rem 1.1rem;
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 0.35rem 1.15rem;
+  gap: 0.35rem 0.9rem;
   transition: background-color 120ms ease;
+}
+@media (min-width: 56rem) {
+  .carte { padding: 1.5rem 1.8rem; gap: 0.35rem 1.15rem; }
 }
 /* Le survol change la surface au lieu de la soulever : pas d'ombre au repos, donc
    pas d'ombre qui apparaît — le geste reste dans le même registre. */
@@ -721,8 +1036,12 @@ code {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: center;
   gap: 0.1rem;
   min-width: 0;
+  /* C'est LA cible d'une offre — celle qui déplie. Elle occupe toute la hauteur de sa
+     colonne plutôt que la seule hauteur de ses deux lignes de texte. */
+  min-height: var(--touche);
   padding: 0;
   font: inherit;
   color: inherit;
@@ -946,11 +1265,14 @@ code {
 
 /* ── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 47.5rem) {
-  .page { padding: 0.75rem 0.75rem 2.5rem; }
+  /* ⚠️ PAS DE `.page` ICI (retiré à la refonte 2026-09-13) : cette règle posait
+     `padding-bottom: 2.5rem` et écrasait la réserve de la barre fixée, qui serait venue
+     recouvrir la dernière offre de la liste. Le padding mobile est désormais LE défaut
+     (mobile-first), et c'est le grand écran qui le remplace. */
   .bord { grid-template-columns: repeat(2, 1fr); }
   .bord .stat:first-child { grid-column: 1 / -1; }
   .controles__recherche { max-width: none; flex: 1 0 100%; font-size: var(--t-m); }
-  .filtre { flex: 1; text-align: center; }
+  .filtre { flex: 1 1 auto; text-align: center; }
   .carte { grid-template-columns: 2.75rem 1fr; }
 }
 
@@ -976,8 +1298,22 @@ code {
 }
 /* Les étiquettes passent en ligne et se rétractent : « Statut » sur deux lignes
    au-dessus d'un menu qui dit déjà « Identifiée » répétait l'évidence. */
-.controle { display: flex; flex-direction: row; align-items: center; gap: 0.4rem; }
-.controle--large { flex: 1 1 14rem; }
+/* ⚠️ LE LIBELLÉ PASSE AU-DESSUS DU CHAMP SUR TÉLÉPHONE (refonte 2026-09-13). Côte à côte,
+   « Statut » plus sa liste déroulante ne tiennent pas dans une demi-largeur de 375 px :
+   soit le libellé se coupe, soit la liste déborde. Empilés, les deux gardent leur taille et
+   la cible reste pleine largeur. */
+.controle {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1 1 8rem;
+}
+@media (min-width: 56rem) {
+  .controle { flex-direction: row; align-items: center; gap: 0.4rem; flex: 0 1 auto; }
+}
+.controle--large { flex: 1 1 100%; }
 .controle__l {
   font-size: var(--t-2xs);
   color: var(--text-soft);
@@ -985,15 +1321,24 @@ code {
 .select,
 .zone-note {
   font: inherit;
-  font-size: var(--t-s);
+  /* ⚠️ 16 px MINIMUM SUR UN CHAMP DE SAISIE, ET CE N'EST PAS UN CHOIX DE STYLE : en
+     dessous, iOS ZOOME tout seul quand on touche le champ, ce qui décale la page et
+     produit exactement le défilement latéral que cette refonte supprime. Le champ ne
+     revient pas au zoom d'origine quand on en sort. */
+  font-size: var(--t-m);
   color: var(--text);
   background: var(--creux);
   border: 0;
   border-radius: var(--r-champ);
-  padding: 0.35rem 0.6rem;
-  min-height: 2.25rem;
+  padding: 0.6rem 0.75rem;
+  /* Les listes déroulantes de statut et de priorité sont les contrôles les plus touchés de
+     l'app — un statut se change à chaque nouvelle de candidature. */
+  min-height: var(--touche);
+  /* Un `<select>` dont le libellé le plus long dépasse sa colonne pousse la grille :
+     il rétrécit au lieu de déborder. */
+  max-width: 100%;
 }
-.zone-note { width: 100%; resize: vertical; font-size: var(--t-s); }
+.zone-note { width: 100%; resize: vertical; }
 .select:focus-visible,
 .zone-note:focus-visible { outline: 2px solid var(--ambre); outline-offset: 1px; }
 .select:disabled,
@@ -1009,8 +1354,12 @@ code {
 
 .bouton--discret {
   margin-top: 0;
-  padding: 0.4rem 0.8rem;
-  font-size: var(--t-xs);
+  /* Même cible que les filtres : « discret » qualifie l'APPARENCE (fond transparent, trait
+     seul), jamais la taille de ce qu'il faut viser. Mesuré avant la refonte : 32 px de
+     haut sur « Marquer périmée », posé sous chaque offre de la liste. */
+  min-height: var(--touche);
+  padding: 0.5rem 1rem;
+  font-size: var(--t-s);
   color: var(--text);
   background: transparent;
   border-color: var(--ambre);
@@ -1715,22 +2064,34 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   display: grid;
   gap: 8px;
 }
+/* ⚠️ TROIS JETONS QUI N'EXISTENT PAS ONT ÉTÉ CORRIGÉS ICI (refonte 2026-09-13, défaut
+   PRÉEXISTANT). Ce bloc écrivait `var(--bordure)` et `var(--texte-doux)` — les jetons de
+   l'app s'appellent `--border` et `--text-soft`. Une variable CSS inconnue ne lève rien et
+   n'apparaît dans aucun test : la bordure tombait sur `currentColor` et le motif de relance
+   s'affichait à la couleur du texte courant au lieu de reculer. C'est la même famille que
+   les couleurs écrites en dur — ça ne casse pas, ça devient faux en silence. */
 .relances__item {
   display: grid;
   gap: 2px;
   padding-left: 10px;
-  border-left: 2px solid var(--bordure);
+  border-left: 2px solid var(--border);
 }
 /* Le silence prolongé se distingue de la relance due : ce ne sont pas les mêmes gestes. */
 .relances__item--sans-suite {
-  border-left-color: var(--accent);
+  border-left-color: var(--rouge);
 }
 .relances__lien {
-  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  /* Mesuré avant la refonte : 26 px de haut. C'est le lien qui ouvre une candidature en
+     retard — la ligne qu'on vient toucher quand on ouvre ce bloc. */
+  min-height: var(--touche);
+  font-weight: 600;
+  font-size: var(--t-s);
 }
 .relances__motif {
-  font-size: var(--t-s);
-  color: var(--texte-doux);
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
 }
 .relances__reste {
   margin-top: 10px;

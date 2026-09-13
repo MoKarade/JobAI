@@ -17,6 +17,55 @@
 
 type Genre = "route" | "marche" | "borne" | "lieu";
 
+/**
+ * Les pictogrammes de la BARRE DE NAVIGATION (refonte téléphone, 2026-09-13).
+ *
+ * ⚠️ ILS NE REMPLACENT PAS LE LIBELLÉ, ILS L'ACCOMPAGNENT. Une barre d'onglets en icônes
+ * seules oblige à apprendre un vocabulaire ; sur une app qu'on ouvre une fois par jour,
+ * personne ne l'apprend. Le libellé reste sous l'icône — c'est l'icône qui rend la cible
+ * repérable d'un coup d'œil, pas qui porte le sens.
+ *
+ * Ils vivent ICI et non dans la barre : c'est déjà le lieu des pictogrammes de l'app, et
+ * deux jeux de traits dessinés dans deux fichiers finissent par ne plus se ressembler.
+ */
+const NAVIGATION = {
+  // Des lignes empilées : la liste du suivi.
+  suivi: ["M4 6h16", "M4 12h16", "M4 18h10"],
+  // Une épingle : le plan.
+  carte: ["M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z", "M12 10.5v.01"],
+  // Trois points : le reste.
+  plus: ["M6 12h.01", "M12 12h.01", "M18 12h.01"],
+  // Un livre ouvert : les références.
+  references: ["M4 5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z", "M20 5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z"],
+  // Une silhouette : le profil.
+  profil: ["M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z", "M5 20a7 7 0 0 1 14 0"],
+  // Des ondes : les sources qui alimentent le suivi.
+  sources: ["M5 19h.01", "M5 14a5 5 0 0 1 5 5", "M5 9a10 10 0 0 1 10 10", "M5 4a15 15 0 0 1 15 15"],
+} as const;
+
+export type GenreNav = keyof typeof NAVIGATION;
+
+/** Le pictogramme d'un onglet. Décoratif : le libellé juste à côté nomme la destination. */
+export function IconeNav({ genre }: { genre: GenreNav }) {
+  return (
+    <svg
+      className="barre__icone"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {NAVIGATION[genre].map((trait) => (
+        <path key={trait} d={trait} />
+      ))}
+    </svg>
+  );
+}
+
 const CHEMINS: Record<Genre, { d: readonly string[]; nom: string }> = {
   // Une épingle de carte : la distance par la route.
   route: {

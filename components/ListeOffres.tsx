@@ -71,10 +71,14 @@ export function ListeOffres({
       />
       {/* Le compte ci-dessus reste en OFFRES (ce que Marc a demandé de voir) ; celui-ci
           dit en combien d'entreprises elles se regroupent — deux faits, deux phrases. */}
+      {/* ⚠️ DEUX LIGNES DE COMPTE SONT DEVENUES UNE MENTION (refonte 2026-09-13). Elle
+          disait « regroupées en 22 entreprises, la meilleure moyenne en premier » : le
+          critère de tri ne change jamais, donc personne ne le relit — il est écrit dans le
+          code qui trie, pas au-dessus de chaque liste. Le COMPTE reste : il dit en combien
+          d'employeurs les offres se regroupent, ce qu'on ne peut pas déduire de la liste. */}
       {groupes.length > 0 ? (
         <p className="controles__compte controles__compte--secondaire">
-          regroupées en {groupes.length} entreprise{groupes.length > 1 ? "s" : ""}, la
-          meilleure moyenne en premier
+          {groupes.length} entreprise{groupes.length > 1 ? "s" : ""}
         </p>
       ) : null}
 

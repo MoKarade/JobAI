@@ -24,6 +24,8 @@ import { TableauBord } from "@/components/TableauBord";
 import { ListeOffres } from "@/components/ListeOffres";
 import { FormulaireAjout } from "@/components/FormulaireAjout";
 import { Relances } from "@/components/Relances";
+import { BandeauResume } from "@/components/BandeauResume";
+import { Depliant } from "@/components/Depliant";
 import { Cadre } from "@/components/Cadre";
 
 // Le suivi change à chaque geste de Marc : jamais de page mise en cache.
@@ -153,21 +155,47 @@ export default async function Accueil() {
           <FormulaireAjout />
         </>
       ) : (
-        <>
-          {/* « Quoi faire » avant « où on en est » : c'est la question qu'on se pose en
-              ouvrant l'app. La date vient du serveur, dans le fuseau de Marc. */}
-          {/* Les relances juste après « à faire » : ce sont des candidatures VIVANTES qui
-              attendent une décision, pas un historique. La logique existait depuis des
-              jours sans que rien ne l'affiche — un test vert n'a jamais mis une
-              information à l'écran. */}
-          <Relances
-            surveillance={aSurveiller(offres, aujourdhui(new Date()))}
-            resume={resumerRelances(offres, aujourdhui(new Date()))}
-          />
-          <TableauBord resume={resumer(offres, aujourdhui(new Date()))} />
-          <FormulaireAjout />
-          <ListeOffres offres={offres} metiers={metiers} />
-        </>
+        (() => {
+          // Une seule date pour tout l'écran : deux appels à `aujourdhui(new Date())`
+          // encadrant minuit rendraient deux jours différents sur la même page.
+          const jour = aujourdhui(new Date());
+          const suivi = resumer(offres, jour);
+          const relances = resumerRelances(offres, jour);
+          const surveillance = aSurveiller(offres, jour);
+
+          return (
+            <>
+              {/* ⚠️ TROIS CHIFFRES, PUIS LA LISTE (choix de Marc, 2026-09-13). L'ordre
+                  d'avant — relances, entonnoir, formulaire, filtres, liste — repoussait la
+                  première offre à 1 267 px du haut sur un téléphone, mesuré : un écran et
+                  demi de défilement avant de voir ce qu'on vient voir. Rien n'est perdu :
+                  le détail est sous les dépliants, à un geste. */}
+              <BandeauResume
+                suivies={suivi.actives}
+                aRelancer={relances.aRelancer}
+                notees80Plus={suivi.notees80Plus}
+              />
+
+              {/* L'indice sur la ligne repliée est ce qui permet de NE PAS ouvrir : sans
+                  lui, il faudrait déplier pour savoir s'il fallait déplier. */}
+              <Depliant
+                titre="Détail du suivi"
+                indice={`${relances.enCours} en attente · ${suivi.cvEnvoyes} CV envoyés`}
+              >
+                <TableauBord resume={suivi} />
+                {/* Les relances sont des candidatures VIVANTES qui attendent une décision,
+                    pas un historique — elles restent en tête du détail. */}
+                <Relances surveillance={surveillance} resume={relances} />
+              </Depliant>
+
+              <Depliant titre="Ajouter une offre" indice="saisie manuelle">
+                <FormulaireAjout />
+              </Depliant>
+
+              <ListeOffres offres={offres} metiers={metiers} />
+            </>
+          );
+        })()
       )}
     </Cadre>
   );
