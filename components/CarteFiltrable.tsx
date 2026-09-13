@@ -154,20 +154,28 @@ export function CarteFiltrable({
         nom="entreprise"
       />
 
+      {/* ⚠️ LES FAITS RESTENT, LES PHRASES PARTENT (demande de Marc, 2026-09-13 : « moins
+          de texte »). Cette ligne disait « X épinglées à leur adresse · Y adresse connue,
+          épingle au centre-ville · Z sans adresse · W en attente de localisation · filtre
+          actif : seules les entreprises qui ont une offre correspondante » — cinq membres
+          de phrase au-dessus d'un plan qui, sur un téléphone, se bat déjà pour sa hauteur.
+          Chaque COMPTE est conservé, parce que chacun appelle un geste différent (attendre
+          une passe, corriger une adresse, baisser un seuil) ; c'est leur glose qui part. */}
       <p className="carte__compte">
-        {exactes} épinglées à leur adresse
-        {adresseSansEpingle > 0
-          ? ` · ${adresseSansEpingle} adresse connue, épingle au centre-ville`
-          : ""}
+        {exactes} à l’adresse
+        {adresseSansEpingle > 0 ? ` · ${adresseSansEpingle} au centre-ville` : ""}
         {sansAdresse > 0 ? ` · ${sansAdresse} sans adresse` : ""}
-        {vue.aSituer.length > 0 ? ` · ${vue.aSituer.length} en attente de localisation` : ""}
-        {filtreActif ? " · filtre actif : seules les entreprises qui ont une offre correspondante" : ""}
+        {vue.aSituer.length > 0 ? ` · ${vue.aSituer.length} à situer` : ""}
+        {filtreActif ? " · filtrées" : ""}
       </p>
 
       {/* ⚠️ CE QUI EST MASQUÉ SE DIT, TOUJOURS. Un filtre qui retire 41 employeurs sans
           l'écrire produirait exactement le défaut qu'il corrige : une couverture qu'on
-          croit complète et qui ne l'est pas. Et la phrase précise où elles sont restées —
-          rien n'est effacé, leurs offres sont toujours dans la liste d'accueil. */}
+          croit complète et qui ne l'est pas. Ce qui a été COUPÉ à la refonte téléphone
+          (2026-09-13), c'est la seconde moitié de la phrase — « sans adresse connue. Leurs
+          offres restent dans la liste d'accueil » : elle répétait le libellé de la case
+          juste à gauche, et rassurait sur une perte qui n'a jamais lieu. Le COMPTE, lui,
+          reste : c'est lui, le fait. */}
       <p className="carte__compte">
         <label className="carte__bascule">
           <input
@@ -175,10 +183,10 @@ export function CarteFiltrable({
             checked={adresseSeulement}
             onChange={(e) => setAdresseSeulement(e.target.checked)}
           />{" "}
-          Seulement les entreprises dont on connaît l&apos;adresse
+          Adresse connue seulement
         </label>
         {adresseSeulement && masquees > 0
-          ? ` — ${masquees} masquée${masquees > 1 ? "s" : ""}, sans adresse connue. Leurs offres restent dans la liste d'accueil.`
+          ? ` — ${masquees} masquée${masquees > 1 ? "s" : ""}`
           : ""}
       </p>
 

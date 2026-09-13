@@ -6,6 +6,44 @@
 
 ---
 
+## Session 2026-09-13 — refonte téléphone `[MOBILE-01]`
+
+Marc : « pas adapté pour téléphone, refonte de l'interface totale, moins de texte,
+plus simple, gros boutons, pas de scroll sur le côté ». Trois arbitrages pris par
+lui avant de coder : **tout redessiner** (pas seulement la mise en page), **barre de
+navigation en bas**, **résumé court puis la liste**.
+
+**Mesuré au navigateur avant / après**, sur l'accueil réel avec le CSS compilé, à
+375, 390 et 412 px :
+
+| | avant | après |
+|---|---|---|
+| défilement latéral | 94 px | **0** |
+| cibles sous 44 px | 26 | **0** |
+| plus petite police rendue | 11,2 px | **13 px** |
+| hauteur avant la première offre | 1 267 px | **690 px** |
+
+Ce qui a changé : navigation fixée en bas (Suivi · Carte · Plus ; la même barre
+remonte en haut au-dessus de 56 rem, `display: contents`, pas un second composant) ·
+bandeau de trois chiffres en tête de l'accueil, relances / entonnoir / ajout sous des
+`<details>` natifs (zéro JS au chargement) · les quatre seuils de filtre sous un pli,
+avec l'indice de ce qui est actif · neutres passés du chaud au froid pour que l'ambre
+tranche · cible tactile devenue un jeton (`--touche`) · phrases d'explication coupées
+partout où le FAIT suffit.
+
+`tests/mobile.test.ts` verrouille les causes mesurées (largeur intrinsèque, cible en
+dur, police sous plancher, champ de saisie sous 16 px, réserve de la barre), pas le
+symptôme — le `overflow-x: clip` du filet le masquerait. Six assertions, chacune
+prouvée par mutation.
+
+**Défaut préexistant corrigé en passant** : le bloc des relances écrivait
+`var(--bordure)` et `var(--texte-doux)` — deux jetons qui n'existent pas. Une variable
+CSS inconnue ne lève rien et n'apparaît dans aucun test.
+
+**À confirmer par Marc sur son téléphone.** Le harnais de mesure vit dans le
+scratchpad de la session (DOM réel recopié + CSS compilé) ; il n'est pas committé —
+un test de rendu exigerait Playwright en dépendance, ce que ce dépôt n'a pas.
+
 ## Session 2026-08-24 — la vraie cause du grand vide : la liste, pas la carte
 
 Marc a fini par trouver lui-même : « quand j'agrandi la map, les offres se mettent

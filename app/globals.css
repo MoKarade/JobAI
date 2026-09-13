@@ -433,7 +433,10 @@ code {
     display: block;
     height: auto;
     overflow: visible;
-    padding-bottom: 4rem;
+    /* ⚠️ LA MÊME RÉSERVE QUE LES AUTRES PAGES (refonte 2026-09-13) : `4rem` écrit à la main
+       ne connaissait pas la barre fixée, qui serait venue recouvrir le bas de la liste des
+       entreprises. Le jeton, lui, suit la barre si elle change de hauteur. */
+    padding-bottom: calc(var(--barre-h) + var(--pas-2));
   }
   .page--pleine main {
     display: block;
@@ -1665,7 +1668,10 @@ code {
 .carte-liste { list-style: none; display: flex; flex-direction: column; gap: var(--pas); }
 .carte-liste__ville {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: var(--trait-surface);
+  /* Le rayon manquait : seule surface de l'app à angles vifs, elle jurait avec les cartes
+     d'offre juste à côté — d'autant plus visible depuis que les rayons ont monté d'un cran. */
+  border-radius: var(--r-champ);
   padding: 0.7rem 0.9rem;
 }
 .carte-liste__titre {
@@ -2195,14 +2201,17 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .carte__bascule {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  min-height: 24px;
+  gap: 0.5rem;
+  /* Une case à cocher de 15 px se rate au doigt. Le LABEL entier est la cible — c'est lui
+     qui bascule la case — donc c'est lui qui porte la hauteur. */
+  min-height: var(--touche);
   cursor: pointer;
 }
 .carte__bascule input {
-  accent-color: var(--accent);
-  width: 15px;
-  height: 15px;
+  accent-color: var(--ambre);
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: none;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
