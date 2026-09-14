@@ -164,6 +164,34 @@ describe("l'app tient dans un téléphone", () => {
     expect(fautifs, "un champ de saisie sous 16 px fait zoomer iOS").toEqual([]);
   });
 
+  it("les cinq destinations sont dans la barre sur grand écran", () => {
+    // ⚠️ CE GARDE NAÎT D'UN DÉFAUT LIVRÉ (signalé par Marc, 2026-09-14 : « je vois que
+    // suivi et carte sur pc »). Trois onglets avaient disparu de l'écran d'ordinateur, et
+    // la cause n'est pas une faute de frappe : UNE `@media` N'AJOUTE AUCUNE SPÉCIFICITÉ.
+    // `.barre__secondaires { display: contents }` écrit dans la requête (0,1,0) perdait
+    // contre `.barre__secondaires[data-ouvert="non"] { display: none }` écrit plus haut
+    // (0,2,0) — la règle du téléphone continuait donc de s'appliquer sur 1 920 px, et le
+    // bouton « Plus », masqué là-haut par conception, ne donnait plus aucun accès.
+    //
+    // C'est une classe de défaut invisible à tout le reste : le CSS est valide, le build
+    // passe, aucune classe n'est orpheline, et la page s'affiche — avec trois liens en
+    // moins. Ce qui l'a rendue possible, c'est que ma mesure d'alors lisait « conteneur à
+    // 0×0 » et concluait « display: contents, donc pas de boîte » : les deux valeurs
+    // rendent exactement la même mesure. On vérifie donc la RÈGLE, faute de pouvoir
+    // compter les liens rendus sans navigateur.
+    const desktop = regles.slice(regles.indexOf("@media (min-width: 56rem)"));
+    const remise = desktop.match(
+      /(\.barre__secondaires[^{}]*){\s*display:\s*contents/,
+    );
+    expect(remise, "la barre doit remettre ses secondaires dans le flux").not.toBeNull();
+    // Le sélecteur de la remise doit peser au moins autant que celui qui masque : il porte
+    // donc lui aussi l'attribut.
+    expect(
+      remise?.[1],
+      "une @media n'ajoute pas de spécificité : le sélecteur doit répéter [data-ouvert]",
+    ).toContain("[data-ouvert=");
+  });
+
   it("la barre de navigation réserve sa place au bas de la page", () => {
     // ⚠️ TROIS ENDROITS DOIVENT CONNAÎTRE SA HAUTEUR, et c'est pour ça que c'est un jeton :
     // la barre elle-même, la réserve de bas de page (sinon la barre recouvre la dernière

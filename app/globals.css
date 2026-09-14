@@ -615,8 +615,18 @@ code {
     border-top: 0;
   }
   /* Les secondaires rejoignent la rangée : le conteneur disparaît de la mise en
-     page, ses enfants prennent sa place. */
-  .barre__secondaires {
+     page, ses enfants prennent sa place.
+     ⚠️ LES DEUX SÉLECTEURS SONT NÉCESSAIRES, et leur absence a coûté trois onglets
+     (signalé par Marc le 2026-09-14 : « je vois que suivi et carte sur pc »). Une
+     `@media` N'AJOUTE AUCUNE SPÉCIFICITÉ : `.barre__secondaires` (0,1,0) écrit ici
+     perdait contre `.barre__secondaires[data-ouvert="non"]` (0,2,0) écrit plus haut,
+     qui pose `display: none` tant que le panneau du téléphone est replié. Sur grand
+     écran, Références, Profil et Sources disparaissaient donc de la barre — et le
+     bouton « Plus », masqué ici par conception, ne permettait plus d'y accéder.
+     On répète l'attribut pour peser autant, plutôt que d'ajouter un `!important` qui
+     rendrait la règle inarrêtable partout ailleurs. */
+  .barre__secondaires,
+  .barre__secondaires[data-ouvert="non"] {
     display: contents;
   }
   .barre__lien {
