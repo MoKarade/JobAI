@@ -14,10 +14,12 @@
 import {
   CONTRACT_VERSION,
   type HubAlert,
+  type HubDetailSection,
   type HubMetric,
   type HubSummary,
 } from "@mokarade/hub-contract";
 import type { CoutPublie } from "./coutLlm";
+import { alertesVeille, blocFraicheur, sectionVeille, type VeillePubliee } from "./fraicheurVeille";
 import type { ResumeSuivi } from "./types";
 
 /** Identité publiée au hub. L'`id` doit rester égal à l'entrée de `Hubperso/lib/sources.ts`. */
@@ -88,11 +90,16 @@ function libelle(texte: string, max = 40): string {
  * @param cout ce que la comptabilité des appels de modèle permet de publier. Paramètre
  *   pour la même raison que la date : la lecture du compteur est impure et vit dans
  *   `lib/coutLlmStore.ts`. Absent ⇒ traité comme « aucun appel », donc pas de bloc `usage`.
+ * @param veille ce que la dernière passe permet de dire de la FRAÎCHEUR. Même raison encore :
+ *   la lecture vit dans `lib/fraicheurVeille.ts`. Absent ⇒ « jamais de passe », donc aucun
+ *   `dataAsOf` — jamais une date fabriquée depuis l'horloge du serveur, qui dirait « à
+ *   l'instant » sur un suivi vieux de trois jours.
  */
 export function construireSummary(
   resume: ResumeSuivi,
   genereLe: string,
   cout: CoutPublie = { etat: "aucun-appel" },
+  veille: VeillePubliee = { etat: "jamais" },
 ): HubSummary {
   const metrics: HubMetric[] = [];
 
@@ -103,6 +110,10 @@ export function construireSummary(
       format: "number",
       // Une offre de palier A mérite d'être remarquée dans la grille du hub.
       severity: resume.meilleure.score >= 80 ? "ok" : undefined,
+      // `primary` (contrat v1.3) désigne LE chiffre de la carte. C'est la même décision que
+      // l'ordre des métriques ci-dessous, rendue explicite : jusqu'ici le hub devinait par la
+      // position 0, ce qui marchait tant que personne ne réordonnait la liste.
+      primary: true,
     });
   }
 
@@ -117,7 +128,16 @@ export function construireSummary(
   // Pour tenir dans six créneaux, « CV envoyés » et « Réponses » sont FUSIONNÉS en un seul.
   // On n'y perd rien — les deux chiffres restent lisibles côte à côte — et ça libère la
   // place d'une information qui, elle, n'existait pas.
-  metrics.push({ label: "Nouvelles (7 j)", value: resume.nouvelles, format: "number" });
+  metrics.push({
+    label: "Nouvelles (7 j)",
+    value: resume.nouvelles,
+    format: "number",
+    // Le titre de carte se REPLIE ici quand aucune offre n'est notée : le contrat autorise
+    // zéro `primary`, mais une carte sans chiffre mis en avant est une carte qu'on ne lit
+    // pas. « Aucune meilleure offre » est un état normal (rien de noté), pas une absence de
+    // sujet — et l'arrivage du jour est ce que Marc regarde ensuite.
+    ...(resume.meilleure ? {} : { primary: true as const }),
+  });
 
   // La moyenne ne se publie QUE s'il y a quelque chose à moyenner. Un « 0 » se lirait
   // « ces offres ne valent rien » alors que la vérité est « aucune n'est notée » — et le
@@ -154,15 +174,62 @@ export function construireSummary(
 
   // Ce qui ne se mesure pas se DIT, plutôt que de s'arrondir à zéro (voir `alertesCout`).
   alerts.push(...alertesCout(cout));
+  // Ce qui n'a pas de DATE se dit aussi : « jamais de passe » et « fraîcheur illisible » ne
+  // sont pas le même message, et aucun des deux ne se déduit de l'absence de `dataAsOf`.
+  alerts.push(...alertesVeille(veille));
 
   return {
     contractVersion: CONTRACT_VERSION,
     app: APP,
     generatedAt: genereLe,
+    // `dataAsOf` + `expectedMaxAgeSec`, ou aucun des deux. Voir `blocFraicheur`.
+    ...blocFraicheur(veille),
     status: "ok",
     metrics: metrics.slice(0, 6),
-    alerts,
+    alerts: alerts.slice(0, 10),
     actions: [{ label: "Ouvrir JobAI", kind: "link", href: APP.url }],
     ...blocUsage(cout),
+    ...blocDetails(resume, veille),
   };
+}
+
+/**
+ * Le bloc `details` du contrat v1.3, ou rien. PURE.
+ *
+ * ── POURQUOI L'ENTONNOIR PASSE EN DÉTAIL PLUTÔT QU'EN MÉTRIQUE ──────────────────────
+ *
+ * « CV envoyés · réponses » est une métrique TEXTE, née du plafond de six créneaux : deux
+ * chiffres collés dans une chaîne pour libérer une place. Ça reste lisible, mais le hub ne
+ * peut en tracer aucune courbe — une valeur texte n'entre pas dans une série (`serieMetrique`
+ * écarte tout ce qui n'est pas un nombre). Le détail les republie donc SÉPARÉS et en nombres.
+ * La métrique fusionnée reste : la retirer changerait ce que Marc voit aujourd'hui pour un
+ * rendu qui n'existe pas encore côté hub.
+ *
+ * ⚠️ Rien de personnel ici (garde-fou n°1, dépôt PUBLIC) : que des comptes.
+ */
+function blocDetails(
+  resume: ResumeSuivi,
+  veille: VeillePubliee,
+): Pick<HubSummary, "details"> | Record<string, never> {
+  const sections: HubDetailSection[] = [];
+
+  const passe = sectionVeille(veille);
+  if (passe) sections.push(passe);
+
+  sections.push({
+    title: "Entonnoir de candidature",
+    items: [
+      { label: "CV envoyés", value: resume.cvEnvoyes, format: "number" },
+      { label: "Réponses", value: resume.reponses, format: "number" },
+      { label: "Entrevues", value: resume.entrevues, format: "number" },
+      {
+        label: "Offres suivies",
+        value: resume.actives,
+        format: "number",
+        hint: `dont ${resume.notees80Plus} notée(s) 80+`,
+      },
+    ],
+  });
+
+  return { details: sections };
 }
