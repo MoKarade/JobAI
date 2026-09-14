@@ -89,7 +89,7 @@ export function Filtres({
           au-dessus de chaque liste.
           ⚠️ L'INDICE DIT CE QUI EST ACTIF, et c'est ce qui rend le pli honnête : un filtre
           qui agit sans se montrer fait chercher un bug dans les données. */}
-      <Depliant titre="Affiner" indice={resumerSeuils(filtres)}>
+      <Depliant titre="Affiner" indice={resumerSeuils(filtres)} classe="depliant--seuils">
         <div className="controles__seuils">
           {/* Le seuil de NOTE : mêmes paliers que le barème, même geste que la distance. Un
               second clic sur le palier actif le retire — sinon il n'y aurait aucun moyen de

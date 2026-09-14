@@ -16,9 +16,19 @@ export function Depliant({
   titre,
   indice,
   children,
+  classe,
   ouvertParDefaut = false,
 }: {
   titre: string;
+  /**
+   * Classe supplémentaire, pour les plis qui se comportent autrement sur grand écran.
+   *
+   * Le seul usage aujourd'hui : `depliant--seuils`, le pli des filtres, que la feuille
+   * ouvre d'office au-dessus de 56 rem — la barre de filtres était un élément PERMANENT
+   * de l'écran d'ordinateur, et la replier y était une régression d'usage sans contrepartie
+   * (sur un téléphone, elle coûtait 472 px de largeur ; sur un écran de 1 366, rien).
+   */
+  classe?: string;
   /**
    * Ce que le bloc contient, dit en deux mots sur la ligne repliée (« 6 en attente »).
    *
@@ -30,7 +40,7 @@ export function Depliant({
   ouvertParDefaut?: boolean;
 }) {
   return (
-    <details className="depliant" open={ouvertParDefaut}>
+    <details className={`depliant${classe ? ` ${classe}` : ""}`} open={ouvertParDefaut}>
       <summary className="depliant__tete">
         <span className="depliant__titre">{titre}</span>
         {indice ? <span className="depliant__indice">{indice}</span> : null}

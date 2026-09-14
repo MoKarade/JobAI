@@ -316,12 +316,26 @@ code {
      dernière offre de la liste — et on ne le voit qu'en descendant jusqu'en bas, donc
      jamais pendant qu'on développe. */
   padding: var(--pas-2) 0.75rem calc(var(--barre-h) + var(--pas-2));
+  /* ⚠️ FLEX POUR POUVOIR RÉORDONNER, et c'est un correctif d'un défaut MESURÉ le
+     2026-09-14 (Marc : « sur pc ça marche plus trop »). La barre de navigation est le
+     DERNIER enfant du DOM — voulu : au clavier, on ne traverse pas cinq onglets avant
+     d'atteindre la liste qu'on vient lire. Sur téléphone elle est `fixed`, donc hors du
+     flux : sa place dans le DOM ne se voit pas. Sur grand écran elle redevient `static`…
+     et se rendait TOUT EN BAS, sous le contenu — mesuré à 1 163 px sur 1366×768, alors
+     que le contenu commençait à 91 px. Les onglets avaient purement disparu du haut de
+     l'écran. `order` remet l'ORDRE VISUEL sans toucher à l'ordre du DOM : c'est
+     exactement ce pour quoi la propriété existe. */
+  display: flex;
+  flex-direction: column;
 }
 @media (min-width: 56rem) {
   .page {
     /* Sur grand écran la barre remonte dans le flux, en haut : plus rien à réserver. */
     padding: clamp(1.5rem, 1rem + 2vw, 2.5rem) clamp(1rem, 0.5rem + 2vw, 2rem) 4rem;
   }
+  .page > .entete { order: 1; }
+  .page > .barre { order: 2; }
+  .page > main { order: 3; }
 }
 
 /* ⚠️ « PLEINE » : LA PAGE REMPLIT L'ÉCRAN, ET RIEN NE DÉFILE EN DEHORS DE SON PROPRE
@@ -938,6 +952,51 @@ code {
      sous un titre qui ne le tient pas. */
   border-top: var(--trait-surface);
   padding-top: 0.9rem;
+}
+
+/* ⚠️ LE PLI DES FILTRES S'OUVRE D'OFFICE SUR GRAND ÉCRAN (correctif du 2026-09-14, Marc :
+   « sur pc ça marche plus trop »). Replier les quatre seuils règle un problème de LARGEUR
+   qui n'existe que sur un téléphone — 472 px de boutons sur un écran de 375. Sur 1 366, la
+   place est là, et la barre de filtres était un élément permanent de l'écran : la mettre
+   sous un pli y coûtait un clic à chaque recherche, sans rien gagner.
+
+   `::details-content` force le contenu visible sans toucher à l'attribut `open` — mesuré
+   au navigateur avant d'être écrit ici, parce que la voie évidente (`> div { display:
+   block }`) NE MARCHE PAS : le masquage d'un `<details>` replié vient d'un
+   `content-visibility` sur un pseudo-élément interne, et un `getBoundingClientRect` rend
+   quand même une hauteur pour ce contenu — de quoi croire que ça fonctionne. Vérifié par
+   `checkVisibility()` : `display: block` ⇒ invisible, `::details-content` ⇒ visible.
+   Là où le pseudo-élément n'est pas connu, le pli reste simplement fermé et cliquable :
+   la dégradation est propre, jamais une barre cassée. */
+@media (min-width: 56rem) {
+  .depliant--seuils {
+    background: none;
+    border: 0;
+  }
+  .depliant--seuils::details-content {
+    content-visibility: visible;
+    block-size: auto;
+  }
+  /* Le titre devient une étiquette : le clic n'a plus d'effet visible ici, autant ne pas
+     le promettre. Le chevron part pour la même raison — il annoncerait un pli qui ne se
+     plie plus. */
+  .depliant--seuils .depliant__tete {
+    min-height: 0;
+    padding: 0 0 0.35rem;
+    cursor: default;
+  }
+  .depliant--seuils .depliant__chevron { display: none; }
+  .depliant--seuils .depliant__corps {
+    padding: 0;
+    border-top: 0;
+  }
+  /* Les quatre groupes de seuils reprennent leur rangée : c'est la forme qu'ils avaient
+     avant la refonte, et celle que la largeur permet. */
+  .depliant--seuils .controles__seuils {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.9rem;
+  }
 }
 
 .liste { display: flex; flex-direction: column; gap: 0.95rem; }
