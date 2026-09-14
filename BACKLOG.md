@@ -222,9 +222,39 @@
       exécution). Ou en CLI : `vercel crons ls`. Non lisible depuis une session Claude (pas de
       jeton Vercel, et le MCP Vercel n'expose pas les crons). Le filet ci-dessus rend la panne
       inoffensive, il ne la corrige pas à la source.
-- [ ] 🔧 **`[VEILLE-12]`** Rendre le silence VISIBLE : publier la fraîcheur de la dernière
-      passe dans `lib/hubSummary.ts` (alerte quand > 36 h). C'est ce qui manquait le plus —
-      trois jours ont passé parce qu'aucun écran ne disait « la veille n'a pas tourné ».
+- [x] 🔧 **`[VEILLE-12]`** Rendre le silence VISIBLE. Fait le 14/09/2026, **autrement que
+      prévu et c'est mieux** : plutôt qu'une alerte maison à 36 h, JobAI publie `dataAsOf` +
+      `expectedMaxAgeSec` (contrat v1.3) et c'est le HUB qui juge — `lib/gel.ts` compare, et
+      distingue « fraîche », « figée », « horloge en avance » et « âge connu non jugé ». Une
+      alerte écrite ici n'aurait parlé qu'à la carte JobAI ; un seuil publié entre dans la page
+      « Ce qui demande mon attention » du hub avec les quatre autres apps.
+      **Le seuil vaut 30 h et non 36** : la cadence DÉCLARÉE (le cron quotidien) plus une marge
+      de 6 h. Un test lit `vercel.json` et refuse la divergence.
+      ⚠️ **Et surtout pas les 16 h de la cadence OBSERVÉE**, même si c'est le rythme réel
+      aujourd'hui : il ne l'est que par l'effet de bord `[VEILLE-13]` ci-dessous. Calibrer sur
+      un accident ferait crier « figée » chaque jour le jour où l'accident est corrigé.
+      La fraîcheur se lit sur `CLE_RAPPORT` (fin d'une passe RÉUSSIE) et jamais sur
+      `sync_state["veille-auto"].majLe`, qui est le jeton de réservation posé AVANT le travail :
+      une passe qui démarre puis échoue l'avancerait, et le hub annoncerait une fraîcheur que
+      personne n'a produite. 7 mutations jouées, 7 attrapées.
+- [ ] 🟡 **`[VEILLE-13]`** **Le cron de géocodage fait une passe de VEILLE chaque nuit, et son
+      journal annonce une panne qui n'existe pas.** Découvert en écrivant `[VEILLE-12]`,
+      **non corrigé** (hors périmètre — un bug préexistant ne se corrige pas sans feu vert).
+      Le filet de reprise de `app/api/cron/geocodage/route.ts` est gardé par
+      `reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, …)`. Ce délai valait **20 h** quand le
+      filet a été écrit ; il est passé à **45 s** le 17/08/2026 (`lib/synchro.ts`, pour la bonne
+      raison — le compteur d'absences compte désormais des jours). À 03:00, la dernière veille
+      a donc 16 h : la réservation réussit TOUJOURS, et la branche de rattrapage part chaque
+      nuit. Conséquences, par ordre de gravité décroissante : (a) `console.warn("veille en
+      retard — reprise depuis ce cron")` est écrit chaque nuit alors que rien n'est en retard —
+      c'est le bruit qui rend un vrai signal invisible, exactement l'inverse du but du chantier ;
+      (b) deux ingestions complètes par jour au lieu d'une (la donnée est plus FRAÎCHE, pas
+      moins — le coût est en runtime et en requêtes aux sources) ; (c) le chemin de géocodage
+      dédié (`MAX_SITUATIONS_CRON`, `BUDGET_GEOCODAGE_CRON_MS`) n'est jamais emprunté — sans
+      perte fonctionnelle, `executerVeilleComplete` mesure les distances elle-même, mais avec un
+      autre budget que celui prévu ici ; (d) le commentaire de la route dit encore « 20 h ».
+      Correctif probable : un délai PROPRE au filet (« reprendre si la veille a plus de N heures »)
+      au lieu de réutiliser l'anti-rafale de 45 s, qui protège d'autre chose.
 
 ## Chantier #08 — CV et profil (ADR-0009) 🟩
 

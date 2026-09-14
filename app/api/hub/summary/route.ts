@@ -34,6 +34,7 @@ import { HUB_TOKEN_HEADER, serveSummary } from "@mokarade/hub-contract/endpoint"
 import { APP, alertesCout, blocUsage, construireSummary } from "@/lib/hubSummary";
 import { getTrackerState } from "@/lib/trackerState";
 import { lireCoutPublie } from "@/lib/coutLlmStore";
+import { alertesVeille, chargerVeillePubliee } from "@/lib/fraicheurVeille";
 
 // Jamais de cache statique : le hub veut l'état courant à chaque appel.
 export const dynamic = "force-dynamic";
@@ -44,12 +45,22 @@ export const dynamic = "force-dynamic";
 async function construireResume(): Promise<HubSummary> {
   let summary: HubSummary;
   try {
-    // Deux lectures indépendantes : l'état du suivi et la comptabilité des appels de
-    // modèle. Elles ne se remplacent pas — un CV analysé avant la première offre suivie
-    // laisse le suivi « pas branché » alors que le coût, lui, est bien réel.
-    const [etat, cout] = await Promise.all([getTrackerState(), lireCoutPublie()]);
+    // TROIS lectures indépendantes : l'état du suivi, la comptabilité des appels de modèle,
+    // et la date de la dernière passe. Aucune ne remplace les autres — un CV analysé avant la
+    // première offre suivie laisse le suivi « pas branché » alors que le coût, lui, est bien
+    // réel ; et une veille qui n'a jamais abouti laisse le suivi lisible mais sans âge.
+    //
+    // ⚠️ `chargerVeillePubliee` NE JETTE JAMAIS (voir son en-tête) : ne pas savoir depuis
+    // quand les chiffres sont vrais n'est pas une raison de refuser de les publier. Une
+    // exception ici retomberait dans le `catch` ci-dessous et transformerait un suivi sain en
+    // `status: "error"`.
+    const [etat, cout, veille] = await Promise.all([
+      getTrackerState(),
+      lireCoutPublie(),
+      chargerVeillePubliee(),
+    ]);
     if (etat) {
-      summary = construireSummary(etat, new Date().toISOString(), cout);
+      summary = construireSummary(etat, new Date().toISOString(), cout, veille);
     } else {
       // null = moteur pas encore branché. Honnête, et distinct d'une panne.
       const enConstruction = buildingSummary(APP, {
@@ -60,9 +71,15 @@ async function construireResume(): Promise<HubSummary> {
       // pour de vrai. Laisser tomber le bloc ici publierait « non suivie » sur une app qui
       // vient de payer un appel — le trou qu'on est en train de boucher, rouvert d'un cran
       // plus loin.
+      // ⚠️ AUCUN `dataAsOf` SUR LA BRANCHE « EN CONSTRUCTION », et le contrat le vérifie :
+      // il rejette `expectedMaxAgeSec` sans horodatage à comparer. C'est cohérent avec le
+      // sens de cette branche — il n'y a pas de suivi, donc rien dont on puisse dater la
+      // fraîcheur. En revanche l'alerte de veille, elle, survit : une passe illisible reste
+      // une chose à regarder même quand le suivi n'est pas branché, exactement comme le coût.
       summary = {
         ...enConstruction,
-        alerts: [...enConstruction.alerts, ...alertesCout(cout)].slice(0, 10),
+        alerts: [...enConstruction.alerts, ...alertesCout(cout), ...alertesVeille(veille)]
+          .slice(0, 10),
         ...blocUsage(cout),
       };
     }
