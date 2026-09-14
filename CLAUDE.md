@@ -1620,6 +1620,48 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   production a viré 14 fois au rouge d'un coup. Un classement d'URL se prouve sur les adresses
   QU'ON A, jamais sur des exemples plausibles.
 
+- **« Quasi tout X » se MESURE avant d'être corrigé — et l'outil de mesure se livre d'abord.**
+  Marc a dit « quasi toutes les offres sont à vérifier ». Mesuré une heure plus tard : **21
+  sur 1 593**, soit 1,3 %. Je n'avais AUCUN moyen de compter — le chiffre n'existait nulle
+  part —, et j'allais construire une automatisation dimensionnée sur une impression. Un
+  traitement automatique qui RETIRE quelque chose se conçoit à l'envers, et « à l'envers »
+  commence par le compte : s'il n'est pas observable, le premier lot est l'observabilité, pas
+  le correctif. ⚠️ Et l'impression n'était pas fausse pour rien : la pastille pouvait
+  effectivement se poser sur TOUT le suivi, parce qu'elle lisait l'absence d'une entrée dans
+  un journal qui tient dans une seule ligne d'état — perdu, il accuse 1 593 offres d'un coup.
+  **Une absence n'est une information que si sa source est prouvée vivante** : d'où
+  `journalPlausible`, qui fait taire la pastille tant que le balayage n'a pas confirmé la
+  majorité du suivi.
+
+- **La garde qu'on copie du voisin peut être INOPÉRANTE chez soi, et elle a l'air prudente.**
+  J'avais gaté la fermeture automatique sur `couvertureComplete` par réflexe : c'est ce que
+  fait `estPerimable`, le mécanisme d'à côté. Deux erreurs dans le même geste. (a) Elle ne
+  répond pas à ma question : « la passe a-t-elle relancé TOUS les termes ? » décide du sort
+  d'une offre DÉJÀ VUE par un terme, et ne dit rien d'une offre que le balayage n'a JAMAIS
+  vue — celle-là se ferme sur un ÂGE mesuré, pas sur un silence. (b) Elle ne pouvait pas
+  tirer : aucun lot n'était déposé depuis 24 jours, donc la production tourne en couverture
+  incomplète en permanence. J'aurais livré un mécanisme vert, testé, et mort à l'arrivée.
+  Réflexe symétrique de « quel garde mes voisins ont-ils que je n'ai pas ? » : **pour chaque
+  garde qu'on hérite, vérifier qu'elle répond à SA question — et surtout qu'elle peut passer
+  au moins une fois sur l'état RÉEL de la production.**
+
+- **Un seuil se mesure avec l'instrument qu'on a déjà construit.** Fermer une offre qu'aucun
+  balayage ne confirme demande un âge. Écrire « 60 jours » aurait été une politique inventée,
+  fausse au premier changement de rythme du marché — alors que `lib/dureeVie.ts` estime déjà
+  la survie des annonces (Kaplan-Meier, censure comprise). Le seuil est donc l'âge auquel la
+  survie observée tombe sous une petite part résiduelle, et quand la mesure ne conclut pas
+  (trop peu de fermetures, courbe qui ne descend pas), **rien ne se ferme**. Un module qui ne
+  peut pas justifier son seuil ne doit pas en prendre un par défaut.
+
+- **Un témoin d'intégration peut être protégé par la BORNE plutôt que par la garde qu'il
+  prétend éprouver.** Deux fois dans le même lot : le témoin « offre que Marc a travaillée »
+  et le témoin « offre que la passe vient de revoir » restaient verts sous la mutation qui
+  retirait leur garde — parce qu'ils avaient le MÊME ÂGE que la vraie candidate et que la
+  borne « pas plus que ce que la passe a confirmé » ne gardait que la première du tri. Le
+  test mesurait l'ordre, pas la garde. **Un témoin doit être le PREMIER que la règle
+  emporterait si sa garde tombait** — ici le plus vieux. Et ça ne se voit qu'en jouant la
+  mutation : les deux fichiers étaient verts, et l'un des deux ne prouvait rien.
+
 ## 10. Style et compte-rendu
 
 > 📣 Forme des comptes-rendus, des commits, des PR et des docs générées :

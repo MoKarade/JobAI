@@ -1705,3 +1705,32 @@ avoir l'offre, parce que ça m'étonne certaines devraient être périmées ».
       `lib/fraicheur.ts` se protège par `Number.isFinite`, mais `observer`/`survie` restent
       exposés — en pratique ils ne lisent que des dates écrites par l'app. Bug PRÉEXISTANT,
       non causé par ce lot, **non corrigé sans feu vert**.
+
+---
+
+## Chantier — la vérification se fait toute seule ✅
+
+Demande de Marc, 2026-09-14 : « quasi toutes les offres sont à vérifier, mais je veux pas
+revérifier manuellement, je veux que tu le mettes en place ».
+
+- [x] 🔧 **`[MESURE-01]`** `resume_suivi` (MCP) rend un bloc `veille` : confirmées, jamais
+      confirmées, leur répartition par âge, et depuis combien de jours la plus ancienne offre
+      suivie n'a pas été revue. ✅ 2026-09-14 — **mesuré aussitôt : 1 572 confirmées, 21
+      jamais vues, toutes entre 30 et 90 jours**, contre « quasi toutes » à l'œil.
+- [x] 🔧 **`[FERMETURE-01]`** `lib/fermetureAuto.ts` ferme d'office, dans la passe
+      quotidienne, ce qu'aucun balayage ne peut confirmer. Seuil d'âge MESURÉ sur la survie
+      observée (`lib/dureeVie.ts`), jamais choisi ; échec fermé quand la mesure ne conclut
+      pas. ✅ 2026-09-14.
+- [x] 🔧 **`[FERMETURE-02]`** La pastille « à vérifier » se tait quand le journal de veille a
+      perdu la majorité du suivi : une pastille sur 1 593 offres ne dit rien des offres, elle
+      dit que le journal est en panne. ✅ 2026-09-14.
+- [ ] 🔧 **`[PROFIL-01]`** Le profil actif stocké en base ne passe plus son schéma Zod
+      (`ponderation.conditions`, `pointsConditions`, `facteurHorsDomaine`, `termesParJour`
+      manquants) : `/references` se replie sur le profil par DÉFAUT, donc **tout réglage
+      enregistré par Marc est ignoré**, `termesParJour` compris. Vu dans les journaux Vercel
+      le 2026-09-14. Bug PRÉEXISTANT, non causé par ce lot, non corrigé sans feu vert.
+      Le correctif est probablement une migration du document persisté, pas un assouplissement
+      du schéma — assouplir rendrait la dérive silencieuse.
+- [ ] 🔧 **`[BORNES-01]`** `bornes=0/1293 (1293 en échec)` dans les journaux du 2026-09-14,
+      plus « boîte englobante anormalement large — interrogation annulée ». La mesure des
+      bornes de recharge ne produit plus rien. Bug PRÉEXISTANT, signalé, non corrigé.

@@ -281,3 +281,37 @@ relecture : le test écrit sur les URL réelles est passé au rouge 14 fois d'un
 compte), `tests/fraicheur.test.ts` (seuil dérivé de la constante, silence sur les offres que
 la veille suit), `tests/liensOffreCables.test.ts` (les écrans APPELLENT la règle — le module
 pouvait être juste sans être branché, et rien entre les deux gardes existantes ne le voyait).
+
+---
+
+## 2026-09-14 — « Quasi tout X » se mesure, et l'outil de mesure se livre en premier
+
+**Le symptôme** : « quasi toutes les offres sont à vérifier, mais je veux pas revérifier
+manuellement, je veux que tu le mettes en place ».
+
+**Le réflexe qu'il fallait retenir** : je n'avais aucun moyen de compter. Le nombre d'offres
+qu'aucun balayage n'a jamais confirmées n'existait nulle part — ni dans le résumé MCP, ni
+dans une route de diagnostic. J'allais donc dimensionner une automatisation qui ARCHIVE des
+offres sur une impression. Premier lot : l'observabilité (`resume_suivi` rend un bloc
+`veille`). Mesuré aussitôt : **1 572 confirmées, 21 jamais vues, toutes entre 30 et 90
+jours**, sur 1 593. Pas « quasi toutes » — 1,3 %.
+
+**Mais l'impression n'était pas gratuite** : le journal de veille tient dans UNE ligne d'état
+JSON. Perdu ou écrit à moitié, il rend toutes les offres « jamais confirmées » d'un coup, et
+la pastille accuse le suivi entier. D'où `journalPlausible` : une absence n'est une
+information que si sa source est prouvée vivante.
+
+**Le piège de conception** : j'avais gaté la fermeture automatique sur `couvertureComplete`,
+la garde du mécanisme voisin. Elle ne répondait pas à ma question (le silence d'une requête
+ne dit rien d'une offre qu'aucune requête n'a jamais trouvée — ce qui la ferme est un ÂGE),
+et surtout elle ne pouvait pas tirer : aucun lot déposé depuis 24 jours, donc couverture
+incomplète en permanence. Mécanisme vert, testé, mort à l'arrivée.
+
+**Le piège de test** : deux témoins d'intégration restaient verts sous la mutation qui
+retirait leur garde, parce qu'ils avaient le même âge que la vraie candidate et que la borne
+« pas plus que ce que la passe a confirmé » ne gardait que le premier du tri. Un témoin doit
+être le PREMIER que la règle emporterait si sa garde tombait.
+
+**Verrous** : `tests/fermetureAuto.test.ts` (17 cas, chaque abstention par son motif),
+`tests/ingest-passe-suspension.test.ts` (deux tests qui TRAVERSENT la passe, dont un sur une
+couverture INCOMPLÈTE), `tests/fraicheur.test.ts` (le silence quand le journal est perdu).

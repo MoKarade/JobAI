@@ -94,14 +94,21 @@ describe("ce qu'elle dit", () => {
 });
 
 describe("fraicheursDuSuivi", () => {
+  // ⚠️ LA PROPORTION DE CETTE FIXTURE EST SIGNIFICATIVE, pas décorative : la carte ne se
+  // remplit que si le balayage a confirmé la MAJORITÉ du suivi. Quatre offres dont trois
+  // confirmées reproduisent le régime normal mesuré en production le 2026-09-14
+  // (1 572 sur 1 593). Une fixture à une confirmée sur trois ferait taire la fonction, et
+  // tout ce fichier passerait en testant l'abstention sans le dire.
   const offres = [
     { id: "seed-vieille", histo: false, perimeeLe: null, dateReperage: ilYA(49) },
     { id: "seed-fraiche", histo: false, perimeeLe: null, dateReperage: ilYA(1) },
     { id: "ingeree", histo: false, perimeeLe: null, dateReperage: ilYA(49) },
+    { id: "ingeree2", histo: false, perimeeLe: null, dateReperage: ilYA(49) },
   ] as unknown as Parameters<typeof fraicheursDuSuivi>[0];
+  const JOURNAL_NORMAL = { ingeree: SUIVI, ingeree2: SUIVI, "seed-fraiche": SUIVI };
 
   it("ne retient que les offres qui ont quelque chose à dire", () => {
-    const carte = fraicheursDuSuivi(offres, { ingeree: SUIVI }, AUJOURDHUI);
+    const carte = fraicheursDuSuivi(offres, JOURNAL_NORMAL, AUJOURDHUI);
     expect(Object.keys(carte)).toEqual(["seed-vieille"]);
     expect(carte["seed-vieille"]?.jours).toBe(49);
   });
@@ -109,8 +116,24 @@ describe("fraicheursDuSuivi", () => {
   it("n'inscrit jamais d'entrée vide pour une offre sans rien à dire", () => {
     // Une entrée présente mais nulle se serait mise à s'afficher au premier consommateur
     // qui teste la PRÉSENCE de la clé plutôt que sa valeur.
-    const carte = fraicheursDuSuivi(offres, { ingeree: SUIVI }, AUJOURDHUI);
+    const carte = fraicheursDuSuivi(offres, JOURNAL_NORMAL, AUJOURDHUI);
     expect("seed-fraiche" in carte).toBe(false);
     expect("ingeree" in carte).toBe(false);
+  });
+
+  it("SE TAIT ENTIÈREMENT quand le journal a perdu la majorité du suivi", () => {
+    // ⚠️ LE CAS QUI A MOTIVÉ LA GARDE. Le journal est un seul JSON dans une ligne d'état :
+    // perdu, il rend TOUTES les offres « jamais revues » d'un coup, et l'écran affiche
+    // « tout est à vérifier ». Ça ne dit rien des offres — ça dit que le journal est en
+    // panne. Marc, lui, lit une accusation contre son suivi entier.
+    expect(fraicheursDuSuivi(offres, {}, AUJOURDHUI)).toEqual({});
+    expect(fraicheursDuSuivi(offres, { ingeree: SUIVI }, AUJOURDHUI)).toEqual({});
+  });
+
+  it("parle de nouveau dès que le journal redevient majoritaire — la garde n'est pas un cliquet", () => {
+    // Une garde qui met des items hors circuit sans chemin de retour transforme un incident
+    // transitoire en silence permanent.
+    const carte = fraicheursDuSuivi(offres, JOURNAL_NORMAL, AUJOURDHUI);
+    expect(Object.keys(carte)).toHaveLength(1);
   });
 });

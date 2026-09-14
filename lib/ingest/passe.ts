@@ -14,7 +14,13 @@
 // et protection des offres jamais vues par un balayage. Une seconde implémentation
 // divergerait, et c'est le jeu de données qui en paierait le prix.
 
-import { appliquerBalayage, resumerBalayage, type JournalVeille } from "../veille";
+import {
+  appliquerBalayage,
+  resumerBalayage,
+  SEUIL_ABSENCES_PEREMPTION,
+  type JournalVeille,
+} from "../veille";
+import { fermeturesAutomatiques, type FermetureAuto } from "../fermetureAuto";
 import type { Offre } from "../types";
 import { cleCanonique, idsStockesVus, lieuxAMesurer, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
 import { verdictsFermes, type RegistreLieux } from "./lieux";
@@ -108,6 +114,20 @@ export interface RapportPasse {
    * les deux produisent des passes qui ont l'air identiques dans le rapport.
    */
   couvertureComplete: boolean;
+  /**
+   * Les offres que la passe a fermées D'OFFICE, faute qu'aucun balayage ne puisse les
+   * confirmer, et le motif quand elle s'en est abstenue.
+   *
+   * ⚠️ NOMMÉES, PAS COMPTÉES. « 21 fermées » ne se vérifie pas : ça ne dit pas si la règle a
+   * bien travaillé ou si elle vient d'archiver la meilleure offre du mois, et le seul moyen
+   * de trancher serait de tout rouvrir à la main — exactement ce que l'automatisation doit
+   * épargner. Même exigence que les refus d'ingestion.
+   */
+  fermetureAuto: {
+    fermetures: FermetureAuto[];
+    motifAbstention: string | null;
+    seuilJours: number | null;
+  };
   resume: string;
   /**
    * Les adresses que les ANNONCES elles-mêmes ont données, par employeur.
@@ -364,6 +384,39 @@ export async function executerPasse(
     ? { offres: apresAjout, journal, nouvelles: [], perimees: [], revenues: [], enSursis: [] }
     : appliquerBalayage(apresAjout, vues, journal, aujourdhui, couvertureComplete);
 
+  // ⚠️ APRÈS LE BALAYAGE, ET SUR SON RÉSULTAT. Une offre que cette passe vient de voir entre
+  // au journal à la ligne au-dessus : la juger sur le journal d'AVANT la rouvrirait à la
+  // fermeture le jour même où une source la republie. On lit donc `balayage.journal` et
+  // `balayage.offres`, jamais les entrées de la fonction.
+  //
+  // Le PLANCHER d'âge vient de `SEUIL_ABSENCES_PEREMPTION` : on ne ferme jamais d'office une
+  // offre plus jeune que la patience que la veille s'accorde déjà pour ce qu'elle a vu
+  // disparaître. Le seuil réel, lui, se MESURE (`lib/fermetureAuto.ts`).
+  const fermeture = aucuneSourceEnSucces
+    ? {
+        fermetures: [],
+        motifAbstention: "aucune source n'a répondu",
+        seuilJours: null,
+      }
+    : fermeturesAutomatiques({
+        offres: balayage.offres,
+        journal: balayage.journal,
+        aujourdhui,
+        vues: vues.length,
+        plancherJours: SEUIL_ABSENCES_PEREMPTION,
+        metiers: flux?.metiers ?? [],
+      });
+
+  const aFermer = new Set(fermeture.fermetures.map((f) => f.id));
+  const offresFinales =
+    aFermer.size === 0
+      ? balayage.offres
+      : balayage.offres.map((o) =>
+          // Date du CONSTAT, comme la péremption ordinaire : on ne sait pas quand l'annonce
+          // a fermé, on sait quand on a cessé de pouvoir l'affirmer ouverte.
+          aFermer.has(o.id) ? { ...o, perimeeLe: `${aujourdhui}T00:00:00.000Z` } : o,
+        );
+
   return {
     sources: compte,
     trouvees: brutes.length,
@@ -379,9 +432,10 @@ export async function executerPasse(
     perimees: balayage.perimees,
     revenues: balayage.revenues,
     enSursis: balayage.enSursis.length,
-    offres: balayage.offres,
+    offres: offresFinales,
     journal: balayage.journal,
     couvertureComplete,
+    fermetureAuto: fermeture,
     resume: aucuneSourceEnSucces
       ? "balayage suspendu : aucune source n'a répondu — compteurs d'absences inchangés"
       : `${tri.retenues.length} nouvelle${tri.retenues.length > 1 ? "s" : ""}, ${resumerBalayage(balayage)}` +
@@ -389,7 +443,15 @@ export async function executerPasse(
         // répète « couverture complète » tous les jours cesse d'être lu, et l'exception
         // passe alors inaperçue — c'est ainsi que la CI de ce dépôt a été ignorée quatre
         // commits d'affilée.
-        (couvertureComplete ? "" : " · couverture incomplète : péremption au seuil long"),
+        (couvertureComplete ? "" : " · couverture incomplète : péremption au seuil long") +
+        // Ce que la fermeture d'office a fait, ou pourquoi elle n'a rien fait. Les deux se
+        // disent : un silence se lirait « rien à fermer » alors qu'il peut vouloir dire
+        // « je n'avais pas le droit de regarder ».
+        (fermeture.fermetures.length > 0
+          ? ` · ${fermeture.fermetures.length} fermée${fermeture.fermetures.length > 1 ? "s" : ""} d'office (jamais confirmée${fermeture.fermetures.length > 1 ? "s" : ""}, seuil ${fermeture.seuilJours} j)`
+          : fermeture.motifAbstention !== null
+            ? ` · fermeture d'office suspendue : ${fermeture.motifAbstention}`
+            : ""),
     adresses: adressesAnnoncees(brutes),
     lieux: mesure,
   };

@@ -24,6 +24,7 @@
 // qu'aucun balayage ne l'a confirmée. C'est l'information qui manquait, pas l'archivage.
 
 import { joursEntre } from "./dureeVie";
+import { journalPlausible } from "./fermetureAuto";
 import type { Offre } from "./types";
 import { SEUIL_ABSENCES_PEREMPTION, type SuiviVeille } from "./veille";
 
@@ -116,6 +117,14 @@ export function fraicheursDuSuivi(
   journal: Readonly<Record<string, SuiviVeille>>,
   aujourdhui: string,
 ): Record<string, Fraicheur> {
+  // ⚠️ UN JOURNAL PERDU NE DOIT ACCUSER PERSONNE. Le journal est un seul JSON dans une ligne
+  // d'état : perdu, tronqué ou écrit à moitié, il rend TOUTES les offres « jamais revues »
+  // d'un coup. Une pastille sur 1 593 offres ne dit rien des offres — elle dit que le
+  // journal est en panne, et l'utilisateur, lui, lit « tout est à vérifier ». Tant que le
+  // balayage n'a pas confirmé la majorité du suivi, on se tait (mesuré le 2026-09-14 :
+  // 1 572 confirmées sur 1 593, soit 98,7 % — la garde ne coûte rien en régime normal).
+  if (!journalPlausible(offres, journal)) return {};
+
   const carte: Record<string, Fraicheur> = {};
   for (const o of offres) {
     const f = fraicheurOffre(o, journal[o.id], aujourdhui);

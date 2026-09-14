@@ -204,6 +204,11 @@ export async function POST(requete: Request) {
     const idsDeposes = new Set(tri.retenues.map((o) => o.id));
     for (const id of idsStockesVus(brutes, connues)) idsDeposes.add(id);
     const vues = apresAjout.filter((o) => idsDeposes.has(o.id));
+    // ⚠️ PAS DE FERMETURE D'OFFICE ICI, ET C'EST UN CHOIX. `lib/fermetureAuto.ts` tourne
+    // dans la passe QUOTIDIENNE (`lib/ingest/passe.ts`), qui voit le suivi entier tous les
+    // jours. Ce point d'entrée-ci reçoit un lot poussé par la Routine : il confirme ce que
+    // le lot contient, ce qui suffit à protéger une offre de la fermeture. L'y ajouter
+    // ferait décider deux fois la même chose, sur deux chemins qui finiraient par diverger.
     const balayage = appliquerBalayage(apresAjout, vues, journal, lot.jour);
 
     for (const id of balayage.perimees) {

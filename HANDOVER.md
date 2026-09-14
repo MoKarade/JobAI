@@ -6,6 +6,56 @@
 
 ---
 
+## Session 2026-09-14 (suite 2) — la vérification se fait toute seule
+
+Marc : « quasi toutes les offres sont à vérifier, mais je veux pas revérifier manuellement,
+je veux que tu le mettes en place ».
+
+**Mesuré d'abord** (`[MESURE-01]`, `resume_suivi` étendu, production 2026-09-14) :
+1 593 offres vivantes, dont **1 572 confirmées** par un balayage et **21 jamais vues**,
+toutes âgées de 30 à 90 jours. La plus ancienne « dernière vue » date de 4 jours : la veille
+tourne. Ce n'est donc pas « quasi toutes » — mais le chiffre n'existait nulle part, et c'est
+ça qu'il fallait réparer en premier.
+
+**`[FERMETURE-01]`** — `lib/fermetureAuto.ts` (PURE) ferme d'office, dans la passe
+quotidienne, les offres qu'aucun balayage ne peut confirmer. Le seuil d'âge se **MESURE** :
+`lib/dureeVie.ts` donne l'âge auquel la survie observée tombe sous 10 %, et c'est lui qui
+ferme. Écrire « 60 jours » aurait été une politique inventée, fausse au premier changement de
+rythme du marché. Quand la mesure ne conclut pas (trop peu de fermetures observées, courbe
+qui ne descend pas), **rien ne se ferme** — échec fermé.
+
+Trois gardes, chacune avec son MOTIF dans le rapport (« rien à fermer » et « je n'avais pas
+le droit de regarder » sont deux situations opposées) : la passe n'a rien vu · le journal ne
+couvre pas la majorité du suivi · la durée de vie n'est pas mesurable. Plus : on ne ferme
+jamais plus que ce que la passe vient de confirmer, les plus vieilles d'abord, et **jamais ce
+que Marc a travaillé** (statut changé, date d'envoi, note perso).
+
+⚠️ **Pas de garde sur `couvertureComplete`, volontairement** — c'est la garde que le voisin
+immédiat a et que celle-ci n'a pas, donc elle est justifiée par écrit dans le module. Elle
+répond à « la passe a-t-elle relancé tous les termes ? », ce qui est décisif pour une offre
+DÉJÀ VUE et ne dit rien d'une offre JAMAIS vue. La garder aurait eu l'air prudent et aurait
+surtout été inopérant : **aucun lot n'est déposé depuis le 2026-08-21**, donc la production
+tourne en couverture incomplète et la règle n'aurait jamais tiré. Un mécanisme livré vert,
+testé, et mort à l'arrivée — un test dédié couvre maintenant ce cas.
+
+**`[FERMETURE-02]`** — la pastille « à vérifier » SE TAIT quand le journal a perdu la majorité
+du suivi. Le journal est un seul JSON dans une ligne d'état : perdu ou écrit à moitié, il
+rendait toutes les offres « jamais revues » d'un coup, et l'écran affichait une accusation
+contre le suivi entier. Ça ne dit rien des offres, ça dit que le journal est en panne.
+
+⚠️ **Bug préexistant vu dans les journaux Vercel, NON corrigé** : le profil actif stocké en
+base ne passe plus son schéma Zod (`ponderation.conditions`, `pointsConditions`,
+`facteurHorsDomaine`, `termesParJour` manquants) — `/references` se replie sur le profil par
+défaut. Conséquence : **tout réglage que Marc a enregistré est ignoré**, y compris
+`termesParJour`. Au backlog (`[PROFIL-01]`).
+
+Gate complet vert. Nouveaux tests : `fermetureAuto` (17), plus deux tests qui TRAVERSENT la
+passe (le module pouvait être juste sans être appelé, et l'être sans jamais tirer). Neuf
+mutations jouées ; deux témoins d'intégration se sont révélés protégés par la borne plutôt
+que par la garde qu'ils prétendaient éprouver — corrigés en les rendant les plus vieux.
+
+---
+
 ## Session 2026-09-14 (suite) — cliquer pour avoir l'offre, et savoir ce qu'on regarde
 
 Marc : « les liens marchent pas forcément, je veux juste cliquer pour avoir l'offre, parce
