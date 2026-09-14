@@ -30,6 +30,7 @@ export interface Onglet {
 export const ONGLETS: readonly Onglet[] = [
   { href: "/", libelle: "Suivi", icone: "suivi", principal: true },
   { href: "/carte", libelle: "Carte", icone: "carte", principal: true },
+  { href: "/archives", libelle: "Archives", icone: "archives", principal: false },
   { href: "/references", libelle: "Références", icone: "references", principal: false },
   { href: "/profil", libelle: "Profil", icone: "profil", principal: false },
   { href: "/sources", libelle: "Sources", icone: "sources", principal: false },

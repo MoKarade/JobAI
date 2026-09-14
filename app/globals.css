@@ -3225,3 +3225,132 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   align-self: center;
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ARCHIVES — ce qui est fermé, et à quelle vitesse le marché se referme.
+
+   Deux blocs sur une page : les statistiques de durée de vie (l'agrégat qu'on
+   vient chercher) puis la liste des offres fermées (la preuve qu'on peut
+   vérifier). Même famille visuelle que le reste — surfaces, rayons et cibles
+   viennent des jetons, rien n'est réinventé ici.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.duree {
+  margin-bottom: var(--pas-3);
+}
+/* ⚠️ LE CHIFFRE PHARE EST GROS PARCE QU'IL EST LE SUJET, et sa note l'accompagne
+   TOUJOURS : il mesure la durée VISIBLE d'une offre, pas sa durée de vie. Un chiffre
+   de cette taille sans sa portée se recopie et devient un fait. */
+.duree__phare {
+  margin: var(--pas) 0 0.35rem;
+  font-size: var(--t-l);
+  line-height: 1.35;
+}
+.duree__phare-n {
+  font-family: var(--mono);
+  font-weight: 500;
+  color: var(--ambre-texte);
+  white-space: nowrap;
+}
+.duree__note {
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+.duree__bloc {
+  margin-top: var(--pas-2);
+  padding: 0.85rem 0.9rem;
+  background: var(--surface);
+  border: var(--trait-surface);
+  border-radius: var(--r-carte);
+}
+.duree__titre {
+  margin: 0 0 0.5rem;
+  font-size: var(--t-s);
+  font-weight: 700;
+}
+.duree__liste {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0 0 0.35rem;
+  padding: 0;
+}
+/* Trois colonnes : le nom prend ce qui reste, la médiane et l'effectif gardent leur
+   largeur. `minmax(0, 1fr)` sur la première — sans lui, un nom d'employeur à rallonge
+   pousse la ligne hors de l'écran, exactement le défilement latéral qu'on vient de
+   supprimer. */
+.duree__ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.duree__ligne:last-child { border-bottom: 0; }
+.duree__nom {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--t-s);
+}
+.duree__valeur {
+  font-family: var(--mono);
+  font-size: var(--t-s);
+  color: var(--text);
+  white-space: nowrap;
+}
+.duree__n {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.archives {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+}
+.archives__ligne {
+  padding: 0.7rem 0.9rem;
+  background: var(--surface);
+  border: var(--trait-surface);
+  border-radius: var(--r-champ);
+}
+/* La ligne entière ouvre la fiche : une archive se consulte, et elle s'y rouvre. */
+.archives__lien {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-height: var(--touche);
+  justify-content: center;
+  color: var(--text);
+  text-decoration: none;
+}
+.archives__lien:hover .archives__entreprise { text-decoration: underline; text-underline-offset: 3px; }
+.archives__lien:focus-visible { outline: 2px solid var(--ambre); outline-offset: 3px; border-radius: var(--r-champ); }
+.archives__entreprise { font-weight: 700; font-size: var(--t-s); }
+.archives__poste { font-size: var(--t-xs); color: var(--text-soft); }
+.archives__faits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin-top: 0.3rem;
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  color: var(--text-soft);
+}
+/* La durée est le sujet de cette page : elle prend l'encre, le reste recule. */
+.archives__duree { color: var(--text); }
+/* ⚠️ « Non mesurée » n'est pas « zéro » : une offre qu'aucun balayage n'a vue n'a pas de
+   durée, et lui en afficher une serait un chiffre fabriqué. */
+.archives__duree--absente { color: var(--text-soft); font-style: italic; }
+.archives__date { white-space: nowrap; }
+.archives__note { white-space: nowrap; }

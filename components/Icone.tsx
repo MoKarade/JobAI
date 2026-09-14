@@ -35,6 +35,8 @@ const NAVIGATION = {
   carte: ["M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z", "M12 10.5v.01"],
   // Trois points : le reste.
   plus: ["M6 12h.01", "M12 12h.01", "M18 12h.01"],
+  // Une boîte fermée : les offres qu'on a rangées.
+  archives: ["M3 7h18v4H3z", "M5 11v9h14v-9", "M10 15h4"],
   // Un livre ouvert : les références.
   references: ["M4 5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z", "M20 5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z"],
   // Une silhouette : le profil.
