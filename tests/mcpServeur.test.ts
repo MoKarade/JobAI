@@ -50,6 +50,7 @@ async function brancher(io: Partial<EntreesSorties> = {}) {
       enregistrees.push(o);
     },
     aujourdhui: () => "2026-08-19",
+    lireJournal: async () => ({}),
     diagnostiquerFlux: async () => ({
       fin: "flux-termine",
       verdicts: { "dans-la-region": 2 },

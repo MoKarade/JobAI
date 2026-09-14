@@ -21,6 +21,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Offre } from "../types";
+import type { SuiviVeille } from "../veille";
 import { FiltresSchema, chercherOffres, lireOffreVue, resumerPourMcp } from "./lecture.spec";
 import { EcritureSuiviSchema, preparerEcriture } from "./ecriture.spec";
 
@@ -41,6 +42,16 @@ export interface EntreesSorties {
    * du seul endroit où elle est censée exister.
    */
   diagnostiquerFlux: () => Promise<Record<string, unknown>>;
+  /**
+   * Le journal de veille : par offre, le jour où un balayage l'a vue pour la dernière fois.
+   *
+   * ⚠️ SON ABSENCE EST UNE INFORMATION, pas un vide. Une offre qui n'y figure pas n'a jamais
+   * été confirmée par un balayage depuis son repérage — et comme la péremption ne compte
+   * d'absences que pour ce qu'elle a déjà vu, ces offres-là ne peuvent pas se fermer seules.
+   * Rend `{}` plutôt que de lever : un journal illisible doit dégrader le résumé, jamais
+   * empêcher de lire le suivi.
+   */
+  lireJournal: () => Promise<Readonly<Record<string, SuiviVeille>>>;
 }
 
 /** Une réponse d'outil : du JSON, dans le seul format que le protocole transporte. */
@@ -108,14 +119,18 @@ export function creerServeur(io: EntreesSorties): McpServer {
       description:
         "L'état du suivi en chiffres : offres suivies, répartition par statut (les statuts " +
         "à zéro compris), périmées, non notées, non situées, meilleure note. Un zéro est " +
-        "une observation, pas une absence de donnée.",
+        "une observation, pas une absence de donnée. Le bloc `veille` distingue ce qu'un " +
+        "balayage a CONFIRMÉ de ce qu'il n'a JAMAIS vu : une offre jamais confirmée n'est " +
+        "pas une offre ouverte, c'est une offre dont on ne sait rien — et elle ne peut pas " +
+        "se périmer toute seule, d'où sa répartition par âge.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
     async () => {
       const offres = await io.lireOffres();
       if (offres === null) return panne(BASE_MUETTE);
-      return json(resumerPourMcp(offres));
+      const journal = await io.lireJournal();
+      return json(resumerPourMcp(offres, { journal, aujourdhui: io.aujourdhui() }));
     },
   );
 

@@ -23,6 +23,9 @@ import { offers } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { BUDGET_MS_MCP, diagnostiquerFlux } from "@/lib/ingest/diagnosticFlux";
 import { creerServeur } from "@/lib/mcp/serveur";
+import { lireEtat } from "@/lib/etat";
+import { CLE_JOURNAL } from "@/lib/veilleComplete";
+import type { JournalVeille } from "@/lib/veille";
 import { empreinte, estProprietaire } from "@/lib/mcp/oauth";
 import { origineDe } from "@/lib/mcp/origine";
 import { lireJetonValide } from "@/lib/oauthStore";
@@ -140,6 +143,14 @@ export async function POST(requete: Request): Promise<Response> {
     // budget plus long que le mur ne bornerait rien, et l'appel serait coupé par le dehors
     // sans rendre le `fin` qui dit si la lecture était complète.
     diagnostiquerFlux: () => diagnostiquerFlux(fetch, BUDGET_MS_MCP),
+    // ⚠️ DÉGRADE, NE LÈVE PAS. Le journal sert à NUANCER le résumé ; s'il est illisible, le
+    // suivi doit rester lisible — avec un bloc `veille` qui dit zéro confirmée, ce qui est
+    // vrai de ce qu'on sait, plutôt qu'une panne sur toute la lecture.
+    lireJournal: () =>
+      lireEtat<JournalVeille>(CLE_JOURNAL, {}).catch((err) => {
+        console.error("[mcp] journal de veille illisible", err);
+        return {} as JournalVeille;
+      }),
   });
 
   await serveur.connect(transport);

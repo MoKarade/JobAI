@@ -15,6 +15,8 @@
 import { z } from "zod";
 import { PrioriteSchema, StatutSchema, type Offre, type Statut } from "../types";
 import { vueOffre, type OffreVue } from "./vue";
+import { joursEntre } from "../dureeVie";
+import type { SuiviVeille } from "../veille";
 
 /**
  * Offres rendues au maximum par une recherche.
@@ -125,6 +127,39 @@ export interface ResumeMcp {
   nonSituees: number;
   /** La meilleure note du suivi courant, ou `null` si rien n'est noté. */
   meilleureNote: number | null;
+  /**
+   * Ce que la VEILLE a confirmé, et ce qu'elle n'a jamais vu.
+   *
+   * ⚠️ C'EST LA DISTINCTION QUE LE RESTE DU RÉSUMÉ NE PORTE PAS, et elle change la lecture
+   * de tous les autres chiffres. « 1 595 suivies » se lit très différemment selon que la
+   * veille les a vues hier ou que personne ne les a jamais revues depuis leur saisie : une
+   * offre qu'aucun balayage n'a confirmée n'est pas une offre ouverte, c'est une offre dont
+   * on ne sait rien. La péremption ne compte d'absences que pour ce qu'elle a déjà vu
+   * (`lib/veille.ts`), donc ces offres-là ne peuvent PAS se fermer toutes seules — leur
+   * compte est le seul moyen de savoir si le suivi dérive.
+   */
+  veille: EtatVeilleMcp;
+}
+
+/** Ce que la veille sait, ou ne sait pas, des offres vivantes. */
+export interface EtatVeilleMcp {
+  /** Offres vivantes qu'un balayage a déjà vues au moins une fois. */
+  confirmees: number;
+  /** Offres vivantes qu'AUCUN balayage n'a jamais vues : leur état est INCONNU. */
+  jamaisConfirmees: number;
+  /**
+   * Les jamais-confirmées par ÂGE depuis le repérage, en jours.
+   *
+   * Un compte seul ne dit pas s'il faut agir : 40 offres repérées cette semaine sont un
+   * intake normal, 40 offres repérées il y a six mois sont un suivi qui ment.
+   */
+  ageJamaisConfirmees: { moins7: number; de7a30: number; de30a90: number; plus90: number };
+  /**
+   * Parmi les offres que la veille SUIT, le plus grand nombre de jours depuis la dernière
+   * vue. `null` s'il n'y en a aucune. Un grand nombre ici veut dire que la veille tourne
+   * mais ne retrouve plus ce qu'elle suivait ; un `null` veut dire qu'elle ne suit rien.
+   */
+  plusVieilleVueJours: number | null;
 }
 
 /** Tous les statuts, dérivés du schéma — même raison que ci-dessus. */
@@ -137,7 +172,18 @@ const STATUTS: readonly Statut[] = StatutSchema.options;
  * sont deux situations opposées, et un objet qui n'aurait que les clés non vides forcerait le
  * modèle à deviner laquelle il regarde.
  */
-export function resumerPourMcp(offres: readonly Offre[]): ResumeMcp {
+export function resumerPourMcp(
+  offres: readonly Offre[],
+  /**
+   * Le journal de veille, et le jour courant pour dater les âges.
+   *
+   * Optionnel : un appelant qui ne peut pas le lire obtient un bloc `veille` à zéro plutôt
+   * qu'une panne. ⚠️ Et il obtient alors `confirmees: 0`, ce qui est VRAI de ce qu'il sait —
+   * l'inverse (supposer tout confirmé) présenterait un suivi dont on ignore l'état comme
+   * un suivi vérifié.
+   */
+  veille?: { journal: Readonly<Record<string, SuiviVeille>>; aujourdhui: string },
+): ResumeMcp {
   const vivantes = offres.filter((o) => o.perimeeLe === null && !o.histo);
   const parStatut = Object.fromEntries(STATUTS.map((s) => [s, 0])) as Record<Statut, number>;
   for (const o of vivantes) parStatut[o.statut] += 1;
@@ -151,5 +197,47 @@ export function resumerPourMcp(offres: readonly Offre[]): ResumeMcp {
     nonNotees: vivantes.filter((o) => o.score === null).length,
     nonSituees: vivantes.filter((o) => o.km === null).length,
     meilleureNote: notes.length === 0 ? null : Math.max(...notes),
+    veille: etatVeille(vivantes, veille),
+  };
+}
+
+/** La partie « veille » du résumé. PURE. */
+function etatVeille(
+  vivantes: readonly Offre[],
+  veille?: { journal: Readonly<Record<string, SuiviVeille>>; aujourdhui: string },
+): EtatVeilleMcp {
+  const vide: EtatVeilleMcp = {
+    confirmees: 0,
+    jamaisConfirmees: vivantes.length,
+    ageJamaisConfirmees: { moins7: 0, de7a30: 0, de30a90: 0, plus90: 0 },
+    plusVieilleVueJours: null,
+  };
+  if (!veille) return vide;
+
+  const age = { moins7: 0, de7a30: 0, de30a90: 0, plus90: 0 };
+  let confirmees = 0;
+  let plusVieille: number | null = null;
+
+  for (const o of vivantes) {
+    const suivi = veille.journal[o.id];
+    if (suivi) {
+      confirmees += 1;
+      const j = joursEntre(suivi.derniereVue, veille.aujourdhui);
+      if (Number.isFinite(j) && (plusVieille === null || j > plusVieille)) plusVieille = j;
+      continue;
+    }
+    const j = joursEntre(o.dateReperage, veille.aujourdhui);
+    if (!Number.isFinite(j)) continue;
+    if (j < 7) age.moins7 += 1;
+    else if (j < 30) age.de7a30 += 1;
+    else if (j < 90) age.de30a90 += 1;
+    else age.plus90 += 1;
+  }
+
+  return {
+    confirmees,
+    jamaisConfirmees: vivantes.length - confirmees,
+    ageJamaisConfirmees: age,
+    plusVieilleVueJours: plusVieille,
   };
 }

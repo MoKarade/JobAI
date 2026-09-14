@@ -191,6 +191,83 @@ describe("resumerPourMcp — un zéro se dit, il ne se tait pas", () => {
   });
 });
 
+describe("resumerPourMcp — ce que la veille a confirmé, et ce qu'elle n'a jamais vu", () => {
+  const JOUR = "2026-09-14";
+  const suivi = (derniereVue: string) => ({
+    premiereVue: derniereVue,
+    derniereVue,
+    absences: 0,
+  });
+
+  it("sans journal, ne prétend RIEN avoir confirmé", () => {
+    // ⚠️ Le sens du défaut compte : supposer tout confirmé présenterait un suivi dont on
+    // ignore l'état comme un suivi vérifié. Zéro est ce qu'on SAIT.
+    const r = resumerPourMcp([offre({ id: "a" }), offre({ id: "b" })]);
+    expect(r.veille.confirmees).toBe(0);
+    expect(r.veille.jamaisConfirmees).toBe(2);
+    expect(r.veille.plusVieilleVueJours).toBeNull();
+  });
+
+  it("sépare les confirmées des jamais vues", () => {
+    const r = resumerPourMcp(
+      [
+        offre({ id: "vue", dateReperage: "2026-01-01" }),
+        offre({ id: "jamais", dateReperage: "2026-01-01" }),
+      ],
+      { journal: { vue: suivi("2026-09-12") }, aujourdhui: JOUR },
+    );
+    expect(r.veille.confirmees).toBe(1);
+    expect(r.veille.jamaisConfirmees).toBe(1);
+    // L'offre CONFIRMÉE n'entre dans aucune tranche d'âge : son état est connu, la
+    // péremption s'en occupe. Sans cette séparation, le compte par âge mélangerait une
+    // offre vue avant-hier et une offre dont personne ne sait rien depuis neuf mois.
+    expect(r.veille.ageJamaisConfirmees.plus90).toBe(1);
+    expect(r.veille.plusVieilleVueJours).toBe(2);
+  });
+
+  it("répartit les jamais confirmées par âge, parce qu'un compte seul ne dit pas s'il faut agir", () => {
+    const r = resumerPourMcp(
+      [
+        offre({ id: "a", dateReperage: "2026-09-12" }),
+        offre({ id: "b", dateReperage: "2026-09-01" }),
+        offre({ id: "c", dateReperage: "2026-08-01" }),
+        offre({ id: "d", dateReperage: "2026-02-25" }),
+      ],
+      { journal: {}, aujourdhui: JOUR },
+    );
+    expect(r.veille.ageJamaisConfirmees).toEqual({
+      moins7: 1,
+      de7a30: 1,
+      de30a90: 1,
+      plus90: 1,
+    });
+  });
+
+  it("ne compte ni les périmées ni les historiques — elles ne sont pas « du suivi »", () => {
+    const r = resumerPourMcp(
+      [
+        offre({ id: "perimee", perimeeLe: "2026-08-01T00:00:00.000Z" }),
+        offre({ id: "histo", histo: true }),
+        offre({ id: "vivante", dateReperage: "2026-09-01" }),
+      ],
+      { journal: {}, aujourdhui: JOUR },
+    );
+    expect(r.veille.jamaisConfirmees).toBe(1);
+    expect(r.veille.ageJamaisConfirmees.de7a30).toBe(1);
+  });
+
+  it("ne fabrique pas d'âge sur une date illisible", () => {
+    // `joursEntre` rend NaN sur une date malformée : sans garde, elle tomberait dans
+    // « plus de 90 jours » (NaN échoue toutes les comparaisons) et gonflerait l'alarme.
+    const r = resumerPourMcp([offre({ id: "a", dateReperage: "pas-une-date" })], {
+      journal: {},
+      aujourdhui: JOUR,
+    });
+    expect(r.veille.jamaisConfirmees).toBe(1);
+    expect(r.veille.ageJamaisConfirmees).toEqual({ moins7: 0, de7a30: 0, de30a90: 0, plus90: 0 });
+  });
+});
+
 describe("lireOffreVue", () => {
   it("rend `null` sur un identifiant inconnu", () => {
     expect(lireOffreVue([offre()], "inexistante")).toBeNull();
