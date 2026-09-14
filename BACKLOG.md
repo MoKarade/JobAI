@@ -1406,6 +1406,31 @@ RESTE — à observer sur les prochaines passes (rien à coder) :
 
 ## Découvertes et dette (à trier)
 
+- ✅ **`[SEC-NEXT-RCE]` — RÉSOLU le 2026-09-14.** Cinq avis sur des dépendances de
+  **production**, dont une RCE **critique non authentifiée**. Trouvés en passant : le job
+  `audit` de CarAI a rougi sur une PR qui ne touchait aucune de ces dépendances, et la
+  vérification a montré le même jeu d'avis ici. Préexistant, établi avant d'agir.
+  - `next` ≤ 15.5.23 — **critique**, GHSA-2xp9-vwfh-vxw4 : exécution de code à distance
+    **non authentifiée** dans l'API d'optimisation d'images (fichiers AVIF).
+    ⚠️ Ce n'est pas théorique sur une app publique : `/_next/image` est joignable sans
+    session par construction. *(GHSA-p293-qw3h-jr36 ne vise que les serveurs Windows et ne
+    s'applique pas à Vercel — dit pour ne pas laisser croire que les deux pèsent pareil.)*
+  - `fast-uri` 3.0.0-3.1.5 — **haute** : deux SSRF (normalisation IPv6 malformée,
+    pourcent-décodage répété du nom d'hôte) et deux confusions d'hôte. JobAI part vers des
+    sources externes, c'est la plus inconfortable du lot.
+  - `sharp` < 0.35.4 — **haute**, GHSA-rgj7-g3m4-5g8c (libheif) : même chemin que l'avis
+    critique, c'est la dépendance de l'optimisation d'images.
+  - `hono` ≤ 4.13.4 (**modérée** ×3) et `qs` ≤ 6.15.3 (**modérée** ×2).
+
+  `npm audit fix` : **lockfile uniquement**, aucune contrainte de `package.json` touchée.
+  `npm audit --omit=dev` : 0 vulnérabilité. Gate rejoué entier après le bump.
+  ⚠️ Ça change ce qui est SERVI (Next lui-même) : vérifier le déploiement de production
+  après le merge, pas seulement la CI.
+  État de la constellation au 14/09 : Hubperso ✅, CarAI ✅, JobAI ✅ (celui-ci),
+  BatchChef déjà sain (`next ^15.5.25`), DriveAI sain (`app/` à 0, `api/` zéro-dépendance),
+  FinanceAI — un `hono` modéré seulement, pas de Next.
+
+
 - 🔧 **`[SCORE-SENIORITE-LETTRES]` — le barème ne lit pas les années écrites en toutes
   lettres.** `scoreSeniorite` cherche `(\d+)…ans d'expérience` : « Posséder **trois à cinq
   années** d'expérience » (offre Dracon, réelle) ne matche pas et retombe sur la valeur
