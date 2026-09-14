@@ -1642,3 +1642,36 @@ RESTE — à observer sur les prochaines passes (rien à coder) :
         boutons que les filtres (`.filtre`/`.filtre--actif`).
       Gate complet vert (81 fichiers, 1398 tests). Aucune modification de `lib/scoring.ts`
       ni de la logique de matching : protocole §11 non déclenché.
+
+---
+
+## Chantier — cliquer pour avoir l'offre, et savoir ce qu'on regarde ✅
+
+Demande de Marc, 2026-09-14 : « les liens marchent pas forcément, je veux juste cliquer pour
+avoir l'offre, parce que ça m'étonne certaines devraient être périmées ».
+
+- [x] 🔧 **`[LIEN-01]`** Classer ce qu'un lien d'offre ATTEINT (`lib/lienOffre.ts`, PURE) et
+      offrir un second chemin quand il ne mène pas à l'annonce. ✅ 2026-09-14.
+      **Mesuré** sur les 32 offres ouvertes notées 60 et plus : 14 vraies annonces
+      (`jobbank.gc.ca/jobsearch/jobposting/N`), 10 jetons `to.indeed.com`, 4 listes d'emplois
+      d'employeur, 4 pages d'accueil. Les 18 liens faibles sont EXACTEMENT les 18 offres du
+      jeu de départ présentes dans la liste ; les 14 ingérées portent toutes une annonce.
+      La règle retenue porte sur le DERNIER segment du chemin — un `includes` naïf aurait
+      classé « liste » les 14 liens qui marchent (`/jobsearch/` contient `jobs`), ce que la
+      mutation du test a montré.
+- [x] 🔧 **`[LIEN-02]`** Dire depuis quand personne n'a vu l'offre (`lib/fraicheur.ts`,
+      PURE). ✅ 2026-09-14. Les offres qui « devraient être périmées » sont les **38 offres
+      du jeu de départ**, jamais entrées dans le journal de veille : `appliquerBalayage` ne
+      compte d'absences que pour ce qu'il a vu lui-même, donc elles sont INPÉRIMABLES par
+      construction. Cette protection est juste et reste — ce qui manquait est l'aveu.
+      🧭 **Tranché sans feu vert, à signaler** : elles ne sont PAS archivées d'office sur leur
+      âge. Ce sont les mieux notées du suivi (88, 85, 84, 82, 80…) ; les retirer sur une
+      supposition ferait l'inverse de ce que Marc demande — il veut cliquer pour vérifier.
+      L'alternative écartée : un seuil d'âge qui périme automatiquement.
+- [ ] 🔧 **`[DUREE-03]`** `joursEntre` (`lib/dureeVie.ts`) rend **NaN**, pas 0, sur une date
+      malformée : son garde teste `undefined`, or `"pas-une-date".split("-").map(Number)`
+      rend trois `NaN`, qui ne sont pas `undefined`. Trouvé en écrivant
+      `tests/fraicheur.test.ts` (le libellé sortait avec « il y a NaN jours » dedans).
+      `lib/fraicheur.ts` se protège par `Number.isFinite`, mais `observer`/`survie` restent
+      exposés — en pratique ils ne lisent que des dates écrites par l'app. Bug PRÉEXISTANT,
+      non causé par ce lot, **non corrigé sans feu vert**.

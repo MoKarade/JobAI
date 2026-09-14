@@ -27,12 +27,14 @@ import {
 } from "@/lib/filtres";
 import { grouperParEntreprise } from "@/lib/groupesEntreprise";
 import { CarteEntreprise } from "./CarteEntreprise";
+import type { Fraicheur } from "@/lib/fraicheur";
 import { BoutonExport } from "./BoutonExport";
 import { CompteFiltre, Filtres } from "./Filtres";
 
 export function ListeOffres({
   offres,
   metiers = [],
+  fraicheurs = {},
 }: {
   offres: Offre[];
   /**
@@ -41,6 +43,14 @@ export function ListeOffres({
    * titre — honnête, jamais faux, simplement moins fine.
    */
   metiers?: readonly string[];
+  /**
+   * Ce que l'app peut encore affirmer sur la présence de chaque offre, par identifiant.
+   *
+   * Traversée telle quelle jusqu'à `CarteOffre` : elle vient du journal de veille, un état
+   * SERVEUR, et ces composants-ci sont clients. Défaut vide — un appelant qui ne la passe
+   * pas n'affiche simplement aucune pastille, jamais une pastille fausse.
+   */
+  fraicheurs?: Readonly<Record<string, Fraicheur>>;
 }) {
   const [filtres, setFiltres] = useState<EtatFiltres>(FILTRES_VIDES);
   const visibles = useMemo(() => filtrer(offres, filtres, metiers), [offres, filtres, metiers]);
@@ -87,7 +97,7 @@ export function ListeOffres({
       ) : (
         <div className="liste">
           {groupes.map((g) => (
-            <CarteEntreprise key={g.nom} groupe={g} />
+            <CarteEntreprise key={g.nom} groupe={g} fraicheurs={fraicheurs} />
           ))}
         </div>
       )}

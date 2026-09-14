@@ -6,6 +6,56 @@
 
 ---
 
+## Session 2026-09-14 (suite) — cliquer pour avoir l'offre, et savoir ce qu'on regarde
+
+Marc : « les liens marchent pas forcément, je veux juste cliquer pour avoir l'offre, parce
+que ça m'étonne certaines devraient être périmées ». Deux plaintes, **une seule cause** — le
+jeu de départ.
+
+**Ce que la mesure a montré** (2026-09-14, les 32 offres ouvertes notées 60 et plus) :
+14 liens mènent à une vraie annonce, 10 sont des jetons `to.indeed.com`, 4 des listes
+d'emplois d'employeur, 4 des pages d'accueil. Les **18 liens faibles sont exactement les 18
+offres du jeu de départ** de cette liste ; les 14 offres ingérées portent toutes une annonce.
+Et les offres « qui devraient être périmées » sont les **38 offres du jeu de départ**
+(2026-02-25 → 2026-07-30) : elles ne sont jamais entrées dans le journal de veille, et
+`appliquerBalayage` ne compte d'absences que pour ce qu'il a vu lui-même. Elles sont donc
+inpérimables **par construction**, et rien à l'écran ne le disait.
+
+**`[LIEN-01]`** — `lib/lienOffre.ts` (PURE) classe ce qu'un lien ATTEINT : `offre`, `liste`
+(accueil ou liste d'emplois), `redirection` (jeton d'agrégateur), `aucun`. Le libellé du lien
+dit la destination (« l'offre » / « le site » / « lien Indeed ») au lieu de promettre
+« offre ↗ » partout, et un **second chemin** — « chercher l'annonce ↗ », une recherche web
+sur employeur + poste — apparaît dès que le lien ne mène pas à l'annonce.
+La règle porte sur le **dernier segment** du chemin : la mutation en `includes` naïf classe
+« liste » les 14 liens qui marchent (`/jobsearch/` contient `jobs`). Genre et adresse
+viennent du MÊME appel (`lienDeOffre`) — deux règles séparées auraient fini par rendre
+cliquable un lien qu'on venait de déclarer inutilisable.
+
+**`[LIEN-02]`** — `lib/fraicheur.ts` (PURE) : une offre que la veille n'a jamais vue et dont
+le repérage date de plus que la patience de la veille elle-même
+(`JOURS_AVANT_DOUTE = SEUIL_ABSENCES_PEREMPTION`, dérivé, jamais choisi) porte une pastille
+**« à vérifier »** et, une fois dépliée, la phrase « repérée il y a N jours, jamais revue par
+un balayage ». Ambre et trait TIRETÉ, contre le rouge plein de « périmée » : on ne sait pas,
+ce n'est pas la même chose que savoir que c'est fermé (contraste mesuré 8,74:1 sur le fond
+des cartes, contre 5,76:1 pour « périmée »).
+
+🧭 **Tranché sans feu vert, à confirmer par Marc** : ces 38 offres ne sont **pas** archivées
+d'office sur leur âge. Ce sont les mieux notées du suivi ; les retirer sur une supposition
+ferait l'inverse de ce qui est demandé — Marc veut cliquer pour vérifier, et il a maintenant
+un lien qui le lui permet. L'alternative écartée : un seuil d'âge qui périme automatiquement.
+
+⚠️ **Bug préexistant trouvé en chemin, non corrigé** (`[DUREE-03]` au backlog) : `joursEntre`
+rend `NaN` et non `0` sur une date malformée. `lib/fraicheur.ts` s'en protège ; `observer` et
+`survie` restent exposés, sans conséquence connue (ils ne lisent que des dates écrites par
+l'app).
+
+Gate complet vert. Nouveaux tests : `lienOffre` (48), `fraicheur` (10), `liensOffreCables`
+(11, garde de câblage — le module pouvait être juste sans être appelé). Chaque garde prouvée
+par mutation. `lib/scoring.ts` et la logique de matching non touchés : protocole §11 non
+déclenché.
+
+---
+
 ## Session 2026-09-14 — durée de vie des offres, archives, couverture totale
 
 Trois demandes de Marc, tranchées par lui avant de coder : couvrir **tout le bassin** de

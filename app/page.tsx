@@ -10,6 +10,10 @@ import { auth } from "@/auth";
 import { after } from "next/server";
 import { lireOffres } from "@/lib/donnees";
 import { lireMetiers } from "@/lib/actionsMetiers";
+import { lireEtat } from "@/lib/etat";
+import { CLE_JOURNAL } from "@/lib/veilleComplete";
+import type { JournalVeille } from "@/lib/veille";
+import { fraicheursDuSuivi } from "@/lib/fraicheur";
 import { mesurerDistances } from "@/lib/actions";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "@/lib/synchro";
 import { db } from "@/lib/db";
@@ -53,9 +57,31 @@ export default async function Accueil() {
    * catégorie se déduit alors du seul titre, ce qui reste honnête.
    */
   let metiers: string[] = [];
+  /**
+   * Le journal de veille : par offre, le jour où un balayage l'a vue pour la dernière fois.
+   *
+   * ⚠️ LU ICI PARCE QUE SON ABSENCE EST UNE INFORMATION. Une offre qui n'y figure pas n'a
+   * jamais été confirmée par personne depuis son repérage — et mesuré le 2026-09-14, c'est
+   * le cas des 38 offres du jeu de départ, dont les mieux notées du suivi, certaines vieilles
+   * de plus de six mois et affichées comme ouvertes. Sans cette lecture, l'écran ne peut pas
+   * distinguer « vue hier » de « personne ne l'a revue depuis février ».
+   */
+  let journal: JournalVeille = {};
 
   try {
-    [offres, metiers] = await Promise.all([lireOffres(), lireMetiers()]);
+    [offres, metiers, journal] = await Promise.all([
+      lireOffres(),
+      lireMetiers(),
+      // ⚠️ SON ÉCHEC NE DOIT PAS EMPORTER L'ÉCRAN. Le journal sert à NUANCER un affichage,
+      // pas à le produire : si sa lecture échoue là où celle des offres réussit (table
+      // d'état absente d'une migration à moitié appliquée), le suivi doit s'afficher quand
+      // même, simplement sans pastille. Le mettre nu dans ce `Promise.all` transformerait
+      // un ajout de confort en panne de la page d'accueil.
+      lireEtat<JournalVeille>(CLE_JOURNAL, {}).catch((err) => {
+        console.error("[page] journal de veille illisible, pastilles omises", err);
+        return {} as JournalVeille;
+      }),
+    ]);
   } catch (err) {
     console.error("[page] lecture des offres impossible", err);
     // La classification vit dans `lib/panne.ts`, partagée avec la page Carte : écrite deux
@@ -162,6 +188,7 @@ export default async function Accueil() {
           const suivi = resumer(offres, jour);
           const relances = resumerRelances(offres, jour);
           const surveillance = aSurveiller(offres, jour);
+          const fraicheurs = fraicheursDuSuivi(offres, journal, jour);
 
           return (
             <>
@@ -192,7 +219,7 @@ export default async function Accueil() {
                 <FormulaireAjout />
               </Depliant>
 
-              <ListeOffres offres={offres} metiers={metiers} />
+              <ListeOffres offres={offres} metiers={metiers} fraicheurs={fraicheurs} />
             </>
           );
         })()

@@ -24,6 +24,8 @@ import type { Offre } from "@/lib/types";
 import { palier, PALIERS_DISTANCE_KM } from "@/lib/scoring";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
+import { lienDeOffre } from "@/lib/lienOffre";
+import { MOT_DOUTE, type Fraicheur } from "@/lib/fraicheur";
 import { Fait } from "./Icone";
 import { ControlesOffre } from "./ControlesOffre";
 
@@ -32,27 +34,28 @@ function formaterKm(km: number): string {
   return `${km.toString().replace(".", ",")} km`;
 }
 
-/**
- * Un lien n'est rendu cliquable que s'il est en http(s) — même règle que le hub.
- * Un `javascript:` ou un `data:` dans un champ de données ne doit jamais devenir un lien.
- */
-function lienSur(brut: string): string | null {
-  if (!brut) return null;
-  try {
-    const u = new URL(brut);
-    return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
-  } catch {
-    return null;
-  }
-}
-
-export function CarteOffre({ offre }: { offre: Offre }) {
+export function CarteOffre({
+  offre,
+  fraicheur,
+}: {
+  offre: Offre;
+  /**
+   * Ce que l'app peut encore affirmer sur la présence de cette offre, ou rien.
+   *
+   * Calculée côté SERVEUR (`fraicheursDuSuivi`) : elle dépend du journal de veille, un état
+   * que ce composant client n'a pas et qu'on n'ouvrira pas par une route pour un libellé.
+   * Absente = il n'y a rien à dire, et c'est le cas de la quasi-totalité du suivi.
+   */
+  fraicheur?: Fraicheur;
+}) {
   const [ouverte, setOuverte] = useState(false);
   const idDetail = useId();
 
   const p = palier(offre.score);
   const perimee = offre.perimeeLe !== null;
-  const href = lienSur(offre.lien);
+  // Le genre du lien ET son adresse viennent du MÊME appel : deux règles séparées auraient
+  // fini par afficher « le site » sur un lien refusé, ou l'inverse (`lib/lienOffre.ts`).
+  const lien = lienDeOffre(offre.lien, offre.entreprise, offre.poste);
   const trajet = lienTrajetGoogleMaps(offre.entreprise);
 
   return (
@@ -85,10 +88,16 @@ export function CarteOffre({ offre }: { offre: Offre }) {
       >
         <span className="carte__entreprise">{offre.entreprise}</span>
         <span className="carte__poste">{offre.poste}</span>
-        {/* UN signal, et un seul. « Périmée » l'emporte sur le salaire : savoir qu'une
-            offre est fermée change la décision plus que savoir ce qu'elle payait. */}
+        {/* UN signal, et un seul. L'ordre est celui de l'effet sur la décision : « périmée »
+            (on SAIT que c'est fermé) l'emporte sur « à vérifier » (on ne sait pas), qui
+            l'emporte sur le salaire — savoir si l'offre existe encore compte plus que savoir
+            ce qu'elle payait. */}
         {perimee ? (
           <span className="badge-perimee">périmée</span>
+        ) : fraicheur ? (
+          <span className="badge-doute" title={fraicheur.libelle}>
+            {MOT_DOUTE}
+          </span>
         ) : offre.salaireAffiche ? (
           <span className="carte__signal">{offre.salaireAffiche}</span>
         ) : null}
@@ -142,11 +151,24 @@ export function CarteOffre({ offre }: { offre: Offre }) {
           </span>
         </p>
 
+        {/* La pastille ne tient qu'un mot ; la phrase dit POURQUOI, avec son âge. Elle vit
+            dans le bloc déplié, à côté du lien de recherche qui permet de trancher. */}
+        {fraicheur ? <p className="carte__doute">{fraicheur.libelle}</p> : null}
+
         <p className="carte__liens">
           <Link href={`/offre/${offre.id}`}>fiche complète</Link>
-          {href ? (
-            <a href={href} target="_blank" rel="noopener noreferrer">
-              offre ↗
+          {lien.href ? (
+            <a href={lien.href} target="_blank" rel="noopener noreferrer">
+              {lien.libelle} ↗
+            </a>
+          ) : null}
+          {/* ⚠️ LE SECOND CHEMIN. Mesuré le 2026-09-14 : 18 des 32 offres ouvertes les mieux
+              notées portent un lien qui ne peut pas mener à l'annonce (page d'accueil, liste
+              d'emplois, jeton Indeed d'avril). Marc a demandé « juste cliquer pour avoir
+              l'offre » — un lien qui marche une fois sur deux ne répond pas à ça. */}
+          {lien.recherche ? (
+            <a href={lien.recherche} target="_blank" rel="noopener noreferrer">
+              chercher l’annonce ↗
             </a>
           ) : null}
           {/* Le trajet s'ouvre DANS Google Maps, où Marc est connecté : sa maison, ses

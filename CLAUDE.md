@@ -1559,6 +1559,40 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   qui dit si la lecture était complète. Un budget se dérive du mur de l'appelant, jamais
   d'une constante partagée entre appelants qui n'ont pas le même.
 
+- **Une garde qui EXCLUT une population d'un mécanisme la prive aussi de ce que ce mécanisme
+  DISAIT.** La veille ne périme que ce qu'elle a vu elle-même — règle juste, écrite pour
+  qu'un silence de requête ne détruise pas le travail saisi à la main. Mais la péremption
+  était le SEUL poste qui disait quoi que ce soit sur la présence d'une offre : exclues du
+  mécanisme, les 38 offres du jeu de départ étaient affichées comme ouvertes depuis février,
+  indiscernables d'une offre confirmée la veille — six mois sans que rien ne cloche nulle
+  part. Le correctif n'est pas de retirer la garde (elle protège toujours) : c'est de
+  demander, pour chaque exclusion, **ce que le mécanisme AFFIRMAIT en passant** et de le dire
+  autrement. Réflexe : devant un `continue`/`if (!connu)` qui saute une population, lister ce
+  que la suite de la fonction PRODUIT, et pas seulement ce qu'elle MODIFIE.
+  ⚠️ Corollaire de conduite, du même lot : Marc a demandé que « certaines soient périmées ».
+  Mesuré, ces offres-là étaient ses MIEUX NOTÉES (88, 85, 84, 82, 80). Exécuter la demande à
+  la lettre aurait archivé ses meilleures pistes sur une supposition. Quand une demande
+  d'AUTOMATISATION porte sur des données qu'on n'a pas encore regardées, mesurer d'abord QUI
+  elle emporterait — et si la réponse surprend, livrer l'information plutôt que la suppression.
+
+- **Deux plaintes d'un même message peuvent n'avoir qu'UNE cause, et seule la mesure le
+  montre.** « Les liens marchent pas » et « certaines devraient être périmées » avaient l'air
+  de deux chantiers : un de liens, un de veille. Relevé sur les 32 offres ouvertes les mieux
+  notées, les 18 liens faibles sont EXACTEMENT les 18 offres du jeu de départ de cette liste,
+  et les offres inpérimables sont ce même jeu de départ. Traiter les deux séparément aurait
+  produit deux correctifs partiels au lieu d'une explication. Avant de découper un message en
+  tâches, croiser les populations : si les deux symptômes frappent les mêmes lignes, c'est un
+  seul défaut.
+
+- **Un mot-clé cherché N'IMPORTE OÙ dans une URL classe mal exactement ce qui marche.**
+  Reconnaître une page de liste d'emplois par `chemin.includes("jobs")` range en « liste »
+  `jobbank.gc.ca/jobsearch/jobposting/49850218` — les 14 seuls liens du suivi qui mènent
+  vraiment à une annonce, soit le contraire exact du but. La règle juste porte sur le DERNIER
+  SEGMENT (`/jobs` est une liste, `/jobs/1234-coordonnateur` est une annonce). Et c'est la
+  MUTATION qui l'a montrée, pas la relecture : le test écrit sur les URL réelles de la
+  production a viré 14 fois au rouge d'un coup. Un classement d'URL se prouve sur les adresses
+  QU'ON A, jamais sur des exemples plausibles.
+
 ## 10. Style et compte-rendu
 
 > 📣 Forme des comptes-rendus, des commits, des PR et des docs générées :

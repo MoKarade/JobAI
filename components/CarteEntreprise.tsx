@@ -18,8 +18,16 @@ import { palier } from "@/lib/scoring";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { Fait } from "./Icone";
 import { CarteOffre } from "./CarteOffre";
+import type { Fraicheur } from "@/lib/fraicheur";
 
-export function CarteEntreprise({ groupe }: { groupe: GroupeEntreprise }) {
+export function CarteEntreprise({
+  groupe,
+  fraicheurs = {},
+}: {
+  groupe: GroupeEntreprise;
+  /** Par identifiant d'offre, et seulement pour celles qui ont quelque chose à dire. */
+  fraicheurs?: Readonly<Record<string, Fraicheur>>;
+}) {
   const [ouverte, setOuverte] = useState(false);
   const idDetail = useId();
   const p = palier(groupe.noteMoyenne);
@@ -72,7 +80,7 @@ export function CarteEntreprise({ groupe }: { groupe: GroupeEntreprise }) {
       <div id={idDetail} className="carte__detail" hidden={!ouverte}>
         <div className="liste liste--groupee">
           {groupe.offres.map((o) => (
-            <CarteOffre key={o.id} offre={o} />
+            <CarteOffre key={o.id} offre={o} fraicheur={fraicheurs[o.id]} />
           ))}
         </div>
       </div>

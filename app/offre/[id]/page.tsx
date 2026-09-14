@@ -14,20 +14,15 @@ import { lireOffre } from "@/lib/donnees";
 import { palier } from "@/lib/scoring";
 import { ControlesOffre } from "@/components/ControlesOffre";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
+import { lienDeOffre } from "@/lib/lienOffre";
+import { fraicheurOffre } from "@/lib/fraicheur";
+import { aujourdhui } from "@/lib/ajout";
+import { lireEtat } from "@/lib/etat";
+import { CLE_JOURNAL } from "@/lib/veilleComplete";
+import type { JournalVeille } from "@/lib/veille";
 import { Cadre } from "@/components/Cadre";
 
 export const dynamic = "force-dynamic";
-
-/** Un lien n'est rendu cliquable qu'en http(s) — même règle que le hub et la carte. */
-function lienSur(brut: string): string | null {
-  if (!brut) return null;
-  try {
-    const u = new URL(brut);
-    return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -68,8 +63,15 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
   if (!offre) notFound();
 
   const p = palier(offre.score);
-  const href = lienSur(offre.lien);
+  // Genre et adresse du MÊME appel — voir `lib/lienOffre.ts` : deux règles séparées
+  // finiraient par se contredire à l'écran.
+  const lien = lienDeOffre(offre.lien, offre.entreprise, offre.poste);
   const trajet = lienTrajetGoogleMaps(offre.entreprise);
+  // Le journal de veille dit si un balayage a déjà CONFIRMÉ cette offre. Son absence n'est
+  // pas un vide : c'est l'aveu que personne ne l'a revue depuis son repérage. Lu après
+  // l'offre — une panne de lecture d'état ne doit pas emporter la fiche, d'où le repli.
+  const journal = await lireEtat<JournalVeille>(CLE_JOURNAL, {}).catch(() => ({}) as JournalVeille);
+  const fraicheur = fraicheurOffre(offre, journal[offre.id], aujourdhui(new Date()));
   const atouts = offre.raisons.filter((r) => r.ton === "atout");
   const reserves = offre.raisons.filter((r) => r.ton === "reserve");
 
@@ -88,9 +90,19 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
           <div>
             <h1>{offre.entreprise}</h1>
             <p className="detail__poste">{offre.poste}</p>
-            {href ? (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="detail__lien">
-                Ouvrir l’offre ↗
+            {/* Le libellé dit la DESTINATION : « l'offre » quand le lien mène à l'annonce,
+                « le site » quand il mène à une page d'accueil ou à une liste d'emplois,
+                « lien Indeed » pour un jeton de redirection qui peut ne plus rien ouvrir.
+                Mesuré le 2026-09-14 : 18 des 32 offres ouvertes les mieux notées sont dans
+                l'un de ces deux derniers cas. */}
+            {lien.href ? (
+              <a
+                href={lien.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="detail__lien"
+              >
+                Ouvrir {lien.libelle} ↗
               </a>
             ) : (
               <p className="detail__sans-lien">Aucun lien enregistré pour cette offre.</p>
@@ -108,6 +120,19 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
                 Trajet dans Google Maps ↗
               </a>
             ) : null}
+            {/* Le second chemin, toujours là quand le premier ne mène pas à l'annonce :
+                Marc a demandé « juste cliquer pour avoir l'offre ». */}
+            {lien.recherche ? (
+              <a
+                href={lien.recherche}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="detail__lien detail__lien--recherche"
+              >
+                Chercher l’annonce sur le web ↗
+              </a>
+            ) : null}
+            {fraicheur ? <p className="detail__doute">{fraicheur.libelle}</p> : null}
           </div>
         </header>
 

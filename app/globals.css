@@ -2030,6 +2030,16 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 /* Deux liens côte à côte : l'annonce et le trajet. L'espacement les distingue, la couleur
    ambre marque le trajet — accompagnée du libellé, jamais seule (WCAG 1.4.1). */
 .detail__lien--trajet { margin-left: 1rem; color: var(--ambre-texte); }
+/* Le second chemin vers l'annonce, quand le lien enregistré n'y mène pas. Il passe à la
+   ligne plutôt que de s'aligner sur le trajet : ce n'est pas une destination de plus,
+   c'est un RECOURS, et l'empiler à côté ferait croire à trois liens équivalents. */
+.detail__lien--recherche { display: block; margin-left: 0; color: var(--ambre-texte); }
+/* Pourquoi on propose ce recours : l'âge du dernier constat. */
+.detail__doute {
+  margin-top: 0.5rem;
+  font-size: var(--t-xs);
+  color: var(--ambre-texte);
+}
 .detail__sans-lien {
   margin-top: 0.5rem;
   font-size: var(--t-xs);
@@ -2092,6 +2102,36 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   border-radius: var(--r-pill);
 }
 .bouton--reouvrir { border-color: var(--vert); color: var(--vert); }
+
+/* ── « À vérifier » : on ne sait plus si l'offre existe ───────────────────────
+   ⚠️ AMBRE, PAS ROUGE, ET LA DIFFÉRENCE EST UN FAIT, PAS UNE NUANCE DE GOÛT.
+   Le rouge de `.badge-perimee` dit « c'est fermé, on l'a constaté ». Celui-ci dit
+   « personne n'a revu cette offre depuis son repérage » — un DOUTE, pas un verdict.
+   Les peindre pareil ferait passer 38 offres, dont les mieux notées du suivi, pour
+   des offres mortes alors que rien ne le prouve (garde-fou n°3, dans les deux sens :
+   on n'affirme pas qu'elle est ouverte, on n'affirme pas non plus qu'elle est morte).
+   Le mot est écrit dedans : la couleur ne porte jamais l'information seule. */
+.badge-doute {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.6rem;
+  color: var(--ambre-texte);
+  background: transparent;
+  border: 1px dashed currentColor;
+  border-radius: var(--r-pill);
+}
+/* Le trait TIRETÉ n'est pas décoratif : c'est le second canal, pour qui ne distingue
+   pas l'ambre du rouge. Plein = constaté, tireté = à confirmer. */
+.carte__tete > .badge-doute { align-self: flex-start; margin-top: 0.3rem; }
+/* La phrase complète, dans le bloc déplié, au-dessus des liens qui permettent d'aller
+   vérifier. Elle porte l'âge — la pastille ne tient qu'un mot. */
+.carte__doute {
+  margin: 0.5rem 0 0;
+  font-size: var(--t-xs);
+  color: var(--ambre-texte);
+}
 
 /* L'adresse d'une entreprise : l'information qu'on vient chercher pour se déplacer. Plus
    lisible que les faits secondaires, sans crier — c'est du texte utile, pas un titre. */

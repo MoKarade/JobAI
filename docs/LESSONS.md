@@ -239,3 +239,45 @@ prouve rien » : le vide non plus.
 
 **Verrou** : aucun (règle de méthode). Le paramètre est retiré, avec la raison écrite à
 côté pour que personne ne le remette.
+
+---
+
+## 2026-09-14 — Une garde qui exclut une population la prive aussi de ce qu'on disait d'elle
+
+**Le symptôme, en deux plaintes** : « les liens marchent pas forcément, je veux juste
+cliquer pour avoir l'offre » et « ça m'étonne, certaines devraient être périmées ».
+
+**La mesure** (les 32 offres ouvertes notées 60 et plus, relevées par le MCP) : 14 liens
+mènent à une vraie annonce, 10 sont des jetons `to.indeed.com`, 4 des listes d'emplois
+d'employeur, 4 des pages d'accueil. Les 18 liens faibles sont EXACTEMENT les 18 offres du
+jeu de départ présentes dans cette liste. Et les offres réputées ouvertes depuis des mois
+sont ce même jeu de départ — 38 entrées saisies à la main entre février et juillet.
+
+**La cause** : `appliquerBalayage` ne compte d'absences que pour les offres déjà présentes
+dans le journal de veille. C'est une garde JUSTE — l'absence d'une offre saisie à la main
+dans une requête Indeed ne prouve rien, et périmer sur ce silence détruirait le travail le
+plus fiable du jeu. Mais la péremption était le SEUL poste de l'app qui disait quelque chose
+sur la présence d'une offre. Exclues du mécanisme, ces 38 offres n'étaient pas « protégées » :
+elles étaient MUETTES, affichées exactement comme une offre confirmée la veille.
+
+**Règle durable** : devant une garde qui saute une population, ne pas se demander seulement
+ce que le mécanisme lui aurait FAIT, mais ce qu'il AFFIRMAIT en passant. Une exclusion retire
+l'action ET l'information ; il faut rendre la seconde autrement.
+
+**Ce qui a été livré, et ce qui a été refusé** : la pastille « à vérifier » plus la phrase
+« repérée il y a N jours, jamais revue par un balayage », dont le seuil est DÉRIVÉ de la
+patience de la veille (`SEUIL_ABSENCES_PEREMPTION`) et non choisi. Pas d'archivage
+automatique sur l'âge : mesuré, ces offres sont les mieux notées du suivi (88, 85, 84, 82,
+80…), et exécuter la demande à la lettre aurait emporté les meilleures pistes de Marc sur une
+supposition. Quand une demande d'automatisation porte sur des données qu'on n'a pas encore
+regardées, mesurer d'abord QUI elle emporterait.
+
+**Le piège technique du même lot** : reconnaître une page de liste par
+`chemin.includes("jobs")` classe `jobbank.gc.ca/jobsearch/jobposting/N` en « liste » — les 14
+seuls liens qui marchent. La règle porte sur le DERNIER segment. Montré par MUTATION, pas par
+relecture : le test écrit sur les URL réelles est passé au rouge 14 fois d'un coup.
+
+**Verrous** : `tests/lienOffre.test.ts` (le relevé de production, 32 entrées, avec son
+compte), `tests/fraicheur.test.ts` (seuil dérivé de la constante, silence sur les offres que
+la veille suit), `tests/liensOffreCables.test.ts` (les écrans APPELLENT la règle — le module
+pouvait être juste sans être branché, et rien entre les deux gardes existantes ne le voyait).
