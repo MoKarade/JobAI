@@ -36,6 +36,9 @@ describe("une offre vue par le balayage", () => {
       premiereVue: "2026-07-30",
       derniereVue: "2026-07-30",
       absences: 0,
+      // Les DEUX compteurs d'absences repartent de zéro sur une offre vue — l'ordinaire et
+      // celui qui ne compte que les absences constatées sous couverture complète.
+      absencesCompletes: 0,
     });
   });
 
@@ -265,5 +268,86 @@ describe("relancer la veille dans la même journée", () => {
     const revue = appliquerBalayage([o], [o], absent, jour).journal;
     expect(revue["x"]!.absences).toBe(0);
     expect(revue["x"]!.derniereAbsence).toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LE SEUIL BAS, ET CE QUI LE REND SÛR (demande de Marc, 2026-09-14 : « je veux que ça
+// recheck toutes les offres à chaque passe »).
+//
+// Deux seuils coexistent : cinq absences quelle que soit la couverture, deux absences
+// CONSTATÉES PAR DES PASSES QUI ONT TOUT BALAYÉ. Le second est ce que la demande achète —
+// une fermeture datée trois jours plus tôt, donc une durée de vie mesurée plus juste.
+//
+// ⚠️ ET C'EST LE CAS PARTIEL QU'IL FAUT PROTÉGER, pas le cas nominal. Le quota Indeed se
+// referme en s'aggravant : une passe PEUT s'arrêter au milieu du bassin. Si ses absences
+// comptaient au seuil bas, deux journées d'infrastructure difficile périmeraient tout un pan
+// du suivi — exactement le faux positif que le seuil existe pour empêcher.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("la couverture décide du seuil de péremption", () => {
+  const o = offre({ id: "x" });
+  const vu: JournalVeille = {
+    x: { premiereVue: "2026-07-01", derniereVue: "2026-07-20", absences: 0, absencesCompletes: 0 },
+  };
+
+  it("deux absences sous couverture COMPLÈTE suffisent", () => {
+    const j1 = appliquerBalayage([o], [], vu, "2026-07-21", true);
+    expect(j1.perimees).toEqual([]);
+    const j2 = appliquerBalayage(j1.offres, [], j1.journal, "2026-07-22", true);
+    expect(j2.perimees).toEqual(["x"]);
+    expect(j2.journal["x"]!.absencesCompletes).toBe(2);
+  });
+
+  it("les mêmes deux absences sous couverture PARTIELLE ne périment rien", () => {
+    // Le test qui compte : mêmes jours, mêmes absences, SEULE la couverture change.
+    let r = appliquerBalayage([o], [], vu, "2026-07-21", false);
+    r = appliquerBalayage(r.offres, [], r.journal, "2026-07-22", false);
+    expect(r.perimees).toEqual([]);
+    expect(r.journal["x"]!.absences).toBe(2);
+    expect(r.journal["x"]!.absencesCompletes).toBe(0);
+  });
+
+  it("une passe qui ne dit rien de sa couverture tombe sous l'ancien seuil", () => {
+    // Échec fermé : le paramètre omis vaut `false`. Un lot déposé par un outil qui ne connaît
+    // pas encore le champ ne doit pas faire passer tout le suivi au seuil bas.
+    let r = appliquerBalayage([o], [], vu, "2026-07-21");
+    r = appliquerBalayage(r.offres, [], r.journal, "2026-07-22");
+    expect(r.perimees).toEqual([]);
+  });
+
+  it("les absences partielles ne s'additionnent pas aux complètes pour atteindre le seuil bas", () => {
+    // Une absence prouvée + une absence douteuse ne font pas deux absences prouvées. Sans
+    // compteur séparé, elles se confondraient et une seule journée d'infrastructure
+    // difficile suffirait à périmer.
+    let r = appliquerBalayage([o], [], vu, "2026-07-21", true);
+    r = appliquerBalayage(r.offres, [], r.journal, "2026-07-22", false);
+    expect(r.perimees).toEqual([]);
+    expect(r.journal["x"]!.absences).toBe(2);
+    expect(r.journal["x"]!.absencesCompletes).toBe(1);
+  });
+
+  it("l'ancien seuil reste le filet quand la couverture n'est jamais prouvée", () => {
+    let r = { offres: [o] as Offre[], journal: vu } as ReturnType<typeof appliquerBalayage>;
+    for (let i = 0; i < SEUIL_ABSENCES_PEREMPTION; i++) {
+      r = appliquerBalayage(r.offres, [], r.journal, `2026-07-${21 + i}`, false);
+    }
+    expect(r.perimees).toEqual(["x"]);
+  });
+
+  it("revoir l'offre remet les DEUX compteurs à zéro", () => {
+    const absente = appliquerBalayage([o], [], vu, "2026-07-21", true).journal;
+    expect(absente["x"]!.absencesCompletes).toBe(1);
+    const revue = appliquerBalayage([o], [o], absente, "2026-07-22", true).journal;
+    expect(revue["x"]!.absences).toBe(0);
+    expect(revue["x"]!.absencesCompletes).toBe(0);
+  });
+
+  it("deux passes complètes le MÊME jour ne comptent qu'une absence prouvée", () => {
+    // L'idempotence dans la journée vaut pour le nouveau compteur comme pour l'ancien :
+    // relancer la veille ne doit jamais vieillir le stock.
+    let r = appliquerBalayage([o], [], vu, "2026-07-21", true);
+    r = appliquerBalayage(r.offres, [], r.journal, "2026-07-21", true);
+    expect(r.journal["x"]!.absencesCompletes).toBe(1);
+    expect(r.perimees).toEqual([]);
   });
 });

@@ -26,7 +26,7 @@
 
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { LotDeposeSchema, type LotDepose } from "./depotSchema";
+import { LotDeposeSchema, couvertureComplete, type LotDepose } from "./depotSchema";
 import { ID_SOURCE_DEPOT } from "./types";
 import type { OffreBrute, ResultatSource, Source } from "./types";
 
@@ -172,6 +172,12 @@ export function sourceDepotFichier(aujourdhui: string, racine = process.cwd()): 
 
       const offres: OffreBrute[] = [];
       const illisibles: string[] = [];
+      // ⚠️ LA COUVERTURE SE LIT SUR LE LOT DU JOUR, PAS SUR LA FENÊTRE. Le dépôt relit sept
+      // jours de lots : ceux d'hier et d'avant-hier décrivent des observations passées, et
+      // leur couverture ne dit rien de ce que la passe D'AUJOURD'HUI a vu. Sans lot du jour
+      // — personne n'a déposé —, aucune couverture n'est prouvée, donc `false` : la source
+      // rend du vieux, et une absence n'y prouve rien.
+      let couvertureDuJour = false;
       for (const nom of fichiersDansLaFenetre(noms, aujourdhui)) {
         try {
           const lot = lireDepot(await readFile(resolve(dossier, nom), "utf8"));
@@ -179,6 +185,7 @@ export function sourceDepotFichier(aujourdhui: string, racine = process.cwd()): 
             illisibles.push(nom);
             continue;
           }
+          if (lot.jour === aujourdhui) couvertureDuJour = couvertureComplete(lot.couverture);
           offres.push(...brutesDuDepot(lot));
         } catch {
           illisibles.push(nom);
@@ -192,7 +199,13 @@ export function sourceDepotFichier(aujourdhui: string, racine = process.cwd()): 
           erreur: `fichier(s) illisible(s) : ${illisibles.join(", ")}`,
         };
       }
-      return { ok: true, source: ID_SOURCE_DEPOT, offres, dernierJour: dernierJourDepose(noms, aujourdhui) ?? undefined };
+      return {
+        ok: true,
+        source: ID_SOURCE_DEPOT,
+        offres,
+        dernierJour: dernierJourDepose(noms, aujourdhui) ?? undefined,
+        couvertureComplete: couvertureDuJour,
+      };
     },
   };
 }

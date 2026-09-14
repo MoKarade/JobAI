@@ -302,6 +302,13 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
           // La date de construction du flux : c'est CE que la source peut offrir de plus
           // frais. Sans elle, un flux figé depuis trois jours se lirait comme un marché calme.
           ...(rapport.construitLe !== null ? { dernierJour: rapport.construitLe } : {}),
+          // ⚠️ LA COUVERTURE EST CELLE DE LA LECTURE, ET ELLE SE LIT DANS `fin`. Le flux est
+          // borné (plafond de retenues, budget de temps, mémoire) : une lecture qui s'arrête
+          // à 42 % a vu 42 % des offres, donc les autres sont ABSENTES sans être fermées.
+          // Toute fin autre que « flux terminé » est un préfixe, et un préfixe ne prouve
+          // rien — c'est la même règle que pour les comptes de cette passe, qui ne se lisent
+          // qu'une fois le motif d'arrêt connu.
+          couvertureComplete: rapport.fin === "flux-termine",
           note: resumerBilanFlux(dernierBilan),
         };
       } catch (err) {

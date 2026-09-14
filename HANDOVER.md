@@ -6,6 +6,40 @@
 
 ---
 
+## Session 2026-09-14 — durée de vie des offres, archives, couverture totale
+
+Trois demandes de Marc, tranchées par lui avant de coder : couvrir **tout le bassin** de
+termes à chaque passe (plutôt qu'ouvrir le lien de chaque offre, qui serait du scraping),
+un **vrai écran Archives**, et une historique orientée « le marché bouge à quelle vitesse ? ».
+
+**`[DUREE-01]`** — la donnée était déjà collectée (le journal de veille garde par offre la
+première et la dernière vue) ; ce qui manquait, c'est ce qu'on en tire. Le piège est la
+CENSURE : une partie des offres est encore ouverte, donc leur durée n'est pas finie. Jeter
+ces offres biaise la médiane vers le bas (les longues sont justement celles qui durent),
+les traiter comme fermées la biaise dans l'autre sens. C'est **Kaplan-Meier** qui répond, et
+le test central est construit pour discriminer : sur le même jeu, les deux naïves donnent 10
+jours, l'estimateur juste en donne 15.
+
+Écran `/archives` : la vitesse du marché (médiane globale, par type de poste, par employeur,
+effectif à côté de chaque chiffre) puis les offres fermées avec leur durée observée.
+
+**`[DUREE-02]`** — la rotation des termes est supprimée : `termesParJour` passe de 18 au
+bassin entier (48). Une offre absente d'un lot l'est désormais de la requête qui la
+trouvait, donc son absence veut dire quelque chose.
+
+⚠️ **Et c'est le cas PARTIEL qui a demandé le vrai travail.** Le quota Indeed se referme en
+s'aggravant, donc une passe peut légitimement s'arrêter au milieu du bassin. Baisser
+simplement le seuil aurait périmé en deux jours tout un pan du suivi sur un empêchement
+d'infrastructure. Le lot porte donc sa propre couverture (`couverture: {demandes, balayes}`,
+additif et optionnel), chaque source dit si elle a tout balayé, et le seuil bas (2 jours au
+lieu de 5) ne s'applique QU'AUX absences constatées sous couverture prouvée — via un
+compteur séparé dans le journal. Échec fermé partout : pas de preuve ⇒ ancien seuil.
+
+**À surveiller** : 48 termes par passe au lieu de 18, c'est 2,7× plus d'appels Indeed sur un
+quota partagé. Si les rapports montrent des couvertures systématiquement incomplètes, c'est
+`termesParJour` qu'on redescend — et le seuil bas cessera de s'appliquer tout seul, sans
+rien périmer à tort entre-temps. Le rapport de passe le DIT (« couverture incomplète »).
+
 ## Session 2026-09-13 — refonte téléphone `[MOBILE-01]`
 
 Marc : « pas adapté pour téléphone, refonte de l'interface totale, moins de texte,

@@ -226,12 +226,25 @@ Fichier `data/depot/<JOUR>.json` — le nom DOIT être la même date que le cham
 {
   "source": "routine-indeed",
   "jour": "<JOUR>",
+  "couverture": { "demandes": 48, "balayes": 48 },
   "offres": [
     { "titre": "…", "entreprise": "…", "ville": "Québec", "lien": "https://…",
       "adresse": "", "adresseSource": null, "adresseUrl": null,
       "description": "", "publieeLe": "AAAA-MM-JJ" }
   ]
 }
+
+⚠️ `couverture` DIT CE QUE TU AS RÉELLEMENT BALAYÉ, et c'est le champ le plus important du
+lot après les offres elles-mêmes. `demandes` = le nombre de termes du bassin (tous, depuis le
+2026-09-14) ; `balayes` = ceux que tu as VRAIMENT interrogés avant de t'arrêter. Les deux
+égaux ⇒ l'app sait qu'une offre absente du lot est absente de la requête qui la trouvait,
+donc elle la périme après DEUX jours de silence au lieu de cinq. Inégaux ⇒ elle revient à
+cinq, toute seule, sans rien périmer à tort.
+⚠️ N'ÉCRIS JAMAIS `balayes` ÉGAL À `demandes` « pour faire propre ». Le quota Indeed se
+referme en s'aggravant et le protocole t'ordonne de t'arrêter après trois refus : une passe
+tronquée est NORMALE. La déclarer complète ferait périmer en deux jours des offres que tu
+n'as simplement pas eu le temps de chercher — un mensonge dont personne ne verrait la cause.
+Dans le doute, écris ce que tu as compté.
 
 ⚠️ `ville` SEULE, sans province. Indeed rend « Quebec City, QC » → écris « Québec ».
 « Saint-lambert-de-lauzon, QC » → « Saint-Lambert-de-Lauzon ». Une virgule dans `ville` fait
@@ -254,6 +267,7 @@ Puis, en un seul enchaînement :
 ═══ 5. RENDRE COMPTE ═══
 Cinq lignes, pas plus :
   offres trouvées / après dédoublonnage / écrites
+  termes balayés / termes demandés  (le champ `couverture` du lot)
   adresses : N annonce · N recherche · N aucune
   offres SANS AUCUNE tentative faute de quota Indeed épuisé : N
   gate : vert / rouge (et pourquoi)

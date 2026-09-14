@@ -98,6 +98,16 @@ export interface RapportPasse {
   /** Le suivi après la passe, prêt à écrire. */
   offres: Offre[];
   journal: JournalVeille;
+  /**
+   * Toutes les sources ont-elles répondu ET prouvé qu'elles avaient tout balayé ?
+   *
+   * ⚠️ EXPOSÉ PARCE QU'IL DÉCIDE DE QUELQUE CHOSE. Ce booléen choisit le seuil de péremption
+   * appliqué aux absences du jour — deux jours ou cinq. Calculé en interne et jamais rendu,
+   * il ferait exactement le défaut déjà payé sur `raffinage.precisees` : on ne pourrait pas
+   * distinguer « la couverture a tenu » de « une source s'est arrêtée à mi-parcours », et
+   * les deux produisent des passes qui ont l'air identiques dans le rapport.
+   */
+  couvertureComplete: boolean;
   resume: string;
   /**
    * Les adresses que les ANNONCES elles-mêmes ont données, par employeur.
@@ -333,9 +343,26 @@ export async function executerPasse(
   // sa source doit le DIRE, pas rendre un résultat vide ». Ici : aucune source en succès
   // ⇒ le journal ne bouge pas, et le résumé nomme la suspension.
   const aucuneSourceEnSucces = compte.every((c) => !c.ok);
+
+  // ⚠️ LA COUVERTURE DE LA PASSE EST CELLE DE SA SOURCE LA PLUS FAIBLE (demande de Marc,
+  // 2026-09-14 : « je veux que ça recheck toutes les offres à chaque passe »). Elle décide si
+  // une absence vaut le seuil BAS de péremption — deux jours au lieu de cinq — et c'est
+  // pourquoi le critère est strict sur les deux plans :
+  //
+  //   · TOUTES les sources interrogées doivent avoir répondu. Une source en échec ne peut
+  //     confirmer aucune de ses offres ; les compter absentes les périmerait sur une panne.
+  //   · TOUTES doivent avoir PROUVÉ leur couverture. Une source qui ne dit rien n'a rien
+  //     prouvé (échec fermé) : lecture de flux arrêtée à mi-parcours, lot déposé par un
+  //     outil qui ne connaît pas encore le champ, jour sans dépôt.
+  //
+  // Une seule source incomplète, et la passe entière retombe sous l'ancien seuil. C'est le
+  // comportement voulu : ce qui manque à une source manque au balayage.
+  const couvertureComplete =
+    resultats.length > 0 && resultats.every((r) => r.ok && r.couvertureComplete === true);
+
   const balayage: ReturnType<typeof appliquerBalayage> = aucuneSourceEnSucces
     ? { offres: apresAjout, journal, nouvelles: [], perimees: [], revenues: [], enSursis: [] }
-    : appliquerBalayage(apresAjout, vues, journal, aujourdhui);
+    : appliquerBalayage(apresAjout, vues, journal, aujourdhui, couvertureComplete);
 
   return {
     sources: compte,
@@ -354,9 +381,15 @@ export async function executerPasse(
     enSursis: balayage.enSursis.length,
     offres: balayage.offres,
     journal: balayage.journal,
+    couvertureComplete,
     resume: aucuneSourceEnSucces
       ? "balayage suspendu : aucune source n'a répondu — compteurs d'absences inchangés"
-      : `${tri.retenues.length} nouvelle${tri.retenues.length > 1 ? "s" : ""}, ${resumerBalayage(balayage)}`,
+      : `${tri.retenues.length} nouvelle${tri.retenues.length > 1 ? "s" : ""}, ${resumerBalayage(balayage)}` +
+        // La couverture se DIT quand elle manque, pas quand elle tient : un rapport qui
+        // répète « couverture complète » tous les jours cesse d'être lu, et l'exception
+        // passe alors inaperçue — c'est ainsi que la CI de ce dépôt a été ignorée quatre
+        // commits d'affilée.
+        (couvertureComplete ? "" : " · couverture incomplète : péremption au seuil long"),
     adresses: adressesAnnoncees(brutes),
     lieux: mesure,
   };

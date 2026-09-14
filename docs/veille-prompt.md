@@ -261,33 +261,40 @@ Fais la veille JobAI du jour.
    recopie pas ici : la liste vivait en double, et l'exemplaire du prompt a
    fini par diverger de celle du code (huit d'un côté, douze de l'autre).
 
-   ⚠️ N'INTERROGE PAS TOUTE LA LISTE. Elle compte 48 termes (mesuré le
-   2026-08-18 : `PROFIL_DEFAUT.recherches`, français ET anglais — Honeywell, Alstom, AMETEK et Domtar
-   publient en anglais dans la région, et Marc est bilingue). Les interroger
-   tous chaque jour ferait sauter le quota Indeed, qui se referme en
-   s'aggravant. C'est un BASSIN, pas une liste à épuiser.
+   ⚠️ INTERROGE TOUT LE BASSIN — LA ROTATION EST SUPPRIMÉE (demande de Marc,
+   2026-09-14 : « je veux que ça recheck toutes les offres à chaque passe »).
+   Il compte 48 termes (`PROFIL_DEFAUT.recherches`, français ET anglais —
+   Honeywell, Alstom, AMETEK et Domtar publient en anglais dans la région, et
+   Marc est bilingue), et `PROFIL_DEFAUT.termesParJour` vaut désormais ce même
+   nombre.
 
-   Prends `PROFIL_DEFAUT.termesParJour` termes par jour (DIX-HUIT depuis le
-   2026-08-17), en TOURNANT : départ = (jour du mois × ce nombre) modulo la
-   longueur du bassin, puis autant à la suite en repartant au début quand tu
-   atteins la fin. Déterministe, sans état à garder, et la couverture fait le
-   tour du bassin de 48 termes en trois jours.
+   ⚠️ CE QUE LA ROTATION COÛTAIT, ET POURQUOI ON L'ABANDONNE. Un terme ne
+   revenait que tous les trois jours : une offre que lui seul trouvait était
+   absente des lots pendant tout ce temps, en étant parfaitement OUVERTE. Le
+   seuil de péremption devait donc couvrir ce cycle — cinq jours de silence —
+   et chaque fermeture était datée cinq jours trop tard. En balayant tout,
+   une absence redevient un signal : l'app périme après DEUX jours
+   (`SEUIL_ABSENCES_COUVERTURE_COMPLETE`), et la durée de vie qu'elle mesure
+   (`/archives`) gagne ces trois jours de précision.
 
-   ⚠️ SI LE QUOTA INDEED REFUSE TROIS FOIS MALGRÉ L'ATTENTE ANNONCÉE, ARRÊTE.
-   La fenêtre est dépensée et aucune patience ne la rend (mesuré : neuf essais
-   espacés, zéro succès, le délai annoncé oscillant sans jamais s'éteindre).
-   Dis-le dans le rapport : c'est ce nombre-là qu'on redescendra en premier.
+   ⚠️ SI LE QUOTA INDEED REFUSE TROIS FOIS MALGRÉ L'ATTENTE ANNONCÉE, ARRÊTE —
+   la consigne ne change pas, et elle compte encore plus qu'avant. La fenêtre
+   est dépensée et aucune patience ne la rend (mesuré : neuf essais espacés,
+   zéro succès, le délai annoncé oscillant sans jamais s'éteindre). Une passe
+   tronquée est NORMALE : écris simplement dans le lot le nombre de termes que
+   tu as réellement balayés (`couverture`), et l'app revient d'elle-même au
+   seuil de cinq jours pour cette passe-là. Rien ne périmera à tort.
 
-   ⚠️ DIS DANS TON RAPPORT quels termes tu as tirés. Sans ça, « 100 offres
-   trouvées » ne se compare pas d'un jour à l'autre — deux tirages différents
-   ne mesurent pas la même chose.
+   ⚠️ DIS DANS TON RAPPORT combien de termes tu as balayés sur combien.
+   Sans ça, « 100 offres trouvées » ne se compare pas d'un jour à l'autre —
+   deux balayages de couverture différente ne mesurent pas la même chose.
 
    Indeed : location "Québec, QC", country_code "CA". Le rayon retenu par
    l'app est passé à 75 km le 2026-08-17 (Beauce, Lotbinière, Portneuf ouest,
    Charlevoix, Bellechasse) : ne rejette plus une offre de ces secteurs, c'est
    `estDansLaRegion` qui tranche, pas toi. Ne double PAS par ville —
    mesuré, le lieu n'a aucun effet sur ce connecteur, c'est le terme qui
-   discrimine. Douze appels, pas vingt-quatre.
+   discrimine. Un appel par terme, pas deux.
 
    ZipRecruiter : location "Quebec City, Quebec" ET "Levis, Quebec",
    country_admin_code "CA", radius_miles 40. Là, le lieu compte.

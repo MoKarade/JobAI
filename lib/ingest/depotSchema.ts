@@ -83,6 +83,42 @@ export const OffreDeposeeSchema = z.object({
   refSource: z.string().max(200).default(""),
 });
 
+/**
+ * Ce qu'un lot dit de SA PROPRE COUVERTURE.
+ *
+ * ⚠️ SANS LUI, « ABSENTE DU LOT » EST AMBIGU — et c'est ce qui empêchait de faire confiance
+ * à une absence. Une offre peut manquer parce qu'elle a fermé, ou parce que la passe n'a
+ * jamais interrogé le terme qui la trouvait : le quota Indeed se referme en s'aggravant
+ * (mesuré : 14 s d'attente annoncée, puis 42, puis 51), donc une passe PEUT s'arrêter au
+ * milieu du bassin. Les deux situations produisaient exactement la même donnée.
+ *
+ * Avec ce bloc, le lot le DIT, et `lib/veille.ts` n'applique son seuil bas qu'aux absences
+ * constatées par une passe qui a tout balayé. Additif et optionnel : un lot écrit avant ce
+ * champ se relit sans rien casser, et retombe simplement sous l'ancien seuil, plus prudent.
+ */
+export const CouvertureSchema = z.object({
+  /** Termes que la passe devait interroger. */
+  demandes: z.number().int().min(0).max(200),
+  /** Termes qu'elle a réellement interrogés — moins si le quota s'est refermé. */
+  balayes: z.number().int().min(0).max(200),
+});
+
+export type Couverture = z.infer<typeof CouvertureSchema>;
+
+/**
+ * La passe a-t-elle tout balayé ? PURE.
+ *
+ * ⚠️ ÉCHEC FERMÉ : pas de bloc ⇒ pas de preuve ⇒ `false`. Supposer « complet » faute
+ * d'information ferait passer au seuil bas tous les lots d'un outil qui ne connaît pas
+ * encore ce champ — donc périmerait des offres vivantes en deux jours, sur du silence.
+ * Et `demandes: 0` n'est pas une couverture complète : c'est une passe qui n'a rien
+ * demandé, donc rien prouvé.
+ */
+export function couvertureComplete(c: Couverture | undefined): boolean {
+  if (!c || c.demandes === 0) return false;
+  return c.balayes >= c.demandes;
+}
+
 /** Un lot complet : d'où il vient, de quel jour il date, ce qu'il porte. */
 export const LotDeposeSchema = z.object({
   /** D'où vient ce lot. Tracé, jamais interprété. */
@@ -92,6 +128,7 @@ export const LotDeposeSchema = z.object({
   // jamais être l'occasion d'un assouplissement discret — c'est la valeur la plus SERRÉE
   // des deux qui gagne, sinon consolider revient à relâcher.
   offres: z.array(OffreDeposeeSchema).max(300),
+  couverture: CouvertureSchema.optional(),
 });
 
 export type LotDepose = z.infer<typeof LotDeposeSchema>;

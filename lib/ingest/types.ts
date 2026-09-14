@@ -105,6 +105,20 @@ export type ResultatSource =
        * dire, et un texte vide vaut mieux qu'une ligne inventée.
        */
       note?: string;
+      /**
+       * Cette source a-t-elle couvert TOUT ce qu'elle devait couvrir ?
+       *
+       * ⚠️ C'EST CE QUI REND UNE ABSENCE EXPLOITABLE. « Cette offre n'est pas dans le lot »
+       * veut dire deux choses opposées selon la réponse : elle a fermé, ou la passe n'a
+       * jamais interrogé le terme qui la trouvait. Sans ce champ, les deux produisent
+       * exactement la même donnée, et le seuil de péremption doit donc rester haut pour
+       * absorber le doute — c'est ce qui coûtait cinq jours de retard sur chaque fermeture.
+       *
+       * Optionnel, et son absence vaut `false` (`lib/veille.ts`, échec fermé) : une source
+       * qui ne dit rien de sa couverture n'en a pas prouvé, et ses absences restent sous
+       * l'ancien seuil.
+       */
+      couvertureComplete?: boolean;
     }
   | { ok: false; source: string; erreur: string };
 

@@ -241,8 +241,14 @@ export const ProfilSchema = z.object({
    * inconnues (comportement Zod par défaut) : un champ posé dans `PROFIL_DEFAUT` mais absent
    * du schéma n'existerait tout simplement pas à l'exécution, sans la moindre erreur — et le
    * test qui s'appuie dessus lirait `undefined`.
+   *
+   * ⚠️ 40 → 60 le 2026-09-14, ET C'EST LE BASSIN QUI COMMANDE. Le tirage couvre désormais
+   * tout le bassin (demande de Marc : « recheck toutes les offres à chaque passe ») : sa
+   * borne doit donc être celle de `recherches` juste au-dessus, sinon la couverture totale
+   * devient impossible à exprimer dès que le bassin dépasse 40 — un refus de schéma sur une
+   * configuration parfaitement voulue, et à un endroit où personne n'irait le chercher.
    */
-  termesParJour: z.number().int().min(1).max(40),
+  termesParJour: z.number().int().min(1).max(60),
 
   // ── Positionnement ───────────────────────────────────────────────────────
   swot: z.array(QuadrantSwotSchema).max(4),
@@ -528,13 +534,27 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
    * `tests/profil.test.ts` : agrandir le bassin sans monter le seuil ou le tirage fait
    * tomber le test.
    *
-   * 12 → 18 le 2026-08-17. C'est le plus RISQUÉ des cinq leviers : le refus de quota Indeed
-   * s'aggrave à chaque tentative (mesuré : 14 s, puis 42 s, puis 51 s). Le protocole ordonne
-   * de s'ARRÊTER après trois refus malgré l'attente annoncée — la fenêtre est dépensée, et
-   * aucune patience ne la rend. Si les rapports montrent des refus répétés, c'est ce
-   * nombre-ci qu'on redescend en premier.
+   * 12 → 18 le 2026-08-17, puis 18 → TOUT LE BASSIN le 2026-09-14 (demande de Marc : « je
+   * veux que ça recheck toutes les offres à chaque passe »).
+   *
+   * ⚠️ CE QUE LA COUVERTURE TOTALE ACHÈTE, ET CE QU'ELLE COÛTE. Elle achète une observation
+   * NON TOURNANTE : une offre absente d'un lot l'est de la requête qui l'avait trouvée, donc
+   * son absence veut enfin dire quelque chose. C'est ce qui autorise le seuil bas de
+   * péremption (`SEUIL_ABSENCES_COUVERTURE_COMPLETE`, deux jours au lieu de cinq) — donc une
+   * fermeture datée trois jours plus tôt, donc une durée de vie mesurée plus juste
+   * (`lib/dureeVie.ts`). Elle coûte 2,7× plus d'appels par passe, sur un quota partagé qui
+   * se referme EN S'AGGRAVANT (mesuré : 14 s d'attente annoncée, puis 42, puis 51).
+   *
+   * ⚠️ ET C'EST POUR ÇA QUE LE SEUIL BAS NE DÉPEND PAS DE CE NOMBRE, MAIS DE CE QUE LA PASSE
+   * A RÉELLEMENT FAIT. Le protocole ordonne de s'ARRÊTER après trois refus malgré l'attente
+   * annoncée : une passe peut donc légitimement s'arrêter au milieu du bassin. Elle le DIT
+   * alors dans son lot (`couverture: { demandes, balayes }`), et ses absences retombent sous
+   * l'ancien seuil. Un nombre écrit ici ne prouve rien ; seul le compte rendu de la passe le
+   * fait. Si les rapports montrent des couvertures systématiquement incomplètes, c'est ce
+   * nombre-ci qu'on redescend — et le seuil bas cessera de s'appliquer tout seul, sans que
+   * rien ne périme à tort entre-temps.
    */
-  termesParJour: 18,
+  termesParJour: 48,
 
 
   swot: [

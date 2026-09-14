@@ -50,6 +50,32 @@ import type { Offre } from "./types";
  */
 export const SEUIL_ABSENCES_PEREMPTION = 5;
 
+/**
+ * Le même seuil, quand la passe a balayé TOUT le bassin de termes.
+ *
+ * ⚠️ DEUX SEUILS PARCE QU'IL Y A DEUX QUALITÉS D'OBSERVATION, et c'est ce qui rend la
+ * demande de Marc (2026-09-14 : « je veux que ça recheck toutes les offres à chaque
+ * passe ») sûre au lieu d'être un simple abaissement de garde.
+ *
+ * Le seuil de cinq ci-dessus paie la ROTATION : quand la passe ne tire que 18 termes sur 48,
+ * une offre qu'un seul terme trouve peut manquer trois jours d'affilée en étant parfaitement
+ * ouverte. Le seuil devait couvrir ce cycle, plus une marge de bruit.
+ *
+ * Quand la passe balaie tout, ce cycle n'existe plus : une offre absente l'a été de la
+ * requête qui l'avait trouvée. Deux jours de silence suffisent alors — et c'est un vrai
+ * gain, pas un raccourci : la fermeture est datée trois jours plus tôt, donc la durée de vie
+ * mesurée (`lib/dureeVie.ts`) est trois jours plus juste.
+ *
+ * ⚠️ MAIS CE SEUIL NE S'APPLIQUE QU'AUX ABSENCES CONSTATÉES SOUS COUVERTURE COMPLÈTE, et la
+ * distinction n'est pas théorique : le quota Indeed se referme en s'aggravant (mesuré : 14 s,
+ * puis 42, puis 51 d'attente annoncée), donc une passe PEUT s'arrêter au milieu du bassin.
+ * Compter ces absences-là au seuil bas périmerait en deux jours tout un pan du suivi, sur un
+ * empêchement d'infrastructure — exactement le faux positif que tout ce mécanisme existe
+ * pour éviter. D'où un compteur SÉPARÉ : une absence ne vaut au seuil bas que si la passe
+ * qui l'a constatée a prouvé sa couverture.
+ */
+export const SEUIL_ABSENCES_COUVERTURE_COMPLETE = 2;
+
 /** Ce que la veille retient d'une offre, entre deux passages. */
 export interface SuiviVeille {
   /** Premier balayage qui l'a vue (AAAA-MM-JJ). */
@@ -76,6 +102,20 @@ export interface SuiviVeille {
    * compté aujourd'hui » de « jamais compté », et le compteur remonterait à chaque passe.
    */
   derniereAbsence?: string;
+  /**
+   * Parmi ces absences, combien ont été constatées par une passe qui a balayé TOUT le
+   * bassin. Remis à zéro dès que l'offre réapparaît, comme `absences`.
+   *
+   * ⚠️ UN COMPTEUR SÉPARÉ, PAS UN DRAPEAU SUR LA PASSE. Les absences s'accumulent sur
+   * plusieurs jours, et rien ne garantit que toutes les passes d'une même série aient eu la
+   * même couverture : une journée où le quota Indeed se referme au milieu du bassin produit
+   * une absence qui ne prouve rien. Ne compter ici que les absences PROUVÉES permet
+   * d'appliquer le seuil bas sans jamais l'appliquer à une observation partielle.
+   *
+   * Additif et optionnel : un journal écrit avant ce champ se relit sans migration, et ses
+   * offres restent simplement sous l'ancien seuil jusqu'à leur prochaine absence.
+   */
+  absencesCompletes?: number;
 }
 
 /** L'état de la veille, par identifiant d'offre. Sérialisé en JSON entre deux passages. */
@@ -101,6 +141,23 @@ function estSousVeille(o: Offre): boolean {
 }
 
 /**
+ * Cette série d'absences suffit-elle à périmer ? PURE.
+ *
+ * DEUX chemins, et le plus court gagne :
+ *   · deux absences constatées par des passes qui ont balayé TOUT le bassin ;
+ *   · cinq absences quelle que soit la couverture — le filet d'avant, qui reste.
+ *
+ * ⚠️ UNE SEULE FONCTION, APPELÉE AUX DEUX ENDROITS QUI EN DÉPENDENT (le « en sursis » et la
+ * péremption elle-même). Écrite deux fois, elle aurait fini par dire qu'une offre est encore
+ * en sursis au moment même où l'autre exemplaire la périme — un écran qui contredit ce que
+ * la base vient d'écrire, et rien pour le signaler.
+ */
+export function estPerimable(etat: { absences: number; absencesCompletes?: number }): boolean {
+  if ((etat.absencesCompletes ?? 0) >= SEUIL_ABSENCES_COUVERTURE_COMPLETE) return true;
+  return etat.absences >= SEUIL_ABSENCES_PEREMPTION;
+}
+
+/**
  * Applique un balayage au suivi.
  *
  * `aujourdhui` est un PARAMÈTRE (AAAA-MM-JJ, dans le fuseau de Marc) : la fonction ne lit
@@ -117,6 +174,15 @@ export function appliquerBalayage(
   vues: readonly Offre[],
   journal: JournalVeille,
   aujourdhui: string,
+  /**
+   * La passe a-t-elle balayé TOUT le bassin de termes ?
+   *
+   * ⚠️ DÉFAUT À `false`, ET C'EST L'ÉCHEC FERMÉ. Une passe qui ne dit rien de sa couverture
+   * n'en a pas prouvé : elle tombe sous l'ancien seuil, plus prudent. L'inverse — supposer
+   * complet faute d'information — périmerait des offres vivantes au premier lot déposé par
+   * un outil qui ne connaît pas encore ce champ.
+   */
+  couvertureComplete = false,
 ): ResultatBalayage {
   const idsVues = new Set(vues.map((o) => o.id));
   const parId = new Map(connues.map((o) => [o.id, o]));
@@ -133,7 +199,12 @@ export function appliquerBalayage(
     suivant[vue.id] = {
       premiereVue: precedent?.premiereVue ?? aujourdhui,
       derniereVue: aujourdhui,
+      // LES DEUX compteurs repartent de zéro : une offre revue n'a plus aucune absence, ni
+      // ordinaire ni prouvée. L'écrire explicitement plutôt que de compter sur l'écrasement
+      // de l'objet — le jour où quelqu'un remplacera ceci par un `{ ...precedent, … }`, un
+      // compteur oublié périmerait une offre parfaitement vivante.
       absences: 0,
+      absencesCompletes: 0,
     };
     if (!precedent && !parId.has(vue.id)) nouvelles.push(vue.id);
   }
@@ -149,11 +220,16 @@ export function appliquerBalayage(
     // cran (trois clics de suite périmaient tout le stock).
     const dejaCompteAujourdhui = precedent.derniereAbsence === aujourdhui;
     const absences = dejaCompteAujourdhui ? precedent.absences : precedent.absences + 1;
-    suivant[id] = { ...precedent, absences, derniereAbsence: aujourdhui };
+    // Le compteur des absences PROUVÉES suit la même règle d'idempotence : une seule par
+    // jour, et seulement quand la passe a montré qu'elle avait tout balayé.
+    const dejaCompletes = precedent.absencesCompletes ?? 0;
+    const absencesCompletes =
+      dejaCompteAujourdhui || !couvertureComplete ? dejaCompletes : dejaCompletes + 1;
+    suivant[id] = { ...precedent, absences, absencesCompletes, derniereAbsence: aujourdhui };
     const offre = parId.get(id);
     // Une offre disparue du suivi (supprimée à la main) n'a plus à être comptée.
     if (!offre) continue;
-    if (absences < SEUIL_ABSENCES_PEREMPTION) {
+    if (!estPerimable({ absences, absencesCompletes })) {
       enSursis.push({ id, absences });
     }
   }
@@ -175,7 +251,7 @@ export function appliquerBalayage(
       return o;
     }
 
-    if (o.perimeeLe === null && etat.absences >= SEUIL_ABSENCES_PEREMPTION) {
+    if (o.perimeeLe === null && estPerimable(etat)) {
       perimees.push(o.id);
       // Date du CONSTAT, pas de la fermeture : on ne sait pas quand l'offre a fermé, on
       // sait quand on a cessé de la voir. `perimeeLe` est un instant ISO (schéma).

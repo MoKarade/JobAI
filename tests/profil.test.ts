@@ -19,7 +19,10 @@ import {
   paliersSenioriteDepuisAnnees,
   type Profil,
 } from "@/lib/profil";
-import { SEUIL_ABSENCES_PEREMPTION } from "@/lib/veille";
+import {
+  SEUIL_ABSENCES_COUVERTURE_COMPLETE,
+  SEUIL_ABSENCES_PEREMPTION,
+} from "@/lib/veille";
 import {
   computeScore,
   scoreDistance,
@@ -296,6 +299,20 @@ describe("bassin de termes, tirage et péremption se commandent l'un l'autre", (
     // Deux jours de marge : le cycle garantit le retour du terme, la marge absorbe le bruit
     // de source (une source muette un matin ne doit pas suffire à éteindre une offre).
     expect(cycleJours + 2).toBeLessThanOrEqual(SEUIL_ABSENCES_PEREMPTION);
+  });
+
+  // ⚠️ LE TIRAGE COUVRE TOUT LE BASSIN (demande de Marc, 2026-09-14), ET C'EST CE QUI REND
+  // LE SEUIL BAS LÉGITIME. Le seuil de deux jours (`SEUIL_ABSENCES_COUVERTURE_COMPLETE`) ne
+  // s'applique qu'aux absences constatées par une passe qui a tout balayé : si le protocole
+  // revenait à un tirage partiel, aucune passe ne pourrait plus prouver sa couverture et le
+  // seuil bas cesserait de s'appliquer — sans rien périmer à tort, mais aussi sans que
+  // personne ne s'aperçoive que la mesure de durée de vie vient de perdre trois jours de
+  // précision. Ce test le dit à voix haute.
+  it("le tirage couvre TOUT le bassin — sinon aucune passe ne prouve sa couverture", () => {
+    expect(parJour).toBeGreaterThanOrEqual(bassin);
+    // Et le seuil bas est bien plus court que l'ancien : sans ça, la couverture totale
+    // coûterait 2,7× plus d'appels pour exactement aucun gain.
+    expect(SEUIL_ABSENCES_COUVERTURE_COMPLETE).toBeLessThan(SEUIL_ABSENCES_PEREMPTION);
   });
 
   it("le bassin couvre les deux langues du marché visé", () => {
