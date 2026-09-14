@@ -11,12 +11,15 @@
 // employeurs. Un test qui verrouille un défaut doit tomber avec lui.
 
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   MARCHE_PLAUSIBLE_M,
   PORTEE_RECHERCHE_M,
   VITESSE_MARCHE_KMH,
   boiteAutour,
   boiteEnglobante,
+  grapperPourBornes,
   distanceM,
   libelleBorne,
   libelleDistanceBorne,
@@ -244,5 +247,126 @@ describe("boîte englobante — une requête au lieu de six", () => {
     expect(englobante.latMax).toBeCloseTo(ponctuelle.latMax, 6);
     expect(englobante.lonMin).toBeCloseTo(ponctuelle.lonMin, 6);
     expect(englobante.lonMax).toBeCloseTo(ponctuelle.lonMax, 6);
+  });
+});
+
+describe("grapperPourBornes — un point aberrant ne gèle plus tout le lot", () => {
+  /** L'amas réel : des employeurs de Portneuf à Charlevoix, l'étalement normal. */
+  const REGION = [
+    { lat: 46.4, lon: -71.9, nom: "portneuf" },
+    { lat: 46.8, lon: -71.2, nom: "quebec" },
+    { lat: 46.81, lon: -71.21, nom: "quebec-2" },
+    { lat: 47.4, lon: -70.3, nom: "charlevoix" },
+  ];
+
+  it("rend UNE seule grappe quand tout le lot tient dans la garde", () => {
+    const { grappes, aberrants } = grapperPourBornes(REGION, ETENDUE_MAX_DEG);
+    expect(aberrants).toEqual([]);
+    expect(grappes).toHaveLength(1);
+    expect(grappes[0]?.lieux).toHaveLength(REGION.length);
+  });
+
+  it("ISOLE le point lointain au lieu de refuser le lot — la panne du 2026-09-14", () => {
+    // Un homonyme géocodé à Paris : sous l'ancien code, la boîte englobante dépassait la
+    // garde et les 1 293 lignes repartaient « en échec », tous les jours, à perpétuité.
+    const avecIntrus = [...REGION, { lat: 48.85, lon: 2.35, nom: "homonyme-paris" }];
+    const { grappes, aberrants } = grapperPourBornes(avecIntrus, ETENDUE_MAX_DEG);
+    expect(aberrants).toEqual([]);
+    // Deux grappes : l'amas, et l'intrus tout seul. Personne n'est perdu.
+    expect(grappes).toHaveLength(2);
+    const noms = grappes.flatMap((g) => g.lieux.map((l) => l.nom)).sort();
+    expect(noms).toEqual(avecIntrus.map((l) => l.nom).sort());
+  });
+
+  it("garantit que CHAQUE boîte respecte la garde, marge comprise", () => {
+    // La propriété qui compte : ce sont ces boîtes-là qui partent en requête. Une seule
+    // qui déborde et on retombe sur le refus qu'on vient de supprimer.
+    const eparpille = [
+      ...REGION,
+      { lat: 48.85, lon: 2.35, nom: "paris" },
+      { lat: 49.28, lon: -123.12, nom: "vancouver" },
+      { lat: 45.5, lon: -73.57, nom: "montreal" },
+    ];
+    const { grappes } = grapperPourBornes(eparpille, ETENDUE_MAX_DEG);
+    expect(grappes.length).toBeGreaterThan(1);
+    for (const g of grappes) {
+      expect(g.boite.latMax - g.boite.latMin).toBeLessThanOrEqual(ETENDUE_MAX_DEG);
+      expect(g.boite.lonMax - g.boite.lonMin).toBeLessThanOrEqual(ETENDUE_MAX_DEG);
+    }
+  });
+
+  it("ne perd aucun lieu : grappes + aberrants = le lot", () => {
+    const eparpille = [
+      ...REGION,
+      { lat: 48.85, lon: 2.35, nom: "paris" },
+      { lat: 49.28, lon: -123.12, nom: "vancouver" },
+    ];
+    const { grappes, aberrants } = grapperPourBornes(eparpille, ETENDUE_MAX_DEG);
+    const vus = [...grappes.flatMap((g) => g.lieux), ...aberrants].map((l) => l.nom).sort();
+    expect(vus).toEqual(eparpille.map((l) => l.nom).sort());
+  });
+
+  it("NOMME en aberrant ce qu'aucune grappe ne peut couvrir", () => {
+    // Une garde plus petite que la marge elle-même : aucun lieu ne peut tenir. On ne boucle
+    // pas, on ne fabrique pas de grappe vide — on rend les lieux, pour que l'appelant les
+    // nomme. « 1 293 en échec » ne se vérifie pas ; un nom et une position se corrigent.
+    const { grappes, aberrants } = grapperPourBornes(REGION, 0.001);
+    expect(grappes).toEqual([]);
+    expect(aberrants).toHaveLength(REGION.length);
+  });
+
+  it("est DÉTERMINISTE : l'ordre d'entrée ne change pas le découpage", () => {
+    // Deux passes successives doivent produire les mêmes grappes, sinon la mesure d'un lieu
+    // dépendrait de l'ordre où Postgres a servi le heap.
+    const melange = [REGION[3]!, REGION[1]!, REGION[0]!, REGION[2]!];
+    const a = grapperPourBornes(REGION, ETENDUE_MAX_DEG);
+    const b = grapperPourBornes(melange, ETENDUE_MAX_DEG);
+    expect(b.grappes.map((g) => g.lieux.map((l) => l.nom))).toEqual(
+      a.grappes.map((g) => g.lieux.map((l) => l.nom)),
+    );
+  });
+
+  it("rend un lot vide sans grappe ni aberrant", () => {
+    expect(grapperPourBornes([], ETENDUE_MAX_DEG)).toEqual({ grappes: [], aberrants: [] });
+  });
+});
+
+describe("la passe des bornes est BRANCHÉE sur le découpage", () => {
+  // ⚠️ LE TROU ENTRE DEUX MOITIÉS GARDÉES. `grapperPourBornes` est prouvé juste, le budget
+  // est prouvé vérifié — et rien, entre les deux, ne prouve que `mesurerBornes` appelle le
+  // découpage avec la bonne garde ni qu'il a cessé de refuser le lot entier. Mesuré : casser
+  // l'étendue passée depuis `lib/actions.ts` laissait toute la suite verte.
+  //
+  // ⚠️ LA SOURCE EST LUE DÉCOMMENTÉE. Les commentaires de `mesurerBornes` racontent la panne
+  // de 2026-09-14 en citant ses mots ; un scan brut serait satisfait par sa propre
+  // explication — le piège le plus classique d'une garde écrite à côté de son sujet.
+  const sansCommentaires = (source: string) =>
+    source
+      .split("\n")
+      .filter((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l))
+      .join("\n");
+
+  const code = sansCommentaires(readFileSync(resolve(process.cwd(), "lib/actions.ts"), "utf8"));
+
+  it("le décommentage laisse du vrai code — sinon tout ce qui suit est vacueux", () => {
+    expect(code.length).toBeGreaterThan(20_000);
+    expect(code).toContain("async function mesurerBornes");
+  });
+
+  it("découpe le lot avec la garde PARTAGÉE, pas un nombre écrit sur place", () => {
+    expect(code).toContain("grapperPourBornes(lignes, ETENDUE_MAX_DEG)");
+  });
+
+  it("n'annule PLUS le lot entier sur une boîte trop large", () => {
+    // La phrase exacte du refus d'avant. Sa disparition du CODE est le fait à défendre ;
+    // les commentaires gardent le droit de raconter l'histoire, d'où la lecture décommentée.
+    expect(code).not.toContain("interrogation annulée");
+    expect(code).not.toContain("boiteEnglobante(lignes)");
+  });
+
+  it("NOMME les positions qu'aucune requête ne peut couvrir", () => {
+    // « 1 293 en échec » ne se corrige pas ; un nom et une position, si.
+    expect(code).toMatch(/aberrants\.map\(/);
+    expect(code).toContain("à re-géocoder");
   });
 });

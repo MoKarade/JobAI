@@ -350,3 +350,41 @@ une ligne de journal.
 `PROFIL_DEFAUT` moins les quatre champs ; cinq mutations jouées), et une lecture UNIQUE —
 `profilActif` et `profilCourantOuDefaut` passent par la même fonction, sans quoi la fiche
 s'afficherait pendant que la validation refuserait.
+
+---
+
+## 2026-09-14 — Un garde-fou qui refuse un LOT devient une panne permanente
+
+**Le symptôme** : `bornes=0/1293 (1293 en échec)`, précédé de « boîte englobante anormalement
+large — interrogation annulée ». Tous les jours, depuis un moment.
+
+**Le mécanisme** : la mesure interroge Overpass UNE fois pour tout le lot (correction d'août
+2026 : une requête par entreprise vidait le budget), et refuse une boîte englobante absurde —
+protection légitime contre une position aberrante en base. Le jour où une telle position est
+réellement entrée, la garde a refusé le lot ENTIER. Et le refus s'auto-entretient : un échec
+ne marque aucune ligne, donc le lot du lendemain contient exactement les mêmes lignes, donc
+la même boîte, donc le même refus. Un membre gèle 1 292 autres, indéfiniment.
+
+**Règle durable** : devant un garde-fou qui rejette une opération GROUPÉE, demander ce qu'il
+fait payer aux membres sains. Si la réponse est « tout », le seuil ne doit pas être relevé
+(ce qui ne fait que déplacer le jour de la panne) mais converti en critère de **partition**.
+
+**Comment partitionner sans inventer de nombre** : croissance gloutonne sur la CONTRAINTE
+RÉELLE — on ajoute un lieu à la grappe tant que sa vraie boîte, marge comprise, respecte la
+garde. Une grille aurait demandé de choisir une taille de cellule et de supposer une latitude
+pour convertir la marge en degrés de longitude. Ici on ne suppose rien, et chaque boîte est
+valide par construction.
+
+**Ce qui ne peut entrer dans aucune grappe est NOMMÉ** (nom + coordonnées + « à re-géocoder »),
+jamais fondu dans un compte : « 1 293 en échec » ne se corrige pas.
+
+**Le piège de test, troisième fois de la journée** : la garde couvrait la fonction pure et
+le budget, mais rien ne couvrait le BRANCHEMENT — casser l'étendue passée depuis
+`lib/actions.ts` laissait toute la suite verte. Révélé par mutation, pas par relecture.
+
+**Le piège de garde** : un test qui cherchait littéralement `budgetMs < DELAI_MAX_MS` a rougi
+sur un lot qui ne touchait pas à ce qu'il défend — la grandeur comparée s'appelle maintenant
+`reste`. Une garde ancre le FAIT, jamais la FORME qu'avait le code.
+
+**Verrous** : `tests/bornes.test.ts` (découpage, déterminisme, aucun lieu perdu, chaque boîte
+sous la garde, aberrants nommés, plus une garde de câblage lue sur la source décommentée).

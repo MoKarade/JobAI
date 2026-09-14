@@ -1691,6 +1691,23 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   (compte-rendu, `BACKLOG.md`, `HANDOVER.md`) : un diagnostic faux laissé en place devient la
   prémisse du lot suivant.
 
+- **Un garde-fou qui REFUSE un lot entier se transforme en panne permanente dès qu'un seul
+  membre est mauvais — et le bon remède n'est jamais de relever le seuil, c'est de DÉCOUPER.**
+  La mesure des bornes interrogeait Overpass une fois pour tout le lot, avec une garde
+  refusant une boîte englobante absurde. Un seul employeur mal géocodé a fait déborder la
+  boîte : `bornes=0/1293 (1293 en échec)`, **tous les jours**. Et le refus était définitif par
+  construction — un échec ne marque aucune ligne, donc le lot du lendemain est identique, donc
+  la boîte aussi. La garde n'était pas fausse (une requête qui ramène un continent doit être
+  refusée) ; c'est son EFFET qui l'était. Réflexe : devant un garde-fou qui rejette une
+  OPÉRATION GROUPÉE, demander **ce qu'il fait payer aux membres sains**, et si la réponse est
+  « tout », le convertir en critère de PARTITION. ⚠️ Corollaire de conception : la partition
+  se construit en vérifiant la CONTRAINTE RÉELLE à chaque ajout (faire grossir une grappe tant
+  que sa vraie boîte tient), jamais en choisissant une taille de cellule — sinon on invente un
+  nombre et on suppose une latitude pour convertir une marge en degrés. ⚠️ Et corollaire déjà
+  payé trois fois ce jour-là : la garde ne couvrait QUE la fonction pure. Casser l'étendue
+  passée depuis l'appelant laissait toute la suite verte — le branchement n'était le sujet
+  d'aucun test, et c'est la mutation qui l'a dit, pas la relecture.
+
 ## 10. Style et compte-rendu
 
 > 📣 Forme des comptes-rendus, des commits, des PR et des docs générées :

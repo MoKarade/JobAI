@@ -294,3 +294,96 @@ export function boiteEnglobante(
     lonMax: lonMax + dLon,
   };
 }
+
+/** Une grappe de lieux voisins, et la boîte qui les couvre tous. */
+export interface GrappeBornes<T> {
+  lieux: T[];
+  boite: { latMin: number; lonMin: number; latMax: number; lonMax: number };
+}
+
+/**
+ * Découpe un lot de lieux en grappes dont la boîte tient sous la garde d'étendue. PURE.
+ *
+ * ── LA PANNE QUE ÇA RÉPARE ───────────────────────────────────────────────────────────
+ *
+ * Journaux du 2026-09-14 : « boîte englobante anormalement large — interrogation annulée »,
+ * puis `bornes=0/1293 (1293 en échec)`. UNE boîte pour tout le lot, UNE garde d'étendue, et
+ * le lot entier refusé — **définitivement**, puisqu'un échec ne marque rien et que le lot
+ * suivant contiendra exactement les mêmes lignes, donc la même boîte. Un seul lieu mal
+ * géocodé (un homonyme à l'autre bout du monde) suffit à geler la mesure de 1 292 autres,
+ * pour toujours, avec une ligne d'erreur par jour pour seule trace.
+ *
+ * ⚠️ LA GARDE N'ÉTAIT PAS FAUSSE, SON EFFET L'ÉTAIT. Refuser une requête qui ramènerait un
+ * continent est juste. Ce qui ne l'est pas, c'est de faire payer ce refus à tout le lot : la
+ * bonne réponse à « ces points sont trop éloignés pour UNE requête » n'est pas « aucune
+ * requête », c'est « plusieurs requêtes ». La garde décide désormais du DÉCOUPAGE, plus de
+ * l'abandon.
+ *
+ * ── POURQUOI UNE CROISSANCE GLOUTONNE, ET PAS UNE GRILLE ─────────────────────────────
+ *
+ * Une grille demanderait de choisir une taille de cellule — donc d'inventer un nombre, et de
+ * supposer une latitude pour convertir la marge en degrés de longitude. Ici on ne suppose
+ * rien : on fait grossir une grappe tant que SA VRAIE BOÎTE, marge comprise, respecte la
+ * garde. La contrainte se vérifie sur l'objet réel, jamais sur une approximation.
+ *
+ * Le tri par latitude puis longitude n'est pas un optimum de regroupement, et il n'a pas
+ * besoin de l'être : sur la forme réelle des données — un amas régional dense plus quelques
+ * points isolés — il rend une grappe pour l'amas et une par isolé. Ce qui compte est que le
+ * découpage soit DÉTERMINISTE (deux passes identiques donnent les mêmes grappes) et que
+ * chaque boîte soit valide par construction.
+ *
+ * ── ET CE QUI NE PEUT PAS ÊTRE COUVERT EST NOMMÉ, PAS AVALÉ ──────────────────────────
+ *
+ * Un lieu dont la boîte À LUI SEUL dépasse la garde ne peut tenir dans aucune grappe (il
+ * faudrait une marge plus petite que celle qu'on cherche). Il sort en `aberrants` avec son
+ * objet, pour que l'appelant le NOMME : « 1 293 en échec » ne se vérifie pas, « Machin inc.
+ * est à 48,8 N 2,3 E » se corrige.
+ */
+export function grapperPourBornes<T extends { lat: number; lon: number }>(
+  lieux: readonly T[],
+  etendueMaxDeg: number,
+  margeM = PORTEE_RECHERCHE_M,
+): { grappes: GrappeBornes<T>[]; aberrants: T[] } {
+  const grappes: GrappeBornes<T>[] = [];
+  const aberrants: T[] = [];
+
+  const tient = (boite: { latMin: number; lonMin: number; latMax: number; lonMax: number }) =>
+    boite.latMax - boite.latMin <= etendueMaxDeg && boite.lonMax - boite.lonMin <= etendueMaxDeg;
+
+  const ordonnes = [...lieux].sort((a, b) => a.lat - b.lat || a.lon - b.lon);
+
+  let courants: T[] = [];
+  let boiteCourante: GrappeBornes<T>["boite"] | null = null;
+
+  const fermer = () => {
+    if (boiteCourante !== null && courants.length > 0) {
+      grappes.push({ lieux: courants, boite: boiteCourante });
+    }
+    courants = [];
+    boiteCourante = null;
+  };
+
+  for (const l of ordonnes) {
+    const seul = boiteEnglobante([l], margeM);
+    // Un lieu que la marge seule fait déborder n'entrera dans aucune grappe : le dire tout
+    // de suite évite de le traîner et de fermer une grappe pour rien.
+    if (seul === null || !tient(seul)) {
+      aberrants.push(l);
+      continue;
+    }
+
+    const elargie = boiteEnglobante([...courants, l], margeM);
+    if (elargie !== null && tient(elargie)) {
+      courants.push(l);
+      boiteCourante = elargie;
+      continue;
+    }
+
+    fermer();
+    courants = [l];
+    boiteCourante = seul;
+  }
+  fermer();
+
+  return { grappes, aberrants };
+}

@@ -49,7 +49,7 @@ import { employeursASituer, invaliderDistancesPrecisees, planifierDistances } fr
 import { villesARattraper } from "./ingest/pipeline";
 import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
-import { ETENDUE_VIDE_SUSPECTE_KM, boiteEnglobante, proximiteBorne } from "./bornes";
+import { ETENDUE_VIDE_SUSPECTE_KM, grapperPourBornes, proximiteBorne } from "./bornes";
 import { DELAI_MAX_MS, ETENDUE_MAX_DEG, chercherBornesBoite } from "./overpass";
 import {
   EPOQUE_A_RETENTER,
@@ -965,66 +965,46 @@ async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
 
   if (lignes.length === 0) return { candidates: 0, mesurees: 0, echecs: 0 };
 
-  // ⚠️ UNE SEULE REQUÊTE POUR TOUT LE LOT, ET C'EST LA CORRECTION D'UNE VRAIE RÉGRESSION.
+  // ⚠️ UNE REQUÊTE PAR GRAPPE, ET C'EST LA CORRECTION DE DEUX RÉGRESSIONS SUCCESSIVES.
   //
-  // Interroger Overpass autour de CHAQUE entreprise coûtait un aller-retour par lieu — et
-  // quand il échoue, il coûte le délai × les trois instances de repli. Mesuré en production
-  // le 2026-08-05 : « bornes=2/6 (3 en échec) · budget restant=0 ms », trois entreprises
-  // ayant chacune épuisé les trois instances. J'avais ramené le délai de 15 s à 5 s le matin
-  // même pour empêcher la passe de tuer la page — sans mesurer si 5 s suffisait. Ça ne
-  // suffisait pas, et le remède a créé la panne.
+  // (1) 2026-08-05 : une requête PAR ENTREPRISE coûtait un aller-retour par lieu, et le
+  //     délai × trois instances quand il échouait. Mesuré : « bornes=2/6 (3 en échec) ·
+  //     budget restant=0 ms ». D'où le passage à une boîte englobante unique, la proximité
+  //     calculée EN LOCAL, et un coût réseau indépendant du nombre d'entreprises.
   //
-  // Une boîte englobante couvre tous les employeurs du lot ; la proximité se calcule ensuite
-  // EN LOCAL. Le coût réseau devient indépendant du nombre d'entreprises, et le délai peut
-  // remonter à une valeur réaliste sans menacer le budget.
-  const boite = boiteEnglobante(lignes);
-  if (boite === null) return { candidates: lignes.length, mesurees: 0, echecs: 0 };
-
-  // Une boîte absurde (position aberrante en base) ramènerait des milliers de bornes ou
-  // expirerait : on refuse plutôt que d'envoyer une requête qu'on sait mauvaise.
-  if (
-    boite.latMax - boite.latMin > ETENDUE_MAX_DEG ||
-    boite.lonMax - boite.lonMin > ETENDUE_MAX_DEG
-  ) {
-    console.error("[bornes] boîte englobante anormalement large — interrogation annulée");
-    return { candidates: lignes.length, mesurees: 0, echecs: lignes.length };
-  }
-
-  // Pas assez de budget pour une requête réseau : on ne la commence pas. Une requête tuée
-  // en vol ne rapporte rien et consomme tout ce qui restait.
-  if (budgetMs !== null && budgetMs < DELAI_MAX_MS) {
-    return { candidates: lignes.length, mesurees: 0, echecs: 0 };
-  }
-
-  const r = await chercherBornesBoite(boite);
-  if (!r.ok) {
-    // On NE marque AUCUNE ligne : elles repasseront. Le journal garde la trace, parce
-    // qu'une source qui tombe tout le temps doit finir par se voir.
-    console.error(`[bornes] lot non mesuré : ${r.raison}`);
-    return { candidates: lignes.length, mesurees: 0, echecs: lignes.length };
-  }
-
-  // ⚠️ ZÉRO BORNE SUR TOUTE UNE RÉGION N'EST PAS UNE MESURE, C'EST UNE NON-RÉPONSE.
+  // (2) 2026-09-14 : cette boîte unique portait une garde d'étendue, et la garde a fini par
+  //     refuser le lot ENTIER — « boîte englobante anormalement large », puis
+  //     `bornes=0/1293 (1293 en échec)`. Un seul lieu mal géocodé suffisait, et le refus
+  //     était DÉFINITIF : un échec ne marque rien, donc le lot du lendemain était identique,
+  //     donc la boîte aussi. Mille deux cent quatre-vingt-douze mesures gelées par une, tous
+  //     les jours, avec une ligne d'erreur pour seule trace.
   //
-  // La boîte couvre ici des dizaines de kilomètres autour de Québec — il y a des bornes de
-  // recharge, c'est un fait vérifiable. Un lot revenu VIDE sur une telle étendue signale
-  // donc un service qui n'a pas cherché, pas une région sans bornes. Et la distinction est
-  // vitale : écrire le résultat pose `bornesLe`, or `bornesAMesurer` ne retient que les
-  // lignes dont cette date est nulle — un vide accepté une fois fige « aucune borne » sur
-  // TOUTES les entreprises, définitivement, sans qu'aucune erreur ne soit jamais levée.
-  //
-  // On ne marque donc rien : le lot repassera. Le seuil est celui d'une boîte plus grande
-  // qu'un quartier — en dessous, un vide est parfaitement crédible et s'inscrit.
-  const etendueKm = (boite.latMax - boite.latMin) * 111;
-  if (r.bornes.length === 0 && etendueKm > ETENDUE_VIDE_SUSPECTE_KM) {
+  // La garde décide désormais du DÉCOUPAGE, plus de l'abandon : `grapperPourBornes` rend des
+  // grappes dont chaque boîte respecte l'étendue PAR CONSTRUCTION. Sur la forme réelle des
+  // données — un amas régional dense plus quelques points isolés — ça fait une requête pour
+  // l'amas et une par isolé, donc le coût reste celui d'avant dans le cas nominal.
+  const { grappes, aberrants } = grapperPourBornes(lignes, ETENDUE_MAX_DEG);
+
+  // ⚠️ NOMMÉS, PAS COMPTÉS. « 1 293 en échec » ne se vérifie pas et ne se corrige pas ; un
+  // nom et une position se corrigent — un homonyme géocodé à l'autre bout du monde se
+  // répare en re-géocodant cette ligne-là, pas en relançant la passe.
+  if (aberrants.length > 0) {
+    const noms = aberrants.map((l) => `${l.nom} (${l.lat.toFixed(2)}, ${l.lon.toFixed(2)})`);
     console.error(
-      `[bornes] réponse VIDE sur ${etendueKm.toFixed(0)} km — traitée comme un échec, ` +
-        `pas comme « aucune borne » : le lot repassera`,
+      `[bornes] ${aberrants.length} position(s) qu'aucune requête régionale ne peut couvrir — ` +
+        `à re-géocoder : ${noms.length <= 12 ? noms.join(" · ") : `${noms.slice(0, 12).join(" · ")} … +${noms.length - 12}`}`,
     );
-    return { candidates: lignes.length, mesurees: 0, echecs: lignes.length };
   }
 
+  // Les plus grosses grappes d'abord : quand le budget ne suffit pas pour toutes, il sert au
+  // plus grand nombre. Un lot non atteint n'est ni mesuré ni en échec — il repassera.
+  const ordre = [...grappes].sort((a, b) => b.lieux.length - a.lieux.length);
+
+  const debutPasse = Date.now();
   let mesurees = 0;
+  let echecs = aberrants.length;
+  let interrogees = 0;
+  let bornesVues = 0;
   // Ce qu'OpenStreetMap renseigne VRAIMENT, compté sur le lot. Sans ce relevé, la seule
   // façon de savoir si « rapide » et « tarif » sont utiles serait de regarder l'écran une
   // entreprise à la fois — et une couverture faible passerait pour un défaut d'affichage.
@@ -1032,30 +1012,65 @@ async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
   let avecVitesse = 0;
   let avecTarif = 0;
 
-  for (const l of lignes) {
-    const p = proximiteBorne({ lat: l.lat, lon: l.lon }, r.bornes);
-    await db
-      .update(entreprisesLieux)
-      .set({
-        bornesM: p.plusProcheM,
-        bornesNom: p.nom,
-        bornesRapide: p.rapide,
-        bornesTarif: p.tarif,
-        bornesLe: new Date(),
-      })
-      .where(eq(entreprisesLieux.nom, l.nom));
-    mesurees++;
-    if (p.nom !== null) avecMarque++;
-    if (p.rapide !== null) avecVitesse++;
-    if (p.tarif !== null) avecTarif++;
+  for (const g of ordre) {
+    // Pas assez de budget pour une requête réseau : on ne la commence pas. Une requête tuée
+    // en vol ne rapporte rien et consomme tout ce qui restait. Le reste du lot repassera.
+    const reste = budgetMs === null ? null : budgetMs - (Date.now() - debutPasse);
+    if (reste !== null && reste < DELAI_MAX_MS) break;
+
+    interrogees++;
+    const r = await chercherBornesBoite(g.boite);
+    if (!r.ok) {
+      // On NE marque AUCUNE ligne de cette grappe : elles repasseront. Le journal garde la
+      // trace, parce qu'une source qui tombe tout le temps doit finir par se voir.
+      console.error(`[bornes] grappe de ${g.lieux.length} lieu(x) non mesurée : ${r.raison}`);
+      echecs += g.lieux.length;
+      continue;
+    }
+
+    // ⚠️ ZÉRO BORNE SUR TOUTE UNE RÉGION N'EST PAS UNE MESURE, C'EST UNE NON-RÉPONSE.
+    //
+    // Écrire le résultat pose `bornesLe`, or `bornesAMesurer` ne retient que les lignes dont
+    // cette date est nulle : un vide accepté une fois fige « aucune borne » sur toutes les
+    // entreprises de la grappe, définitivement, sans qu'aucune erreur ne soit jamais levée.
+    // Le seuil est celui d'une boîte plus grande qu'un quartier — en dessous, un vide est
+    // parfaitement crédible et s'inscrit.
+    const etendueKm = (g.boite.latMax - g.boite.latMin) * 111;
+    if (r.bornes.length === 0 && etendueKm > ETENDUE_VIDE_SUSPECTE_KM) {
+      console.error(
+        `[bornes] réponse VIDE sur ${etendueKm.toFixed(0)} km — traitée comme un échec, ` +
+          `pas comme « aucune borne » : la grappe repassera`,
+      );
+      echecs += g.lieux.length;
+      continue;
+    }
+
+    bornesVues += r.bornes.length;
+    for (const l of g.lieux) {
+      const p = proximiteBorne({ lat: l.lat, lon: l.lon }, r.bornes);
+      await db
+        .update(entreprisesLieux)
+        .set({
+          bornesM: p.plusProcheM,
+          bornesNom: p.nom,
+          bornesRapide: p.rapide,
+          bornesTarif: p.tarif,
+          bornesLe: new Date(),
+        })
+        .where(eq(entreprisesLieux.nom, l.nom));
+      mesurees++;
+      if (p.nom !== null) avecMarque++;
+      if (p.rapide !== null) avecVitesse++;
+      if (p.tarif !== null) avecTarif++;
+    }
   }
 
   console.log(
-    `[bornes] ${r.bornes.length} borne(s) dans la boîte · ${mesurees} lieu(x) mesuré(s) · ` +
-      `marque=${avecMarque}/${mesurees} vitesse=${avecVitesse}/${mesurees} tarif=${avecTarif}/${mesurees}`,
+    `[bornes] ${interrogees}/${grappes.length} grappe(s) interrogée(s) · ${bornesVues} borne(s) vue(s) · ` +
+      `${mesurees} lieu(x) mesuré(s) · marque=${avecMarque}/${mesurees} vitesse=${avecVitesse}/${mesurees} tarif=${avecTarif}/${mesurees}`,
   );
 
-  return { candidates: lignes.length, mesurees, echecs: 0 };
+  return { candidates: lignes.length, mesurees, echecs };
 }
 
 interface PasseDetails {

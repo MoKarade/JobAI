@@ -6,6 +6,46 @@
 
 ---
 
+## Session 2026-09-14 (suite 4) — les bornes de recharge se mesurent de nouveau
+
+`[BORNES-01]`, demandé par Marc après le lot précédent.
+
+**La panne** : `bornes=0/1293 (1293 en échec)`, précédé de « boîte englobante anormalement
+large — interrogation annulée ». La mesure interroge Overpass **une fois pour tout le lot**
+(correction d'août : une requête par entreprise vidait le budget), avec une garde qui refuse
+une boîte absurde. La garde a fini par refuser le lot ENTIER — et le refus était **définitif**
+par construction : un échec ne marque aucune ligne, donc le lot du lendemain est identique,
+donc la boîte aussi. Un seul lieu mal géocodé gèle 1 292 mesures, tous les jours, avec une
+ligne d'erreur pour seule trace.
+
+**Le correctif** : la garde décide désormais du **découpage**, plus de l'abandon.
+`grapperPourBornes` (`lib/bornes.ts`, PURE) fait grossir une grappe tant que SA VRAIE boîte —
+marge de 15 km comprise — respecte l'étendue. Chaque boîte est donc valide par construction,
+sans inventer de taille de cellule ni supposer une latitude pour convertir la marge en degrés
+de longitude. Sur la forme réelle des données (un amas régional dense plus quelques points
+isolés), ça fait une requête pour l'amas et une par isolé : le coût nominal ne bouge pas.
+
+La passe interroge les **plus grosses grappes d'abord** — quand le budget ne suffit pas pour
+toutes, il sert au plus grand nombre —, et ce qui n'est pas atteint n'est ni mesuré ni en
+échec : ça repasse. Le journal rend `interrogées/grappes` et le nombre de bornes vues.
+
+⚠️ **Ce qu'aucune requête régionale ne peut couvrir est NOMMÉ**, avec ses coordonnées et la
+consigne « à re-géocoder ». « 1 293 en échec » ne se corrige pas ; « Machin inc. (48,85 ; 2,35) »
+se corrige.
+
+⚠️ **Un test-garde a rougi sur un lot qui ne touchait pas à ce qu'il défend** : il cherchait
+littéralement `budgetMs < DELAI_MAX_MS`, et la grandeur comparée s'appelle maintenant `reste`
+(le budget restant à l'instant de la grappe — strictement plus juste, puisqu'il y a plusieurs
+requêtes). Réancré sur le FAIT, avec une anti-vacuité sur la provenance de la constante.
+
+Gate complet vert. `tests/bornes.test.ts` (+11 cas : découpage, déterminisme, aucun lieu
+perdu, chaque boîte sous la garde, aberrants nommés, plus une garde de CÂBLAGE lue sur la
+source décommentée). Cinq mutations jouées — dont une qui a révélé que rien ne couvrait le
+branchement dans `mesurerBornes` : casser l'étendue passée depuis `lib/actions.ts` laissait
+toute la suite verte.
+
+---
+
 ## Session 2026-09-14 (suite 3) — le profil enregistré se relit
 
 `[PROFIL-01]`, demandé par Marc après le lot précédent.

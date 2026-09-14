@@ -96,8 +96,18 @@ describe("aucune étape ne peut à elle seule manger le budget", () => {
     // Une requête tuée en vol ne rapporte rien et consomme tout ce qui restait. Le code
     // vérifie donc le budget restant AVANT de partir — sinon la dernière étape de la passe
     // partirait systématiquement pour mourir.
+    //
+    // ⚠️ CETTE GARDE ANCRAIT LA FORME, PAS LE FAIT, et elle a rougi le 2026-09-14 sur un
+    // lot qui ne touchait pas à ce qu'elle défend : elle cherchait littéralement
+    // `budgetMs < DELAI_MAX_MS`, et le passage à une requête PAR GRAPPE a renommé la
+    // grandeur comparée en `reste` — le budget restant à l'instant de la grappe, ce qui est
+    // strictement plus juste puisqu'il y a maintenant plusieurs requêtes. Ce qu'elle doit
+    // dire : « quelque chose est comparé à `DELAI_MAX_MS` avant de lancer la requête ».
     const source = lire("lib/actions.ts");
-    expect(source).toContain("budgetMs < DELAI_MAX_MS");
+    expect(source).toMatch(/<\s*DELAI_MAX_MS/);
+    // Non-vacuité : la constante doit venir d'`overpass`, pas d'un homonyme local qui
+    // laisserait la comparaison vraie tout en mesurant autre chose.
+    expect(source).toMatch(/DELAI_MAX_MS[^\n]*\}? from "\.\/overpass"|DELAI_MAX_MS,/);
   });
 
   it("la temporisation entre deux passes dépasse la durée d'une passe", () => {

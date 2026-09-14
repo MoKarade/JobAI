@@ -1739,6 +1739,15 @@ revérifier manuellement, je veux que tu le mettes en place ».
       qui était réellement cassé : la FICHE de Marc (`/profil` et `/references` affichaient
       le barème et le SWOT du code au lieu des siens) et surtout **`validerProfil`, qui
       refusait — donc plus aucun CV validable**.
-- [ ] 🔧 **`[BORNES-01]`** `bornes=0/1293 (1293 en échec)` dans les journaux du 2026-09-14,
-      plus « boîte englobante anormalement large — interrogation annulée ». La mesure des
-      bornes de recharge ne produit plus rien. Bug PRÉEXISTANT, signalé, non corrigé.
+- [x] 🔧 **`[BORNES-01]`** `bornes=0/1293 (1293 en échec)` dans les journaux du 2026-09-14,
+      plus « boîte englobante anormalement large — interrogation annulée ». ✅ 2026-09-14 :
+      la garde d'étendue décide désormais du **découpage**, plus de l'abandon.
+      `grapperPourBornes` (`lib/bornes.ts`, PURE) rend des grappes dont chaque boîte respecte
+      l'étendue PAR CONSTRUCTION — croissance gloutonne sur la vraie boîte, marge comprise,
+      donc aucune taille de cellule ni latitude supposée. La passe interroge les plus grosses
+      grappes d'abord, tant que le budget permet une requête entière ; ce qui n'est pas
+      atteint repasse. Les positions qu'aucune requête régionale ne peut couvrir sont
+      **NOMMÉES avec leurs coordonnées** (à re-géocoder), plus jamais fondues dans un compte.
+      ⚠️ Le défaut n'était pas la garde — refuser une requête qui ramènerait un continent est
+      juste — mais son EFFET : un seul lieu mal géocodé gelait 1 292 mesures, et le refus
+      était définitif (un échec ne marque rien, donc le lot du lendemain était identique).
