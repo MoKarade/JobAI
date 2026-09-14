@@ -16,7 +16,8 @@ import { z } from "zod";
 import { PrioriteSchema, StatutSchema, type Offre, type Statut } from "../types";
 import { vueOffre, type OffreVue } from "./vue";
 import { joursEntre } from "../dureeVie";
-import type { SuiviVeille } from "../veille";
+import { SEUIL_ABSENCES_PEREMPTION, type SuiviVeille } from "../veille";
+import { seuilFermetureJours } from "../fermetureAuto";
 
 /**
  * Offres rendues au maximum par une recherche.
@@ -160,6 +161,16 @@ export interface EtatVeilleMcp {
    * mais ne retrouve plus ce qu'elle suivait ; un `null` veut dire qu'elle ne suit rien.
    */
   plusVieilleVueJours: number | null;
+  /**
+   * L'âge à partir duquel la passe ferme d'office une offre jamais confirmée, en jours.
+   *
+   * ⚠️ `null` VEUT DIRE « LA RÈGLE NE TIRERA PAS », et c'est la seule chose qui distingue
+   * « rien à fermer » de « le mécanisme est mort à l'arrivée ». Il se MESURE sur la survie
+   * observée (`lib/fermetureAuto.ts`) : trop peu de fermetures connues, ou une courbe qui
+   * ne descend jamais assez bas, et il n'y a pas de seuil justifiable — donc rien ne ferme.
+   * Sans ce champ, on ne peut pas distinguer les deux avant d'attendre une passe.
+   */
+  seuilFermetureJours: number | null;
 }
 
 /** Tous les statuts, dérivés du schéma — même raison que ci-dessus. */
@@ -197,12 +208,21 @@ export function resumerPourMcp(
     nonNotees: vivantes.filter((o) => o.score === null).length,
     nonSituees: vivantes.filter((o) => o.km === null).length,
     meilleureNote: notes.length === 0 ? null : Math.max(...notes),
-    veille: etatVeille(vivantes, veille),
+    veille: etatVeille(offres, vivantes, veille),
   };
 }
 
 /** La partie « veille » du résumé. PURE. */
 function etatVeille(
+  /**
+   * TOUTES les offres, périmées comprises.
+   *
+   * ⚠️ PAS SEULEMENT LES VIVANTES : la survie se mesure sur les offres qui ont FERMÉ, et un
+   * appel qui ne verrait que les vivantes n'observerait aucune fermeture — donc aucun seuil,
+   * donc « la règle ne tirera pas », en permanence et sans raison. Le seuil annoncé ici doit
+   * être celui que la passe applique, et la passe voit tout le suivi.
+   */
+  toutes: readonly Offre[],
   vivantes: readonly Offre[],
   veille?: { journal: Readonly<Record<string, SuiviVeille>>; aujourdhui: string },
 ): EtatVeilleMcp {
@@ -211,6 +231,7 @@ function etatVeille(
     jamaisConfirmees: vivantes.length,
     ageJamaisConfirmees: { moins7: 0, de7a30: 0, de30a90: 0, plus90: 0 },
     plusVieilleVueJours: null,
+    seuilFermetureJours: null,
   };
   if (!veille) return vide;
 
@@ -239,5 +260,8 @@ function etatVeille(
     jamaisConfirmees: vivantes.length - confirmees,
     ageJamaisConfirmees: age,
     plusVieilleVueJours: plusVieille,
+    // Le MÊME appel que la passe, avec le MÊME plancher : deux calculs séparés finiraient
+    // par annoncer un seuil que la passe n'applique pas.
+    seuilFermetureJours: seuilFermetureJours(toutes, veille.journal, SEUIL_ABSENCES_PEREMPTION),
   };
 }

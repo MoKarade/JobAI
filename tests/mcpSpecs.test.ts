@@ -342,3 +342,35 @@ describe("preparerEcriture — l'exception de l'ADR-0011, et ses quatre conditio
     expect(suivante?.priorite).toBe("Haute");
   });
 });
+
+describe("resumerPourMcp — le seuil de fermeture, lisible AVANT qu'une passe tourne", () => {
+  const JOUR = "2026-09-14";
+  const vu = (p: string, d: string) => ({ premiereVue: p, derniereVue: d, absences: 0 });
+
+  it("rend `null` quand la règle ne peut pas tirer — et c'est l'information qui manquait", () => {
+    // « Rien à fermer » et « le mécanisme est mort à l'arrivée » produisent le même silence
+    // dans la production. Sans ce champ, il faut attendre une passe pour les distinguer.
+    const r = resumerPourMcp([offre({ id: "a" })], { journal: {}, aujourdhui: JOUR });
+    expect(r.veille.seuilFermetureJours).toBeNull();
+  });
+
+  it("MESURE le seuil sur les offres FERMÉES, pas seulement sur les vivantes", () => {
+    // ⚠️ LE PIÈGE QUE CE TEST FERME : un calcul qui ne verrait que les offres vivantes
+    // n'observerait aucune fermeture, donc rendrait `null` en permanence — un « la règle ne
+    // tirera pas » permanent et faux, exactement le genre de verdict qu'on croit.
+    const offres = [];
+    const journal: Record<string, ReturnType<typeof vu>> = {};
+    for (let i = 0; i < 12; i++) {
+      const id = `f-${i}`;
+      offres.push(offre({ id, perimeeLe: "2026-09-01T00:00:00.000Z" }));
+      journal[id] = vu("2026-08-10", "2026-08-15");
+    }
+    for (let i = 0; i < 12; i++) {
+      const id = `v-${i}`;
+      offres.push(offre({ id }));
+      journal[id] = vu("2026-09-13", "2026-09-13");
+    }
+    const r = resumerPourMcp(offres, { journal, aujourdhui: JOUR });
+    expect(r.veille.seuilFermetureJours).toBe(5);
+  });
+});
