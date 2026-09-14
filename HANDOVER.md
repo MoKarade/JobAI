@@ -6,6 +6,54 @@
 
 ---
 
+## Session 2026-09-14 (suite 3) — le profil enregistré se relit
+
+`[PROFIL-01]`, demandé par Marc après le lot précédent.
+
+**La panne** : le document de profil en base ne passait plus `ProfilSchema` — quatre champs
+manquants, tous ajoutés au MÊME commit (ADR-0014 D2). Le document n'est pas corrompu, il est
+**antérieur** au barème d'aujourd'hui, et rien ne l'avait relu depuis.
+
+**⚠️ Ce que j'avais annoncé était trop large, et c'est mesuré** : « tout réglage enregistré
+est ignoré, `termesParJour` compris » est FAUX. Le rayon et les métiers vivent dans leurs
+propres lignes d'état ; `lib/scoring.ts` note avec `PROFIL_DEFAUT` par défaut ; et
+`termesParJour` n'est lu par aucun code hors du défaut — c'est la Routine qui l'applique
+depuis le protocole. Ce qui était réellement cassé : la FICHE (`/profil` et `/references`
+montraient le barème et le SWOT du CODE au lieu de ceux tirés du CV de Marc) et surtout
+**`validerProfil`, qui refusait — donc plus aucun CV validable**.
+
+**Le correctif** : `lib/profilStocke.ts` (PURE) comble depuis `PROFIL_DEFAUT` ce que le
+document n'a pas, **récursivement** (le cas réel, `ponderation.conditions`, est DANS un objet
+déjà présent : une migration à un seul niveau l'aurait raté), puis passe le schéma STRICT.
+
+Trois refus maintenus, chacun délibéré :
+- une valeur **présente** n'est jamais écrasée, même différente du défaut — c'est le choix de
+  Marc, et c'est le test qui sépare une migration d'un écrasement ;
+- une valeur présente mais **fausse** lève toujours : « ce champ n'existait pas encore » et
+  « ce champ est cassé » sont deux situations opposées ;
+- un document qui n'est pas un objet lève : fabriquer un profil complet à partir de rien
+  reviendrait à servir le défaut sous l'apparence d'un profil validé.
+
+⚠️ **Pas d'assouplissement du schéma**, qui aurait réparé l'écran en une ligne et fait de
+chaque ajout futur une dérive silencieuse. Et **la liste des champs à combler se DÉRIVE du
+défaut** : le prochain champ du barème est couvert le jour où il y entre, sans que personne
+n'y pense — ce dépôt a payé cinq fois des listes écrites à la main.
+
+⚠️ **Pas de réécriture en base non plus** : un chemin de lecture qui écrit court contre les
+vraies écritures. Inutile ici — la prochaine validation de CV part du profil MIGRÉ et
+persiste la forme complète, donc la dérive se soigne d'elle-même.
+
+Un `console.warn` NOMME les champs comblés à chaque lecture : une migration muette ferait
+disparaître la seule trace que certains réglages viennent du défaut et non de Marc. C'est
+aussi le signal qui prouvera, dans les journaux Vercel, que le correctif a pris effet.
+
+Gate complet vert. `tests/profilStocke.test.ts` (11 cas, le document réel reconstitué depuis
+`PROFIL_DEFAUT` moins les quatre champs), plus la lecture unifiée : `profilActif` et
+`profilCourantOuDefaut` passent par la MÊME fonction, sans quoi la fiche s'afficherait
+pendant que la validation refuserait.
+
+---
+
 ## Session 2026-09-14 (suite 2) — la vérification se fait toute seule
 
 Marc : « quasi toutes les offres sont à vérifier, mais je veux pas revérifier manuellement,

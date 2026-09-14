@@ -1724,13 +1724,21 @@ revérifier manuellement, je veux que tu le mettes en place ».
 - [x] 🔧 **`[FERMETURE-02]`** La pastille « à vérifier » se tait quand le journal de veille a
       perdu la majorité du suivi : une pastille sur 1 593 offres ne dit rien des offres, elle
       dit que le journal est en panne. ✅ 2026-09-14.
-- [ ] 🔧 **`[PROFIL-01]`** Le profil actif stocké en base ne passe plus son schéma Zod
+- [x] 🔧 **`[PROFIL-01]`** Le profil actif stocké en base ne passait plus son schéma Zod
       (`ponderation.conditions`, `pointsConditions`, `facteurHorsDomaine`, `termesParJour`
-      manquants) : `/references` se replie sur le profil par DÉFAUT, donc **tout réglage
-      enregistré par Marc est ignoré**, `termesParJour` compris. Vu dans les journaux Vercel
-      le 2026-09-14. Bug PRÉEXISTANT, non causé par ce lot, non corrigé sans feu vert.
-      Le correctif est probablement une migration du document persisté, pas un assouplissement
-      du schéma — assouplir rendrait la dérive silencieuse.
+      manquants — les QUATRE ajoutés au même commit, ADR-0014 D2). ✅ 2026-09-14 :
+      `lib/profilStocke.ts` comble depuis `PROFIL_DEFAUT` ce que le document n'a pas, champ
+      par champ et RÉCURSIVEMENT, **sans jamais écraser une valeur présente**, puis passe le
+      schéma STRICT. Une valeur présente mais fausse lève toujours : « ce champ n'existait
+      pas encore » et « ce champ est cassé » ne se confondent pas.
+      ⚠️ **Correction de ce que cette entrée affirmait** : « tout réglage enregistré est
+      ignoré, `termesParJour` compris » était FAUX, et mesuré comme tel. Le rayon et les
+      métiers vivent dans leurs propres lignes d'état (`CLE_RAYON`, `CLE_METIERS`),
+      `lib/scoring.ts` note avec `PROFIL_DEFAUT` par défaut, et `termesParJour` n'est lu par
+      aucun code hors du défaut (c'est la Routine qui l'applique, depuis le protocole). Ce
+      qui était réellement cassé : la FICHE de Marc (`/profil` et `/references` affichaient
+      le barème et le SWOT du code au lieu des siens) et surtout **`validerProfil`, qui
+      refusait — donc plus aucun CV validable**.
 - [ ] 🔧 **`[BORNES-01]`** `bornes=0/1293 (1293 en échec)` dans les journaux du 2026-09-14,
       plus « boîte englobante anormalement large — interrogation annulée ». La mesure des
       bornes de recharge ne produit plus rien. Bug PRÉEXISTANT, signalé, non corrigé.

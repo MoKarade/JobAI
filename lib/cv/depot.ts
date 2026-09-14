@@ -12,7 +12,8 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "../db";
 import { colonnesCv, cvs } from "../db/schema";
 import { assurerMigrations } from "../migrations";
-import { ProfilSchema, type Profil, PROFIL_DEFAUT } from "../profil";
+import { type Profil, PROFIL_DEFAUT } from "../profil";
+import { parserProfilStocke } from "../profilStocke";
 import { ReponseExtractionSchema, type ReponseExtraction } from "./extraction";
 
 /** Un CV tel qu'on l'affiche : tout sauf le fichier et son texte. */
@@ -81,7 +82,19 @@ export async function profilActif(): Promise<Profil> {
     .where(eq(cvs.actif, true))
     .limit(1);
   if (!ligne?.profilValide) return PROFIL_DEFAUT;
-  return ProfilSchema.parse(JSON.parse(ligne.profilValide));
+  // ⚠️ MÊME LECTURE QUE `profilCourantOuDefaut` (`lib/profilStocke.ts`) : un document écrit
+  // avant qu'un champ du barème n'existe se comble depuis le défaut, champ par champ, sans
+  // écraser ce que Marc a choisi. Deux parses écrits séparément auraient divergé.
+  const { profil, combles } = parserProfilStocke(ligne.profilValide);
+  if (combles.length > 0) {
+    // ⚠️ DIT, JAMAIS SILENCIEUX. Une migration muette ferait disparaître la seule trace que
+    // certains réglages ne viennent pas de Marc mais du défaut. Et elle se NOMME : « 4
+    // champs comblés » ne se vérifie pas, la liste si.
+    console.warn(
+      `[profil] document antérieur à ${combles.length} champ(s) du barème, comblés depuis le défaut : ${combles.join(", ")}`,
+    );
+  }
+  return profil;
 }
 
 /**

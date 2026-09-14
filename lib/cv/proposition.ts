@@ -29,6 +29,7 @@ import {
   paliersSenioriteDepuisAnnees,
   type Profil,
 } from "../profil";
+import { parserProfilStocke } from "../profilStocke";
 import type { ReponseExtraction } from "./extraction";
 
 /** La nature d'un écart — elle change ce que Marc doit vérifier avant de cocher. */
@@ -301,11 +302,11 @@ export function appliquerEcarts(
 /** Le profil de départ d'une comparaison : le validé s'il existe, sinon celui du code. */
 export function profilCourantOuDefaut(profilValideJson: string | null): Profil {
   if (!profilValideJson) return PROFIL_DEFAUT;
-  const analyse = ProfilSchema.safeParse(JSON.parse(profilValideJson));
-  // Un profil stocké illisible NE DOIT PAS retomber en silence sur le défaut : les notes
-  // changeraient sans que rien ne l'explique. On lève — l'écran dira quoi.
-  if (!analyse.success) {
-    throw new Error(`Profil enregistré illisible : ${analyse.error.issues[0]?.message ?? "?"}`);
-  }
-  return analyse.data;
+  // ⚠️ PASSE PAR `parserProfilStocke`, ET PAS PAR UN `safeParse` À SOI. Un document écrit
+  // avant qu'un champ du barème n'existe n'est pas corrompu, il est ANCIEN — il se comble
+  // depuis le défaut, champ par champ, sans jamais écraser ce que Marc a choisi. Deux
+  // lectures écrites séparément auraient fini par migrer l'une et pas l'autre : la fiche
+  // s'afficherait pendant que la validation refuserait. Un profil stocké illisible continue
+  // de LEVER : retomber en silence sur le défaut ferait changer une fiche sans un mot.
+  return parserProfilStocke(profilValideJson).profil;
 }

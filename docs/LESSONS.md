@@ -315,3 +315,38 @@ retirait leur garde, parce qu'ils avaient le même âge que la vraie candidate e
 **Verrous** : `tests/fermetureAuto.test.ts` (17 cas, chaque abstention par son motif),
 `tests/ingest-passe-suspension.test.ts` (deux tests qui TRAVERSENT la passe, dont un sur une
 couverture INCOMPLÈTE), `tests/fraicheur.test.ts` (le silence quand le journal est perdu).
+
+---
+
+## 2026-09-14 — Un document persisté est daté par le schéma qui l'a écrit
+
+**La panne** : le profil enregistré de Marc ne passait plus `ProfilSchema`. Quatre champs
+manquants — `ponderation.conditions`, `pointsConditions`, `facteurHorsDomaine`,
+`termesParJour` —, tous ajoutés au MÊME commit (ADR-0014 D2). Document sain, simplement
+antérieur. Rien ne l'avait relu depuis.
+
+**Ce que ça cassait vraiment** : `/profil` et `/references` affichaient le barème et le SWOT
+du CODE sous l'apparence de ceux de Marc, et `validerProfil` REFUSAIT — plus aucun CV
+validable. Aucun de ces deux effets n'était dans mon annonce initiale.
+
+**Le remède, et ce qu'on a refusé de faire** : `lib/profilStocke.ts` comble depuis
+`PROFIL_DEFAUT` ce que le document n'a pas, récursivement, puis passe le schéma STRICT.
+Assouplir le schéma aurait réparé l'écran en une ligne et transformé chaque ajout futur en
+dérive silencieuse. La liste des champs se DÉRIVE du défaut : le prochain champ du barème est
+couvert le jour où il y entre. Une valeur présente n'est jamais écrasée (sinon on efface au
+lieu de migrer), et une valeur présente mais FAUSSE lève toujours — « ce champ n'existait pas
+encore » et « ce champ est cassé » sont deux situations opposées.
+
+**La deuxième leçon, plus chère** : j'avais annoncé à Marc « tout réglage enregistré est
+ignoré, `termesParJour` compris ». Mesuré une heure plus tard par un simple `grep` des
+consommateurs : FAUX sur toute la ligne. `termesParJour` n'est lu par aucun code hors du
+défaut, le rayon et les métiers ont leurs propres lignes d'état, la notation tourne sur
+`PROFIL_DEFAUT`. **Le nom d'un champ dans une trace d'erreur ne dit pas qui le lit.** J'avais
+déduit la portée du symptôme au lieu de la mesurer — la faute exacte que l'ADR-0005 avait
+déjà consignée (« un plan écrit d'après un TABLEAU de symptômes se trompe »), transposée à
+une ligne de journal.
+
+**Verrous** : `tests/profilStocke.test.ts` (11 cas, le document réel reconstitué depuis
+`PROFIL_DEFAUT` moins les quatre champs ; cinq mutations jouées), et une lecture UNIQUE —
+`profilActif` et `profilCourantOuDefaut` passent par la même fonction, sans quoi la fiche
+s'afficherait pendant que la validation refuserait.

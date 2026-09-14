@@ -1662,6 +1662,35 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   emporterait si sa garde tombait** — ici le plus vieux. Et ça ne se voit qu'en jouant la
   mutation : les deux fichiers étaient verts, et l'un des deux ne prouvait rien.
 
+- **Un document PERSISTÉ est daté par le schéma qui l'a écrit : ajouter un champ requis le
+  rend illisible, et personne ne le voit avant des semaines.** Quatre champs entrés au même
+  commit (ADR-0014 D2) ont fait tomber le profil enregistré de Marc — document parfaitement
+  sain, simplement ANTÉRIEUR. Conséquence invisible : `/profil` et `/references` montraient
+  le barème du CODE sous l'apparence du sien, et surtout **plus aucun CV ne pouvait être
+  validé**. Le remède n'est PAS d'assouplir le schéma (ça répare l'écran en une ligne et fait
+  de chaque ajout futur une dérive silencieuse) : c'est de COMBLER le document depuis le
+  défaut, à la lecture, et de garder le schéma strict derrière. Trois règles qui vont avec :
+  **la liste des champs à combler se DÉRIVE du défaut** (récursivement — le champ réel qui
+  manquait vivait DANS un objet déjà présent, une migration à un niveau l'aurait raté) ;
+  **une valeur présente n'est jamais écrasée**, même différente du défaut, sinon on ne migre
+  pas, on efface ; et **« absent » ne se confond jamais avec « présent mais faux »** — le
+  premier est un document ancien, le second une corruption, et maquiller le second est la
+  seule vraie faute possible ici. Réflexe : en ajoutant un champ requis à un schéma, demander
+  **ce qui est DÉJÀ écrit sous l'ancien**, exactement comme pour une colonne de base.
+
+- **Un diagnostic tiré d'un message d'erreur décrit le SYMPTÔME, pas la portée — y compris
+  quand c'est moi qui l'ai écrit une heure plus tôt.** J'ai lu « `termesParJour` manquant »
+  dans une trace Zod et annoncé à Marc que « tout réglage enregistré est ignoré ». Mesuré
+  ensuite par `grep` des consommateurs : `termesParJour` n'est lu par AUCUN code hors du
+  défaut (c'est la Routine qui l'applique depuis le protocole), le rayon et les métiers
+  vivent dans leurs propres lignes d'état, et la notation tourne sur `PROFIL_DEFAUT`. Rien de
+  ce que j'avais annoncé n'était exact — et le vrai dégât, lui, n'était pas dans la liste :
+  la validation d'un CV était totalement bloquée. **Le nom d'un champ dans une erreur ne dit
+  pas qui le lit.** Avant d'annoncer une portée, grepper les CONSOMMATEURS du champ, jamais
+  déduire de son nom. Et corriger l'annonce dans les trois endroits où elle a été écrite
+  (compte-rendu, `BACKLOG.md`, `HANDOVER.md`) : un diagnostic faux laissé en place devient la
+  prémisse du lot suivant.
+
 ## 10. Style et compte-rendu
 
 > 📣 Forme des comptes-rendus, des commits, des PR et des docs générées :
