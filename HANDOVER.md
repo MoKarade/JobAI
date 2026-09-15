@@ -6,6 +6,32 @@
 
 ---
 
+## Session 2026-09-15 (17:18 UTC) — le 403 a disparu, et le budget bloque la vérification
+
+Marc a fait le geste console. Passe suivante :
+
+`[trajets] sautée : Budget Routes du jour épuisé (48/50 éléments) — demain, ou le lien
+Google Maps.`
+
+**Plus de 403 — et ça ne prouve RIEN.** L'appel n'est pas parti : il a été refusé en amont par
+le frein quotidien. On ne sait donc pas encore si l'ajout de « Routes API » aux restrictions de
+la clé a réglé le problème. Ne pas lire cette ligne comme une réussite.
+
+**Ce qui a mangé le budget** : les appels REFUSÉS. `consommerBudgetRoutes` réserve AVANT
+l'appel — justifié pour un appel que Google accepte (« un appel parti est facturé même si sa
+réponse est illisible »), FAUX pour un 403 que Google refuse à la porte et ne facture pas.
+48 des 50 éléments du jour ont été brûlés sans qu'un seul trajet n'existe. Le frein posé pour
+protéger l'argent bloque désormais la réparation d'un défaut qui n'a rien coûté. Au backlog
+sous `[TRAJETS-02]`, avec le correctif proposé (rendre le budget sur un refus de configuration,
+jamais sur un 429 ni sur un appel accepté).
+
+**Le test qui reste possible AUJOURD'HUI** : un clic de trajet sur la Carte coûte **1 élément**
+(`obtenirTrajet` → `consommerBudgetRoutes(1)`) et il en reste 2. C'est le seul moyen de savoir
+aujourd'hui si le geste console a marché — la matrice, elle, en demande plus et sera refusée
+jusqu'à demain.
+
+---
+
 ## Session 2026-09-15 (17:05 UTC) — LA CAUSE : `API_KEY_SERVICE_BLOCKED`
 
 La citation de la réponse brute, livrée une heure plus tôt, a rendu son verdict au premier

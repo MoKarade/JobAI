@@ -1814,3 +1814,23 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       verrouillé par le corps EXACT relevé en production.
       **Ce qui reste, et c'est le geste de Marc** : ajouter Routes API aux restrictions de la
       clé. Le lot se coche quand les durées de trajet reviennent.
+      ⚠️ **17:18 UTC — le 403 a disparu, mais la vérification est BLOQUÉE pour la journée** :
+      `[trajets] sautée : Budget Routes du jour épuisé (48/50 éléments)`. L'appel n'est donc
+      même pas parti — on ne sait PAS encore si le geste console a marché. Un clic de trajet
+      sur la Carte coûte 1 élément et tient dans les 2 restants : c'est le seul test possible
+      aujourd'hui (voir `[TRAJETS-02]`).
+- [ ] 🟠 **`[TRAJETS-02]`** **Un refus de PLATEFORME ne doit pas consommer le budget Routes.**
+      `consommerBudgetRoutes` réserve AVANT l'appel, et son commentaire le justifie : « un appel
+      parti est facturé même si sa réponse est illisible ». C'est juste pour un appel que Google
+      ACCEPTE — c'est faux pour un **403 `API_KEY_SERVICE_BLOCKED`**, que Google refuse à la
+      porte et ne facture pas. Mesuré le 2026-09-15 : **48 des 50 éléments du jour brûlés sans
+      qu'un seul trajet n'existe**, uniquement par des appels refusés. Conséquence vécue : le
+      geste console de Marc a été fait, et il devient INVÉRIFIABLE jusqu'au lendemain — le frein
+      posé pour protéger l'argent bloque la réparation du défaut qui n'a rien coûté.
+      C'est la classe de leçon déjà écrite pour les échecs LLM de DriveAI (« classer par ORIGINE
+      avant de compter ; une panne de plateforme ne s'impute jamais à l'item »).
+      **Correctif proposé** : RENDRE le budget quand la réponse est un refus de configuration
+      (401/403 avec une `raison` de `lib/erreurGoogle.ts` ≠ quota). Ne pas rendre sur un 429
+      (quota réel), ni sur un succès, ni sur une réponse illisible d'un appel accepté — ce sont
+      les cas que la réservation avant appel protège vraiment. Un test par cas, et la mutation
+      « on rend toujours » doit rougir.
