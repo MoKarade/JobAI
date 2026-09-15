@@ -1751,3 +1751,24 @@ revérifier manuellement, je veux que tu le mettes en place ».
       ⚠️ Le défaut n'était pas la garde — refuser une requête qui ramènerait un continent est
       juste — mais son EFFET : un seul lieu mal géocodé gelait 1 292 mesures, et le refus
       était définitif (un échec ne marque rien, donc le lot du lendemain était identique).
+
+---
+
+## Constats de production du 2026-09-15 (12:49 UTC)
+
+Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc a ouvert l'app.
+
+- ✅ **`[FERMETURE-03]`** — `perimees` 624 → 645 (+21), `jamaisConfirmees` 21 → 0. La fermeture
+      d'office tire ET s'écrit. ⚠️ `meilleureNote` 85 → 78 : les mieux notées du suivi étaient
+      ces offres-là. Réversible depuis les archives.
+- ✅ **`[BORNES-01]`** — `1/6 grappe(s) interrogée(s) · 225 borne(s) vue(s) · 1178 lieu(x)
+      mesuré(s)`, soit `bornes=1178/1300`. Les cinq grappes restantes repasseront (budget).
+      ⚠️ **AUCUN aberrant signalé** : ma supposition « homonyme mal géocodé » était fausse. Les
+      six grappes sont des amas légitimes — le bassin couvre maintenant Gaspé, Cacouna,
+      Cap-Chat, plus de 3° d'étalement réel. Bon remède, mauvaise cause supposée.
+- 🟦 **`[PROFIL-01]`** — l'erreur a disparu (aucun log warning/error, corps vides sur `/profil`
+      et `/references`). Mais aucun `[profil] document antérieur…` non plus : rien n'a eu
+      besoin d'être comblé. Impossible de distinguer d'ici « document complet » de « aucun CV
+      actif ». À confirmer par l'écran.
+- [ ] 🧭 **`[TRAJETS-01]`** `[trajets] échec : Matrice refusée (403) — « Routes API » doit être
+      activée et dans les restrictions de la clé serveur.` Geste console Google, côté Marc.

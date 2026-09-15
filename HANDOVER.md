@@ -6,6 +6,44 @@
 
 ---
 
+## Session 2026-09-15 (suite) — les trois correctifs CONSTATÉS en production
+
+Marc a ouvert l'app à 12:49 UTC. Les journaux et `resume_suivi` tranchent, chacun par une
+mesure.
+
+**`[FERMETURE-03]` — tiré, et persisté.** `perimees` 624 → **645 (+21)**, `jamaisConfirmees`
+**21 → 0**, `suivies` 1588 → 1568. Les 21 offres qu'aucun balayage n'avait jamais confirmées
+sont aux archives, avec leur lien et leur recherche web.
+⚠️ **Conséquence à connaître** : `meilleureNote` est passée de **85 à 78**. Les mieux notées du
+suivi étaient précisément ces offres du jeu de départ (Chantier Davie 85, Groupe Leclerc 84,
+STERIS 80…). C'est ce que Marc a demandé, et c'est réversible — mais ça change ce que l'accueil
+montre en premier.
+
+**`[BORNES-01]` — de 0 à 1 178.** `[bornes] 1/6 grappe(s) interrogée(s) · 225 borne(s) vue(s) ·
+1178 lieu(x) mesuré(s) · marque=1028/1178 vitesse=150/1178 tarif=189/1178`, et
+`bornes=1178/1300` dans le bilan de la passe. Une grappe sur six a suffi au budget (`budget
+restant=0 ms`) ; les cinq autres repasseront, comme prévu.
+⚠️ **Ma supposition était fausse, et la mesure la corrige** : j'avais annoncé « probablement un
+homonyme géocodé à l'autre bout du monde ». **AUCUN aberrant n'a été signalé.** Les six grappes
+sont des amas LÉGITIMES — le suivi couvre désormais Gaspé, Cacouna, Cap-Chat, Vaudreuil : plus
+de 3° d'étalement réel. La garde ne bloquait pas sur une donnée sale, elle bloquait sur la
+croissance normale du bassin. Le découpage était donc le bon remède, pour une raison que je
+n'avais pas.
+
+**`[PROFIL-01]` — l'erreur a disparu.** Aucun log de niveau warning ou error dans la fenêtre,
+et les entrées `GET /profil` et `GET /references` ont un corps VIDE. La `ZodError` « profil
+actif illisible » de la veille n'est plus là : les pages relisent le profil sans incident.
+⚠️ **Ce que la mesure ne dit PAS** : aucun `[profil] document antérieur à N champ(s)…` non plus,
+donc `combles` valait zéro — rien n'a eu besoin d'être comblé. Impossible de distinguer d'ici
+« le document est complet » de « aucun CV n'est actif ». L'écran, lui, le dit : s'il montre les
+faits tirés du CV, tout va bien ; s'il montre « aucun CV », c'est l'autre branche.
+
+**Autre chose vue en passant, non corrigée** : `[trajets] échec : Matrice refusée (403) —
+« Routes API » doit être activée et dans les restrictions de la clé serveur`. Geste console
+Google côté Marc, déjà connu.
+
+---
+
 ## Session 2026-09-15 — la fermeture d'office n'atteignait pas la base
 
 Vérification du lendemain, et elle a trouvé quelque chose.
