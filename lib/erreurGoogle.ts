@@ -48,6 +48,24 @@
 //
 // ⚠️ Le corps ne porte JAMAIS la clé — elle voyage dans l'en-tête `X-Goog-Api-Key`, et Google
 // ne la renvoie pas. Citer la réponse brute ne publie donc aucun secret (garde-fou n°1).
+//
+// ── CE QUE LA CITATION A TROUVÉ, LE JOUR MÊME ───────────────────────────────────────
+//
+// 17:05 UTC, passe suivante : la réponse brute citée disait
+// `[{ "error": { … "reason": "API_KEY_SERVICE_BLOCKED" … } }]`. Deux faits d'un coup.
+//
+// 1. LA CAUSE ÉTAIT `API_KEY_SERVICE_BLOCKED` — dans la table depuis le premier jour. Le
+//    geste est « ajouter Routes API aux restrictions d'API de la clé serveur », PAS
+//    « activer l'API » : l'API est activée, c'est la CLÉ qui ne l'autorise pas.
+// 2. ELLE N'ÉTAIT PAS ATTEINTE parce que le corps est un TABLEAU (`computeRouteMatrix` est
+//    un endpoint de streaming) : `.error` y vaut `undefined`, donc la table n'était jamais
+//    consultée. Un refus parfaitement reconnaissable est resté « cause inconnue » deux lots
+//    durant — voir `denvelopper`.
+//
+// La morale pour la suite : ce module n'a JAMAIS eu tort de refuser de deviner. Ce qui
+// manquait était en amont, dans la façon de lui livrer le corps — d'abord un `json()` qui
+// jetait le non-JSON, puis une enveloppe qu'il ne savait pas ouvrir. Un classificateur
+// correct nourri d'une donnée amputée rend un verdict faux avec aplomb.
 
 /** La cause d'un refus, telle que Google la nomme. */
 export type RaisonRefusGoogle =
@@ -108,6 +126,30 @@ function citation(brut: string | null): string | null {
 }
 
 /**
+ * Rend l'objet qui PORTE l'erreur, que le corps soit un objet ou un TABLEAU.
+ *
+ * ⚠️ MESURÉ EN PRODUCTION LE 2026-09-15, ET C'EST LE PIÈGE DE TOUT CE MODULE.
+ * `computeRouteMatrix` est un endpoint de STREAMING : il rend un TABLEAU d'éléments, et son
+ * refus arrive donc ENVELOPPÉ — `[{ "error": { … } }]`, pas `{ "error": { … } }`. La cause
+ * était `API_KEY_SERVICE_BLOCKED`, que la table connaît depuis le premier jour ; elle n'a
+ * jamais été atteinte parce que `.error` sur un tableau vaut `undefined`. Un refus
+ * parfaitement reconnaissable est donc resté « cause inconnue » pendant deux lots.
+ *
+ * La leçon n'est pas « ajouter le cas tableau » mais : **la FORME de l'enveloppe fait partie
+ * du contrat d'erreur, et elle n'est pas la même pour toutes les méthodes d'une même API.**
+ * `computeRoutes` rend un objet, `computeRouteMatrix` un tableau — même hôte, même clé, même
+ * famille d'erreurs.
+ */
+function denvelopper(corps: unknown): unknown {
+  if (!Array.isArray(corps)) return corps;
+  for (const e of corps) {
+    const o = e as { error?: unknown; error_message?: unknown } | null;
+    if (o?.error !== undefined || o?.error_message !== undefined) return e;
+  }
+  return null;
+}
+
+/**
  * Lit le corps d'une erreur Google, à partir du TEXTE de la réponse. PURE, et tolérante :
  * un corps illisible rend « inconnue », jamais une exception — un diagnostic ne doit pas
  * devenir une seconde panne.
@@ -127,13 +169,14 @@ export function lireRefusGoogle(brut: string | null): RefusGoogle {
     }
   }
 
-  const err = (corps as { error?: unknown } | null)?.error as
+  const racine = denvelopper(corps);
+  const err = (racine as { error?: unknown } | null)?.error as
     | { message?: unknown; status?: unknown; details?: unknown }
     | undefined;
   // Les API « legacy » (Geocoding classique) n'ont pas d'`ErrorInfo` : elles rendent
   // `status: "REQUEST_DENIED"` et un `error_message`. On ne sur-interprète pas — c'est un
   // refus dont on ne connaît pas la cause, et le message cité fera le diagnostic.
-  const legacy = (corps as { error_message?: unknown } | null) ?? {};
+  const legacy = (racine as { error_message?: unknown } | null) ?? {};
   const message = texte(err?.message) ?? texte(legacy.error_message);
 
   const details = Array.isArray(err?.details) ? err.details : [];

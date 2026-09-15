@@ -1802,7 +1802,15 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       les cinq sites lisaient `reponse.json()`, donc un corps vide, une page HTML et un JSON
       muet rendaient la même phrase. Corrigé dans la foulée — lecture en TEXTE, JSON tenté
       dessus, et ce qui ne livre aucune phrase est CITÉ tel quel, borné.
-      **Ce qui reste** : la vraie cause n'est toujours pas connue. Le prochain passage citera
-      la réponse brute de Google, et c'est ELLE qui dira quel geste faire dans la console — ou,
-      si le corps est vide, que le refus ne vient probablement pas de l'API elle-même. Le lot ne
-      se coche qu'une fois ce geste fait et les durées revenues.
+      **CAUSE TROUVÉE — passage de 17:05 UTC, par la citation** :
+      `[{ "error": { … "reason": "API_KEY_SERVICE_BLOCKED" … } }]`. Deux faits d'un coup.
+      (a) Le geste est **« ajouter Routes API aux RESTRICTIONS D'API de la clé serveur »** —
+      Console Google → Identifiants → la clé serveur → Restrictions d'API. L'API est ACTIVÉE ;
+      c'est la clé qui ne l'autorise pas. Le message d'origine (« doit être activée ») envoyait
+      donc bien au mauvais endroit, comme supposé.
+      (b) La cause était dans la table `PAR_REASON` **depuis le premier jour** et n'a jamais été
+      atteinte : `computeRouteMatrix` est un endpoint de STREAMING, son refus arrive enveloppé
+      dans un TABLEAU, et `.error` sur un tableau vaut `undefined`. Corrigé (`denvelopper`),
+      verrouillé par le corps EXACT relevé en production.
+      **Ce qui reste, et c'est le geste de Marc** : ajouter Routes API aux restrictions de la
+      clé. Le lot se coche quand les durées de trajet reviennent.

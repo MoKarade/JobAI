@@ -483,3 +483,49 @@ filtré — la ligne n'avait simplement pas été émise dans la fenêtre observ
 migration du profil n'est donc pas silencieuse, et elle comble bien cinq champs. **Une absence
 de log dans une fenêtre d'une heure n'a jamais rien prouvé** ; il a suffi de regarder la bonne
 exécution.
+
+---
+
+## 2026-09-15 (17:05) — la cause était dans la table depuis le début : c'est l'ENVELOPPE qui la cachait
+
+**Ce que la citation a rendu**, au premier passage après le lot précédent :
+
+```
+[{ "error": { "code": 403,
+   "message": "Requests to this API routes.googleapis.com method
+               google.maps.routing.v2.Routes.ComputeRouteMatrix are blocked.",
+   "status": "PERMISSION_DENIED",
+   "details": [ { "reason": "API_KEY_SERVICE_BLOCKED", … } ] } }]
+```
+
+**Deux faits d'un coup.** Le geste est « ajouter Routes API aux restrictions d'API de la clé
+serveur » — l'API est activée, c'est la clé qui ne l'autorise pas. Et surtout :
+`API_KEY_SERVICE_BLOCKED` était dans la table `PAR_REASON` **depuis le premier commit**.
+
+**Pourquoi elle n'était jamais atteinte** : `computeRouteMatrix` est un endpoint de
+**STREAMING**. Il rend un TABLEAU d'éléments, et son refus arrive donc ENVELOPPÉ —
+`[{ "error": … }]` et non `{ "error": … }`. `.error` sur un tableau vaut `undefined`, donc la
+table n'était jamais consultée. Un refus parfaitement reconnaissable est resté « cause
+inconnue » pendant deux lots, avec un message juste assez vrai pour ne pas alerter.
+
+**Règle** : la FORME de l'enveloppe fait partie du contrat d'erreur, et elle n'est pas la même
+pour toutes les méthodes d'une même API — `computeRoutes` rend un objet, `computeRouteMatrix`
+un tableau, même hôte et même clé. Avant de conclure qu'une réponse « ne porte pas » ce qu'on
+cherche, vérifier si elle le porte **une couche plus bas**.
+
+**La morale de la série entière** : trois lots d'affilée, la logique de classement était JUSTE
+et c'est le CHEMIN D'ALIMENTATION qui perdait l'information — d'abord la cause déduite du seul
+statut, puis un `json()` qui jetait tout corps non-JSON, puis une enveloppe qu'on ne savait pas
+ouvrir. **Un classificateur correct nourri d'une donnée amputée rend un verdict faux avec
+aplomb**, et il le rend d'autant plus crédiblement qu'il est bien écrit. Devant un verdict
+« inconnu » qui persiste, auditer ce qu'on DONNE au classificateur avant de toucher au
+classificateur.
+
+**Ce qui a rendu le diagnostic possible** : la citation du corps brut, livrée une heure plus
+tôt. Sans elle, la chaîne restait « Google n'a donné aucune explication lisible » à vie — une
+phrase vraie, stable, et qui n'aurait jamais mené nulle part. Un repli honnête qui CITE la
+donnée finit par résoudre le problème ; un repli honnête qui se contente de dire « je ne sais
+pas » ne le résout jamais.
+
+**Verrou** : le corps EXACT relevé en production est une fixture de `tests/erreurGoogle.test.ts`.
+Mutation : retirer `denvelopper` fait tomber 3 tests.

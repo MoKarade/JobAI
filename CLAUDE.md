@@ -1761,6 +1761,21 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   invisible aux tests parce que leurs faux `fetch` ne pouvaient même pas exprimer le cas**
   (ils rendaient un objet portant `json`) — seul l'usage réel le montre, donc on REGARDE la
   première exécution en production au lieu de la supposer conforme.
+  ⚠️⚠️ **Et la citation a livré la cause le jour même : `API_KEY_SERVICE_BLOCKED`, que la
+  table connaissait DEPUIS LE PREMIER JOUR.** Elle n'était jamais atteinte parce que le corps
+  de `computeRouteMatrix` est un **TABLEAU** (`[{ "error": … }]`, endpoint de streaming) et
+  que `.error` sur un tableau vaut `undefined`. Un refus parfaitement reconnaissable est resté
+  « cause inconnue » pendant deux lots, et le message affiché était juste assez vrai pour ne
+  pas alerter. **La FORME de l'enveloppe fait partie du contrat d'erreur, et elle n'est pas la
+  même pour toutes les méthodes d'une même API** — `computeRoutes` rend un objet,
+  `computeRouteMatrix` un tableau, même hôte et même clé. Avant de conclure qu'une réponse
+  « ne porte pas » ce qu'on cherche, vérifier si elle le porte **une couche plus bas**.
+  ⚠️ La morale de la série entière, en une phrase : **un classificateur correct nourri d'une
+  donnée amputée rend un verdict faux avec aplomb.** Trois lots de suite, la logique de
+  classement était juste et c'est le CHEMIN D'ALIMENTATION qui perdait l'information — d'abord
+  le corps déduit du statut, puis le `json()` qui jetait le non-JSON, puis l'enveloppe non
+  ouverte. Devant un verdict « inconnu » persistant, auditer ce qu'on DONNE au classificateur
+  avant de toucher au classificateur.
 
 ## 10. Style et compte-rendu
 

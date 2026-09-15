@@ -77,6 +77,73 @@ describe("lireRefusGoogle — la cause vient de `reason`, jamais du message", ()
   });
 });
 
+describe("lireRefusGoogle — le corps de computeRouteMatrix est un TABLEAU", () => {
+  /**
+   * ⚠️ LE CORPS EXACT RENVOYÉ PAR LA PRODUCTION LE 2026-09-15 À 17:05 UTC, relevé dans les
+   * journaux parce que le lot précédent avait appris à CITER ce qu'il ne comprenait pas.
+   * `computeRouteMatrix` est un endpoint de STREAMING : son refus arrive enveloppé dans un
+   * tableau. La cause — `API_KEY_SERVICE_BLOCKED` — était dans la table depuis le premier
+   * jour et n'a jamais été atteinte : `.error` sur un tableau vaut `undefined`.
+   */
+  const CORPS_MATRICE = JSON.stringify([
+    {
+      error: {
+        code: 403,
+        message:
+          "Requests to this API routes.googleapis.com method " +
+          "google.maps.routing.v2.Routes.ComputeRouteMatrix are blocked.",
+        status: "PERMISSION_DENIED",
+        details: [
+          {
+            "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+            reason: "API_KEY_SERVICE_BLOCKED",
+            domain: "googleapis.com",
+            metadata: {
+              service: "routes.googleapis.com",
+              method: "google.maps.routing.v2.Routes.ComputeRouteMatrix",
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  it("⚠️ reconnaît la cause ENVELOPPÉE dans un tableau — le cas réel du 2026-09-15", () => {
+    const r = lireRefusGoogle(CORPS_MATRICE);
+    expect(r.raison).toBe("cle-restreinte-api");
+    expect(r.message).toContain("are blocked");
+    // Cause reconnue ⇒ plus de citation brute : le geste se suffit.
+    expect(r.brut).toBeNull();
+  });
+
+  it("mène au geste JUSTE — les restrictions de la clé, PAS la Library", () => {
+    const p = expliquerRefusGoogle("Routes API", 403, lireRefusGoogle(CORPS_MATRICE));
+    expect(p).toContain("Restrictions d'API");
+    expect(p).not.toContain("Library");
+  });
+
+  it("un tableau sans erreur reconnaissable reste « inconnue », et se cite", () => {
+    const r = lireRefusGoogle('[{"autre":1}]');
+    expect(r.raison).toBe("inconnue");
+    expect(r.brut).toContain("autre");
+  });
+
+  it("un tableau VIDE ne lève pas et n'invente rien", () => {
+    const r = lireRefusGoogle("[]");
+    expect(r.raison).toBe("inconnue");
+    expect(r.message).toBeNull();
+  });
+
+  it("prend le PREMIER élément qui porte une erreur, pas le premier tout court", () => {
+    // Un flux de matrice peut commencer par des éléments valides avant de buter.
+    const r = lireRefusGoogle(
+      '[{"originIndex":0},{"error":{"message":"Refus.","details":[{"reason":"BILLING_DISABLED"}]}}]',
+    );
+    expect(r.raison).toBe("facturation");
+    expect(r.message).toBe("Refus.");
+  });
+});
+
 describe("lireRefusGoogle — ce qu'on ne sait pas, on ne l'invente pas", () => {
   it("rend « inconnue » sur une raison qu'on ne connaît pas, en gardant la phrase", () => {
     const r = lireRefusGoogle(corpsAvecReason("QUELQUE_CHOSE_DE_NEUF", "Une cause inédite."));

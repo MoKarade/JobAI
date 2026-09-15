@@ -6,6 +6,39 @@
 
 ---
 
+## Session 2026-09-15 (17:05 UTC) — LA CAUSE : `API_KEY_SERVICE_BLOCKED`
+
+La citation de la réponse brute, livrée une heure plus tôt, a rendu son verdict au premier
+passage :
+
+`[{ "error": { "code": 403, "message": "Requests to this API routes.googleapis.com method
+google.maps.routing.v2.Routes.ComputeRouteMatrix are blocked.", "status":
+"PERMISSION_DENIED", "details": [ { …, "reason": "API_KEY_SERVICE_BLOCKED", … } ] } }]`
+
+**LE GESTE, pour Marc** : Console Google → **Identifiants** → la clé serveur
+(`GOOGLE_MAPS_API_KEY`) → **Restrictions d'API** → ajouter **« Routes API »**. L'API est
+ACTIVÉE ; c'est la CLÉ qui ne l'autorise pas. Le message d'origine (« doit être activée »)
+envoyait donc bien au mauvais endroit — la supposition de départ est confirmée par la mesure.
+
+**ET LE DÉFAUT QUI L'AVAIT CACHÉE** : `API_KEY_SERVICE_BLOCKED` est dans la table
+`PAR_REASON` depuis le premier commit. Elle n'a jamais été atteinte parce que
+`computeRouteMatrix` est un endpoint de **STREAMING** : son refus arrive enveloppé dans un
+TABLEAU (`[{ "error": … }]`), et `.error` sur un tableau vaut `undefined`. Un refus
+parfaitement reconnaissable est resté « cause inconnue » pendant deux lots. Corrigé par
+`denvelopper`, verrouillé par le corps EXACT relevé en production.
+
+⚠️ **La morale des trois lots, et elle vaut au-delà de Google** : la logique de classement
+était juste à chaque fois ; c'est le CHEMIN D'ALIMENTATION qui perdait l'information — le
+corps déduit du statut, puis le `json()` qui jetait le non-JSON, puis l'enveloppe non ouverte.
+**Un classificateur correct nourri d'une donnée amputée rend un verdict faux avec aplomb.**
+Devant un « inconnu » qui persiste, auditer ce qu'on DONNE au classificateur avant de toucher
+au classificateur.
+
+**Vérifications** : gate complet vert. Mutation : retirer `denvelopper` fait tomber 3 tests,
+dont celui qui porte le corps réel.
+
+---
+
 ## Session 2026-09-15 (soir) — premier passage réel : le message ne ment plus, mais il ne dit rien
 
 Marc a lancé la veille à 15:45 UTC. La ligne est tombée :
