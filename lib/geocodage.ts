@@ -622,7 +622,7 @@ export async function geocoderEntrepriseGoogle(
     // 403, et les affirmer toutes les deux à chaque fois envoie chercher au mauvais endroit
     // quatre fois sur six.
     if (reponse.status === 403 || reponse.status === 401) {
-      const refus = lireRefusGoogle(await reponse.json().catch(() => null));
+      const refus = lireRefusGoogle(await reponse.text().catch(() => null));
       throw new Error(
         `${expliquerRefusGoogle("Geocoding API", reponse.status, refus)} (pour « ${nom} »)`,
       );
@@ -704,7 +704,7 @@ export async function chercherEntreprisesGoogle(
   });
   if (!reponse.ok) {
     if (reponse.status === 403 || reponse.status === 401) {
-      const refus = lireRefusGoogle(await reponse.json().catch(() => null));
+      const refus = lireRefusGoogle(await reponse.text().catch(() => null));
       throw new Error(expliquerRefusGoogle("Places API (New)", reponse.status, refus));
     }
     throw new Error(`Google Places Autocomplete a répondu HTTP ${reponse.status}`);
@@ -771,7 +771,7 @@ export async function detailsEntrepriseGoogle(
   );
   if (!reponse.ok) {
     if (reponse.status === 403 || reponse.status === 401) {
-      const refus = lireRefusGoogle(await reponse.json().catch(() => null));
+      const refus = lireRefusGoogle(await reponse.text().catch(() => null));
       throw new Error(expliquerRefusGoogle("Places API (New)", reponse.status, refus));
     }
     throw new Error(

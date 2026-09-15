@@ -1745,6 +1745,22 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   d'un nom. Prouvé par mutation aux deux bouts : couper la lecture du corps aux cinq sites
   fait tomber cinq tests (un par site), et rétablir le repli « cause inconnue → API non
   activée » en fait tomber six.
+  ⚠️⚠️ **Et « on cite ce qu'on ne sait pas » ne valait RIEN tant que le corps devait être du
+  JSON — trouvé au PREMIER USAGE RÉEL, deux heures après le déploiement.** La production a
+  rendu `Routes API refuse la clé (403). Google n'a donné aucune explication lisible`. Le
+  message ne mentait pas ; il n'apprenait rien non plus. Cause : les cinq sites lisaient
+  `reponse.json().catch(() => null)`, donc un corps VIDE, une page HTML et un JSON sans
+  `message` produisaient la MÊME phrase — alors que ce sont trois diagnostics différents (rien
+  à lire ; un refus posé AVANT l'API ; une cause à ajouter à la table). On lit donc le corps en
+  **TEXTE** et on tente le JSON dessus : ce qui n'a livré aucune phrase est cité TEL QUEL,
+  borné, espaces repliés. **Règle générale : une branche de repli qui promet de CITER la donnée
+  brute doit RECEVOIR la donnée brute** — un analyseur placé avant elle lui livre `null`
+  exactement dans les cas qu'elle existe pour couvrir. Réflexe de revue : pour chaque repli
+  « on rend ce qu'on a », remonter le chemin et vérifier que « ce qu'on a » n'a pas déjà été
+  jeté par une conversion en amont. Corollaire de calendrier, re-vécu : **ce défaut était
+  invisible aux tests parce que leurs faux `fetch` ne pouvaient même pas exprimer le cas**
+  (ils rendaient un objet portant `json`) — seul l'usage réel le montre, donc on REGARDE la
+  première exécution en production au lieu de la supposer conforme.
 
 ## 10. Style et compte-rendu
 

@@ -252,10 +252,12 @@ function refusGoogle(reason: string, statut = 403) {
       details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason }],
     },
   };
+  // ⚠️ `text`, PAS `json` : le code lit le corps en TEXTE et tente le JSON dessus, pour ne
+  // pas jeter une réponse qui n'en serait pas (cf. `lib/erreurGoogle.ts`, 2026-09-15).
   return (async () => ({
     ok: false,
     status: statut,
-    json: async () => corps,
+    text: async () => JSON.stringify(corps),
   })) as unknown as typeof fetch;
 }
 

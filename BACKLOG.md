@@ -1776,13 +1776,16 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       qu'ils rendent les `console.log` des mêmes requêtes. Une promesse d'observabilité qu'on
       ne peut pas relire n'en est pas une — à re-vérifier au prochain incident de profil
       plutôt qu'à chasser à froid (`[PROFIL-02]`).
-- [ ] 🔧 **`[PROFIL-02]`** Le `console.warn` de `profilActif` (« document antérieur à N
-      champ(s) du barème ») n'apparaît pas dans les journaux Vercel, alors que les
-      `console.log` voisins y sont. Tant que ce n'est pas tranché, la migration du profil est
-      SILENCIEUSE en production : Marc ne peut pas savoir lesquels de ses réglages viennent du
-      défaut. Pistes : `console.warn` filtré côté plateforme, ou la ligne n'a jamais été émise
-      (document déjà complet). Trancher en faisant émettre un `console.log` de contrôle au
-      même endroit lors du prochain passage sur ce module — pas un lot à part.
+- [x] 🔧 **`[PROFIL-02]`** ✅ **Tranché le 2026-09-15 par l'observation, sans écrire une ligne.**
+      La question était : le `console.warn` de `profilActif` est-il filtré par Vercel, ou n'a-t-il
+      jamais été émis ? Il est apparu au `GET /profil` de 15:44:59 UTC :
+      `[profil] document antérieur à 5 champ(s) du barème, comblés depuis le défaut :
+      faits.parcours, ponderation.conditions, pointsConditions, facteurHorsDomaine, termesParJour`.
+      Rien n'est filtré ; la ligne n'avait simplement pas été émise dans la fenêtre observée la
+      veille. **La migration du profil n'est donc PAS silencieuse**, et elle comble cinq champs —
+      dont `faits.parcours`, que le diagnostic initial ne nommait pas.
+      ⚠️ Leçon : une absence de log dans une fenêtre d'une heure ne prouve rien (rétention Vercel
+      ≈ 1 h). Ce lot a existé sur une inférence tirée d'un silence.
 - [ ] 🧭 **`[TRAJETS-01]`** `[trajets] échec : Matrice refusée (403) — « Routes API » doit être
       activée et dans les restrictions de la clé serveur.` Geste console Google, côté Marc.
       ⚠️ **L'énoncé ci-dessus était une SUPPOSITION du code, pas un diagnostic** : cette phrase
@@ -1793,6 +1796,13 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       problème réglé. Livré le 2026-09-15 : `lib/erreurGoogle.ts` lit la cause dans
       `error.details[].reason` (l'identifiant STABLE de Google) et rend LE geste de cette
       cause ; les cinq sites de refus (Routes ×2, Geocoding, Places ×2) y passent.
-      **Ce qui reste** : la vraie cause n'est pas encore connue — elle s'affichera au prochain
-      passage des trajets, et c'est ELLE qui dira quel geste faire dans la console. Le lot ne
+      **Premier passage réel, 2026-09-15 15:45 UTC** : `Routes API refuse la clé (403). Google
+      n'a donné aucune explication lisible — relever la réponse brute pour trancher.` Le message
+      n'a donc PAS menti (il a refusé d'inventer « active l'API »), mais il n'apprenait rien :
+      les cinq sites lisaient `reponse.json()`, donc un corps vide, une page HTML et un JSON
+      muet rendaient la même phrase. Corrigé dans la foulée — lecture en TEXTE, JSON tenté
+      dessus, et ce qui ne livre aucune phrase est CITÉ tel quel, borné.
+      **Ce qui reste** : la vraie cause n'est toujours pas connue. Le prochain passage citera
+      la réponse brute de Google, et c'est ELLE qui dira quel geste faire dans la console — ou,
+      si le corps est vide, que le refus ne vient probablement pas de l'API elle-même. Le lot ne
       se coche qu'une fois ce geste fait et les durées revenues.

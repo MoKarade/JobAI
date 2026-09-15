@@ -105,12 +105,29 @@ describe("appelerRoutes — fetch injecté, échecs NOMMÉS", () => {
     expect(r.raison).not.toMatch(/Library/);
   });
 
-  it("⚠️ un corps illisible ne devient pas une cause inventée", async () => {
-    const r = await appelerRoutes(maison, P, "cle", vi.fn(async () => new Response("<html>", { status: 403 })));
+  it("⚠️ un corps illisible est CITÉ, pas jeté — sinon le journal n'apprend rien", async () => {
+    // Le 2026-09-15, la production a rendu « Google n'a donné aucune explication lisible ».
+    // Vrai, et inexploitable : le corps était jeté par un `json()` avant d'être lu.
+    const r = await appelerRoutes(
+      maison,
+      P,
+      "cle",
+      vi.fn(async () => new Response("<html>403 Forbidden</html>", { status: 403 })),
+    );
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.raison).toContain("403");
+    expect(r.raison).toContain("Réponse brute");
+    expect(r.raison).toContain("Forbidden");
     expect(r.raison).not.toMatch(/Library|SITES WEB/);
+  });
+
+  it("⚠️ un corps VIDE se DIT — un refus sans corps ne vient pas de l'API elle-même", async () => {
+    const r = await appelerRoutes(maison, P, "cle", vi.fn(async () => new Response("", { status: 403 })));
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.raison).toContain("VIDE");
+    expect(r.raison).not.toContain("Réponse brute");
   });
 
   it("refuse une réponse hors schéma plutôt que de cacher un NaN", async () => {

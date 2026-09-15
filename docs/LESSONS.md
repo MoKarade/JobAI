@@ -436,3 +436,50 @@ d'en supposer un — et le dire ainsi vaut mieux que de laisser croire que c'est
 **Verrous** : `tests/erreurGoogle.test.ts` (la traduction, cas par cas, dont le discriminant
 « un message qui dit autre chose que `reason` »), plus un test de branchement par site dans
 `tests/trajetRoutes.test.ts` et `tests/geocodage.test.ts`.
+
+---
+
+## 2026-09-15 (fin de journée) — « on cite ce qu'on ne sait pas » ne vaut rien si le corps doit être du JSON
+
+**Le symptôme, deux heures après le déploiement du correctif** :
+`[trajets] échec : Routes API refuse la clé (403). Google n'a donné aucune explication
+lisible — relever la réponse brute pour trancher.`
+
+**Ce qui allait bien** : le message ne mentait plus. La branche « cause inconnue » a fait
+exactement son travail — elle a refusé d'inventer « l'API n'est pas activée ».
+
+**Ce qui n'allait pas** : elle n'apprenait rien. Le module promettait de CITER ce qu'il ne
+sait pas interpréter, mais les cinq sites d'appel lisaient `reponse.json().catch(() => null)`
+— donc au premier caractère inattendu, le corps était **jeté avant d'arriver au module**. Un
+corps vide, une page HTML et un JSON sans `message` produisaient la même phrase, alors que ce
+sont trois diagnostics opposés : rien à lire ; un refus posé AVANT l'API (une page d'erreur de
+passerelle n'a pas la même cause qu'un refus de l'API) ; une cause à ajouter à la table.
+
+**La règle générale** : une branche de repli qui promet de rendre la donnée BRUTE doit la
+RECEVOIR. Un analyseur placé en amont lui livre `null` exactement dans les cas qu'elle existe
+pour couvrir — c'est-à-dire qu'elle est vide précisément quand on en a besoin. Pour chaque
+repli « on rend ce qu'on a », remonter le chemin et vérifier que « ce qu'on a » n'a pas déjà
+été converti, filtré ou avalé.
+
+**Le remède** : lire le corps en TEXTE, tenter le JSON dessus. Ce qui n'a livré aucune phrase
+est cité tel quel — borné à 300 caractères, espaces repliés sur une ligne. La citation n'est
+POSÉE que s'il n'y a pas de phrase (répéter la même chose deux fois est du bruit) et jamais
+quand la cause est reconnue (le geste se suffit). Le corps ne porte pas la clé — elle voyage
+dans l'en-tête `X-Goog-Api-Key` et Google ne la renvoie pas : citer ne publie aucun secret.
+
+**Pourquoi les tests ne pouvaient pas le voir** : leurs faux `fetch` rendaient un objet portant
+`json`. Le cas « le corps n'est pas du JSON » n'était pas seulement non testé — il était
+**inexprimable** dans le harnais. C'est la signature d'un défaut qui n'apparaît qu'au premier
+usage réel : on REGARDE la première exécution en production au lieu de la supposer conforme.
+
+**Prouvé par mutation, deux fois** : rendre `brut` toujours `null` fait tomber 5 tests ;
+revenir à `.json()` aux cinq sites en fait tomber 6.
+
+**En passant, une question tranchée par les mêmes journaux** : `[PROFIL-02]` demandait pourquoi
+le `console.warn` de `profilActif` n'apparaissait pas chez Vercel. Il est apparu :
+`[profil] document antérieur à 5 champ(s) du barème, comblés depuis le défaut : faits.parcours,
+ponderation.conditions, pointsConditions, facteurHorsDomaine, termesParJour`. Rien n'était
+filtré — la ligne n'avait simplement pas été émise dans la fenêtre observée la veille. La
+migration du profil n'est donc pas silencieuse, et elle comble bien cinq champs. **Une absence
+de log dans une fenêtre d'une heure n'a jamais rien prouvé** ; il a suffi de regarder la bonne
+exécution.

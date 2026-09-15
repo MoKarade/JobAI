@@ -17,9 +17,16 @@ import {
   type RaisonRefusGoogle,
 } from "@/lib/erreurGoogle";
 
-/** Le corps d'un refus Google « moderne » (Routes, Places New) : `ErrorInfo` dans `details`. */
+/**
+ * Le corps d'un refus Google « moderne » (Routes, Places New) : `ErrorInfo` dans `details`.
+ *
+ * ⚠️ RENDU EN TEXTE, parce que c'est ce que la fonction reçoit en vrai. Le premier usage réel
+ * (2026-09-15) a montré pourquoi ça compte : tant que l'appelant faisait `reponse.json()`, un
+ * corps qui n'est pas du JSON était jeté avant d'arriver ici, et les tests ne pouvaient même
+ * pas exprimer ce cas.
+ */
 function corpsAvecReason(reason: string, message = "Une phrase de Google.") {
-  return {
+  return JSON.stringify({
     error: {
       code: 403,
       message,
@@ -33,7 +40,7 @@ function corpsAvecReason(reason: string, message = "Une phrase de Google.") {
         },
       ],
     },
-  };
+  });
 }
 
 describe("lireRefusGoogle — la cause vient de `reason`, jamais du message", () => {
@@ -79,17 +86,52 @@ describe("lireRefusGoogle — ce qu'on ne sait pas, on ne l'invente pas", () => 
 
   it("lit le `error_message` des API legacy, qui n'ont pas d'ErrorInfo", () => {
     // Geocoding classique : ni `details`, ni `error` — un `status` et un `error_message`.
-    const r = lireRefusGoogle({ status: "REQUEST_DENIED", error_message: "La clé est bloquée." });
+    const r = lireRefusGoogle(
+      JSON.stringify({ status: "REQUEST_DENIED", error_message: "La clé est bloquée." }),
+    );
     expect(r.raison).toBe("inconnue");
     expect(r.message).toBe("La clé est bloquée.");
   });
 
   it("ne lève JAMAIS sur un corps illisible — un diagnostic n'est pas une seconde panne", () => {
-    for (const brut of [null, undefined, "", 42, [], { error: null }, { error: {} }]) {
+    for (const brut of [null, "", "   ", "42", "[]", "<html>oups", '{"error":null}', '{"error":{}}']) {
       const r = lireRefusGoogle(brut);
       expect(r.raison).toBe("inconnue");
     }
     expect(lireRefusGoogle(null).message).toBeNull();
+  });
+
+  it("⚠️ CITE la réponse brute quand elle ne porte AUCUNE phrase — le cas du 2026-09-15", () => {
+    // Journal du premier usage réel : « Google n'a donné aucune explication lisible ». Vrai,
+    // et inexploitable — parce que le corps était jeté avant d'arriver ici. Une page HTML,
+    // une réponse tronquée et un JSON muet donnaient tous la même phrase.
+    const r = lireRefusGoogle("<html><title>403 Forbidden</title></html>");
+    expect(r.raison).toBe("inconnue");
+    expect(r.message).toBeNull();
+    expect(r.brut).toContain("403 Forbidden");
+  });
+
+  it("replie les espaces et borne la citation — un journal, pas un vidage", () => {
+    const r = lireRefusGoogle("<html>\n\n   " + "z".repeat(500) + "</html>");
+    expect(r.brut).not.toBeNull();
+    expect((r.brut ?? "").length).toBeLessThanOrEqual(300);
+    expect(r.brut).not.toContain("\n");
+  });
+
+  it("⚠️ NE cite PAS le brut quand une phrase existe — répéter la même chose est du bruit", () => {
+    const r = lireRefusGoogle(corpsAvecReason("REASON_INEDITE", "Une cause inédite."));
+    expect(r.message).toBe("Une cause inédite.");
+    expect(r.brut).toBeNull();
+  });
+
+  it("⚠️ NI quand la cause est RECONNUE — le geste se suffit, la citation encombre", () => {
+    expect(lireRefusGoogle(corpsAvecReason("SERVICE_DISABLED")).brut).toBeNull();
+  });
+
+  it("distingue un corps VIDE d'un corps illisible — deux diagnostics, pas un", () => {
+    expect(lireRefusGoogle("").brut).toBeNull();
+    expect(lireRefusGoogle(null).brut).toBeNull();
+    expect(lireRefusGoogle("bruit").brut).toBe("bruit");
   });
 });
 
@@ -124,9 +166,16 @@ describe("expliquerRefusGoogle — le geste SUIT la cause", () => {
     expect(p).not.toContain("Restrictions d'API");
   });
 
-  it("le dit aussi quand Google n'a rien expliqué du tout", () => {
-    const p = expliquerRefusGoogle("Geocoding API", 403, lireRefusGoogle(null));
-    expect(p).toContain("aucune explication");
+  it("⚠️ un corps VIDE et un corps ILLISIBLE ne rendent PAS la même phrase", () => {
+    // C'est exactement ce que la version du 2026-09-15 confondait, et les deux cas appellent
+    // des gestes opposés : lire ce que le serveur a renvoyé, ou constater qu'il n'a rien
+    // renvoyé du tout — un refus sans corps ne vient en général pas de l'API elle-même.
+    const vide = expliquerRefusGoogle("Routes API", 403, lireRefusGoogle(""));
+    const illisible = expliquerRefusGoogle("Routes API", 403, lireRefusGoogle("<html>403</html>"));
+    expect(vide).toContain("VIDE");
+    expect(illisible).toContain("Réponse brute");
+    expect(illisible).toContain("403");
+    expect(vide).not.toBe(illisible);
   });
 
   it("rend une phrase DIFFÉRENTE pour chaque cause — sinon le classement est décoratif", () => {

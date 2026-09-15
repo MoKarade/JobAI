@@ -6,6 +6,44 @@
 
 ---
 
+## Session 2026-09-15 (soir) — premier passage réel : le message ne ment plus, mais il ne dit rien
+
+Marc a lancé la veille à 15:45 UTC. La ligne est tombée :
+
+`[trajets] échec : Routes API refuse la clé (403). Google n'a donné aucune explication
+lisible — relever la réponse brute pour trancher.`
+
+**La moitié qui marche** : la branche « cause inconnue » a fait son travail — elle a REFUSÉ
+d'affirmer « l'API n'est pas activée ». C'est précisément ce que le lot précédent visait.
+
+**La moitié qui manquait** : le module promettait de CITER ce qu'il ne sait pas interpréter,
+mais les cinq sites lisaient `reponse.json().catch(() => null)` — donc le corps était jeté
+AVANT d'arriver au module dès qu'il n'était pas du JSON. Un corps vide, une page HTML et un
+JSON sans `message` rendaient la même phrase, alors que ce sont trois diagnostics opposés.
+Corrigé : lecture en TEXTE, JSON tenté dessus, citation bornée de ce qui reste. Trois phrases
+distinctes désormais — cause non reconnue / réponse brute citée / réponse VIDE.
+
+**Ce qu'on sait à ce stade, et c'est peu** : le refus ne porte ni `reason` connue, ni phrase
+lisible. Le prochain passage citera la réponse telle quelle. Si elle est VIDE, ça oriente
+ailleurs que l'API elle-même — un refus sans corps d'erreur ne ressemble pas à un refus de
+Routes API.
+
+**`[PROFIL-02]` est clos par les mêmes journaux**, sans une ligne de code. Le `console.warn`
+est apparu : `[profil] document antérieur à 5 champ(s) du barème, comblés depuis le défaut :
+faits.parcours, ponderation.conditions, pointsConditions, facteurHorsDomaine, termesParJour`.
+Rien n'était filtré — la ligne n'avait pas été émise dans la fenêtre regardée la veille. La
+migration du profil comble bien cinq champs, dont un que je n'avais pas nommé.
+
+**Vu en passant, pas un défaut** : `[bornes] 0/6 grappe(s) interrogée(s)` avec `budget
+restant=0 ms`. La passe de distances a consommé le budget avant les bornes. Le découpage en
+grappes tient ; c'est l'ordre des étapes dans le budget qui décide, et `bornes=0/126` sur cette
+passe-là n'infirme rien.
+
+**Vérifications** : gate complet vert. Deux mutations : rendre `brut` toujours nul fait tomber
+5 tests, revenir à `.json()` aux cinq sites en fait tomber 6.
+
+---
+
 ## Session 2026-09-15 (fin) — `[TRAJETS-01]` : le message accusait la mauvaise cause
 
 **Le défaut n'était pas le 403, c'était la PHRASE.** `[trajets] échec : Matrice refusée (403) :

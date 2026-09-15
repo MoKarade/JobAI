@@ -115,7 +115,7 @@ export async function appelerRoutes(
     // traduisait tout 403 par « l'API doit être activée ou listée dans les restrictions » —
     // deux causes sur six, et les quatre autres envoyaient chercher au mauvais endroit.
     if (reponse.status === 403 || reponse.status === 401) {
-      const refus = lireRefusGoogle(await reponse.json().catch(() => null));
+      const refus = lireRefusGoogle(await reponse.text().catch(() => null));
       return { ok: false, raison: expliquerRefusGoogle("Routes API", reponse.status, refus) };
     }
     return { ok: false, raison: `Routes a répondu ${reponse.status}` };
@@ -211,7 +211,7 @@ export async function appelerMatrice(
     // appellent trois gestes différents : envoyer Marc activer une API qui l'est déjà lui
     // coûte un aller-retour et lui laisse croire le problème réglé (`lib/erreurGoogle.ts`).
     if (reponse.status === 403 || reponse.status === 401) {
-      const refus = lireRefusGoogle(await reponse.json().catch(() => null));
+      const refus = lireRefusGoogle(await reponse.text().catch(() => null));
       return { ok: false, raison: expliquerRefusGoogle("Routes API", reponse.status, refus) };
     }
     return { ok: false, raison: `Matrice a répondu ${reponse.status}` };
