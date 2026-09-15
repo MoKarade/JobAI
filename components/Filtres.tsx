@@ -193,6 +193,35 @@ export function resumerSeuils(filtres: EtatFiltres): string {
 }
 
 /**
+ * TOUT ce qui filtre, dit en une ligne — pour la barre REPLIÉE de la carte.
+ *
+ * ⚠️ POURQUOI ELLE EXISTE, ET POURQUOI ELLE DOIT ÊTRE COMPLÈTE. Replier la barre sur la
+ * page Carte rend de la hauteur au plan (demande de Marc, 2026-09-15), mais un filtre qui
+ * agit sans se montrer fait chercher un bug dans les données — c'est la règle du dépôt
+ * « ce qui est masqué se dit, TOUJOURS ». `resumerSeuils` ne couvre que les quatre seuils :
+ * repliée, la barre cache AUSSI la recherche et les trois bascules, donc l'indice les dit.
+ *
+ * PURE et exportée : son exhaustivité est vérifiée par un test qui DÉRIVE ses cas de
+ * `FILTRES_VIDES` — un filtre ajouté plus tard sans passer ici fait rougir la suite, au
+ * lieu de disparaître en silence derrière un pli.
+ */
+export function resumerFiltres(filtres: EtatFiltres): string {
+  const actifs: string[] = [];
+
+  const texte = filtres.texte.trim();
+  if (texte !== "") actifs.push(`« ${texte} »`);
+
+  // Les bascules viennent de la MÊME liste que les boutons rendus plus haut : l'indice ne
+  // peut pas nommer autre chose que ce que la barre propose.
+  for (const { cle, libelle } of BASCULES) if (filtres[cle]) actifs.push(libelle);
+
+  const seuils = resumerSeuils(filtres);
+  if (seuils !== "aucun") actifs.push(seuils);
+
+  return actifs.length === 0 ? "aucun" : actifs.join(" · ");
+}
+
+/**
  * Le compte affiché sous la barre, y compris ce qu'un seuil de distance a écarté FAUTE DE
  * MESURE.
  *

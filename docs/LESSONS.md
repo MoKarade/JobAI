@@ -529,3 +529,46 @@ pas » ne le résout jamais.
 
 **Verrou** : le corps EXACT relevé en production est une fixture de `tests/erreurGoogle.test.ts`.
 Mutation : retirer `denvelopper` fait tomber 3 tests.
+
+---
+
+## 2026-09-15 (soir) — replier une barre, c'est promettre de dire ce qu'elle cache
+
+**La demande** : « rends la carte plus grande ». Trois lectures possibles — ouvrir déjà
+agrandie (le bouton existe), garder la liste à côté et récupérer la hauteur au-dessus, ou les
+deux. Marc a choisi la deuxième. Poser la question a coûté trente secondes et évité de livrer
+une mise en page qu'il n'aurait pas voulue.
+
+**Ce qui était déjà là** : un bouton « Agrandir la carte » (82 % de la hauteur, liste dessous),
+un `Depliant` natif (`<details>`, sans JavaScript au chargement, avec un champ `indice` pour
+dire ce que le pli contient), et tout un lot d'août qui avait DÉJÀ resserré cette page au
+pixel. Le levier restant était le seul gros bloc encore à l'air libre : la barre de filtres.
+
+**La règle qui décide de la forme** : ce qui est masqué se dit, TOUJOURS. Un filtre actif
+derrière un pli fermé fait chercher un bug dans les données. `resumerSeuils` existait et ne
+couvre que les quatre seuils — s'en contenter aurait laissé la recherche et les trois bascules
+agir invisiblement. D'où `resumerFiltres`, qui dit tout, et dont l'exhaustivité est DÉRIVÉE de
+`FILTRES_VIDES` : un filtre ajouté plus tard sans passer par là fait rougir la suite, au lieu
+de disparaître derrière le pli.
+
+**Le pli est posé au POINT D'APPEL, pas dans le composant.** `Depliant` porte en commentaire
+que la barre est « un élément PERMANENT de l'écran d'ordinateur » et que la replier y serait
+une régression sans contrepartie. C'est vrai — sur la LISTE, où la hauteur ne manque pas. Sur
+la carte, la contrepartie existe et Marc l'a choisie. Deux surfaces, deux arbitrages, une
+seule barre : ça ne tient que si le pli vit chez l'appelant, et un test interdit au pli de
+déborder sur la liste.
+
+**« Situer » reste hors du pli** : c'est une ACTION, pas un filtre. Rangée sous un bouton
+nommé « Filtres », elle deviendrait introuvable — et son compte rendu avec elle. Le test vise
+l'ORDRE (le bouton vient après la fermeture du pli), pas seulement sa présence.
+
+⚠️ **Un cas de test IMPOSSIBLE est resté vert.** Ma table de cas portait `categorie:
+"production"` — une catégorie qui n'existe pas dans le type. Les 15 tests passaient : **vitest
+ne typecheck pas**, et le cas ne prouvait donc rien de ce qu'il prétendait couvrir. Seul `tsc`,
+au gate, l'a vu. La valeur est maintenant dérivée de `CATEGORIES` — comme la liste des champs
+est dérivée de `FILTRES_VIDES`. Règle : dans un test dont l'objet est l'EXHAUSTIVITÉ, les
+valeurs se dérivent du code autant que la liste des clés, sinon la garde devient une liste à
+tenir à la main de plus.
+
+**Prouvé par mutation** : vider l'indice de la recherche et des bascules fait tomber 6 tests ;
+déplacer « Situer » dans le pli en fait tomber 1.

@@ -6,6 +6,40 @@
 
 ---
 
+## Session 2026-09-15 (soir) — `[TRAJETS-01]` CLOS, et la carte gagne la barre de filtres
+
+**Les trajets marchent.** Marc a ajouté « Routes API » aux restrictions de la clé serveur, et
+le clic de trajet sur la Carte rend une durée. Le 403 est réglé — restera à confirmer la
+MATRICE (elle demande plus d'un élément et le budget du jour était épuisé) au prochain passage.
+
+**`[CARTE-04]` — la barre de filtres se replie, sur la carte SEULEMENT.** Demande : « rends la
+carte plus grande », avec la liste gardée à côté (choix de Marc entre trois options). Sur cette
+page la hauteur est la ressource rare : tout ce qui vit au-dessus du plan se retranche de lui,
+et la barre — recherche, trois bascules, quatre groupes de seuils — en est le plus gros poste.
+Repliée, elle tient sur une ligne.
+
+C'est un ARBITRAGE, écrit comme tel dans le code : filtrer coûte un clic de plus sur la carte.
+Le pli est posé AU POINT D'APPEL, jamais dans `Filtres` — la liste garde sa barre à l'air
+libre, où la hauteur ne manque pas, et un test interdit au pli d'y déborder.
+
+⚠️ **Ce qui rend le pli honnête, c'est son indice.** `resumerFiltres` dit TOUT ce qui filtre —
+la recherche, les trois bascules, les quatre seuils. `resumerSeuils` ne couvrait que les
+seuils : s'en contenter aurait laissé une recherche active agir derrière un pli fermé, et fait
+chercher un bug dans les données. Son exhaustivité est DÉRIVÉE de `FILTRES_VIDES` : un filtre
+ajouté plus tard sans passer par là fait rougir la suite.
+
+⚠️ **« Situer » reste HORS du pli** — c'est une action, pas un filtre, et son compte rendu avec
+elle. Un test vise l'ORDRE, pas seulement la présence.
+
+⚠️ **Un cas impossible est resté VERT en test** : ma table de cas portait une catégorie qui
+n'existe pas (`production`). Vitest ne typecheck pas — seul `tsc` l'a vu, au gate. La valeur
+est maintenant DÉRIVÉE de `CATEGORIES`.
+
+**Vérifications** : gate complet vert (1 619 tests). Deux mutations : vider l'indice de la
+recherche et des bascules fait tomber 6 tests, déplacer « Situer » dans le pli en fait tomber 1.
+
+---
+
 ## Session 2026-09-15 (17:18 UTC) — le 403 a disparu, et le budget bloque la vérification
 
 Marc a fait le geste console. Passe suivante :

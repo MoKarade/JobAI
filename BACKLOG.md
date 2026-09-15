@@ -1812,8 +1812,15 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       atteinte : `computeRouteMatrix` est un endpoint de STREAMING, son refus arrive enveloppé
       dans un TABLEAU, et `.error` sur un tableau vaut `undefined`. Corrigé (`denvelopper`),
       verrouillé par le corps EXACT relevé en production.
-      **Ce qui reste, et c'est le geste de Marc** : ajouter Routes API aux restrictions de la
-      clé. Le lot se coche quand les durées de trajet reviennent.
+      ✅ **GESTE FAIT, ET ÇA MARCHE (2026-09-15)** : Marc a ajouté « Routes API » aux
+      restrictions de la clé serveur, et le trajet au clic rend une durée sur la Carte. Reste à
+      confirmer la MATRICE au prochain passage — elle demande plus d'un élément, et le budget
+      du jour était épuisé par les appels refusés (cf. `[TRAJETS-02]`).
+- [ ] 🟡 **`[CARTE-04]`** La barre de filtres est repliée sur la page Carte (2026-09-15, « rends
+      la carte plus grande »). ✅ Livré. Reste ouvert comme point d'OBSERVATION : filtrer y coûte
+      désormais un clic de plus, et c'est un arbitrage assumé. Si l'usage montre que la
+      recherche mérite de rester à l'air libre, la sortir du pli est un changement d'une ligne
+      au point d'appel — le pli n'est pas dans `Filtres`.
       ⚠️ **17:18 UTC — le 403 a disparu, mais la vérification est BLOQUÉE pour la journée** :
       `[trajets] sautée : Budget Routes du jour épuisé (48/50 éléments)`. L'appel n'est donc
       même pas parti — on ne sait PAS encore si le geste console a marché. Un clic de trajet

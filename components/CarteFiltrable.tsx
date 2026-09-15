@@ -39,7 +39,8 @@ import {
   unFiltreEstActif,
   type EtatFiltres,
 } from "@/lib/filtres";
-import { CompteFiltre, Filtres } from "./Filtres";
+import { CompteFiltre, Filtres, resumerFiltres } from "./Filtres";
+import { Depliant } from "./Depliant";
 import { CarteOffres } from "./CarteOffres";
 import { CarteGoogle } from "./CarteGoogle";
 import { ListeCarte } from "./ListeCarte";
@@ -137,14 +138,31 @@ export function CarteFiltrable({
 
   return (
     <>
-      {/* La MÊME barre que la liste : un seul composant, une seule règle. */}
-      <Filtres
-        filtres={filtres}
-        onChange={setFiltres}
-        etiquetteRecherche="Filtrer (entreprise, poste, note)…"
-      >
-        <BoutonSituer restantes={ciblesManquantes} />
-      </Filtres>
+      {/* ⚠️ LA BARRE EST REPLIÉE ICI, ET NULLE PART AILLEURS (demande de Marc, 2026-09-15 :
+          « rends la carte plus grande », en gardant la liste à côté). Sur cette page la
+          hauteur est la ressource rare : tout ce qui vit au-dessus du plan se retranche de
+          lui, et la barre — recherche, trois bascules, quatre groupes de seuils — en est le
+          plus gros poste. Repliée, elle tient sur une ligne.
+          C'est un ARBITRAGE, pas une amélioration gratuite : filtrer coûte désormais un clic
+          de plus sur la carte. Le commentaire de `Depliant` dit l'inverse pour la liste
+          (« la barre est un élément PERMANENT de l'écran d'ordinateur ») — et il a raison
+          LÀ-BAS, où la hauteur ne manque pas. C'est pourquoi le pli est posé au point
+          d'appel, jamais dans `Filtres` : la liste garde sa barre à l'air libre.
+          ⚠️ ET L'INDICE N'EST PAS DÉCORATIF : un filtre actif derrière un pli fermé ferait
+          chercher un bug dans les données. `resumerFiltres` dit tout ce qui filtre. */}
+      <Depliant titre="Filtres" indice={resumerFiltres(filtres)} classe="depliant--carte">
+        <Filtres
+          filtres={filtres}
+          onChange={setFiltres}
+          etiquetteRecherche="Filtrer (entreprise, poste, note)…"
+        />
+      </Depliant>
+
+      {/* ⚠️ HORS DU PLI, et c'est délibéré : « Situer » est une ACTION, pas un filtre. La
+          ranger sous un bouton nommé « Filtres » la rendrait introuvable, et elle rend
+          compte de ce qu'elle a fait (`BoutonSituer`) — un compte rendu caché ne sert à
+          personne. Le composant s'efface tout seul quand il n'y a rien à situer. */}
+      <BoutonSituer restantes={ciblesManquantes} />
 
       <CompteFiltre
         affichees={entreprises}

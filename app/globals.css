@@ -393,6 +393,31 @@ code {
 .page--pleine .geocodage {
   margin-bottom: 0.4rem;
 }
+/* ⚠️ LE PLI DES FILTRES DE LA CARTE (2026-09-15, « rends la carte plus grande »). Ce pli
+   n'existe que sur cette page — la liste garde sa barre à l'air libre — et tout son intérêt
+   est la hauteur qu'il rend au plan. Il porte donc le rythme de CETTE page (serré) et non
+   celui d'un dépliant de lecture : la cible reste pleine largeur, mais la ligne ne coûte
+   plus la hauteur de touche d'un bloc qu'on ouvre rarement.
+   ⚠️ L'INDICE RESTE VISIBLE, quoi qu'il arrive : c'est lui qui dit ce qui filtre pendant que
+   la barre est fermée. Le resserrer jusqu'à le tronquer transformerait le pli en filtre
+   invisible — exactement ce que ce dépôt s'interdit (« ce qui est masqué se dit »). */
+.page--pleine .depliant--carte {
+  margin-bottom: 0.35rem;
+}
+.page--pleine .depliant--carte > .depliant__tete {
+  min-height: 0;
+  padding: 0.3rem 0.7rem;
+}
+.page--pleine .depliant--carte > .depliant__corps {
+  padding: 0.5rem 0.7rem 0.6rem;
+  padding-top: 0.5rem;
+}
+/* Le pli INTÉRIEUR (les quatre seuils) garde son comportement : sur grand écran la feuille
+   le laisse ouvert, et il n'a alors ni fond ni bordure — deux cadres imbriqués feraient
+   lire « un bloc dans un bloc » là où il n'y a qu'une barre. */
+.page--pleine .depliant--carte .depliant--seuils {
+  margin-bottom: 0;
+}
 /* ⚠️ TROIS `<p>` DEVIENNENT UNE SEULE LIGNE DE STATUT (ICI SEULEMENT) — rien n'est
    retiré, chaque fait reste écrit (« ce qui est masqué se dit, toujours » vaut pour
    les ENTREPRISES qu'un filtre écarte, pas pour la mise en page de ce qui le dit).
