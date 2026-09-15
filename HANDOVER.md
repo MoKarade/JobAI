@@ -33,10 +33,16 @@ n'avais pas.
 **`[PROFIL-01]` — l'erreur a disparu.** Aucun log de niveau warning ou error dans la fenêtre,
 et les entrées `GET /profil` et `GET /references` ont un corps VIDE. La `ZodError` « profil
 actif illisible » de la veille n'est plus là : les pages relisent le profil sans incident.
-⚠️ **Ce que la mesure ne dit PAS** : aucun `[profil] document antérieur à N champ(s)…` non plus,
-donc `combles` valait zéro — rien n'a eu besoin d'être comblé. Impossible de distinguer d'ici
-« le document est complet » de « aucun CV n'est actif ». L'écran, lui, le dit : s'il montre les
-faits tirés du CV, tout va bien ; s'il montre « aucun CV », c'est l'autre branche.
+**Confirmé par Marc dans la foulée** : `/profil` affiche bien les faits tirés de son CV. La
+branche « aucun CV actif » est écartée — c'est l'écran qui a tranché ce que les journaux ne
+pouvaient pas dire, et `[PROFIL-01]` est clos.
+
+⚠️ **Il reste une limite d'OBSERVABILITÉ, pas du correctif** : aucun `[profil] document
+antérieur à N champ(s)…` n'a été capté. On ne sait donc pas si la migration a comblé quelque
+chose ou si le document n'avait plus rien à combler — et le `console.warn` devait justement
+être ce signal, alors que les `console.log` des mêmes requêtes passent. Une promesse
+d'observabilité qu'on ne peut pas relire n'en est pas une : au backlog sous `[PROFIL-02]`, à
+trancher lors du prochain passage sur ce module plutôt qu'à chasser à froid.
 
 **Autre chose vue en passant, non corrigée** : `[trajets] échec : Matrice refusée (403) —
 « Routes API » doit être activée et dans les restrictions de la clé serveur`. Geste console

@@ -1766,9 +1766,22 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       ⚠️ **AUCUN aberrant signalé** : ma supposition « homonyme mal géocodé » était fausse. Les
       six grappes sont des amas légitimes — le bassin couvre maintenant Gaspé, Cacouna,
       Cap-Chat, plus de 3° d'étalement réel. Bon remède, mauvaise cause supposée.
-- 🟦 **`[PROFIL-01]`** — l'erreur a disparu (aucun log warning/error, corps vides sur `/profil`
-      et `/references`). Mais aucun `[profil] document antérieur…` non plus : rien n'a eu
-      besoin d'être comblé. Impossible de distinguer d'ici « document complet » de « aucun CV
-      actif ». À confirmer par l'écran.
+- ✅ **`[PROFIL-01]`** — **confirmé par Marc le 2026-09-15** : `/profil` affiche les faits
+      tirés de son CV. La branche « aucun CV actif » est donc écartée, et le document se relit
+      bien — c'est l'écran qui a tranché ce que les journaux ne pouvaient pas dire.
+      ⚠️ **Ce qui reste indéterminé, et c'est une limite d'OBSERVABILITÉ, pas du correctif** :
+      aucun `[profil] document antérieur à N champ(s)…` n'a été capté, donc on ne sait pas si
+      la migration a comblé quelque chose ou si le document n'avait plus rien à combler. Le
+      `console.warn` devait être ce signal ; les journaux Vercel ne l'ont pas rendu, alors
+      qu'ils rendent les `console.log` des mêmes requêtes. Une promesse d'observabilité qu'on
+      ne peut pas relire n'en est pas une — à re-vérifier au prochain incident de profil
+      plutôt qu'à chasser à froid (`[PROFIL-02]`).
+- [ ] 🔧 **`[PROFIL-02]`** Le `console.warn` de `profilActif` (« document antérieur à N
+      champ(s) du barème ») n'apparaît pas dans les journaux Vercel, alors que les
+      `console.log` voisins y sont. Tant que ce n'est pas tranché, la migration du profil est
+      SILENCIEUSE en production : Marc ne peut pas savoir lesquels de ses réglages viennent du
+      défaut. Pistes : `console.warn` filtré côté plateforme, ou la ligne n'a jamais été émise
+      (document déjà complet). Trancher en faisant émettre un `console.log` de contrôle au
+      même endroit lors du prochain passage sur ce module — pas un lot à part.
 - [ ] 🧭 **`[TRAJETS-01]`** `[trajets] échec : Matrice refusée (403) — « Routes API » doit être
       activée et dans les restrictions de la clé serveur.` Geste console Google, côté Marc.
