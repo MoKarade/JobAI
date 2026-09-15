@@ -232,6 +232,33 @@ describe("Google Maps Geocoding — lecture de la réponse", () => {
   });
 });
 
+/**
+ * Un refus Google tel qu'il arrive VRAIMENT : la cause vit dans `error.details[].reason`
+ * (un `google.rpc.ErrorInfo`), jamais dans le code HTTP.
+ *
+ * ⚠️ POURQUOI UN CORPS ET PAS UN `{}`. Les trois tests de 403 ci-dessous éprouvent le
+ * BRANCHEMENT, pas la traduction (celle-ci est couverte par `tests/erreurGoogle.test.ts`).
+ * Avec un corps vide, ils passeraient encore si le code jetait la réponse et fabriquait une
+ * phrase à partir du seul statut — c'est-à-dire exactement le défaut qu'on vient de retirer.
+ * Chaque cas porte donc une raison DIFFÉRENTE et exige LE geste correspondant : si la
+ * réponse cesse d'être lue, la phrase change et le test tombe.
+ */
+function refusGoogle(reason: string, statut = 403) {
+  const corps = {
+    error: {
+      code: statut,
+      message: "Une phrase de Google.",
+      status: "PERMISSION_DENIED",
+      details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason }],
+    },
+  };
+  return (async () => ({
+    ok: false,
+    status: statut,
+    json: async () => corps,
+  })) as unknown as typeof fetch;
+}
+
 describe("Google Maps Geocoding — géocoder UNE entreprise", () => {
   function faussetFetchGoogle(reponse: unknown) {
     const recuperer = (async () => ({
@@ -289,15 +316,17 @@ describe("Google Maps Geocoding — géocoder UNE entreprise", () => {
     ).rejects.toThrow(/500/);
   });
 
-  it("⚠️ un 403 se TRADUIT — nomme Geocoding, pas un HTTP générique", async () => {
-    const recuperer = (async () => ({
-      ok: false,
-      status: 403,
-      json: async () => ({}),
-    })) as unknown as typeof fetch;
-    await expect(
-      geocoderEntrepriseGoogle("Laserax", "Lévis", "cle", { recuperer }),
-    ).rejects.toThrow(/Geocoding API/);
+  it("⚠️ un 403 se TRADUIT — la CAUSE vient du corps, pas du code HTTP", async () => {
+    const recuperer = refusGoogle("API_KEY_HTTP_REFERRER_BLOCKED");
+    const erreur = await geocoderEntrepriseGoogle("Laserax", "Lévis", "cle", {
+      recuperer,
+    }).catch((e: unknown) => e);
+    expect(String(erreur)).toMatch(/Geocoding API/);
+    // Le geste PROPRE à cette cause : une clé navigateur ne se débloque par aucune
+    // activation d'API. Si le corps n'était pas lu, la phrase dirait autre chose.
+    expect(String(erreur)).toMatch(/SITES WEB/);
+    // Et le nom cherché reste dans la phrase : sans lui, le journal ne dit pas QUI a échoué.
+    expect(String(erreur)).toMatch(/Laserax/);
   });
 
   it("capture le `place_id` — [CARTE-03-PLACES] : c'est lui qui permettra l'enrichissement", () => {
@@ -390,11 +419,14 @@ describe("Google Places Autocomplete — chercher des entreprises", () => {
     await expect(chercherEntreprisesGoogle("Laser", "cle", { recuperer })).rejects.toThrow(/429/);
   });
 
-  it("⚠️ un 403 se TRADUIT — nomme Places, pas un HTTP générique", async () => {
-    const recuperer = (async () => ({ ok: false, status: 403 })) as unknown as typeof fetch;
-    await expect(chercherEntreprisesGoogle("Laser", "cle", { recuperer })).rejects.toThrow(
-      /Places API/,
+  it("⚠️ un 403 se TRADUIT — la CAUSE vient du corps, pas du code HTTP", async () => {
+    const recuperer = refusGoogle("SERVICE_DISABLED");
+    const erreur = await chercherEntreprisesGoogle("Laser", "cle", { recuperer }).catch(
+      (e: unknown) => e,
     );
+    expect(String(erreur)).toMatch(/Places API \(New\)/);
+    // Ici, et ici SEULEMENT, le geste est bien « activer l'API dans la Library ».
+    expect(String(erreur)).toMatch(/Library/);
   });
 });
 
@@ -442,11 +474,14 @@ describe("Google Place Details — récupérer les détails d'un lieu", () => {
     ).rejects.toThrow(/404/);
   });
 
-  it("⚠️ un 403 se TRADUIT — nomme Places, pas un HTTP générique", async () => {
-    const recuperer = (async () => ({ ok: false, status: 403 })) as unknown as typeof fetch;
-    await expect(detailsEntrepriseGoogle("ChIJ-exemple", "cle", { recuperer })).rejects.toThrow(
-      /Places API/,
+  it("⚠️ un 403 se TRADUIT — la CAUSE vient du corps, pas du code HTTP", async () => {
+    const recuperer = refusGoogle("API_KEY_INVALID");
+    const erreur = await detailsEntrepriseGoogle("ChIJ-exemple", "cle", { recuperer }).catch(
+      (e: unknown) => e,
     );
+    expect(String(erreur)).toMatch(/Places API \(New\)/);
+    // Une clé refusée EN TANT QUE TELLE : le geste est de vérifier la variable, pas la console.
+    expect(String(erreur)).toMatch(/GOOGLE_MAPS_API_KEY/);
   });
 });
 

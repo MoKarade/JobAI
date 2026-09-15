@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import type { TrajetRow } from "./db/schema";
+import { expliquerRefusGoogle, lireRefusGoogle } from "./erreurGoogle";
 
 /**
  * En deçà de cet écart (en degrés, ≈ 110 m en latitude), une position est « la même ».
@@ -110,16 +111,12 @@ export async function appelerRoutes(
   }
 
   if (!reponse.ok) {
-    // Le statut se DIT, et le 403 se TRADUIT : mesuré en prod le 2026-08-21, il veut dire
-    // que la CLÉ n'a pas le droit d'appeler Routes — soit l'API n'est pas activée dans le
-    // projet (Library), soit elle manque aux restrictions de la clé SERVEUR. « Routes a
-    // répondu 403 » seul a envoyé Marc chercher au mauvais endroit.
-    if (reponse.status === 403) {
-      return {
-        ok: false,
-        raison:
-          "Routes refuse la clé (403). Console Google, projet hubperso : « Routes API » doit être ACTIVÉE (Library) ET listée dans les restrictions d'API de la clé serveur.",
-      };
+    // Le statut se DIT, et le refus se LIT DANS LA RÉPONSE. La version de 2026-08-21
+    // traduisait tout 403 par « l'API doit être activée ou listée dans les restrictions » —
+    // deux causes sur six, et les quatre autres envoyaient chercher au mauvais endroit.
+    if (reponse.status === 403 || reponse.status === 401) {
+      const refus = lireRefusGoogle(await reponse.json().catch(() => null));
+      return { ok: false, raison: expliquerRefusGoogle("Routes API", reponse.status, refus) };
     }
     return { ok: false, raison: `Routes a répondu ${reponse.status}` };
   }
@@ -208,12 +205,14 @@ export async function appelerMatrice(
     return { ok: false, raison: `Matrice injoignable : ${e instanceof Error ? e.message : e}` };
   }
   if (!reponse.ok) {
-    if (reponse.status === 403) {
-      return {
-        ok: false,
-        raison:
-          "Matrice refusée (403) : « Routes API » doit être activée et dans les restrictions de la clé serveur.",
-      };
+    // ⚠️ LA CAUSE VIENT DE GOOGLE, PLUS DU CODE HTTP. Ce bloc affirmait « Routes API doit
+    // être activée » pour TOUT 403 — vrai une fois sur six. Une clé restreinte à des sites
+    // web, une clé d'un autre projet, une facturation inactive rendent le même 403 et
+    // appellent trois gestes différents : envoyer Marc activer une API qui l'est déjà lui
+    // coûte un aller-retour et lui laisse croire le problème réglé (`lib/erreurGoogle.ts`).
+    if (reponse.status === 403 || reponse.status === 401) {
+      const refus = lireRefusGoogle(await reponse.json().catch(() => null));
+      return { ok: false, raison: expliquerRefusGoogle("Routes API", reponse.status, refus) };
     }
     return { ok: false, raison: `Matrice a répondu ${reponse.status}` };
   }

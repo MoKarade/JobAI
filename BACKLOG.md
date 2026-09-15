@@ -1785,3 +1785,14 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       même endroit lors du prochain passage sur ce module — pas un lot à part.
 - [ ] 🧭 **`[TRAJETS-01]`** `[trajets] échec : Matrice refusée (403) — « Routes API » doit être
       activée et dans les restrictions de la clé serveur.` Geste console Google, côté Marc.
+      ⚠️ **L'énoncé ci-dessus était une SUPPOSITION du code, pas un diagnostic** : cette phrase
+      était déduite du seul nombre 403, alors qu'un 403 de Google porte au moins six causes
+      (API non activée, clé hors restrictions, clé NAVIGATEUR côté serveur, restriction d'IP,
+      clé invalide, facturation inactive) qui appellent des gestes différents. Cinq fois sur
+      six, elle envoyait Marc au mauvais endroit de la console en le laissant croire le
+      problème réglé. Livré le 2026-09-15 : `lib/erreurGoogle.ts` lit la cause dans
+      `error.details[].reason` (l'identifiant STABLE de Google) et rend LE geste de cette
+      cause ; les cinq sites de refus (Routes ×2, Geocoding, Places ×2) y passent.
+      **Ce qui reste** : la vraie cause n'est pas encore connue — elle s'affichera au prochain
+      passage des trajets, et c'est ELLE qui dira quel geste faire dans la console. Le lot ne
+      se coche qu'une fois ce geste fait et les durées revenues.

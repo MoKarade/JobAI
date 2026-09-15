@@ -22,6 +22,12 @@
 // la session de développement n'a PAS accès à Nominatim ; sans injection, tout ce fichier
 // serait livré sans une seule vérification.
 
+// ⚠️ LE SEUL IMPORT DE CE FICHIER, et vers un module PUR : `lib/erreurGoogle.ts` ne fait
+// ni réseau ni état, il traduit une réponse déjà reçue. L'autonomie qui compte ici est
+// celle de l'I/O (injectée), pas l'absence d'import — et la règle « une cause, un geste »
+// doit être la MÊME pour Geocoding, Places et Routes, sinon les trois divergeront.
+import { expliquerRefusGoogle, lireRefusGoogle } from "./erreurGoogle";
+
 /** Bornes larges de la grande région de Québec, alignées sur les CHECK de la table. */
 export const BORNES = { latMin: 45, latMax: 49, lonMin: -75, lonMax: -68 } as const;
 
@@ -610,15 +616,15 @@ export async function geocoderEntrepriseGoogle(
     signal: AbortSignal.timeout(DELAI_MAX_REQUETE_MS),
   });
   if (!reponse.ok) {
-    // ⚠️ LE 403 SE TRADUIT, COMME POUR ROUTES (`lib/trajetRoutes.ts`) : la clé SERVEUR est
-    // restreinte par API (ADR-0016), et Geocoding, Places et Routes se refusent chacune
-    // INDÉPENDAMMENT tant qu'elles ne sont pas toutes les trois activées et listées. « a
-    // répondu 403 » seul ne dit pas LAQUELLE des trois manque encore.
-    if (reponse.status === 403) {
+    // ⚠️ LE REFUS SE LIT DANS LA RÉPONSE, COMME POUR ROUTES (`lib/erreurGoogle.ts`). La clé
+    // SERVEUR est restreinte par API (ADR-0016) et les trois API se refusent chacune
+    // indépendamment — mais « activée ou listée » n'est que DEUX des causes possibles d'un
+    // 403, et les affirmer toutes les deux à chaque fois envoie chercher au mauvais endroit
+    // quatre fois sur six.
+    if (reponse.status === 403 || reponse.status === 401) {
+      const refus = lireRefusGoogle(await reponse.json().catch(() => null));
       throw new Error(
-        `Geocoding refuse la clé (403) pour « ${nom} ». Console Google, projet hubperso : ` +
-          "« Geocoding API » doit être ACTIVÉE (Library) ET listée dans les restrictions " +
-          "d'API de la clé serveur.",
+        `${expliquerRefusGoogle("Geocoding API", reponse.status, refus)} (pour « ${nom} »)`,
       );
     }
     throw new Error(`Google Maps Geocoding a répondu HTTP ${reponse.status} pour « ${nom} »`);
@@ -697,11 +703,9 @@ export async function chercherEntreprisesGoogle(
     signal: AbortSignal.timeout(DELAI_MAX_REQUETE_MS),
   });
   if (!reponse.ok) {
-    if (reponse.status === 403) {
-      throw new Error(
-        "Places refuse la clé (403). Console Google, projet hubperso : « Places API (New) » " +
-          "doit être ACTIVÉE (Library) ET listée dans les restrictions d'API de la clé serveur.",
-      );
+    if (reponse.status === 403 || reponse.status === 401) {
+      const refus = lireRefusGoogle(await reponse.json().catch(() => null));
+      throw new Error(expliquerRefusGoogle("Places API (New)", reponse.status, refus));
     }
     throw new Error(`Google Places Autocomplete a répondu HTTP ${reponse.status}`);
   }
@@ -766,11 +770,9 @@ export async function detailsEntrepriseGoogle(
     },
   );
   if (!reponse.ok) {
-    if (reponse.status === 403) {
-      throw new Error(
-        "Places refuse la clé (403). Console Google, projet hubperso : « Places API (New) » " +
-          "doit être ACTIVÉE (Library) ET listée dans les restrictions d'API de la clé serveur.",
-      );
+    if (reponse.status === 403 || reponse.status === 401) {
+      const refus = lireRefusGoogle(await reponse.json().catch(() => null));
+      throw new Error(expliquerRefusGoogle("Places API (New)", reponse.status, refus));
     }
     throw new Error(
       `Google Place Details a répondu HTTP ${reponse.status} pour « ${placeId} »`,

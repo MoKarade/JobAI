@@ -6,6 +6,39 @@
 
 ---
 
+## Session 2026-09-15 (fin) — `[TRAJETS-01]` : le message accusait la mauvaise cause
+
+**Le défaut n'était pas le 403, c'était la PHRASE.** `[trajets] échec : Matrice refusée (403) :
+« Routes API » doit être activée et dans les restrictions de la clé serveur` — cette phrase
+était écrite EN DUR, déduite du seul nombre 403. Or Google refuse pour au moins six raisons :
+API non activée, API absente des restrictions de la clé, clé NAVIGATEUR utilisée côté serveur,
+restriction par IP, clé invalide, facturation inactive. Chacune se répare à un endroit
+DIFFÉRENT de la console — et cinq fois sur six, le message envoyait Marc au mauvais, en lui
+laissant croire le problème réglé une fois le geste inutile accompli.
+
+**Livré.** `lib/erreurGoogle.ts` (nouveau, PUR) lit la cause là où Google la met vraiment :
+`error.details[].reason`, un identifiant stable et documenté — jamais `error.message`, qui est
+de la prose que Google traduit et remanie. Il rend ensuite LE geste de CETTE cause. Les cinq
+sites de refus y passent : `appelerRoutes`, `appelerMatrice`, le géocodage d'entreprise,
+l'autocomplétion Places et les détails Places. Une cause non reconnue n'est plus déguisée en
+« API non activée » : elle est CITÉE telle que Google l'a écrite, avec le code HTTP.
+
+**Ce que ça ne fait pas, et il faut le dire** : je ne peux pas basculer un interrupteur dans la
+console Google depuis ici. Ce lot ne rétablit pas les trajets — il fait que le prochain passage
+NOMME le geste à faire au lieu d'en supposer un. La vraie cause se lira dans les journaux au
+prochain `[trajets]`.
+
+**Vérifications** : gate complet vert. Les cinq branchements sont prouvés par MUTATION — en
+faisant cesser la lecture du corps aux cinq sites, exactement cinq tests tombent, un par site ;
+et en refaisant du repli « cause inconnue » un « API non activée », six tests tombent. Sans
+cette preuve, les tests de 403 seraient restés verts sur un code qui jette la réponse (c'est
+d'ailleurs ce qu'ils faisaient avant : leurs faux `fetch` ne portaient aucun corps).
+
+⚠️ **Correction d'une ligne de la session précédente** : « Geste console Google côté Marc, déjà
+connu » (ci-dessous) était faux. Rien n'était connu — c'est le code qui affirmait connaître.
+
+---
+
 ## Session 2026-09-15 (suite) — les trois correctifs CONSTATÉS en production
 
 Marc a ouvert l'app à 12:49 UTC. Les journaux et `resume_suivi` tranchent, chacun par une

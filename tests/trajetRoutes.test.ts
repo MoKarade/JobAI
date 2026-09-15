@@ -13,6 +13,29 @@ import {
   formaterDuree,
 } from "@/lib/trajetRoutes";
 
+/**
+ * Un refus Google tel qu'il arrive vraiment : la cause vit dans `error.details[].reason`
+ * (un `google.rpc.ErrorInfo`), jamais dans le code HTTP.
+ *
+ * ⚠️ UN CORPS, PAS UN VIDE. Les deux tests de 403 ci-dessous éprouvent le BRANCHEMENT — la
+ * traduction elle-même est couverte par `tests/erreurGoogle.test.ts`. Sur un corps vide, ils
+ * passeraient encore si le code jetait la réponse pour fabriquer une phrase à partir du seul
+ * statut : c'est exactement le défaut qu'on vient de retirer, où « active l'API » était
+ * affirmé pour six causes différentes.
+ */
+const refusGoogle = (reason: string, statut = 403) =>
+  new Response(
+    JSON.stringify({
+      error: {
+        code: statut,
+        message: "Une phrase de Google.",
+        status: "PERMISSION_DENIED",
+        details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason }],
+      },
+    }),
+    { status: statut },
+  );
+
 const P = { lat: 46.8, lon: -71.25 };
 const ligne = { lat: P.lat, lon: P.lon, origineLat: 46.81, origineLon: -71.3 };
 const maison = { lat: 46.81, lon: -71.3 };
@@ -61,9 +84,33 @@ describe("appelerRoutes — fetch injecté, échecs NOMMÉS", () => {
   });
 
   it("nomme le statut HTTP — un 403 (clé) et un 429 (quota) appellent des gestes opposés", async () => {
-    const r = await appelerRoutes(maison, P, "cle", vi.fn(async () => new Response("", { status: 403 })));
+    const r = await appelerRoutes(maison, P, "cle", vi.fn(async () => new Response("", { status: 429 })));
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.raison).toContain("403");
+    if (!r.ok) expect(r.raison).toContain("429");
+  });
+
+  it("⚠️ un 403 dit LE geste de SA cause — lue dans le corps, jamais déduite du statut", async () => {
+    const r = await appelerRoutes(
+      maison,
+      P,
+      "cle",
+      vi.fn(async () => refusGoogle("API_KEY_HTTP_REFERRER_BLOCKED")),
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.raison).toContain("Routes API");
+    // Une clé restreinte aux SITES WEB ne se débloque par aucune activation d'API : si la
+    // réponse cessait d'être lue, la phrase renverrait Marc dans la Library pour rien.
+    expect(r.raison).toMatch(/SITES WEB/);
+    expect(r.raison).not.toMatch(/Library/);
+  });
+
+  it("⚠️ un corps illisible ne devient pas une cause inventée", async () => {
+    const r = await appelerRoutes(maison, P, "cle", vi.fn(async () => new Response("<html>", { status: 403 })));
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.raison).toContain("403");
+    expect(r.raison).not.toMatch(/Library|SITES WEB/);
   });
 
   it("refuse une réponse hors schéma plutôt que de cacher un NaN", async () => {
@@ -123,6 +170,19 @@ describe("appelerMatrice — N destinations, les inatteignables NOMMÉES", () =>
     if (!r.ok) return;
     expect(r.elements).toHaveLength(1);
     expect(r.inatteignables).toEqual(["Beta Fabrication"]);
+  });
+
+  it("⚠️ un 403 dit LE geste de SA cause — c'est CE site qui a menti en production", async () => {
+    // Journal du 2026-09-15 : « Matrice refusée (403) : Routes API doit être activée ». La
+    // phrase était déduite du seul statut ; ici la cause est une clé d'un autre projet.
+    const r = await appelerMatrice(maison, dests, "cle", vi.fn(async () =>
+      refusGoogle("API_KEY_INVALID"),
+    ));
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.raison).toContain("Routes API");
+    expect(r.raison).toMatch(/GOOGLE_MAPS_API_KEY/);
+    expect(r.raison).not.toMatch(/Library/);
   });
 
   it("zéro destination = zéro appel — le fetch n'est jamais touché", async () => {

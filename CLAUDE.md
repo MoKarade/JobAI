@@ -1724,6 +1724,28 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   une façon de produire un fait DÉJÀ persisté ailleurs, ne pas ajouter une seconde boucle
   d'écriture — faire entrer le nouveau fait dans la liste existante, et garder les deux bouts.
 
+- **Un message qui DÉDUIT sa cause d'un code de statut envoie au mauvais endroit — et il le
+  fait avec aplomb.** `[trajets] échec : Matrice refusée (403) : « Routes API » doit être
+  activée` n'était pas une lecture, c'était une phrase écrite EN DUR dans le `if (status ===
+  403)`. Or un 403 de Google porte au moins six causes (API non activée, API hors des
+  restrictions de la clé, clé NAVIGATEUR côté serveur, restriction d'IP, clé invalide,
+  facturation inactive), chacune réparable à un endroit DIFFÉRENT de la console : le message
+  était juste une fois sur six, et les cinq autres fois il faisait faire un geste inutile
+  après lequel on croit le problème réglé. La cause se lit donc dans la donnée RICHE que le
+  fournisseur envoie — ici `error.details[].reason`, un identifiant STABLE et documenté —,
+  jamais dans `error.message`, qui est de la prose que le fournisseur traduit et remanie sans
+  préavis (un détecteur qui la lirait changerait de verdict à la première reformulation). Et
+  **ce qu'on ne reconnaît pas se CITE**, borné, avec le code : retomber sur la cause la plus
+  fréquente refait le défaut en plus discret, et empêche de reconnaître la prochaine.
+  ⚠️ **Le test qui « couvrait » ce site ne pouvait pas voir le défaut** : son faux `fetch`
+  rendait `{ ok: false, status: 403 }` — aucun corps. Il éprouvait donc qu'une phrase nomme
+  l'API, ce qu'un message écrit en dur fait aussi bien qu'une lecture réelle : vert sur le
+  défaut ET sur son correctif. **Un test de traduction d'erreur doit porter un corps
+  RÉALISTE et exiger le geste PROPRE à cette cause-là** — sinon il ne mesure que la présence
+  d'un nom. Prouvé par mutation aux deux bouts : couper la lecture du corps aux cinq sites
+  fait tomber cinq tests (un par site), et rétablir le repli « cause inconnue → API non
+  activée » en fait tomber six.
+
 ## 10. Style et compte-rendu
 
 > 📣 Forme des comptes-rendus, des commits, des PR et des docs générées :

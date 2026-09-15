@@ -388,3 +388,51 @@ sur un lot qui ne touchait pas à ce qu'il défend — la grandeur comparée s'a
 
 **Verrous** : `tests/bornes.test.ts` (découpage, déterminisme, aucun lieu perdu, chaque boîte
 sous la garde, aberrants nommés, plus une garde de câblage lue sur la source décommentée).
+
+---
+
+## 2026-09-15 — Un message qui DÉDUIT sa cause d'un code HTTP envoie au mauvais endroit
+
+**Le symptôme** : `[trajets] échec : Matrice refusée (403) : « Routes API » doit être activée
+et dans les restrictions de la clé serveur.` Une phrase sûre d'elle, dans le journal, tous les
+jours.
+
+**Le mécanisme** : cette phrase n'était pas une lecture, c'était une SUPPOSITION écrite en dur
+dans le `if (status === 403)`. Un 403 de Google porte au moins six causes — API non activée,
+API absente des restrictions de la clé, clé NAVIGATEUR utilisée côté serveur, restriction par
+IP, clé invalide, facturation inactive — et chacune se répare à un endroit différent de la
+console. Le message était donc exact une fois sur six ; les cinq autres fois, il envoyait
+faire un geste inutile, après quoi on croit le problème réglé et on attend un résultat qui ne
+viendra pas. « Un message d'erreur FAUX coûte plus cher qu'un message générique » (§9), et
+celui-ci coûtait un aller-retour complet à chaque fois.
+
+**Le remède** : la cause se lit dans la donnée RICHE, à un seul endroit. Google la met dans
+`error.details[].reason` (un `google.rpc.ErrorInfo`), qui est un identifiant stable et
+documenté. `error.message`, lui, est de la prose pour humains : la traduire ou la reformuler ne
+casse rien chez Google et casserait tout détecteur qui la lirait — d'où une TABLE sur `reason`,
+jamais un `includes` sur le message. Le message n'est plus utilisé que pour être CITÉ.
+
+**Et ce qu'on ne sait pas, on le cite.** Une raison inconnue ne retombe pas sur « l'API n'est
+pas activée » : ce serait refaire exactement le défaut, en plus discret. Elle rend la phrase de
+Google, bornée, avec le code HTTP — moins satisfaisant à lire, et vrai. C'est aussi ce qui
+permettra de reconnaître la prochaine cause au lieu de la déguiser en celle d'avant.
+
+**Le piège de test, et il était déjà là** : les tests de 403 existants passaient avec des faux
+`fetch` qui ne portaient AUCUN corps (`{ ok: false, status: 403 }`). Ils éprouvaient donc qu'une
+phrase nommait l'API — ce qu'un message écrit en dur fait aussi bien qu'une lecture réelle.
+Autrement dit, ils seraient restés verts sur le défaut comme sur son correctif. Chaque test
+porte désormais un corps avec une raison DIFFÉRENTE et exige LE geste correspondant : si la
+réponse cesse d'être lue, la phrase change et le test tombe.
+
+**Prouvé par mutation, deux fois** : couper la lecture du corps aux cinq sites fait tomber
+exactement cinq tests, un par site ; refaire du repli « inconnue » un « api-desactivee » en
+fait tomber six. Deux mutations parce que ce sont deux propriétés distinctes — le branchement,
+et le refus d'inventer.
+
+**Ce que le lot ne fait pas** : il ne rétablit pas les trajets. Aucune session ne peut basculer
+un interrupteur dans la console Google. Il fait que le prochain passage NOMME le geste au lieu
+d'en supposer un — et le dire ainsi vaut mieux que de laisser croire que c'est réparé.
+
+**Verrous** : `tests/erreurGoogle.test.ts` (la traduction, cas par cas, dont le discriminant
+« un message qui dit autre chose que `reason` »), plus un test de branchement par site dans
+`tests/trajetRoutes.test.ts` et `tests/geocodage.test.ts`.
