@@ -1777,6 +1777,27 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   ouverte. Devant un verdict « inconnu » persistant, auditer ce qu'on DONNE au classificateur
   avant de toucher au classificateur.
 
+- **Libérer de la place au-dessus d'un élément qui est à son PLANCHER ne lui donne RIEN.**
+  Marc : « rends la carte plus grande » → j'ai replié la barre de filtres, gate vert, déployé.
+  Sa réponse : « elle a pas grandi ». Mesuré au navigateur (Chromium, page reconstituée avec
+  la vraie feuille) : sur 1366×648 le plan faisait **337 px avant ET après** — les 170 px
+  libérés étaient allés au DÉFILEMENT de la page (277 → 102 px), pas à la carte. Cause :
+  `.plan-ecran` porte `min-height: 26rem`, et sur un portable c'est la valeur QUI S'APPLIQUE
+  — l'élément reçoit déjà plus que ce qui tient, donc tout gain en amont ne fait que réduire
+  le débordement. **Avant de gagner de la place pour un élément, vérifier s'il est à son
+  plancher** : si oui, le seul levier est le plancher lui-même, et il se paie en défilement.
+  Corollaire de conduite : un correctif de mise en page qui « devrait » agrandir quelque chose
+  se MESURE avant d'être annoncé — et la mesure est possible même quand la page est derrière
+  une session, en reconstituant le balisage avec la feuille RÉELLE dans un navigateur sans
+  affichage. C'est ce qui a transformé « ça devrait marcher » en diagnostic.
+  ⚠️ **Et `display: inline` sur un enfant DIRECT d'un conteneur flex ou grid est INERTE** —
+  la spécification blockifie les items. Une règle posée le 13/09 pour mettre trois compteurs
+  sur une ligne n'a jamais rien fait (mesuré : 102 px au lieu de 54), et son commentaire
+  affirmait le contraire depuis deux jours. Le remède est une ENVELOPPE qui sort les éléments
+  du contexte flex. Vaut pareil pour `float` et `vertical-align`. Réflexe : avant d'écrire
+  `display:inline`, regarder ce qu'est le PARENT — et se rappeler qu'une règle ignorée ne
+  laisse aucune trace, contrairement à une règle fausse.
+
 ## 10. Style et compte-rendu
 
 > 📣 Forme des comptes-rendus, des commits, des PR et des docs générées :

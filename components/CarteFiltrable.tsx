@@ -158,55 +158,63 @@ export function CarteFiltrable({
         />
       </Depliant>
 
-      {/* ⚠️ HORS DU PLI, et c'est délibéré : « Situer » est une ACTION, pas un filtre. La
-          ranger sous un bouton nommé « Filtres » la rendrait introuvable, et elle rend
-          compte de ce qu'elle a fait (`BoutonSituer`) — un compte rendu caché ne sert à
-          personne. Le composant s'efface tout seul quand il n'y a rien à situer. */}
-      <BoutonSituer restantes={ciblesManquantes} />
+      {/* ⚠️ UNE SEULE BANDE D'ÉTAT, ET C'EST UNE ENVELOPPE QUI LA REND POSSIBLE.
+          Ces quatre éléments disent la même chose — où on en est — et tenaient chacun sa
+          ligne. La feuille posait bien `display: inline` dessus, mais ils étaient enfants
+          directs de `main`, un conteneur FLEX : un item de flex est blockifié, la règle
+          était donc INERTE depuis le 2026-09-13 (mesuré : 102 px au lieu de 54 sur
+          1366×648). L'enveloppe les sort du contexte flex ; c'est elle, le correctif.
+          ⚠️ « Situer » entre dans la bande mais RESTE hors du pli des filtres : c'est une
+          ACTION, pas un filtre, et elle rend compte de ce qu'elle a fait. Rangée sous un
+          bouton nommé « Filtres » elle deviendrait introuvable. Le composant s'efface tout
+          seul quand il n'y a rien à situer. */}
+      <div className="carte-etat">
+        <BoutonSituer restantes={ciblesManquantes} />
 
-      <CompteFiltre
-        affichees={entreprises}
-        total={entreprises + masquees + vue.aSituer.length + vue.sansLieu.length}
-        sansDistance={sansDistance}
-        sansNote={sansNote}
-        nom="entreprise"
-      />
+        <CompteFiltre
+          affichees={entreprises}
+          total={entreprises + masquees + vue.aSituer.length + vue.sansLieu.length}
+          sansDistance={sansDistance}
+          sansNote={sansNote}
+          nom="entreprise"
+        />
 
-      {/* ⚠️ LES FAITS RESTENT, LES PHRASES PARTENT (demande de Marc, 2026-09-13 : « moins
-          de texte »). Cette ligne disait « X épinglées à leur adresse · Y adresse connue,
-          épingle au centre-ville · Z sans adresse · W en attente de localisation · filtre
-          actif : seules les entreprises qui ont une offre correspondante » — cinq membres
-          de phrase au-dessus d'un plan qui, sur un téléphone, se bat déjà pour sa hauteur.
-          Chaque COMPTE est conservé, parce que chacun appelle un geste différent (attendre
-          une passe, corriger une adresse, baisser un seuil) ; c'est leur glose qui part. */}
-      <p className="carte__compte">
-        {exactes} à l’adresse
-        {adresseSansEpingle > 0 ? ` · ${adresseSansEpingle} au centre-ville` : ""}
-        {sansAdresse > 0 ? ` · ${sansAdresse} sans adresse` : ""}
-        {vue.aSituer.length > 0 ? ` · ${vue.aSituer.length} à situer` : ""}
-        {filtreActif ? " · filtrées" : ""}
-      </p>
+        {/* ⚠️ LES FAITS RESTENT, LES PHRASES PARTENT (demande de Marc, 2026-09-13 : « moins
+            de texte »). Cette ligne disait « X épinglées à leur adresse · Y adresse connue,
+            épingle au centre-ville · Z sans adresse · W en attente de localisation · filtre
+            actif : seules les entreprises qui ont une offre correspondante » — cinq membres
+            de phrase au-dessus d'un plan qui, sur un téléphone, se bat déjà pour sa hauteur.
+            Chaque COMPTE est conservé, parce que chacun appelle un geste différent (attendre
+            une passe, corriger une adresse, baisser un seuil) ; c'est leur glose qui part. */}
+        <p className="carte__compte">
+          {exactes} à l’adresse
+          {adresseSansEpingle > 0 ? ` · ${adresseSansEpingle} au centre-ville` : ""}
+          {sansAdresse > 0 ? ` · ${sansAdresse} sans adresse` : ""}
+          {vue.aSituer.length > 0 ? ` · ${vue.aSituer.length} à situer` : ""}
+          {filtreActif ? " · filtrées" : ""}
+        </p>
 
-      {/* ⚠️ CE QUI EST MASQUÉ SE DIT, TOUJOURS. Un filtre qui retire 41 employeurs sans
-          l'écrire produirait exactement le défaut qu'il corrige : une couverture qu'on
-          croit complète et qui ne l'est pas. Ce qui a été COUPÉ à la refonte téléphone
-          (2026-09-13), c'est la seconde moitié de la phrase — « sans adresse connue. Leurs
-          offres restent dans la liste d'accueil » : elle répétait le libellé de la case
-          juste à gauche, et rassurait sur une perte qui n'a jamais lieu. Le COMPTE, lui,
-          reste : c'est lui, le fait. */}
-      <p className="carte__compte">
-        <label className="carte__bascule">
-          <input
-            type="checkbox"
-            checked={adresseSeulement}
-            onChange={(e) => setAdresseSeulement(e.target.checked)}
-          />{" "}
-          Adresse connue seulement
-        </label>
-        {adresseSeulement && masquees > 0
-          ? ` — ${masquees} masquée${masquees > 1 ? "s" : ""}`
-          : ""}
-      </p>
+        {/* ⚠️ CE QUI EST MASQUÉ SE DIT, TOUJOURS. Un filtre qui retire 41 employeurs sans
+            l'écrire produirait exactement le défaut qu'il corrige : une couverture qu'on
+            croit complète et qui ne l'est pas. Ce qui a été COUPÉ à la refonte téléphone
+            (2026-09-13), c'est la seconde moitié de la phrase — « sans adresse connue. Leurs
+            offres restent dans la liste d'accueil » : elle répétait le libellé de la case
+            juste à gauche, et rassurait sur une perte qui n'a jamais lieu. Le COMPTE, lui,
+            reste : c'est lui, le fait. */}
+        <p className="carte__compte">
+          <label className="carte__bascule">
+            <input
+              type="checkbox"
+              checked={adresseSeulement}
+              onChange={(e) => setAdresseSeulement(e.target.checked)}
+            />{" "}
+            Adresse connue seulement
+          </label>
+          {adresseSeulement && masquees > 0
+            ? ` — ${masquees} masquée${masquees > 1 ? "s" : ""}`
+            : ""}
+        </p>
+      </div>
 
       {/* ⚠️ LE PLAN ET LA LISTE CÔTE À CÔTE (choix de Marc, 2026-08-05).
           Empilés, il fallait faire défiler pour relier une épingle à sa fiche — le plan

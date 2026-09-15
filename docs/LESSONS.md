@@ -572,3 +572,50 @@ tenir à la main de plus.
 
 **Prouvé par mutation** : vider l'indice de la recherche et des bascules fait tomber 6 tests ;
 déplacer « Situer » dans le pli en fait tomber 1.
+
+---
+
+## 2026-09-15 (tard) — « elle a pas grandi » : libérer de la place au-dessus d'un élément à son PLANCHER ne lui donne rien
+
+**Le retour de Marc, après un lot vert et déployé** : « la carte est trop petite encore, elle
+a pas grandi ». Il avait raison.
+
+**Ce que la mesure a montré** (Chromium sans affichage, page reconstituée avec la feuille et
+le balisage RÉELS — la page elle-même exige une session et une base) : sur 1366×648, le plan
+faisait **337 px avant ET après** le repli de la barre de filtres. Les 170 px libérés étaient
+allés au **défilement** de la page (277 → 102 px), pas à la carte.
+
+**La cause** : `.plan-ecran` porte `min-height: 26rem`. Sur un portable, c'est la valeur QUI
+S'APPLIQUE — l'élément reçoit déjà plus que ce que la fenêtre laisse, et le surplus devient un
+débordement. Dans cet état, tout gain en amont réduit le débordement et **ne change rien à la
+hauteur rendue**. La règle générale : **avant de gagner de la place pour un élément, vérifier
+s'il est à son plancher.** Si oui, le seul levier est le plancher, et il se paie en défilement.
+
+**Le second défaut, trouvé par la même mesure** : les trois compteurs portaient
+`display: inline` depuis le 13/09 pour tenir sur une ligne… et étaient enfants DIRECTS de
+`main`, un conteneur flex. La spécification **blockifie les items de flex** : la règle était
+inerte, la bande coûtait **102 px au lieu de 54**, et son commentaire affirmait le contraire.
+Une règle ignorée ne laisse aucune trace — contrairement à une règle fausse, rien ne la
+signale. Le remède est une ENVELOPPE qui sort les éléments du contexte flex. Même piège pour
+`float` et `vertical-align`.
+
+**Ce que ça change dans la conduite** : un correctif de mise en page qui « devrait » agrandir
+quelque chose se MESURE avant d'être annoncé. Et la mesure reste possible quand la page est
+derrière une session : on reconstitue le balisage avec la feuille réelle et on lit les
+hauteurs dans un navigateur sans affichage. Ça a pris dix minutes et transformé « ça devrait
+marcher » en diagnostic — après un aller-retour complet avec Marc qui, lui, coûtait une demande
+répétée.
+
+**Les deux correctifs ne servent pas le même écran**, et c'est à savoir avant d'en retirer un :
+sur 1920 le plancher ne mord pas, les +80 px viennent entièrement de la bande ; sur un
+portable c'est l'inverse, la bande ne change que le défilement et les +160 px viennent du
+plancher.
+
+**Arbitrage assumé** : « je veux pas pouvoir scroll sous la map » (2026-08-21) est révisé.
+Sur un portable la promesse n'était déjà plus tenue (102 px de défilement avant ce lot), et la
+demande du jour est explicite.
+
+**Verrous** : `tests/carteHauteur.test.ts`. Ils ne mesurent pas des pixels (pas de navigateur
+dans la suite) — ils verrouillent les MÉCANISMES : l'enveloppe existe, l'inline vise ses
+enfants et non des items flex, le plancher ne redescend pas sous 34rem, et il reste un
+plancher plutôt qu'une hauteur imposée. Trois mutations, trois rouges distincts.

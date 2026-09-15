@@ -418,19 +418,27 @@ code {
 .page--pleine .depliant--carte .depliant--seuils {
   margin-bottom: 0;
 }
-/* ⚠️ TROIS `<p>` DEVIENNENT UNE SEULE LIGNE DE STATUT (ICI SEULEMENT) — rien n'est
-   retiré, chaque fait reste écrit (« ce qui est masqué se dit, toujours » vaut pour
-   les ENTREPRISES qu'un filtre écarte, pas pour la mise en page de ce qui le dit).
-   Empilés en blocs, ils coûtaient chacun leur propre ligne — `display:inline` les
-   laisse s'écouler comme du texte continu et ne retomber à la ligne suivante que si
-   la largeur l'exige vraiment, au lieu de l'imposer par défaut. */
-.page--pleine .controles__compte,
-.page--pleine .carte__compte {
+/* ⚠️ LES COMPTEURS ET « SITUER » TIENNENT SUR UNE SEULE BANDE (ICI SEULEMENT) — rien n'est
+   retiré, chaque fait reste écrit (« ce qui est masqué se dit, toujours » vaut pour les
+   ENTREPRISES qu'un filtre écarte, pas pour la mise en page de ce qui le dit).
+   ⚠️⚠️ ET LA VERSION PRÉCÉDENTE DE CETTE RÈGLE ÉTAIT INERTE. Elle posait `display: inline`
+   sur les `<p>` DIRECTEMENT — or ils étaient enfants de `main`, qui est un conteneur FLEX
+   (`.page--pleine main`) : un enfant de flex est BLOCKIFIÉ, `display:inline` y est ignoré
+   par la spécification. Les trois lignes coûtaient donc toujours trois lignes, et le
+   commentaire affirmait le contraire depuis le 2026-09-13. Mesuré au navigateur le
+   2026-09-15 (Chromium, 1366×648) : la bande faisait **102 px** ; regroupée sous une
+   enveloppe qui n'est PAS un item flex, elle en fait **54**. Les 48 px reviennent au plan.
+   Réflexe que ça donne : `display:inline` (ou `float`, ou `vertical-align`) sur un enfant
+   direct de flex/grid ne fait RIEN — il faut une enveloppe. */
+.page--pleine .carte-etat {
+  display: block;
+  margin: 0 0 0.4rem;
+}
+.page--pleine .carte-etat > * {
   display: inline;
   margin: 0;
 }
-.page--pleine .controles__compte::after,
-.page--pleine .carte__compte::after {
+.page--pleine .carte-etat > *::after {
   content: " ";
 }
 .page--pleine main {
@@ -1554,7 +1562,27 @@ code {
      plancher garantit un plan UTILISABLE ; s'il ne tient pas avec le reste sur un écran
      très bas, `main` (plus haut) prend le relais avec un court défilement plutôt que
      d'écraser la carte à néant. */
-  min-height: 26rem;
+  /* ⚠️ RELEVÉ DE 26rem À 36rem LE 2026-09-15 (« la carte est trop petite encore, je la veux
+     plus haute »). Le repli des filtres n'avait RIEN donné au plan sur un portable, et la
+     mesure dit pourquoi : ce plancher est la valeur QUI S'APPLIQUE là-bas, donc libérer de
+     la place au-dessus ne faisait que réduire le défilement. Mesuré au navigateur (Chromium,
+     page reconstituée avec CETTE feuille et CE balisage), avant → après ce lot :
+
+       viewport       hauteur du plan   défilement de main
+       1366×648        337 → 497 px      102 → 181 px
+       1536×744        337 → 497 px        6 →  85 px
+       1920×960        545 → 625 px        0 →   0 px
+
+     ⚠️ LES DEUX CORRECTIFS DE CE LOT NE SERVENT PAS LE MÊME ÉCRAN — à savoir avant d'en
+     retirer un. Sur 1920 le plancher ne mord PAS (625 > 576) : les +80 px y viennent
+     ENTIÈREMENT de la bande d'état réparée plus haut. Sur un portable c'est l'inverse : la
+     bande ne change que le défilement, et c'est ce plancher qui donne les +160 px de plan.
+
+     C'est un PLANCHER, pas une hauteur imposée. Sur un portable il fait grandir le plan de
+     ~47 %, et la page défile un peu plus — c'est l'ARBITRAGE, et il est demandé. Il révise
+     « je veux pas pouvoir scroll sous la map » (2026-08-21), qui n'était de toute façon
+     déjà plus tenu là-bas (102 px de défilement AVANT ce lot). */
+  min-height: 36rem;
 }
 /* La colonne du plan porte la barre d'outils ET le plan : `CarteOffres` rend un
    fragment, donc c'est cette enveloppe qui en fait UN élément de grille. Étirée par

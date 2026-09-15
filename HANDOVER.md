@@ -6,6 +6,49 @@
 
 ---
 
+## Session 2026-09-15 (tard) — la carte grandit VRAIMENT, mesuré au navigateur
+
+Marc : « la carte est trop petite encore, elle a pas grandi ». **Il avait raison, et le lot
+précédent n'y était pour rien de visible.**
+
+**Mesuré** (Chromium, page reconstituée avec la vraie feuille et le vrai balisage) : sur
+1366×648, le plan faisait **337 px avant ET après** le repli des filtres. Les 170 px libérés
+étaient allés au DÉFILEMENT (277 → 102 px), pas à la carte — parce que `.plan-ecran` est à son
+PLANCHER (`min-height: 26rem`) sur un portable : il reçoit déjà plus que ce qui tient, donc
+tout gain au-dessus ne fait que réduire le débordement.
+
+**Deux correctifs, qui ne servent pas le même écran** :
+
+1. **La bande d'état** (`.carte-etat`). Les compteurs et le bouton « Situer » portaient bien
+   `display: inline`… mais ils étaient enfants directs de `main`, un conteneur FLEX : la
+   spécification BLOCKIFIE les items de flex, donc la règle était **inerte** depuis le 13/09,
+   avec un commentaire qui affirmait le contraire. Une enveloppe les en sort. Mesuré :
+   **102 px → 54 px**. C'est ce qui donne les **+80 px sur 1920×960**, où le plancher ne mord
+   pas.
+2. **Le plancher**, 26rem → **36rem**. C'est le seul levier sur un portable, et il se paie en
+   défilement. Mesuré :
+
+   | viewport | plan | défilement de `main` |
+   |---|---|---|
+   | 1366×648 | 337 → **497 px** | 102 → 181 px |
+   | 1536×744 | 337 → **497 px** | 6 → 85 px |
+   | 1920×960 | 545 → **625 px** | 0 → 0 px |
+
+⚠️ **L'arbitrage est assumé et il RÉVISE une demande antérieure** : « je veux pas pouvoir
+scroll sous la map » (2026-08-21). Sur un portable, cette promesse n'était de toute façon
+déjà plus tenue (102 px de défilement avant ce lot). La carte passe devant.
+
+⚠️ **Ce que les tests ne peuvent PAS faire ici** : mesurer des pixels — il n'y a pas de
+navigateur dans la suite. `tests/carteHauteur.test.ts` verrouille les MÉCANISMES (l'enveloppe
+existe, l'inline vise ses enfants, le plancher ne redescend pas sous 34rem, il reste un
+plancher et non une hauteur). Les chiffres, eux, vivent à côté de la déclaration dans
+`app/globals.css`, datés.
+
+**Vérifications** : gate complet vert. Trois mutations, trois rouges distincts (plancher
+rabaissé, règle inline remise sur les items flex, enveloppe retirée).
+
+---
+
 ## Session 2026-09-15 (soir) — `[TRAJETS-01]` CLOS, et la carte gagne la barre de filtres
 
 **Les trajets marchent.** Marc a ajouté « Routes API » aux restrictions de la clé serveur, et

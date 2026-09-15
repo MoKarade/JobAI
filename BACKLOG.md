@@ -1821,6 +1821,19 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       désormais un clic de plus, et c'est un arbitrage assumé. Si l'usage montre que la
       recherche mérite de rester à l'air libre, la sortir du pli est un changement d'une ligne
       au point d'appel — le pli n'est pas dans `Filtres`.
+      ⚠️ **ET CE LOT-LÀ N'A RIEN DONNÉ AU PLAN SUR UN PORTABLE** — Marc : « elle a pas grandi ».
+      Mesuré : 337 px avant ET après sur 1366×648, la place libérée étant allée au défilement.
+      Voir `[CARTE-05]`, qui livre le vrai levier.
+- [ ] 🟡 **`[CARTE-05]`** Hauteur du plan : bande d'état + plancher (2026-09-15). ✅ Livré.
+      Deux mécanismes, deux écrans : l'enveloppe `.carte-etat` rend `display:inline` opérant
+      (il était INERTE sur des items flex — 102 px au lieu de 54, donc +80 px de plan sur un
+      grand écran), et le plancher de `.plan-ecran` passe de 26rem à 36rem (+160 px de plan
+      sur un portable, au prix de ~80 px de défilement en plus). Mesures datées dans
+      `app/globals.css`, mécanismes verrouillés par `tests/carteHauteur.test.ts`.
+      **Point d'observation** : si le défilement gêne sur un portable, le plancher est le
+      bouton à tourner (34rem est le minimum que le test accepte). Si la carte reste petite
+      sur un écran donné, la re-MESURER sur CET écran avant de toucher quoi que ce soit —
+      c'est ce qui a manqué au lot précédent.
       ⚠️ **17:18 UTC — le 403 a disparu, mais la vérification est BLOQUÉE pour la journée** :
       `[trajets] sautée : Budget Routes du jour épuisé (48/50 éléments)`. L'appel n'est donc
       même pas parti — on ne sait PAS encore si le geste console a marché. Un clic de trajet
