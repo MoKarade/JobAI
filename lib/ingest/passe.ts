@@ -429,7 +429,20 @@ export async function executerPasse(
     },
     nouvelles: tri.retenues.map((o) => o.id),
     villesACompleter: villesACompleter(brutes, connues),
-    perimees: balayage.perimees,
+    // ⚠️ LES FERMETURES D'OFFICE SONT DEDANS, ET C'EST CE QUI LES REND RÉELLES.
+    //
+    // Ce champ n'est pas un compte-rendu : c'est la LISTE que `lib/veilleComplete.ts`
+    // parcourt pour écrire `perimeeLe` en base. Livrée sans elles (2026-09-14), la fermeture
+    // d'office calculait juste, rendait juste, passait ses tests — et n'écrivait RIEN.
+    // Mesuré le lendemain : `perimees` 606 → 624 (la péremption ordinaire, persistée) pendant
+    // que `jamaisConfirmees` restait à 21, inchangé. Un mécanisme vert, testé, et mort à
+    // l'arrivée — exactement le piège que le lot d'à côté venait d'éviter sur la couverture.
+    //
+    // UNE SEULE LISTE, pas une seconde boucle chez l'appelant : deux chemins d'écriture pour
+    // le même fait auraient fini par diverger, et le troisième mécanisme de péremption aurait
+    // été oublié pareil. Le POURQUOI de chaque fermeture reste dans `fermetureAuto`, qui
+    // nomme ses offres et son motif d'abstention.
+    perimees: [...balayage.perimees, ...fermeture.fermetures.map((f) => f.id)],
     revenues: balayage.revenues,
     enSursis: balayage.enSursis.length,
     offres: offresFinales,

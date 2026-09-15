@@ -1708,6 +1708,22 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   passée depuis l'appelant laissait toute la suite verte — le branchement n'était le sujet
   d'aucun test, et c'est la mutation qui l'a dit, pas la relecture.
 
+- **Un test qui vérifie ce qu'une fonction REND ne prouve rien sur ce qui est ÉCRIT — et la
+  liste que la persistance parcourt EST le contrat.** La fermeture d'office livrée le
+  2026-09-14 calculait juste, rendait juste, passait un test d'intégration qui traversait la
+  passe… et n'atteignait jamais la base : `lib/veilleComplete.ts` n'écrit `perimeeLe` que pour
+  les identifiants de `rapport.perimees`, et les fermetures vivaient dans un champ voisin.
+  Mesuré le lendemain : `perimees` 606 → 624 (la péremption ordinaire, persistée) pendant que
+  `jamaisConfirmees` restait à 21. ⚠️ **J'avais écrit la leçon « mécanisme vert, testé, mort à
+  l'arrivée » dans le commit précédent, sur une autre garde, et je l'ai reprise par la porte
+  d'à côté** — écrire une leçon ne la fait pas appliquer, seul un test le fait. Le verrou juste
+  n'est pas un cas de plus : c'est l'INVARIANT du contrat — toute offre rendue avec un
+  `perimeeLe` que l'entrée n'avait pas doit figurer dans la liste que l'écriture parcourt —,
+  plus une garde à l'autre bout qui vérifie que l'écriture parcourt bien cette liste-là. Il
+  couvre alors le prochain mécanisme sans que personne y pense. Réflexe : quand un lot ajoute
+  une façon de produire un fait DÉJÀ persisté ailleurs, ne pas ajouter une seconde boucle
+  d'écriture — faire entrer le nouveau fait dans la liste existante, et garder les deux bouts.
+
 ## 10. Style et compte-rendu
 
 > 📣 Forme des comptes-rendus, des commits, des PR et des docs générées :

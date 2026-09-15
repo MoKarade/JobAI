@@ -10,9 +10,9 @@
 // pas rendre un résultat vide » — et ne surtout pas DÉCIDER sur ce vide.
 
 import { describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { SEUIL_ABSENCES_PEREMPTION } from "@/lib/veille";
 import { executerPasse } from "../lib/ingest/passe";
 import type { Offre } from "../lib/types";
@@ -91,6 +91,30 @@ describe("balayage suspendu quand aucune source ne répond", () => {
   });
 });
 
+// ⚠️ DES EMPLOYEURS DISTINCTS, ET C'EST UNE CONDITION DU TEST, PAS DU DÉCOR. La passe
+// résout une annonce vers une offre STOCKÉE par la clé canonique (entreprise + poste) :
+// avec le même employeur partout, le lot déposé « confirmait » une offre au hasard — et
+// la première version de ce fichier a vu la candidate marquée vue, donc jamais fermée,
+// pour cette seule raison.
+function suiviAvecDureeMesurable(): { offres: Offre[]; journal: Record<string, { premiereVue: string; derniereVue: string; absences: number }> } {
+  const offres: Offre[] = [];
+  const journal: Record<string, { premiereVue: string; derniereVue: string; absences: number }> = {};
+  // Douze offres fermées observées 5 jours : la survie tombe à zéro au jour 5.
+  for (let i = 0; i < 12; i++) {
+    const id = `fermee-${i}`;
+    offres.push({ ...OFFRE_SUIVIE, id, entreprise: `Fermee ${i}`, perimeeLe: "2026-08-20T00:00:00.000Z" });
+    journal[id] = { premiereVue: "2026-08-10", derniereVue: "2026-08-15", absences: 4 };
+  }
+  // Douze vivantes confirmées, vues un seul jour : le journal reste majoritaire sans
+  // diluer l'événement de fermeture (voir `tests/fermetureAuto.test.ts`).
+  for (let i = 0; i < 12; i++) {
+    const id = `vivante-${i}`;
+    offres.push({ ...OFFRE_SUIVIE, id, entreprise: `Vivante ${i}`, dateReperage: "2026-09-10" });
+    journal[id] = { premiereVue: "2026-09-13", derniereVue: "2026-09-13", absences: 0 };
+  }
+  return { offres, journal };
+}
+
 describe("fermeture d'office — la passe l'applique vraiment", () => {
   /**
    * ⚠️ UN TEST QUI TRAVERSE, PAS UN TEST DE MODULE.
@@ -100,30 +124,6 @@ describe("fermeture d'office — la passe l'applique vraiment", () => {
    * genre de trou qui laisse un lot vert de bout en bout ne rien changer à l'écran : les
    * deux moitiés sont gardées, et le chaînon n'est le sujet d'aucun fichier.
    */
-  // ⚠️ DES EMPLOYEURS DISTINCTS, ET C'EST UNE CONDITION DU TEST, PAS DU DÉCOR. La passe
-  // résout une annonce vers une offre STOCKÉE par la clé canonique (entreprise + poste) :
-  // avec le même employeur partout, le lot déposé « confirmait » une offre au hasard — et
-  // la première version de ce fichier a vu la candidate marquée vue, donc jamais fermée,
-  // pour cette seule raison.
-  function suiviAvecDureeMesurable(): { offres: Offre[]; journal: Record<string, { premiereVue: string; derniereVue: string; absences: number }> } {
-    const offres: Offre[] = [];
-    const journal: Record<string, { premiereVue: string; derniereVue: string; absences: number }> = {};
-    // Douze offres fermées observées 5 jours : la survie tombe à zéro au jour 5.
-    for (let i = 0; i < 12; i++) {
-      const id = `fermee-${i}`;
-      offres.push({ ...OFFRE_SUIVIE, id, entreprise: `Fermee ${i}`, perimeeLe: "2026-08-20T00:00:00.000Z" });
-      journal[id] = { premiereVue: "2026-08-10", derniereVue: "2026-08-15", absences: 4 };
-    }
-    // Douze vivantes confirmées, vues un seul jour : le journal reste majoritaire sans
-    // diluer l'événement de fermeture (voir `tests/fermetureAuto.test.ts`).
-    for (let i = 0; i < 12; i++) {
-      const id = `vivante-${i}`;
-      offres.push({ ...OFFRE_SUIVIE, id, entreprise: `Vivante ${i}`, dateReperage: "2026-09-10" });
-      journal[id] = { premiereVue: "2026-09-13", derniereVue: "2026-09-13", absences: 0 };
-    }
-    return { offres, journal };
-  }
-
   /** Un lot déposé qui RE-PUBLIE une offre connue et PROUVE sa couverture. */
   function ecrireLot(racine: string, jour: string) {
     mkdirSync(join(racine, "data", "depot"), { recursive: true });
@@ -288,5 +288,93 @@ describe("fermeture d'office — la passe l'applique vraiment", () => {
       process.chdir(cwd);
       rmSync(tmp, { recursive: true, force: true });
     }
+  });
+});
+
+describe("ce que la passe FERME, elle le met dans la liste que la base écrit", () => {
+  // ⚠️ L'INVARIANT QUI MANQUAIT, ET IL A COÛTÉ UNE JOURNÉE. La fermeture d'office livrée le
+  // 2026-09-14 calculait juste, rendait juste, et passait un test d'intégration qui vérifiait
+  // `rapport.offres` — ce que la passe REND. Or `lib/veilleComplete.ts` n'écrit en base que
+  // les identifiants listés dans `rapport.perimees` : les fermetures n'y étaient pas, donc
+  // rien n'atteignait la base. Mesuré le lendemain : `perimees` 606 → 624 (la péremption
+  // ordinaire, persistée) pendant que `jamaisConfirmees` restait à 21, inchangé.
+  //
+  // Le test d'avant regardait le bon objet au mauvais endroit. Celui-ci défend le CONTRAT
+  // dont l'écriture dépend : toute offre que la passe rend avec un `perimeeLe` que l'entrée
+  // n'avait pas DOIT figurer dans `rapport.perimees`. Il vaut pour la péremption ordinaire,
+  // pour la fermeture d'office, et pour le prochain mécanisme qu'on ajoutera.
+  function fermeturesNonListees(
+    avant: readonly Offre[],
+    rapport: { offres: readonly Offre[]; perimees: readonly string[] },
+  ): string[] {
+    const etait = new Map(avant.map((o) => [o.id, o.perimeeLe]));
+    return rapport.offres
+      .filter((o) => o.perimeeLe !== null && (etait.get(o.id) ?? null) === null)
+      .map((o) => o.id)
+      .filter((id) => !rapport.perimees.includes(id));
+  }
+
+  it("une offre fermée d'office est dans `perimees`, sinon la base ne la verra jamais", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "jobai-contrat-"));
+    const cwd = process.cwd();
+    try {
+      const jour = "2026-09-14";
+      mkdirSync(join(tmp, "data", "depot"), { recursive: true });
+      writeFileSync(
+        join(tmp, "data", "depot", `${jour}.json`),
+        JSON.stringify({
+          source: "indeed",
+          jour,
+          couverture: { demandes: 3, balayes: 3 },
+          offres: [
+            {
+              titre: OFFRE_SUIVIE.poste,
+              entreprise: OFFRE_SUIVIE.entreprise,
+              ville: "Québec",
+              adresse: "",
+              adresseSource: null,
+              adresseUrl: null,
+              lien: OFFRE_SUIVIE.lien,
+              description: "",
+              publieeLe: jour,
+              refSource: "",
+            },
+          ],
+        }),
+        "utf8",
+      );
+      process.chdir(tmp);
+
+      const { offres, journal } = suiviAvecDureeMesurable();
+      const jamais: Offre = {
+        ...OFFRE_SUIVIE,
+        id: "jamais-vue",
+        entreprise: "Jamais Vue inc.",
+        dateReperage: "2026-07-01",
+      };
+      const avant = [...offres, jamais];
+      const r = await executerPasse(avant, journal, 0, jour, (() => {
+        throw new Error("aucun réseau nécessaire");
+      }) as never);
+
+      // Anti-vacuité : sans fermeture, l'invariant serait vrai pour rien.
+      expect(r.fermetureAuto.fermetures.map((f) => f.id)).toEqual(["jamais-vue"]);
+      expect(fermeturesNonListees(avant, r)).toEqual([]);
+      expect(r.perimees).toContain("jamais-vue");
+    } finally {
+      process.chdir(cwd);
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("`lib/veilleComplete.ts` écrit bien depuis cette liste-là", () => {
+    // L'autre bout du contrat. Si la persistance cessait de parcourir `rapport.perimees`,
+    // l'invariant ci-dessus resterait vrai et ne protégerait plus rien.
+    const code = readFileSync(resolve(process.cwd(), "lib/veilleComplete.ts"), "utf8")
+      .split("\n")
+      .filter((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l))
+      .join("\n");
+    expect(code.length).toBeGreaterThan(5_000);
+    expect(code).toContain("for (const id of rapport.perimees)");
   });
 });

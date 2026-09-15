@@ -6,6 +6,46 @@
 
 ---
 
+## Session 2026-09-15 — la fermeture d'office n'atteignait pas la base
+
+Vérification du lendemain, et elle a trouvé quelque chose.
+
+**Mesuré** (`resume_suivi`, 12:30 UTC) : `perimees` 606 → **624** (+18) et `suivies` 1593 →
+1588 — donc une passe a bien tourné. Mais `jamaisConfirmees` reste à **21**, inchangé, avec
+`seuilFermetureJours` toujours à 27. La péremption ordinaire s'écrit ; la fermeture d'office,
+non.
+
+**La cause, lue dans le code** : `lib/veilleComplete.ts` n'écrit `perimeeLe` en base que pour
+les identifiants listés dans `rapport.perimees`. Les fermetures d'office vivaient dans
+`rapport.fermetureAuto.fermetures` et dans `rapport.offres` — jamais dans cette liste. Le
+mécanisme calculait juste, rendait juste, passait ses tests, et **n'écrivait rien**.
+
+⚠️ **C'est exactement le piège dont j'avais écrit la leçon la veille**, dans le même lot
+(« un mécanisme livré vert, testé, et mort à l'arrivée »). Je l'avais évité sur
+`couvertureComplete` et repris par la porte d'à côté. Ce qui l'a rendu invisible : mon test
+d'intégration vérifiait `rapport.offres` — ce que la passe REND —, et l'écriture vit un
+module plus haut.
+
+**Le correctif** : les fermetures entrent dans `rapport.perimees`, la liste que la
+persistance parcourt déjà. **Une seule liste**, pas une seconde boucle chez l'appelant : deux
+chemins d'écriture pour le même fait auraient divergé, et le troisième mécanisme de
+péremption aurait été oublié pareil. Le POURQUOI de chaque fermeture reste dans
+`fermetureAuto`, qui nomme ses offres et son motif d'abstention.
+
+**Le verrou qui manquait** : un invariant sur le CONTRAT dont l'écriture dépend — toute offre
+que la passe rend avec un `perimeeLe` que l'entrée n'avait pas DOIT figurer dans
+`rapport.perimees`. Il vaut pour la péremption ordinaire, pour la fermeture d'office, et pour
+le prochain mécanisme. Plus une garde à l'autre bout : la persistance parcourt bien cette
+liste-là. Mutation jouée : remettre le code d'hier fait tomber le test.
+
+**Ce qui reste NON prouvé, et il faut le dire** : `[PROFIL-01]` et `[BORNES-01]` n'ont laissé
+aucune trace — la rétention des journaux Vercel semble être de l'ordre de l'heure (une
+requête sur 16 h ne rend que les 30 dernières minutes), et ni `/profil` ni `/references`
+n'ont été ouverts. Leur code est déployé et vert ; leur effet en production n'est pas
+constaté. Prochaine vérification programmée.
+
+---
+
 ## Session 2026-09-14 (suite 4) — les bornes de recharge se mesurent de nouveau
 
 `[BORNES-01]`, demandé par Marc après le lot précédent.
