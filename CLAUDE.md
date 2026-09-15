@@ -1798,6 +1798,24 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
   `display:inline`, regarder ce qu'est le PARENT — et se rappeler qu'une règle ignorée ne
   laisse aucune trace, contrairement à une règle fausse.
 
+- **Un frein qui compte ce que PERSONNE n'a dépensé ne protège rien : il enferme.** Marc :
+  « budget épuisé mais j'ai juste fait 2 recherches, pourquoi ». Mesuré : **48 des 50 éléments
+  du jour** avaient été brûlés par QUATRE passes de matrice refusées en 403 (12 éléments
+  réservés chacune), sans qu'un seul trajet n'existe — ses deux clics ne coûtaient que 2. La
+  réservation se fait AVANT l'appel, et son commentaire le justifiait : « un appel parti est
+  facturé même si sa réponse est illisible ». Vrai d'un appel que Google ACCEPTE ; **faux d'un
+  403, refusé à la porte et jamais facturé**. Le frein posé pour protéger l'argent a fini par
+  bloquer la VÉRIFICATION du correctif qui réglait ce même 403 — le défaut se paie deux fois.
+  Règle : **classer l'échec par ORIGINE avant de le compter** (la leçon des échecs LLM de
+  DriveAI, payée ici sur un budget d'argent). Ce dont on est SÛR qu'il n'a rien coûté se rend
+  (appel jamais parti, 401/403) ; ce dont on n'est pas sûr reste dépensé (429 — le quota est
+  justement ce qu'on protège —, 5xx, réponse illisible d'un appel ACCEPTÉ). Le marqueur est
+  posé par le site qui a VU la réponse, jamais deviné par le compteur.
+  ⚠️ **Et le symptôme ne désigne pas le coupable** : « budget épuisé » se lit comme « tu as
+  trop consommé », alors que l'utilisateur n'avait rien consommé du tout. Un compteur partagé
+  entre un geste humain et un travail de fond doit pouvoir dire QUI a dépensé — sinon la
+  première hypothèse est toujours la mauvaise.
+
 ## 10. Style et compte-rendu
 
 > 📣 Forme des comptes-rendus, des commits, des PR et des docs générées :

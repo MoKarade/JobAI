@@ -16,7 +16,7 @@ import { entreprisesLieux, trajets } from "./db/schema";
 import { exigerSession } from "./session";
 import { domicile } from "./domicile";
 import { appelerRoutes, cacheValide } from "./trajetRoutes";
-import { consommerBudgetRoutes } from "./budgetRoutes";
+import { consommerBudgetRoutes, jourBudgetRoutes, rendreBudgetRoutes } from "./budgetRoutes";
 
 export type ResultatTrajet =
   | {
@@ -86,9 +86,14 @@ export async function obtenirTrajet(nomEntreprise: string): Promise<ResultatTraj
   // computeRoutes vaut UN élément.
   const budget = await consommerBudgetRoutes(1);
   if (!budget.ok) return budget;
+  const jourReserve = jourBudgetRoutes();
 
   const r = await appelerRoutes(maison, { lat: lieu.lat, lon: lieu.lon }, cle);
-  if (!r.ok) return r;
+  if (!r.ok) {
+    // Même règle que la matrice : ce que Google refuse à la porte n'a rien coûté.
+    if (r.nonFacture) await rendreBudgetRoutes(1, jourReserve);
+    return r;
+  }
 
   // Écrit APRÈS le succès seulement : un échec ne doit pas poser une ligne vide qui
   // passerait pour un trajet.

@@ -8,7 +8,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "./db";
 import { entreprisesLieux, trajets } from "./db/schema";
 import { domicile } from "./domicile";
-import { consommerBudgetRoutes } from "./budgetRoutes";
+import { consommerBudgetRoutes, jourBudgetRoutes, rendreBudgetRoutes } from "./budgetRoutes";
 import { appelerMatrice, cacheValide, type DestinationMatrice } from "./trajetRoutes";
 
 /**
@@ -63,9 +63,16 @@ export async function remplirDureesTrajet(): Promise<BilanMatrice> {
   // Le budget se réserve à l'ÉLÉMENT — N destinations = N éléments, dans UN appel HTTP.
   const budget = await consommerBudgetRoutes(aFaire.length);
   if (!budget.ok) return { resume: `sautée : ${budget.raison}`, remplies: 0 };
+  const jourReserve = jourBudgetRoutes();
 
   const r = await appelerMatrice(maison, aFaire, cle);
-  if (!r.ok) return { resume: `échec : ${r.raison}`, remplies: 0 };
+  if (!r.ok) {
+    // ⚠️ UN REFUS À LA PORTE NE SE PAIE PAS. Sans ce rendu, quatre passes refusées en 403
+    // brûlaient les 50 éléments du jour sans produire un seul trajet — vécu le 2026-09-15,
+    // et le frein a fini par bloquer la vérification du correctif qui réglait ce 403.
+    if (r.nonFacture) await rendreBudgetRoutes(aFaire.length, jourReserve);
+    return { resume: `échec : ${r.raison}`, remplies: 0 };
+  }
 
   for (const e of r.elements) {
     await db

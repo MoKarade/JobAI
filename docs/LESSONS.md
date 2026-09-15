@@ -619,3 +619,39 @@ demande du jour est explicite.
 dans la suite) — ils verrouillent les MÉCANISMES : l'enveloppe existe, l'inline vise ses
 enfants et non des items flex, le plancher ne redescend pas sous 34rem, et il reste un
 plancher plutôt qu'une hauteur imposée. Trois mutations, trois rouges distincts.
+
+---
+
+## 2026-09-15 (fin) — un frein qui compte ce que personne n'a dépensé n'enferme que l'utilisateur
+
+**La question de Marc** : « budget épuisé mais j'ai juste fait 2 recherches, pourquoi ».
+
+**Le compte** : quatre passes de matrice ont réservé 12 éléments chacune — 48 — et toutes ont
+été refusées en 403 par Google. Aucune route calculée, aucune facturation, 48 éléments
+dépensés au compteur. Les deux clics de Marc ont fait le reste : 50/50.
+
+**Le défaut** : la réservation se fait AVANT l'appel, et son commentaire le justifiait — « un
+appel parti est facturé même si sa réponse est illisible ». C'est vrai d'un appel que Google
+ACCEPTE. C'est faux d'un 403 : Google refuse la clé à la porte et ne calcule rien. Le
+raisonnement était juste, son DOMAINE était trop large.
+
+**Ce qui rend l'incident instructif** : le frein posé pour protéger l'argent a fini par
+bloquer la VÉRIFICATION du correctif qui venait de régler ce même 403. Le défaut se paie deux
+fois — une fois en budget, une fois en temps de diagnostic.
+
+**La règle** : classer l'échec par ORIGINE avant de le compter. Ce dont on est SÛR qu'il n'a
+rien coûté se rend (appel jamais parti, 401/403) ; ce dont on n'est pas sûr reste dépensé
+(429 — le quota est justement ce qu'on protège —, 5xx, réponse illisible d'un appel accepté).
+Le marqueur est posé par le site qui a VU la réponse, jamais deviné par le compteur : c'est la
+même discipline que « le verdict se lit dans la donnée riche, une seule fois ».
+
+**Et le symptôme ne désignait pas le coupable** : « budget épuisé » se lit comme « tu as trop
+consommé », alors que Marc n'avait presque rien consommé. Un compteur partagé entre un geste
+humain et un travail de fond devrait pouvoir dire QUI a dépensé — sinon la première hypothèse
+est toujours la mauvaise, et c'est l'utilisateur qui la porte.
+
+**Verrou** : `tests/budgetRoutes.test.ts`. Il ne peut pas éprouver le compteur lui-même
+(`lib/etat.ts` importe Neon directement) : il éprouve la DÉCISION sur le vrai module avec un
+`fetch` injecté, et le BRANCHEMENT par scan des deux appelants — dont le fait que le rendu est
+SOUS condition, un rendu inconditionnel créditant aussi les 429. Trois mutations, trois rouges
+distincts.

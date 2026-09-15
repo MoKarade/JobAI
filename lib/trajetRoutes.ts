@@ -68,9 +68,23 @@ const ReponseRoutesSchema = z.object({
     .min(1),
 });
 
+/**
+ * ⚠️ `nonFacture` DIT CE QUE GOOGLE N'A PAS FACTURÉ, et il n'est pas décoratif : le budget
+ * est réservé AVANT l'appel (voir `lib/budgetRoutes.ts`), donc sans lui un refus coûte au
+ * compteur ce qu'il n'a coûté à personne. Mesuré le 2026-09-15 : quatre passes refusées en
+ * 403 ont brûlé 48 des 50 éléments du jour sans produire un seul trajet, et le frein a fini
+ * par bloquer la vérification du correctif qui venait de régler ce 403.
+ *
+ * Il n'est posé QUE sur les refus dont on est SÛR qu'ils n'ont rien coûté :
+ *   · l'appel n'est jamais parti (le `fetch` a levé) ;
+ *   · Google a refusé la clé à la porte (401/403) — aucune route n'a été calculée.
+ * Il n'est PAS posé sur un 429 (quota : ne rien facturer ne veut pas dire « recommence »),
+ * ni sur un 5xx (on ne sait pas), ni sur une réponse illisible d'un appel ACCEPTÉ — ces
+ * trois-là restent dépensés, c'est le sens conservateur.
+ */
 export type ResultatRoutes =
   | { ok: true; dureeS: number; distanceM: number; polyline: string }
-  | { ok: false; raison: string };
+  | { ok: false; raison: string; nonFacture?: true };
 
 /**
  * Appelle Routes API pour UN trajet voiture, sans trafic.
@@ -107,7 +121,12 @@ export async function appelerRoutes(
       }),
     });
   } catch (e) {
-    return { ok: false, raison: `Routes injoignable : ${e instanceof Error ? e.message : e}` };
+    // L'appel n'est jamais parti : rien n'a pu être facturé.
+    return {
+      ok: false,
+      raison: `Routes injoignable : ${e instanceof Error ? e.message : e}`,
+      nonFacture: true,
+    };
   }
 
   if (!reponse.ok) {
@@ -116,7 +135,12 @@ export async function appelerRoutes(
     // deux causes sur six, et les quatre autres envoyaient chercher au mauvais endroit.
     if (reponse.status === 403 || reponse.status === 401) {
       const refus = lireRefusGoogle(await reponse.text().catch(() => null));
-      return { ok: false, raison: expliquerRefusGoogle("Routes API", reponse.status, refus) };
+      // Refusé À LA PORTE : Google ne facture pas une clé qu'il n'a pas acceptée.
+      return {
+        ok: false,
+        raison: expliquerRefusGoogle("Routes API", reponse.status, refus),
+        nonFacture: true,
+      };
     }
     return { ok: false, raison: `Routes a répondu ${reponse.status}` };
   }
@@ -167,7 +191,7 @@ export type ResultatMatrice =
       elements: { nom: string; dureeS: number; distanceM: number }[];
       inatteignables: string[];
     }
-  | { ok: false; raison: string };
+  | { ok: false; raison: string; nonFacture?: true };
 
 /**
  * UNE origine vers N destinations, en UN appel HTTP — mais N ÉLÉMENTS facturés : c'est à
@@ -202,7 +226,12 @@ export async function appelerMatrice(
       }),
     });
   } catch (e) {
-    return { ok: false, raison: `Matrice injoignable : ${e instanceof Error ? e.message : e}` };
+    // L'appel n'est jamais parti : rien n'a pu être facturé.
+    return {
+      ok: false,
+      raison: `Matrice injoignable : ${e instanceof Error ? e.message : e}`,
+      nonFacture: true,
+    };
   }
   if (!reponse.ok) {
     // ⚠️ LA CAUSE VIENT DE GOOGLE, PLUS DU CODE HTTP. Ce bloc affirmait « Routes API doit
@@ -212,7 +241,12 @@ export async function appelerMatrice(
     // coûte un aller-retour et lui laisse croire le problème réglé (`lib/erreurGoogle.ts`).
     if (reponse.status === 403 || reponse.status === 401) {
       const refus = lireRefusGoogle(await reponse.text().catch(() => null));
-      return { ok: false, raison: expliquerRefusGoogle("Routes API", reponse.status, refus) };
+      // Refusé À LA PORTE : Google ne facture pas une clé qu'il n'a pas acceptée.
+      return {
+        ok: false,
+        raison: expliquerRefusGoogle("Routes API", reponse.status, refus),
+        nonFacture: true,
+      };
     }
     return { ok: false, raison: `Matrice a répondu ${reponse.status}` };
   }

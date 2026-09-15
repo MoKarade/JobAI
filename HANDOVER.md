@@ -6,6 +6,39 @@
 
 ---
 
+## Session 2026-09-15 (fin) — `[TRAJETS-02]` : le budget comptait des appels jamais facturés
+
+Marc : « budget épuisé mais j'ai juste fait 2 recherches, pourquoi ». **Ses deux clics ne
+coûtaient que 2 éléments sur 50.**
+
+**Le compte, mesuré dans les journaux** : quatre passes de matrice ont réservé 12 éléments
+chacune (`MATRICE_MAX_PAR_PASSE`), soit **48**, et toutes les quatre ont été REFUSÉES en 403
+par Google. Aucune route calculée, aucune facturation — et 48 éléments dépensés au compteur.
+Ses deux clics ont fait le reste : 50/50.
+
+**Le défaut** : `consommerBudgetRoutes` réserve AVANT l'appel, ce qui est juste pour un appel
+que Google ACCEPTE (« un appel parti est facturé même si sa réponse est illisible »). C'est
+faux d'un 403 `API_KEY_SERVICE_BLOCKED` : Google refuse la clé à la porte. Le frein posé pour
+protéger l'argent a donc fini par bloquer la VÉRIFICATION du correctif qui réglait ce 403 —
+le même défaut payé deux fois.
+
+**Livré** : `nonFacture` est posé par le site qui a VU la réponse (appel jamais parti, ou
+401/403), et le budget est rendu — au JOUR de la réservation, jamais sous zéro. **Restent
+dépensés** : 429 (le quota est justement ce qu'on protège), 5xx (on ne sait pas), et la
+réponse illisible d'un appel ACCEPTÉ (elle, a bien été facturée).
+
+⚠️ **Ce que ça ne répare PAS** : les 48 éléments du 15/09 sont déjà écrits. Le compteur reste
+à 50/50 jusqu'à sa remise à zéro (minuit, fuseau de Marc). Aucun chemin de correction manuelle
+n'a été ajouté — ce serait un override d'un frein de dépense, et ça se décide.
+
+⚠️ **Ce que les tests ne peuvent pas faire** : éprouver le compteur lui-même (`lib/etat.ts`
+importe Neon directement). Ils éprouvent la DÉCISION sur le vrai module avec un `fetch`
+injecté, et le BRANCHEMENT par scan des deux appelants. Trois mutations, trois rouges.
+
+**Vérifications** : gate complet vert.
+
+---
+
 ## Session 2026-09-15 (tard) — la carte grandit VRAIMENT, mesuré au navigateur
 
 Marc : « la carte est trop petite encore, elle a pas grandi ». **Il avait raison, et le lot

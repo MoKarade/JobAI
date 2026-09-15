@@ -1839,7 +1839,7 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       même pas parti — on ne sait PAS encore si le geste console a marché. Un clic de trajet
       sur la Carte coûte 1 élément et tient dans les 2 restants : c'est le seul test possible
       aujourd'hui (voir `[TRAJETS-02]`).
-- [ ] 🟠 **`[TRAJETS-02]`** **Un refus de PLATEFORME ne doit pas consommer le budget Routes.**
+- [x] 🟠 **`[TRAJETS-02]`** ✅ **Livré le 2026-09-15.** **Un refus de PLATEFORME ne doit pas consommer le budget Routes.**
       `consommerBudgetRoutes` réserve AVANT l'appel, et son commentaire le justifie : « un appel
       parti est facturé même si sa réponse est illisible ». C'est juste pour un appel que Google
       ACCEPTE — c'est faux pour un **403 `API_KEY_SERVICE_BLOCKED`**, que Google refuse à la
@@ -1854,3 +1854,12 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       (quota réel), ni sur un succès, ni sur une réponse illisible d'un appel accepté — ce sont
       les cas que la réservation avant appel protège vraiment. Un test par cas, et la mutation
       « on rend toujours » doit rougir.
+      ✅ **Fait** : `nonFacture` (`lib/trajetRoutes.ts`) est posé par le site qui a VU la
+      réponse — appel jamais parti, ou 401/403 — et `rendreBudgetRoutes` (`lib/budgetRoutes.ts`)
+      rend alors ce qui avait été réservé, au JOUR de la réservation, sans jamais descendre
+      sous zéro. Restent dépensés : 429, 5xx, et la réponse illisible d'un appel ACCEPTÉ.
+      Verrou : `tests/budgetRoutes.test.ts` (10 cas), trois mutations, trois rouges distincts.
+      ⚠️ **Ce que ça ne fait PAS** : rendre les 48 éléments déjà brûlés le 2026-09-15. Le
+      compteur du jour reste à 50/50 jusqu'à sa remise à zéro (minuit, fuseau de Marc). Aucun
+      chemin de correction manuelle n'a été ajouté — ce serait un override d'un frein de
+      dépense, et ça se décide.
