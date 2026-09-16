@@ -13,6 +13,21 @@ import { lireEtat, ecrireEtat } from "./etat";
 /** Plafond d'ÉLÉMENTS Routes par jour. Le filet ne se désactive jamais ; il se dit. */
 export const ROUTES_ELEMENTS_MAX_PAR_JOUR = 50;
 
+/**
+ * Ce que la passe nocturne NE PREND PAS, pour que Marc puisse encore cliquer.
+ *
+ * ⚠️ RAISON D'ÊTRE : la passe et le clic partagent le MÊME compteur. Une passe qui réserve
+ * tout le budget du jour laisse zéro clic — et un clic n'est pas redondant avec elle : la
+ * matrice ne remplit qu'une DURÉE, le tracé sur la carte vient du clic (`obtenirTrajet`),
+ * qui coûte un élément de plus. Sans cette marge, « tracer » répondrait « budget épuisé »
+ * tous les jours où la passe a du travail, sans que rien n'ait mal tourné.
+ *
+ * Dix, parce que c'est ce qui reste d'un ordre de grandeur honnête : au-delà d'une dizaine
+ * de tracés dans une même journée, c'est le plafond quotidien qu'il faut rediscuter, pas
+ * cette marge.
+ */
+export const MARGE_CLICS_PAR_JOUR = 10;
+
 const CLE_COMPTEUR = "routes-compteur";
 
 function aujourdhuiQuebec(): string {

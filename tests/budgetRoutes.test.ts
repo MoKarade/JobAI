@@ -22,6 +22,8 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { appelerMatrice, appelerRoutes } from "@/lib/trajetRoutes";
+import { MARGE_CLICS_PAR_JOUR, ROUTES_ELEMENTS_MAX_PAR_JOUR } from "@/lib/budgetRoutes";
+import { MATRICE_MAX_PAR_PASSE } from "@/lib/trajetMatrice";
 
 const maison = { lat: 46.81, lon: -71.3 };
 const P = { lat: 46.8, lon: -71.25 };
@@ -149,5 +151,36 @@ describe("le branchement — qui RÉSERVE doit RENDRE", () => {
       const ligne = src.slice(src.lastIndexOf("\n", rendu) + 1, rendu);
       expect(ligne).toMatch(/if \(.*nonFacture.*\)\s*(await\s*)?$/);
     }
+  });
+});
+
+describe("la passe et le clic se partagent UN budget — trois façons de tout casser", () => {
+  // Marc, 2026-09-16 : « accélère les trajets ». La borne par passe est passée de 12 à
+  // tout le budget du jour moins une marge. Ces trois assertions verrouillent ce que
+  // l'accélération pourrait casser, et AUCUNE ne dépend des valeurs du jour : elles se
+  // dérivent des constantes, comme l'exige la règle « un test d'un comportement PARAMÉTRÉ
+  // par une config dérive ses cas de la constante, jamais de sa valeur du jour ».
+
+  it("⚠️ une passe ne peut JAMAIS demander plus que le budget du jour", () => {
+    // Le mode de panne : `consommerBudgetRoutes` refuse la réservation ENTIÈRE dès que
+    // `n + elements` dépasse le plafond. Une borne par passe au-dessus du plafond ne
+    // remplit donc plus JAMAIS une seule durée — et la seule trace est « Budget Routes du
+    // jour épuisé », qui se lit exactement comme un frein qui fonctionne.
+    expect(MATRICE_MAX_PAR_PASSE).toBeLessThanOrEqual(ROUTES_ELEMENTS_MAX_PAR_JOUR);
+  });
+
+  it("⚠️ elle laisse de quoi CLIQUER le même jour", () => {
+    // La matrice ne remplit qu'une durée ; le tracé vient du clic, qui coûte un élément de
+    // plus sur le même compteur. Marge à zéro = « tracer » refusé tous les jours où la
+    // passe a du travail, sans qu'il y ait de panne.
+    expect(ROUTES_ELEMENTS_MAX_PAR_JOUR - MATRICE_MAX_PAR_PASSE).toBeGreaterThanOrEqual(1);
+    expect(MARGE_CLICS_PAR_JOUR).toBeGreaterThanOrEqual(1);
+  });
+
+  it("⚠️ et elle remplit encore quelque chose — la marge ne peut pas tout prendre", () => {
+    // Le symétrique du précédent : une marge égale au plafond rendrait la borne nulle, et
+    // la passe s'arrêterait sur « à jour » sans avoir rien fait. Silencieux dans les deux
+    // sens, d'où les deux assertions.
+    expect(MATRICE_MAX_PAR_PASSE).toBeGreaterThanOrEqual(1);
   });
 });

@@ -1906,7 +1906,7 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       (l'ORDRE est la politique d'allocation d'un budget partagé), ou lui réserver sa propre
       enveloppe. Ne rien changer tant que le compte descend — une étape qui avance n'est pas
       une étape à réparer.
-- [ ] 🟡 **`[TRAJETS-03]`** **Le débit des durées est plafonné par la PASSE, pas par le budget
+- [x] 🟡 **`[TRAJETS-03]`** ✅ **Livré le 2026-09-16, sur « accélère les trajets » (Marc).** **Le débit des durées était plafonné par la PASSE, pas par le budget
       — et la justification de la constante a rôti.** `MATRICE_MAX_PAR_PASSE` = 12, avec en
       commentaire « douze par nuit couvrent le stock d'entreprises placées en trois jours ».
       Mesuré le 2026-09-16 : **277 durées restantes** après la passe, soit ~23 jours à ce
@@ -1919,6 +1919,32 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       Routes quatre fois plus vite. Rien n'est changé ici.
       ⚠️ Et si la constante bouge, re-dériver son commentaire depuis le stock RÉEL plutôt que
       d'y réécrire une durée — c'est exactement ce qui vient de se périmer.
+      ✅ **FAIT — 12 → 40 par passe, et la borne est DÉRIVÉE.**
+      `MATRICE_MAX_PAR_PASSE = ROUTES_ELEMENTS_MAX_PAR_JOUR − MARGE_CLICS_PAR_JOUR`, soit
+      50 − 10. **277 restantes : ~23 jours → ~7 jours.**
+      **Pourquoi 40 et pas 48** (qui aurait donné 6 jours) : la passe et le clic partagent le
+      MÊME compteur, et la matrice ne remplit qu'une DURÉE — le tracé sur la carte vient du
+      clic, qui coûte un élément de plus. À 48, il resterait deux clics par jour tant que la
+      passe a du travail. Un jour de rattrapage en plus contre cinq fois plus de marge de
+      clic : l'arbitrage n'est pas serré.
+      **Pourquoi DÉRIVÉE et pas écrite en dur** : une borne par passe posée au-dessus du
+      plafond quotidien ferait refuser la réservation ENTIÈRE à chaque passe — plus une seule
+      durée remplie, pour toujours, avec « Budget Routes du jour épuisé » pour seule trace,
+      c'est-à-dire une configuration qui se bloque elle-même en ressemblant à un frein qui
+      marche. Dérivée, elle suit le plafond et ne peut pas le dépasser.
+      **Et le commentaire est réécrit en BUDGET, pas en durée** : l'ancien promettait « trois
+      jours » et s'est périmé sans bruit quand le stock a grandi. Une borne exprimée en « ce
+      qu'on accepte de dépenser par jour » reste vraie quel que soit le stock ; le rythme se
+      lit dans le journal (`[trajets] N remplie(s) · M restante(s)`).
+      Verrou : `tests/budgetRoutes.test.ts`, trois invariants dérivés des constantes (jamais
+      de leur valeur du jour) — la passe ne peut pas demander plus que le jour, elle laisse
+      au moins un clic, elle remplit encore quelque chose. Trois mutations, trois rouges.
+      ⚠️ **Ce qui reste à surveiller** : la passe écrit une ligne par élément, à la fin d'une
+      invocation qui a déjà ingéré et géocodé. Le cron de veille a 300 s (large), mais le cron
+      de géocodage qui la REPREND quand elle est restée muette n'a que 60 s. Une coupure au
+      mur y laisserait des éléments réservés pour un travail à moitié écrit — du budget perdu,
+      jamais une ligne fausse, et la passe suivante refait le reliquat. Si ça se produit, le
+      remède est de grouper les écritures en une seule, pas de redescendre la borne.
 - [ ] 🟡 **`[TEST-FLAKE-01]`** **Bug préexistant, vu au gate du 2026-09-16.**
       `tests/oauthStore.test.ts` a échoué sur `Hook timed out in 10000ms` — son `beforeAll`
       démarre une base PGlite en mémoire et applique les migrations. Relancé SEUL dans la

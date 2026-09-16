@@ -8,15 +8,40 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "./db";
 import { entreprisesLieux, trajets } from "./db/schema";
 import { domicile } from "./domicile";
-import { consommerBudgetRoutes, jourBudgetRoutes, rendreBudgetRoutes } from "./budgetRoutes";
+import {
+  MARGE_CLICS_PAR_JOUR,
+  ROUTES_ELEMENTS_MAX_PAR_JOUR,
+  consommerBudgetRoutes,
+  jourBudgetRoutes,
+  rendreBudgetRoutes,
+} from "./budgetRoutes";
 import { appelerMatrice, cacheValide, type DestinationMatrice } from "./trajetRoutes";
 
 /**
- * Destinations par passe. Douze : la matrice les facture à l'ÉLÉMENT, et douze par nuit
- * couvrent le stock d'entreprises placées en trois jours sans jamais approcher le budget
- * quotidien — la veille du lendemain reprend là où celle-ci s'arrête.
+ * Destinations par passe — TOUT le budget du jour sauf la marge réservée aux clics.
+ *
+ * ⚠️ DÉRIVÉ, JAMAIS ÉCRIT EN DUR, et c'est la moitié qui compte. Un nombre posé à la main
+ * au-dessus de `ROUTES_ELEMENTS_MAX_PAR_JOUR` ferait refuser la réservation ENTIÈRE à
+ * chaque passe (`consommerBudgetRoutes` refuse `n + elements > plafond`) : plus une seule
+ * durée remplie, pour toujours, avec « Budget Routes du jour épuisé » pour seule trace —
+ * une configuration qui se bloque elle-même et qui ressemble à un frein qui fonctionne.
+ * Dérivée, la borne suit le plafond quand il bouge et ne peut pas le dépasser.
+ *
+ * ⚠️ ET LE CHIFFRE PRÉCÉDENT AVAIT ROTI. Il valait douze, avec en commentaire « douze par
+ * nuit couvrent le stock d'entreprises placées en TROIS JOURS ». Mesuré le 2026-09-16, à la
+ * première passe qui a réussi : `12 durée(s) remplie(s) · 277 restante(s)`, soit ~23 jours
+ * au lieu de trois. Le stock avait grandi, la promesse non — et rien ne pouvait le dire,
+ * une durée en commentaire ne se re-mesure pas toute seule. D'où une borne exprimée en
+ * BUDGET (ce qu'on accepte de dépenser par jour), qui reste vraie quel que soit le stock.
+ * Le rythme, lui, se lit dans le journal : `[trajets] N remplie(s) · M restante(s)`.
+ *
+ * ⚠️ CE QUE ÇA COÛTE quand la passe a du travail : autant d'écritures que d'éléments, à la
+ * fin d'une invocation qui a déjà ingéré et géocodé. Le cron de veille a 300 s (large), mais
+ * le cron de géocodage qui la REPREND quand elle est restée muette n'a que 60 s : là, une
+ * coupure au mur laisse des éléments réservés pour un travail à moitié écrit. La passe
+ * suivante refait le reliquat — c'est du budget perdu, jamais une ligne fausse.
  */
-export const MATRICE_MAX_PAR_PASSE = 12;
+export const MATRICE_MAX_PAR_PASSE = ROUTES_ELEMENTS_MAX_PAR_JOUR - MARGE_CLICS_PAR_JOUR;
 
 export interface BilanMatrice {
   /** Ce que la passe a fait — ou POURQUOI elle n'a rien fait (« sautée : … »). */

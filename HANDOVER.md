@@ -6,6 +6,47 @@
 
 ---
 
+## Session 2026-09-16 — `[TRAJETS-03]` : le débit des durées passe de ~23 jours à ~7
+
+Marc, après le contrôle du matin : « accélère les trajets ».
+
+**Une constante, et elle est maintenant DÉRIVÉE.**
+`MATRICE_MAX_PAR_PASSE = ROUTES_ELEMENTS_MAX_PAR_JOUR − MARGE_CLICS_PAR_JOUR` = 50 − 10 = **40**
+par passe, contre 12 avant. Sur les 277 durées restantes mesurées ce matin : **~7 jours** au
+lieu de ~23.
+
+**Trois décisions, et chacune répond à un mode de panne précis.**
+
+1. **40 et pas 48.** La passe et le clic partagent le MÊME compteur, et la matrice ne remplit
+   qu'une DURÉE — le tracé sur la carte vient du clic (`obtenirTrajet`), qui coûte un élément
+   de plus. À 48, il resterait deux clics par jour tant que la passe a du travail. Un jour de
+   rattrapage en plus contre cinq fois plus de marge : l'arbitrage n'est pas serré.
+2. **Dérivée, pas écrite en dur.** Une borne par passe posée au-dessus du plafond quotidien
+   ferait refuser la réservation ENTIÈRE à chaque passe (`consommerBudgetRoutes` refuse
+   `n + elements > plafond`) : plus une seule durée remplie, pour toujours, avec « Budget
+   Routes du jour épuisé » pour seule trace — une configuration qui se bloque elle-même en
+   ressemblant à un frein qui marche.
+3. **Le commentaire est réécrit en BUDGET, pas en durée.** L'ancien promettait « trois jours »
+   et s'était périmé sans bruit quand le stock a grandi (c'est le constat du matin même). Une
+   borne exprimée en « ce qu'on accepte de dépenser par jour » reste vraie quel que soit le
+   stock ; le rythme se lit dans le journal, `[trajets] N remplie(s) · M restante(s)`.
+
+**Verrou** : `tests/budgetRoutes.test.ts`, trois invariants DÉRIVÉS des constantes (jamais de
+leur valeur du jour) — la passe ne peut pas demander plus que le jour, elle laisse au moins un
+clic, elle remplit encore quelque chose. Trois mutations, trois rouges distincts.
+
+**⚠️ À surveiller, et c'est le seul point** : la passe écrit une ligne par élément, à la fin
+d'une invocation qui a déjà ingéré et géocodé. Le cron de veille a 300 s (large), mais le cron
+de géocodage qui la REPREND quand elle est restée muette n'a que 60 s. Une coupure au mur y
+laisserait des éléments réservés pour un travail à moitié écrit — du budget perdu, jamais une
+ligne fausse, et la passe suivante refait le reliquat. Si ça se produit, le remède est de
+grouper les écritures en une seule, pas de redescendre la borne.
+
+**Prochaine passe de veille** : demain, fenêtre 11:00–12:00 UTC (plan hobby, cf. le contrôle
+ci-dessous). On devrait y lire `[trajets] 40 durée(s) remplie(s) · ~237 restante(s)`.
+
+---
+
 ## Contrôle 2026-09-16 (12:11 UTC) — la matrice passe, et les bornes touchent au but
 
 **Aucune ligne de code changée.** Ce contrôle était un rendez-vous pris la veille pour juger
