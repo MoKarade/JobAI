@@ -1786,7 +1786,7 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       dont `faits.parcours`, que le diagnostic initial ne nommait pas.
       ⚠️ Leçon : une absence de log dans une fenêtre d'une heure ne prouve rien (rétention Vercel
       ≈ 1 h). Ce lot a existé sur une inférence tirée d'un silence.
-- [ ] 🧭 **`[TRAJETS-01]`** `[trajets] échec : Matrice refusée (403) — « Routes API » doit être
+- [x] 🧭 **`[TRAJETS-01]`** ✅ **CLOS le 2026-09-16 — la matrice passe.** `[trajets] échec : Matrice refusée (403) — « Routes API » doit être
       activée et dans les restrictions de la clé serveur.` Geste console Google, côté Marc.
       ⚠️ **L'énoncé ci-dessus était une SUPPOSITION du code, pas un diagnostic** : cette phrase
       était déduite du seul nombre 403, alors qu'un 403 de Google porte au moins six causes
@@ -1816,6 +1816,13 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       restrictions de la clé serveur, et le trajet au clic rend une durée sur la Carte. Reste à
       confirmer la MATRICE au prochain passage — elle demande plus d'un élément, et le budget
       du jour était épuisé par les appels refusés (cf. `[TRAJETS-02]`).
+      ✅ **PROUVÉ EN PRODUCTION — cron de veille du 2026-09-16, 11:31:50 UTC** :
+      `[trajets] 12 durée(s) remplie(s) · 277 restante(s) pour les passes suivantes`.
+      Douze = `MATRICE_MAX_PAR_PASSE`, donc **l'appel entier a été accepté** et douze lignes
+      ont été écrites : c'est la PREMIÈRE réussite de `computeRouteMatrix` depuis l'existence
+      du lot. Le geste console de Marc (Routes API dans les restrictions de la clé serveur)
+      couvre donc bien les DEUX méthodes de l'API — `computeRoutes` (le clic, prouvé la
+      veille) et `computeRouteMatrix` (la passe nocturne, prouvé ici).
 - [ ] 🟡 **`[CARTE-04]`** La barre de filtres est repliée sur la page Carte (2026-09-15, « rends
       la carte plus grande »). ✅ Livré. Reste ouvert comme point d'OBSERVATION : filtrer y coûte
       désormais un clic de plus, et c'est un arbitrage assumé. Si l'usage montre que la
@@ -1863,3 +1870,59 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       compteur du jour reste à 50/50 jusqu'à sa remise à zéro (minuit, fuseau de Marc). Aucun
       chemin de correction manuelle n'a été ajouté — ce serait un override d'un frein de
       dépense, et ça se décide.
+      ✅ **PROUVÉ EN PRODUCTION — 2026-09-16, 11:31 UTC.** Le compteur, remis à zéro à minuit
+      (fuseau de Marc), a servi une réservation de douze éléments qui ont TOUS produit une
+      durée. Aucune ligne « Budget Routes du jour épuisé » dans la passe. Le rendu n'a pas eu
+      à tirer — il n'y a plus eu de refus à rendre —, ce qui est le résultat attendu et non
+      une preuve de son câblage : celle-là reste portée par `tests/budgetRoutes.test.ts`.
+
+---
+
+## Constats de production du 2026-09-16 (cron de veille, 11:31:50 UTC)
+
+Les deux points laissés en suspens la veille, tranchés sur la ligne de journal de la passe.
+
+- ✅ **`[TRAJETS-01]` + `[TRAJETS-02]`** — `[trajets] 12 durée(s) remplie(s) · 277 restante(s)
+      pour les passes suivantes`. Première réussite de la matrice. Détail dans chaque entrée.
+- ✅ **`[BORNES-01]`** — la campagne est passée de `bornes=1178/1300` (15/09) à **14 lieux
+      restants**, en deux grappes. Les grappes que le budget avait laissées de côté ont bien
+      été servies par les passes suivantes : le découpage n'était pas en cause, comme annoncé.
+
+- [ ] 🟠 **`[BORNES-02]`** **La dernière étape de la passe de distances peut être affamée, et
+      elle l'a été.** Même passe, même ligne de journal :
+      `[bornes] 0/2 grappe(s) interrogée(s) · 0 borne(s) vue(s) · 0 lieu(x) mesuré(s)` avec
+      `bornes=0/14` et, à la fin, `budget restant=7409 ms`.
+      **Le mécanisme** : `mesurerBornes` est appelée en avant-dernier (`lib/actions.ts`, avec
+      `budgetRestant()`), et elle refuse de COMMENCER une requête s'il reste moins de
+      `DELAI_MAX_MS` = 15 000 ms (`lib/overpass.ts`) — une requête tuée en vol ne rapporte rien
+      et consomme tout. Le budget total de la passe est `BUDGET_GEOCODAGE_CRON_MS` = 25 000 ms.
+      Il faut donc que TOUT ce qui précède tienne en moins de 10 s pour qu'une seule grappe
+      soit interrogée. Ce jour-là le reste a consommé ~17,6 s : zéro grappe, sans qu'aucune
+      erreur ne soit levée.
+      ⚠️ **Ce n'est pas un blocage définitif** — `mesurerDistances` tourne DEUX fois par jour
+      (cron de géocodage 03:00 UTC + cron de veille), et c'est précisément ce qui a drainé les
+      1 286 autres. Avec 14 lieux restants, la campagne finira probablement d'elle-même.
+      **À décider si elle stagne** : remonter l'étape des bornes AVANT les étapes de géocodage
+      (l'ORDRE est la politique d'allocation d'un budget partagé), ou lui réserver sa propre
+      enveloppe. Ne rien changer tant que le compte descend — une étape qui avance n'est pas
+      une étape à réparer.
+- [ ] 🟡 **`[TRAJETS-03]`** **Le débit des durées est plafonné par la PASSE, pas par le budget
+      — et la justification de la constante a rôti.** `MATRICE_MAX_PAR_PASSE` = 12, avec en
+      commentaire « douze par nuit couvrent le stock d'entreprises placées en trois jours ».
+      Mesuré le 2026-09-16 : **277 durées restantes** après la passe, soit ~23 jours à ce
+      rythme. Le stock a grandi, le chiffre n'a pas suivi.
+      Le budget quotidien (`ROUTES_ELEMENTS_MAX_PAR_JOUR` = 50) n'est donc utilisé qu'au
+      quart : 12 éléments sur 50, une seule passe de veille par jour (le plan Vercel est
+      **hobby**, un cron par jour). Monter la constante à 48 finirait le stock en six jours
+      sans toucher au frein quotidien.
+      ⚠️ **C'est une décision de DÉPENSE, donc elle revient à Marc** : ça consomme le budget
+      Routes quatre fois plus vite. Rien n'est changé ici.
+      ⚠️ Et si la constante bouge, re-dériver son commentaire depuis le stock RÉEL plutôt que
+      d'y réécrire une durée — c'est exactement ce qui vient de se périmer.
+- [ ] 🟡 **`[TEST-FLAKE-01]`** **Bug préexistant, vu au gate du 2026-09-16.**
+      `tests/oauthStore.test.ts` a échoué sur `Hook timed out in 10000ms` — son `beforeAll`
+      démarre une base PGlite en mémoire et applique les migrations. Relancé SEUL dans la
+      foulée : vert en 1,8 s. C'est donc la contention de la suite complète qui fait déborder
+      le `hookTimeout` de 10 s par défaut, pas le test. Remède probable : un `hookTimeout`
+      explicite sur ce fichier (le seul qui démarre un moteur Postgres). Non corrigé —
+      découvert en chemin, hors périmètre du contrôle.

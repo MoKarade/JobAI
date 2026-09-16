@@ -6,6 +6,48 @@
 
 ---
 
+## Contrôle 2026-09-16 (12:11 UTC) — la matrice passe, et les bornes touchent au but
+
+**Aucune ligne de code changée.** Ce contrôle était un rendez-vous pris la veille pour juger
+deux mécanismes sur la production, pas pour livrer.
+
+**`[TRAJETS-01]` et `[TRAJETS-02]` sont CLOS.** Cron de veille du 2026-09-16, 11:31:50 UTC :
+
+    [trajets] 12 durée(s) remplie(s) · 277 restante(s) pour les passes suivantes
+
+Douze, c'est `MATRICE_MAX_PAR_PASSE` en entier : l'appel a été accepté et douze lignes de
+trajet ont été écrites. **Première réussite de `computeRouteMatrix` depuis l'existence du
+lot.** Le geste console de Marc (« Routes API » dans les restrictions de la clé serveur)
+couvre donc bien les deux méthodes de l'API — le clic (`computeRoutes`, prouvé le 15/09) et
+la passe nocturne (la matrice, prouvée ici). Le budget, remis à zéro à minuit, a servi une
+réservation de douze éléments qui ont tous produit une durée : plus une seule ligne « Budget
+Routes du jour épuisé ».
+
+**`[BORNES-01]` : de `1178/1300` à 14 lieux restants.** Les grappes que le budget avait
+laissées de côté le 15/09 ont été servies par les passes suivantes — le découpage n'était pas
+en cause, comme annoncé. Il reste deux grappes, quatorze lieux.
+
+**⚠️ Deux points d'observation ouverts, aucun corrigé** (ils sont au `BACKLOG.md`) :
+- `[BORNES-02]` — la même passe a fait `0/2 grappe(s) interrogée(s)` : il restait 7 409 ms
+  quand l'étape des bornes a été atteinte, contre les 15 000 ms qu'une requête Overpass exige
+  pour seulement COMMENCER. L'étape est avant-dernière dans un budget de 25 000 ms partagé,
+  donc elle ne tourne que les jours où tout ce qui précède tient en moins de dix secondes.
+  Pas un blocage : `mesurerDistances` tourne deux fois par jour, et c'est ce qui a drainé les
+  1 286 autres. À ne toucher que si le compte cesse de descendre.
+- `[TRAJETS-03]` — 277 durées restantes à 12 par passe font ~23 jours, alors que le commentaire
+  de la constante promet « trois jours ». Le stock a grandi, le chiffre n'a pas suivi. Le
+  budget quotidien n'est utilisé qu'au quart (12 éléments sur 50). Monter la constante est une
+  décision de DÉPENSE : elle revient à Marc.
+
+**⚠️ Leçon de MÉTHODE, et elle a failli coûter un faux verdict.** Le compte Vercel est en plan
+**hobby** : un cron `0 11 * * *` y est déclenché **à l'heure près, pas à la minute** (celui-ci
+a tiré à 11:31), et la rétention des journaux est courte — mesuré à 11:25, la plus vieille
+ligne gardée datait de 11:08, et une fenêtre de 24 h ne rendait que 8 lignes. Un contrôle posé
+à 11:20 ne voyait donc RIEN, et ce rien ne prouvait rien. Corollaire pour les prochains
+rendez-vous : viser la FIN de la fenêtre d'une heure (≈ 12:05 UTC), jamais l'heure planifiée.
+
+---
+
 ## Session 2026-09-15 (fin) — `[TRAJETS-02]` : le budget comptait des appels jamais facturés
 
 Marc : « budget épuisé mais j'ai juste fait 2 recherches, pourquoi ». **Ses deux clics ne
