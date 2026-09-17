@@ -2139,6 +2139,18 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       **Remède recommandé** : publier la durée de CHAQUE étape dans la ligne `[distances]`.
       Le diagnostic deviendrait certain au lieu d'être déduit — c'est exactement ce qui a
       manqué ici, et ce qui m'a fait accuser Nominatim sans preuve.
+      ✅ **LIVRÉ le 2026-09-17** (« continue les tâches backlog »), tel que recommandé :
+      `lib/jalons.ts` (pur, horloge injectée) et une ligne DÉDIÉE
+      `[distances] budget par étape — villes:Nms centres:Nms … (total N ms)`, neuf jalons.
+      Une ligne à part parce que celle des comptes est déjà longue et répond à une AUTRE
+      question. Ordre chronologique et non trié par durée : ce qu'on cherche est l'étape qui
+      affame CELLES QUI LA SUIVENT, et c'est une relation d'ordre. Les zéros restent affichés.
+      ⚠️ L'étape non bornée n'est PAS bornée par ce lot — elle est désormais MESURÉE. Le
+      défaut corrigé est l'absence d'instrument, pas la durée ; borner se décidera sur le
+      chiffre, s'il le demande.
+      Le mode de panne de l'instrument est l'oubli : un inventaire des neuf noms rougit si une
+      étape est ajoutée sans son jalon. Trois mutations prouvées (horodatages cumulés, zéros
+      masqués, jalon retiré).
 - [x] 🟡 **`[TRAJETS-03]`** ✅ **Livré le 2026-09-16, sur « accélère les trajets » (Marc).** **Le débit des durées était plafonné par la PASSE, pas par le budget
       — et la justification de la constante a rôti.** `MATRICE_MAX_PAR_PASSE` = 12, avec en
       commentaire « douze par nuit couvrent le stock d'entreprises placées en trois jours ».

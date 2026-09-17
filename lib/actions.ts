@@ -67,6 +67,7 @@ import {
   type Etablissement,
 } from "./registre";
 import { BUDGET_PASSE_PAGE_MS } from "./synchro";
+import { creerChrono } from "./jalons";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -1204,6 +1205,17 @@ export async function mesurerDistances(
     const offresLues = await lireOffres();
     if (offresLues === null) return { ok: false, erreur: "Base non configurée." };
 
+    // ⚠️ LA DURÉE DE CHAQUE ÉTAPE, PUBLIÉE (`[DISTANCES-01]`). Une étape de cette passe n'est
+    // bornée par RIEN — `adressesDepuisRegistre` l'assume dans son propre commentaire (aucun
+    // accès réseau, donc « elle comble TOUTES les adresses manquantes d'un coup ») — et son
+    // volume grandit avec le registre. Tant qu'elle reste rapide, rien à faire ; le défaut est
+    // que RIEN ne le mesurait. Une étape sans borne dans un budget PARTAGÉ est invisible
+    // jusqu'au jour où elle le mange, et ce jour-là le diagnostic se fait par déduction : le
+    // 2026-09-17 j'ai écrit que Nominatim consommait ~17,5 s des 25 s partagés, sans aucune
+    // preuve, alors que l'étape non bornée était juste à côté. Ces jalons rendent la réponse
+    // CERTAINE au lieu de plausible — et ils coûtent un `Date.now()` par étape.
+    const { jalon, ligne: ligneBudget } = creerChrono();
+
     // 0. RATTRAPER LES VILLES MANQUANTES, avant tout le reste.
     //
     // Les 40 premières offres déposées sont entrées avant que la colonne `ville` soit
@@ -1222,6 +1234,8 @@ export async function mesurerDistances(
     const offres = offresLues.map((o) =>
       villesEcrites.has(o.id) ? { ...o, ville: villesEcrites.get(o.id) ?? null } : o,
     );
+
+    jalon("villes");
 
     const lignes = await db.select().from(entreprisesLieux);
     const positions = new Map(
@@ -1318,6 +1332,8 @@ export async function mesurerDistances(
       }
     }
 
+    jalon("centres");
+
     let situees = 0;
     if (manquants.length > 0) {
       const r = await situerLot(
@@ -1334,6 +1350,8 @@ export async function mesurerDistances(
       }
     }
 
+    jalon("situer");
+
     // 1 bis. Récupérer les adresses manquantes des entreprises déjà situées — sans quoi
     //        la colonne resterait vide pour tout ce qui existait avant elle.
     let adresses: Rattrapage = { candidates: 0, ecrites: 0, horsRayon: 0, sansReponse: 0 };
@@ -1344,6 +1362,8 @@ export async function mesurerDistances(
       // le critère n°1, l'adresse est un confort.
       console.error("[actions] rattrapage des adresses impossible", err);
     }
+
+    jalon("adresses");
 
     // 1 bis-2. LE REGISTRE, pour tout ce qu'OpenStreetMap n'a pas donné.
     //
@@ -1370,6 +1390,8 @@ export async function mesurerDistances(
     } catch (err) {
       console.error("[actions] recherche dans le registre impossible", err);
     }
+
+    jalon("registre");
 
     // 1 quater. Retenter de situer VRAIMENT celles qui sont au centre-ville. Sans ça,
     //           l'élargissement de la règle de résolution ne servirait qu'aux entreprises
@@ -1409,6 +1431,8 @@ export async function mesurerDistances(
       console.error("[actions] raffinage des positions impossible", err);
     }
 
+    jalon("raffinage");
+
     // 1 ter. Les bornes de recharge, pour les entreprises jamais regardées.
     //
     // ⚠️ SON BUDGET N'EST PAS LE RELIQUAT DU BUDGET PARTAGÉ QUAND L'APPELANT LUI EN DONNE UN.
@@ -1429,6 +1453,8 @@ export async function mesurerDistances(
       console.error("[actions] mesure des bornes impossible", err);
     }
 
+    jalon("bornes");
+
     // 1 quater. La fiche enrichie (site, téléphone, horaires) — [CARTE-03-PLACES].
     let details: PasseDetails = { candidates: 0, enrichies: 0, echecs: 0 };
     try {
@@ -1436,6 +1462,8 @@ export async function mesurerDistances(
     } catch (err) {
       console.error("[actions] enrichissement Places impossible", err);
     }
+
+    jalon("details");
 
     // 2. Mesurer. Le domicile ne sort pas de cette closure.
     //
@@ -1469,6 +1497,7 @@ export async function mesurerDistances(
     // rattrapage avait démarré, ce qu'il avait trouvé, ou s'il s'était fait couper par le
     // budget. Les comptes sont donnés en X/Y : « 0/0 » dit qu'il n'y avait rien à faire,
     // « 0/6 » dit que six candidates ont été écartées, et ce sont deux situations opposées.
+    jalon("mesure");
     const restant = budgetRestant();
     console.log(
       `[distances] passe terminée — placées=${placees} mesurées=${majs.length} situées=${situees}/${manquants.length} ` +
@@ -1506,6 +1535,11 @@ export async function mesurerDistances(
         `${details.echecs > 0 ? ` (${details.echecs} en échec)` : ""} ` +
         `budget restant=${restant === null ? "illimité" : `${restant} ms`}`,
     );
+
+    // ⚠️ UNE LIGNE À PART, et c'est délibéré : celle du dessus se lit pour les COMPTES, et
+    // elle est déjà longue. Celle-ci répond à une AUTRE question — « où est passé le budget ? ».
+    // La mise en forme vit dans `lib/jalons.ts`, avec le pourquoi.
+    console.log(`[distances] budget par étape — ${ligneBudget()}`);
 
     // ⚠️ NOMMER LES REFUS, PAS SEULEMENT LES COMPTER.
     //
