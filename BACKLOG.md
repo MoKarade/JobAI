@@ -2096,3 +2096,17 @@ vérifier l'état d'une annonce moi-même.
       viendra du prochain cron de veille.
 - ℹ️ `[trajets] sautée : Budget Routes du jour épuisé (41/50 éléments)` — attendu : 40 pris par
       la passe de 11:31 plus un clic. La marge de 10 réservée aux clics joue son rôle.
+- [ ] 🟡 **`[LIEN-04]`** **Une réserve écrite à l'ingestion n'est jamais retirée quand elle
+      cesse d'être vraie.** Vu en lisant `groupe-dsd-inc-plastic-products-manufacturing-supervisor`
+      le 2026-09-17 : la fiche porte `km: 81.2` ET la réserve « Annoncée à Thetford Mines — la
+      distance reste à mesurer ». Les deux s'affichent ensemble, et la seconde est fausse depuis
+      que la première existe. `raisonsAutomatiques` (lib/ingest/pipeline.ts) écrit cette phrase
+      une fois, à l'ingestion, quand `km` est encore nul ; rien ne la retire quand la mesure
+      arrive. Même famille que `[LIEN-03]` : un champ figé à la première écriture, qui continue
+      d'affirmer au présent.
+      **Remède** : ne pas la stocker — la DÉRIVER à l'affichage de `km === null`. Une phrase qui
+      décrit un état se calcule depuis l'état, elle ne se recopie pas.
+      ⚠️ Attention en corrigeant : `villeDepuisRaisons` RELIT cette phrase pour rattraper une
+      ville manquante (`PREFIXE_VILLE_ANNONCEE`). La retirer des données casserait ce
+      rattrapage — c'est un consommateur, pas une décoration.
+      Signalé, non corrigé : hors du périmètre demandé.
