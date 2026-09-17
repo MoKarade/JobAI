@@ -53,6 +53,30 @@ tests dont l'anti-vacuité du ratchet.
 **Reste ouvert** : `J`, 48 % de la queue, volontairement non triée. Et le ratchet interdit `G`
 et `J` dans la liste — les ajouter doit forcer à relire la mesure, pas à re-baser le test.
 
+### Vérification en production, 19:45 UTC — ce qui est prouvé et ce qui ne l'est pas
+
+**Prouvé** : CI verte et déploiement `READY` sur `cfc9b36`, aliasé sur `emploi.hubperso.com`.
+Et la non-contamination de l'instrument, vérifiée sur la production APRÈS la mise en ligne :
+`lettresInconnues` affiche toujours `H = 707`, identique à la mesure d'avant la règle. Si la
+règle avait fui dans l'instrument, `H` aurait disparu de ce compte — c'est le seul contrôle qui
+pouvait rougir ce soir, et il est vert.
+
+⚠️ **NON PROUVÉ : l'effet de la règle sur l'ingestion.** Il ne s'observe que sur une PASSE de
+veille, et aucune n'a tourné depuis le déploiement (logs Vercel interrogés sur 3 h : rien).
+`diagnostic_flux` ne peut pas y répondre — l'instrument n'applique délibérément pas la règle.
+Ne pas lire son `lieu-inconnu: 3705` comme « la règle ne fait rien » : il mesure autre chose.
+
+**Comment ce sera tranché** : cron de veille `0 11 * * *`, parti à 11:31:50 UTC les 16 et 17/09.
+Contrôle armé pour le 2026-09-18 à 11:42 UTC (`trig_01Sn1k2gJhyABCWHB3FFr8UN`) — la rétention
+des logs Vercel est d'environ 17 minutes, donc la lecture doit être immédiate. Marc peut aussi
+lancer la passe depuis `/sources` à tout moment et la réponse arrive en une minute.
+
+**Ce qu'il faudra regarder, et ce qui ne prouvera rien** : `lieu-inconnu=40` restera
+probablement à 40 — c'est le PLAFOND `MAX_LIEUX_INCONNUS_FLUX`, et il reste 1 210 inconnues en
+`G` plus 1 784 en `J` pour le remplir. Un 40 inchangé n'est PAS un échec. Le vrai signal est la
+ligne `[veille] lieux refusés — inconnus : …` : plus aucun nom de l'île de Montréal ne doit y
+figurer, et `hors-région` doit monter.
+
 ---
 
 ## Session 2026-09-17 (fin) — `[VEILLE-42]` : l'instrument avant la règle
