@@ -146,7 +146,9 @@ export function creerServeur(io: EntreesSorties): McpServer {
         "autorise à conclure — sous toute autre fin, les comptes ne sont que le début d'une " +
         "mesure. Il rend aussi, par leur CODE POSTAL, les offres qu'il n'a pas su placer " +
         "(`lettresInconnues`, `regionsInconnues`) — à lire avec `verdicts['lieu-inconnu']` " +
-        "pour dénominateur. Par défaut l'outil rend le résumé et la table des professions ; `champ` " +
+        "pour dénominateur — et la bande postale de celles qu'il a jugées HORS RÉGION par " +
+        "leur nom (`lettresHorsRegion`), qui est le contraste permettant de dire quelle " +
+        "bande est lointaine sans le supposer. Par défaut l'outil rend le résumé et la table des professions ; `champ` " +
         "permet d'en demander une autre (postalcode-region, education, salary…). Chaque " +
         "appel relit le flux : n'en fais pas plusieurs pour rien.",
       inputSchema: { champ: z.string().max(40).optional() },
@@ -176,6 +178,11 @@ export function creerServeur(io: EntreesSorties): McpServer {
         // dénominateur, `verdicts["lieu-inconnu"]`, juste au-dessus.
         lettresInconnues: r["lettresInconnues"],
         regionsInconnues: r["regionsInconnues"],
+        // ⚠️ LE CONTRASTE qui autorise une règle de bande : ces offres-ci sont jugées
+        // LOINTAINES par le NOM de leur ville, sans que leur code postal n'ait rien décidé.
+        // Se lit contre `lettresInconnues` ET contre l'inventaire `postalcode-lettre` des
+        // RETENUES (`champ: "postalcode-lettre"`), qui dit ce que la région porte vraiment.
+        lettresHorsRegion: r["lettresHorsRegion"],
         inventairesDisponibles: Object.keys(inventaires),
         champ: cle,
         // « Le champ demandé n'existe pas » et « il n'a aucune valeur » sont deux choses

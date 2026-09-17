@@ -185,11 +185,15 @@ describe("diagnostic_flux — la table qui décide, pas les onze inventaires", (
         verdicts: { "lieu-inconnu": 3 },
         lettresInconnues: [{ nom: "J", n: 2 }, { nom: "(vide)", n: 1 }],
         regionsInconnues: [{ nom: "J9T", n: 1 }],
+        lettresHorsRegion: [{ nom: "H", n: 9 }],
       }),
     });
     const r = corps(await client.callTool({ name: "diagnostic_flux", arguments: {} }));
     expect(r.lettresInconnues).toEqual([{ nom: "J", n: 2 }, { nom: "(vide)", n: 1 }]);
     expect(r.regionsInconnues).toEqual([{ nom: "J9T", n: 1 }]);
+    // Le contraste part AVEC eux : sans lui, les deux autres ne disent pas quelle bande est
+    // lointaine, et la règle de bande se déciderait de mémoire.
+    expect(r.lettresHorsRegion).toEqual([{ nom: "H", n: 9 }]);
     expect(r.verdicts).toEqual({ "lieu-inconnu": 3 });
   });
 });

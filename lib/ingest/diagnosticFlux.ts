@@ -137,6 +137,23 @@ export async function diagnostiquerFlux(
   // lirait comme une proportion.
   const fsaInconnues = new Map<string, number>();
   const lettresInconnues = new Map<string, number>();
+  // ⚠️ ET UN TROISIÈME, SUR LA POPULATION « HORS RÉGION » — c'est LUI qui autorise à écrire
+  // une règle de bande, et les deux autres n'y suffisaient pas.
+  //
+  // Les deux comptes ci-dessus décrivent la queue à trier ; ils ne disent PAS quelles bandes
+  // sont lointaines. Répondre « H est l'île de Montréal, J le sud-ouest » serait une
+  // connaissance recopiée de mémoire, pas une mesure — exactement la table inventée que
+  // `[VEILLE-42]` refuse. Or le flux porte déjà une population dont l'éloignement est établi
+  // par une règle INDÉPENDANTE du code postal : les offres rejetées par `HORS_PORTEE`, sur le
+  // NOM de leur ville (Montréal, Toronto, Ontario…). Leur distribution par bande est donc une
+  // mesure de « quelle bande porte ce qui est loin », et elle se lit en CONTRASTE avec
+  // l'inventaire `postalcode-lettre` des RETENUES, qui dit quelle bande porte ce qui est
+  // proche. Une bande fréquente dans l'une et absente de l'autre est un rejet franc ; une
+  // bande présente des deux côtés n'en est pas un.
+  //
+  // La LETTRE seule, pas la région de tri : la règle se décidera sur la bande, et trois cents
+  // lignes de FSA n'ajouteraient que du bruit à la question posée.
+  const lettresHorsRegion = new Map<string, number>();
 
   const rapport = await lireFluxGuichet(recuperer, {
     budgetMs,
@@ -155,6 +172,11 @@ export async function diagnostiquerFlux(
         const lettre = code.slice(0, 1) === "" ? "(vide)" : code.slice(0, 1);
         fsaInconnues.set(fsa, (fsaInconnues.get(fsa) ?? 0) + 1);
         lettresInconnues.set(lettre, (lettresInconnues.get(lettre) ?? 0) + 1);
+      }
+      if (v === "hors-region") {
+        const code = lireChamp(brut, "postalcode").replace(/\s+/g, "").toUpperCase();
+        const lettre = code.slice(0, 1) === "" ? "(vide)" : code.slice(0, 1);
+        lettresHorsRegion.set(lettre, (lettresHorsRegion.get(lettre) ?? 0) + 1);
       }
       return v === "dans-la-region";
     },
@@ -221,6 +243,13 @@ export async function diagnostiquerFlux(
     // La LETTRE d'abord : c'est elle qui dit s'il existe un rejet franc et sans homonyme à
     // faire (une bande postale ne se confond avec aucune autre), et elle tient en dix lignes.
     lettresInconnues: [...lettresInconnues.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([nom, n]) => ({ nom, n })),
+    // ⚠️ LE CONTRASTE, ET IL SE LIT AVEC DEUX AUTRES CHIFFRES, JAMAIS SEUL : `lettresInconnues`
+    // ci-dessus (la queue à trier) et l'inventaire `postalcode-lettre` des RETENUES (ce que la
+    // région porte vraiment). Ces offres-ci sont jugées lointaines par leur NOM, sans que leur
+    // code postal n'ait rien décidé — c'est ce qui en fait une mesure et non une conviction.
+    lettresHorsRegion: [...lettresHorsRegion.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([nom, n]) => ({ nom, n })),
     regionsInconnues: [...fsaInconnues.entries()]

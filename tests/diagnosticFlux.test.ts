@@ -74,6 +74,10 @@ const FLUX = `<source>${[
   offre({ ref: "3", ville: "Amos", code: "J9T 1A1" }),
   offre({ ref: "4", ville: "Kuujjuaq", code: "J0M 1C0" }),
   offre({ ref: "5", ville: "Gaspé" }),
+  // ⚠️ DEUX hors-région de bandes DIFFÉRENTES, et c'est ce qui rend le troisième compte
+  // discriminant : avec une seule, un tally qui ignorerait le code et poserait toujours la
+  // même clé rendrait exactement le même résultat.
+  offre({ ref: "6", ville: "Toronto", code: "M5H 2N2" }),
 ].join("")}</source>`;
 
 async function mesurer() {
@@ -93,7 +97,7 @@ describe("diagnostic_flux — le code postal des offres NON PLACÉES", () => {
     expect(r.fin).toBe("flux-termine");
     expect(r.verdicts["lieu-inconnu"]).toBe(3);
     expect(r.verdicts["dans-la-region"]).toBe(1);
-    expect(r.verdicts["hors-region"]).toBe(1);
+    expect(r.verdicts["hors-region"]).toBe(2);
 
     // ⚠️ L'ÉGALITÉ PORTE SUR `lettresInconnues`, ET C'EST DÉLIBÉRÉ : `regionsInconnues` est
     // tronqué au top 25, donc son total ne peut PAS servir de preuve de totalité — il serait
@@ -105,6 +109,22 @@ describe("diagnostic_flux — le code postal des offres NON PLACÉES", () => {
     // ce qui distingue ce compte des onze inventaires, qui décrivent les RETENUES.
     expect(r.lettresInconnues.map((c) => c.nom).sort()).toEqual(["(vide)", "J"]);
     expect(r.regionsInconnues.map((c) => c.nom).sort()).toEqual(["(vide)", "J0M", "J9T"]);
+  });
+
+  it("compte À PART la bande des offres jugées hors région PAR LEUR NOM", async () => {
+    // ⚠️ C'EST LE CONTRASTE QUI AUTORISE UNE RÈGLE DE BANDE, et il n'est une mesure que parce
+    // que le verdict vient d'AILLEURS : ces offres sont rejetées par `HORS_PORTEE` sur le nom
+    // de leur ville, sans que leur code postal n'ait rien décidé. Le confondre avec la
+    // population « lieu inconnu » rendrait la mesure circulaire — on lirait dans le résultat
+    // la règle qu'on cherche à écrire.
+    const r = await mesurer();
+    expect(total(r.lettresHorsRegion)).toBe(r.verdicts["hors-region"]);
+    expect(r.lettresHorsRegion.map((c) => c.nom).sort()).toEqual(["H", "M"]);
+
+    // Et il ne déborde NI sur l'acceptée (G), NI sur les non placées (J) : trois populations,
+    // trois comptes, aucun recouvrement.
+    expect(r.lettresHorsRegion.map((c) => c.nom)).not.toContain("G");
+    expect(r.lettresHorsRegion.map((c) => c.nom)).not.toContain("J");
   });
 
   it("compte `(vide)` une offre sans code postal, au lieu de l'abandonner", async () => {
