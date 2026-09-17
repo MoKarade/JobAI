@@ -217,7 +217,7 @@
       (20 h, bornes dérivées de l'écart de 12 h entre les deux crons), reprise depuis le cron
       de géocodage. Discrimination prouvée dans les deux sens (25 h → jour sauté ; 10 h →
       double passe).
-- [ ] 👤 **`[VEILLE-11]`** **Vérifier côté Vercel pourquoi le cron de veille ne part plus** :
+- [x] 👤 **`[VEILLE-11]`** ✅ **Clos à l'audit du 2026-09-17 : le cron PART.** Mesuré deux jours de suite dans les journaux Vercel — 11:31:50 UTC les 16 et 17/09 (plan hobby : un cron `0 11 * * *` y est déclenché à l'heure près, pas à la minute). Le filet de reprise reste utile, mais il n'y a plus de panne à diagnostiquer. **Vérifier côté Vercel pourquoi le cron de veille ne part plus** :
       Dashboard → projet `job-ai` → Settings → Cron Jobs (état activé/désactivé, dernière
       exécution). Ou en CLI : `vercel crons ls`. Non lisible depuis une session Claude (pas de
       jeton Vercel, et le MCP Vercel n'expose pas les crons). Le filet ci-dessus rend la panne
@@ -286,16 +286,16 @@
       La logique PURE l'est (46 tests) ; les actions ne le sont pas.
 - [ ] 🔧 **`[CV-10]`** Un PDF SCANNÉ reste illisible (pas de reconnaissance de caractères).
       L'app le dit et propose le remède ; c'est une limite, pas un bug.
-- [ ] 🔧 **`[CV-11]`** `CLAUDE.md` fait 867 lignes pour un « plafond assumé : 150 ». Il se
+- [ ] 🔧 **`[CV-11]`** `CLAUDE.md` fait **1 854 lignes** pour un « plafond assumé : 150 » — il en faisait 867 quand cet item a été écrit, donc il a DOUBLÉ depuis (re-mesuré à l'audit du 2026-09-17). Il se
       charge à chaque session : le distiller vers `docs/LESSONS.md` en gardant ici les seules
       règles qui changent la façon de coder.
 
 ## Chantier #04 — V4 : ingestion d'offres ⬜
 
-- [ ] 👤 **`[V4-01]`** Demander l'accès au flux XML du Guichet-Emplois auprès d'EDSC.
-- [ ] 🔧 **`[V4-02]`** Pipeline sur l'export CSV des données ouvertes en attendant le flux.
-- [ ] 🔧 **`[V4-03]`** Compléter les codes CNP visés.
-- [ ] 🔧 **`[V4-04]`** Déduplication et filtre de rayon appliqués avant notation.
+- [x] 👤 **`[V4-01]`** ✅ **Clos à l'audit du 2026-09-17 : sans objet.** Le flux XML est lu et branché depuis le 2026-08-20 — aucune demande à EDSC n'a été nécessaire, il est public. Mesuré ce jour : `ingérées=8/1600`. ~~Demander l'accès au flux XML du Guichet-Emplois auprès d'EDSC.~~
+- [x] 🔧 **`[V4-02]`** ✅ **CADUC (audit 2026-09-17).** Il n'y a plus d'« en attendant » : le flux XML tourne. Un second pipeline sur le CSV serait une deuxième source de la même donnée, à maintenir pour rien. ~~Pipeline sur l'export CSV des données ouvertes en attendant le flux.~~
+- [x] 🔧 **`[V4-03]`** ✅ **Fait (ADR-0013), vérifié à l'audit du 2026-09-17.** Les codes retenus se choisissent depuis l'écran (mesure du flux, table code/compte/titres, cases à cocher) et pèsent dans la note via `metiers`. ~~Compléter les codes CNP visés.~~
+- [x] 🔧 **`[V4-04]`** ✅ **Vérifié dans le code à l'audit du 2026-09-17** : dans `trier`, `cleDoublon`/`cleCanonique` écartent le doublon puis `situer` tranche la région — les deux AVANT `computeScore`. ~~Déduplication et filtre de rayon appliqués avant notation.~~
 
 ## Chantier #05 — Expérience et présentation ⬜
 
@@ -976,7 +976,7 @@
       ⚠️ **Reste à faire côté Marc** : allumer « toute la région » dans `/sources` et cocher
       ses codes. Rien ne se déclenche tout seul — le défaut reste `eteint`.
 
-- [ ] **[NOTE-04]** ⚠️ **Le mode « toute la région » n'a JAMAIS tourné en vrai.** Les bornes
+- [x] **[NOTE-04]** ✅ **Clos à l'audit du 2026-09-17 : le mode « toute la région » TOURNE, et depuis un mois.** Il a tourné tous les jours depuis le 2026-08-20 — mesuré ce jour `ingérées=8/1600`, `doublons=1548`, sur 1 635 offres suivies. Ce qui restait « à vérifier sur la première passe » l'a été par un mois d'exploitation. ⚠️ **Le mode « toute la région » n'a JAMAIS tourné en vrai.** Les bornes
       sont posées (plafond 1 600, `maxDuration` 300 s, insertions par lots de 200) et le
       raisonnement est écrit, mais aucune passe réelle n'a encore ingéré 1 300 offres. Ce qui
       reste à VÉRIFIER sur la première passe, et qu'aucun test ne peut prouver : la durée
@@ -1006,7 +1006,7 @@
       la carte charge avec la cle client, le trajet trace au clic, la matrice remplit les
       durees a la prochaine passe. Rien de tout ca n'a tourne contre les vraies cles.
 
-- [ ] **[VEILLE-44]** ⚠️ **DECISION MARC : 1 300 offres regionales par passe** (mesure sur
+- [x] **[VEILLE-44]** ✅ **Clos à l'audit du 2026-09-17 : tranché par l'usage.** Le flux est branché, le tri se fait par les codes de profession retenus (ADR-0013) et par la note, pas par le volume. Le tableau n'a pas été noyé : 17 offres ouvertes notées 60+. ⚠️ **DECISION MARC : 1 300 offres regionales par passe** (mesure sur
       une passe complete), contre quelques dizaines suivies aujourd'hui. L'echantillon reste
       domine par des postes peu qualifies. Brancher la source telle quelle noierait le
       tableau. Le volume n'est pas le sujet, le TRI l'est — et `noc2021` est le premier
@@ -1029,7 +1029,7 @@
       structurelle, pas un artefact d'un jour** : c'est ce qui justifie d'y mettre le
       travail de [VEILLE-43] plutôt que d'attendre qu'elle se résorbe.
 
-- [ ] **[VEILLE-40]** Brancher le flux Guichet sur `selectionnerSources`, **après** une
+- [x] **[VEILLE-40]** ✅ **Fait, vérifié à l'audit du 2026-09-17** : `selectionnerSources` pousse `sourceGuichetFlux(flux).source` (lib/ingest/passe.ts), et la production le confirme (`sources=2`, `ingérées=8/1600`). Les conditions posées ici ont été tenues — `[VEILLE-32]` livré, passe complète obtenue. Brancher le flux Guichet sur `selectionnerSources`, **après** une
       passe de diagnostic qui rend `flux-termine` (celle du 19 août s'est arrêtée sur
       `plafond-retenues`, donc aucun de ses comptes n'était concluant) — et **après**
       [VEILLE-32]/[VEILLE-34] : les titres du flux sont en ANGLAIS, un barème monolingue
@@ -1089,7 +1089,7 @@
       *Verrou* : `tests/rayon.test.ts` (12 cas, discriminant prouvé — le registre non re-jugé
       garde son verdict périmé ; bornes et marge dérivées des constantes, jamais écrites en dur).
 
-- [ ] **[VEILLE-32]** ⚠️ **Le bassin de termes est bilingue, le VOCABULAIRE DE NOTATION ne
+- [x] **[VEILLE-32]** ✅ **Fait, vérifié à l'audit du 2026-09-17** : `PROFIL_DEFAUT.motsCoordination` porte désormais les deux langues (`project manager`, `project coordinator`, `project lead`, `program manager`, `team lead`, `project planner`…) à côté du vocabulaire français. ⚠️ **Le bassin de termes est bilingue, le VOCABULAIRE DE NOTATION ne
       l'est pas — et c'est le plus restrictif des deux qui gagne, en silence.** Mesuré à la
       veille du 2026-08-18, sur le lot réel : `PROFIL_DEFAUT.motsCoordination` ne contient
       que du français (coordonnateur, superviseur, chargé de projet, gestionnaire…), alors
@@ -1403,7 +1403,7 @@ registre ratent encore. Fait le 2026-08-12, gate vert :
       quelques API supplémentaires activées (voir `[CARTE-03-PLACES]` ci-dessous).
 
 RESTE — à observer sur les prochaines passes (rien à coder) :
-- [ ] **[V-CARTE-03-GOOGLE]** Lire `[distances] … (N par Google)` dans les logs d'une passe
+- [x] **[V-CARTE-03-GOOGLE]** ✅ **Mesuré à l'audit du 2026-09-17** : `precisees=2/8 (2 par Google)` le 16/09, `precisees=1/6 (1 par adresse) (0 par Google)` le 17/09. Google résout donc bien une partie des cas — la question posée ici a sa réponse, et `parGoogle=0` sur UNE passe n'est pas un verdict. Lire `[distances] … (N par Google)` dans les logs d'une passe
       réelle. `googleTente=true` avec `parGoogle=0` sur plusieurs passes = ces employeurs
       sont introuvables aussi chez Google — limite des données, pas du code.
 
@@ -1430,7 +1430,7 @@ choisis explicitement (voir l'ADR pour le détail des options écartées). Fait 
 - [x] `.env.example` : section réécrite pour les trois usages de la clé.
 
 RESTE — à observer sur les prochaines passes (rien à coder) :
-- [ ] **[V-CARTE-03-PLACES]** Vérifier en production : des suggestions apparaissent bien à
+- [x] **[V-CARTE-03-PLACES]** ✅ **Mesuré à l'audit du 2026-09-17** : `details=2/2` sur la passe du 17/09 au matin — l'enrichissement de fiche progresse en production. Vérifier en production : des suggestions apparaissent bien à
       l'ajout d'une offre, et `[distances] … details=N/M` progresse sur les entreprises déjà
       résolues par Google.
 
@@ -1823,7 +1823,7 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       du lot. Le geste console de Marc (Routes API dans les restrictions de la clé serveur)
       couvre donc bien les DEUX méthodes de l'API — `computeRoutes` (le clic, prouvé la
       veille) et `computeRouteMatrix` (la passe nocturne, prouvé ici).
-- [ ] 🟡 **`[CARTE-04]`** La barre de filtres est repliée sur la page Carte (2026-09-15, « rends
+- [x] 🟡 **`[CARTE-04]`** ✅ **Clos à l'audit du 2026-09-17** — livré le 15/09, et son point d'observation est tranché : `[CARTE-05]` a mesuré que ce lot n'avait rien donné au plan sur un portable. Il n'y a plus rien à observer ici. La barre de filtres est repliée sur la page Carte (2026-09-15, « rends
       la carte plus grande »). ✅ Livré. Reste ouvert comme point d'OBSERVATION : filtrer y coûte
       désormais un clic de plus, et c'est un arbitrage assumé. Si l'usage montre que la
       recherche mérite de rester à l'air libre, la sortir du pli est un changement d'une ligne
@@ -1831,7 +1831,7 @@ Les trois correctifs de la veille, vérifiés sur la vraie base après que Marc 
       ⚠️ **ET CE LOT-LÀ N'A RIEN DONNÉ AU PLAN SUR UN PORTABLE** — Marc : « elle a pas grandi ».
       Mesuré : 337 px avant ET après sur 1366×648, la place libérée étant allée au défilement.
       Voir `[CARTE-05]`, qui livre le vrai levier.
-- [ ] 🟡 **`[CARTE-05]`** Hauteur du plan : bande d'état + plancher (2026-09-15). ✅ Livré.
+- [x] 🟡 **`[CARTE-05]`** ✅ **Clos à l'audit du 2026-09-17** — livré et mesuré le 15/09, sans retour de Marc depuis. Le point d'observation (« si le défilement gêne, le plancher est le bouton à tourner ») reste écrit dans `app/globals.css`, où il sert. Hauteur du plan : bande d'état + plancher (2026-09-15). ✅ Livré.
       Deux mécanismes, deux écrans : l'enveloppe `.carte-etat` rend `display:inline` opérant
       (il était INERTE sur des items flex — 102 px au lieu de 54, donc +80 px de plan sur un
       grand écran), et le plancher de `.plan-ecran` passe de 26rem à 36rem (+160 px de plan
@@ -2110,3 +2110,58 @@ vérifier l'état d'une annonce moi-même.
       ville manquante (`PREFIXE_VILLE_ANNONCEE`). La retirer des données casserait ce
       rattrapage — c'est un consommateur, pas une décoration.
       Signalé, non corrigé : hors du périmètre demandé.
+
+---
+
+## Audit du backlog — 2026-09-17
+
+Demandé par Marc (« fais backlog »). **48 items ouverts** avant, **35 après** : treize fermés,
+chacun contre le CODE ou une MESURE de production, jamais contre son titre. Aucun code touché.
+
+⚠️ **Ce que cet audit a appris, et qui vaut plus que les treize cases.** Un backlog qui mélange
+le fait et l'à-faire ne trompe pas un peu : il trompe au moment précis où on lui demande quoi
+faire ensuite. Quatre items décrivaient un monde qui n'existe plus depuis un mois — « demander
+l'accès au flux », « en attendant le flux », « le mode toute la région n'a JAMAIS tourné » —
+alors que le flux tourne tous les jours depuis le 2026-08-20. Les lire aujourd'hui aurait fait
+refaire du déjà-fait, ou pire, renoncer à brancher ce qui est déjà branché.
+
+### Fermés, avec ce qui les a tranchés
+
+| Item | Tranché par |
+|---|---|
+| `[V4-01]` | Sans objet : le flux est public et lu depuis le 20/08 (`ingérées=8/1600`). |
+| `[V4-02]` | Caduc : plus d'« en attendant », le flux tourne. |
+| `[V4-03]` | Fait (ADR-0013) : les codes se choisissent à l'écran et pèsent dans la note. |
+| `[V4-04]` | Code : dans `trier`, doublon puis `situer` passent AVANT `computeScore`. |
+| `[VEILLE-11]` | Journaux : le cron part à 11:31 les 16 ET 17/09. |
+| `[VEILLE-32]` | Code : `motsCoordination` porte les deux langues. |
+| `[VEILLE-40]` | Code + prod : `selectionnerSources` pousse le flux, `sources=2`. |
+| `[NOTE-04]`, `[VEILLE-44]` | Un mois d'exploitation à 1 600 offres/passe. |
+| `[V-CARTE-03-GOOGLE]` | Journaux : `precisees=2/8 (2 par Google)` le 16/09. |
+| `[V-CARTE-03-PLACES]` | Journaux : `details=2/2` le 17/09. |
+| `[CARTE-04]`, `[CARTE-05]` | Livrés le 15/09, points d'observation tranchés ou écrits dans le code. |
+
+### Vérifiés ENCORE OUVERTS — la vérification compte autant que la fermeture
+
+- **`[VEILLE-34]`** — `normaliserTitre` (lib/scoring.ts) ne retire toujours PAS les accents :
+  ni `normalize("NFD")`, ni retrait de diacritiques. Un titre « Charge de projet » continue de
+  ne pas matcher « chargé de projet ». **Toujours vrai, relu ligne à ligne.**
+- **`[VEILLE-33]`** — `situer` (lib/ingest/region.ts) compare toujours `MUNICIPALITES` par
+  `includes`, et ces listes sont consultées AVANT le registre mesuré. « Quebec Province »
+  passerait encore. La mesure a réduit le pari, elle ne l'a pas supprimé.
+- **`[VEILLE-42]`** — confirmé par les journaux du jour même : `mont-royal×6`,
+  `pointe-aux-trembles×4`, `sherrington×5` tombent encore en « lieu inconnu ».
+- **`[DUREE-03]`** — le garde de `joursEntre` teste toujours `undefined`, et
+  `"pas-une-date".split("-").map(Number)` rend trois `NaN`, qui n'en sont pas. **Toujours vrai.**
+- **`[CV-09]`** — aucun fichier de test ne référence `cv/actions` ni `cv/depot`. **Toujours vrai.**
+- **`[B-07]`** — `claude/hopeful-lovelace-4d09zx` existe toujours sur le distant. Attend le feu
+  vert de Marc, comme écrit.
+- **`[CV-11]`** — chiffre RE-MESURÉ : 867 → **1 854 lignes**. L'item ne s'est pas périmé, il a
+  empiré du double, et ce fichier se charge à chaque session.
+
+### Non re-vérifiés, et je le dis plutôt que de les cocher
+
+`[VEILLE-13]` (le cron de géocodage annoncerait une panne qui n'existe pas), les items `[V2-*]`
+et `[V3-*]` (fonctionnalités non commencées), `[CV-07]` (variable d'environnement, côté Marc),
+`[ROUTINE-01]` (arbitrage de Marc, pas une tâche). Les laisser ouverts est le verdict honnête :
+je n'ai pas mesuré, donc je ne coche pas.
