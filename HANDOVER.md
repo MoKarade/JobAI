@@ -30,13 +30,31 @@ total serait court dès que la queue s'allonge, c'est-à-dire quand la mesure de
 le tally remonté d'un cran décrit tout le flux (5 au lieu de 3) ; une offre sans code postal
 abandonnée en silence fait tomber le compte `(vide)` ; le relais MCP retiré rend `undefined`.
 
-**Reste à faire, et c'est la moitié qui compte** : appeler `diagnostic_flux` sur une passe
-complète, lire `lettresInconnues` / `regionsInconnues`, et n'écrire la règle de rejet que si
-la distribution la justifie. Tant que ce n'est pas fait, `[VEILLE-42]` reste ouvert — la
-mesure existe, le tri non.
+**LA MESURE A ÉTÉ FAITE dans la foulée** (19:05 UTC, `fin: "flux-termine"`, 42 856 offres en
+5,2 s — `dans-la-region: 1443`, `hors-region: 2020`, `lieu-inconnu: 3683`) :
 
-**Mesuré avant le lot** (passe complète, `fin: "flux-termine"`) : `dans-la-region: 1443`,
-`hors-region: 2020`, `lieu-inconnu: 3683`.
+- **100 % des non placées portent un code postal.** `(vide)` est ABSENT de `lettresInconnues`.
+  C'est ce qui rend le remède seulement APPLICABLE, et personne ne le savait.
+- Bandes : **J 1776 (48,2 %) · G 1207 (32,8 %) · H 696 (18,9 %) · E 2 · A 2**.
+- ⚠️ **La contre-mesure change le remède.** L'inventaire `postalcode-lettre` des offres
+  RETENUES (1 443) donne **G 1399, J 43, H 1** : quarante-quatre offres RÉGIONALES portent un
+  code hors bande — l'employeur y met son siège social, pas le lieu de travail. Un rejet franc
+  par bande posé AVANT la liste blanche les perdrait toutes. Et `G` ne se rejette pas : c'est
+  la bande de la région elle-même.
+
+**Et le gain n'est pas celui que le ticket annonce.** Les 3 683 non placées sont DÉJÀ hors
+ingestion (`garder` ne retient que `dans-la-region`) : une bande ne changerait rien à ce qui
+entre. Ce qu'elle économise, ce sont les MESURES Nominatim du registre des lieux ; ce qu'elle
+risque, c'est de figer en « hors région » un nom que la mesure aurait placé dedans.
+
+**Conception qui en découle — À VALIDER PAR MARC, rien n'est codé.** Poser le test de bande LÀ
+OÙ `resolus` est consulté : après `HORS_PORTEE`, après la liste blanche, à la place du recours
+Nominatim. Les 44 offres J/H restent acceptées PAR LEUR NOM, et la bande ne tranche que pour
+les noms que personne ne connaît. Coût : `situer` doit recevoir le code postal, qui vit dans le
+bloc BRUT — changement de signature sur tous ses appelants, donc un lot à part avec son ADR.
+
+`[VEILLE-42]` reste donc OUVERT, mais il a changé de nature : ce n'est plus « on ne sait pas »,
+c'est « on sait, et l'arbitrage appartient à Marc ».
 
 ---
 

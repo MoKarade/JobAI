@@ -1036,8 +1036,29 @@
       silence des offres lointaines. `diagnostic_flux` rend donc désormais `lettresInconnues`
       (la bande, non tronquée) et `regionsInconnues` (la région de tri, top 25) sur la seule
       population « lieu inconnu », à lire avec `verdicts["lieu-inconnu"]` pour dénominateur.
-      Trois discriminations prouvées par mutation. **Prochaine étape : appeler l'outil, lire
-      la distribution, et n'écrire la règle que si elle tombe sur du mesuré.**
+      Trois discriminations prouvées par mutation.
+      ✔ **MESURE FAITE le 2026-09-17, 19:05 UTC** (`fin: "flux-termine"`, 42 856 offres lues en
+      5,2 s ; `dans-la-region: 1443`, `hors-region: 2020`, `lieu-inconnu: 3683`) :
+      · **100 % des non placées portent un code postal** — `(vide)` est ABSENT de
+        `lettresInconnues`. Le remède est donc seulement APPLICABLE, ce qu'aucune mesure ne
+        disait jusqu'ici.
+      · Bandes : **J 1776 (48,2 %) · G 1207 (32,8 %) · H 696 (18,9 %) · E 2 · A 2**.
+      · ⚠️ **CONTRE-MESURE, et elle change le remède** : l'inventaire `postalcode-lettre` des
+        offres RETENUES (1 443) donne **G 1399, J 43, H 1**. Quarante-quatre offres RÉGIONALES
+        portent donc un code hors bande — l'employeur y met son siège, pas le lieu de travail.
+        Un rejet franc par bande posé AVANT la liste blanche les perdrait TOUTES.
+      · Et `G` ne se rejette pas : c'est la bande de la région elle-même (1 399 des 1 443).
+      ⚠️ **CE QUE LE REJET GAGNERAIT N'EST PAS CE QU'ON CROIT.** Les 3 683 non placées sont
+      DÉJÀ hors ingestion (`garder` ne retient que `dans-la-region`) : une bande ne changerait
+      rien à ce qui entre. Ce qu'elle économise, ce sont les MESURES Nominatim du registre des
+      lieux — et ce qu'elle risque, c'est de figer en « hors région » un nom que la mesure
+      aurait placé dans la région.
+      ➜ **CONCEPTION QUI EN DÉCOULE, à valider par Marc avant toute ligne** : poser le test de
+      bande LÀ OÙ `resolus` est consulté — après `HORS_PORTEE` et après la liste blanche, à la
+      place du recours Nominatim. Les 44 offres J/H restent alors acceptées PAR LEUR NOM, et la
+      bande ne tranche que pour les noms que personne ne connaît. Coût : `situer` doit recevoir
+      le code postal, qui vit dans le bloc BRUT — changement de signature sur tous ses
+      appelants, donc un lot à part et un ADR.
 
 - [x] **[VEILLE-40]** ✅ **Fait, vérifié à l'audit du 2026-09-17** : `selectionnerSources` pousse `sourceGuichetFlux(flux).source` (lib/ingest/passe.ts), et la production le confirme (`sources=2`, `ingérées=8/1600`). Les conditions posées ici ont été tenues — `[VEILLE-32]` livré, passe complète obtenue. Brancher le flux Guichet sur `selectionnerSources`, **après** une
       passe de diagnostic qui rend `flux-termine` (celle du 19 août s'est arrêtée sur
