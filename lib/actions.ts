@@ -1154,7 +1154,17 @@ async function enrichirDetailsGoogle(
  * Ne touche ni les distances déjà connues, ni les notes manuelles (`lib/distances.ts`).
  */
 export async function mesurerDistances(
-  options: { maxSituations?: number; budgetGeocodageMs?: number } = {},
+  options: {
+    maxSituations?: number;
+    budgetGeocodageMs?: number;
+    /**
+     * Enveloppe PROPRE à l'étape des bornes, hors du budget partagé. Voir
+     * `BUDGET_BORNES_VEILLE_MS` : seul le cron de VEILLE la passe, parce que lui seul a un
+     * `maxDuration` (300 s) qui l'autorise. Absente, l'étape retombe sur le reliquat du
+     * budget partagé — le comportement d'avant, et celui du cron de géocodage (60 s).
+     */
+    budgetBornesMs?: number;
+  } = {},
 ): Promise<
   | {
       ok: true;
@@ -1387,9 +1397,20 @@ export async function mesurerDistances(
     }
 
     // 1 ter. Les bornes de recharge, pour les entreprises jamais regardées.
+    //
+    // ⚠️ SON BUDGET N'EST PAS LE RELIQUAT DU BUDGET PARTAGÉ QUAND L'APPELANT LUI EN DONNE UN.
+    // Mesuré les 16 et 17/09/2026 : deux passes de suite à zéro borne mesurée, le reste à
+    // faire qui MONTE (14 → 21), et un reliquat stable à ~7,5 s alors qu'il faut
+    // `DELAI_MAX_MS` (15 s) d'un coup pour seulement COMMENCER une requête. Une étape placée
+    // en queue d'un budget partagé que l'amont fait grossir finit par ne plus JAMAIS tourner,
+    // sans qu'une ligne ne change et sans qu'aucune erreur ne soit levée.
+    // L'enveloppe dédiée (`BUDGET_BORNES_VEILLE_MS`) n'est accordée que par le cron de veille,
+    // dont le mur est à 300 s. Voir sa déclaration pour pourquoi ce n'est PAS un déplacement
+    // de l'étape en tête de passe : elle doit rester APRÈS `raffinerPositions`, sans quoi les
+    // bornes d'une entreprise fraîchement épinglée seraient figées depuis le centre-ville.
     let bornes: PasseBornes = { candidates: 0, mesurees: 0, echecs: 0 };
     try {
-      bornes = await mesurerBornes(budgetRestant());
+      bornes = await mesurerBornes(options.budgetBornesMs ?? budgetRestant());
     } catch (err) {
       // Un confort ne fait pas tomber l'essentiel.
       console.error("[actions] mesure des bornes impossible", err);

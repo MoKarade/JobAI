@@ -39,3 +39,45 @@ export const MAX_SITUATIONS_CRON = 8;
  * qui ne changerait rien — le plafond en nombre, ci-dessus, reste la vraie limite.
  */
 export const BUDGET_GEOCODAGE_CRON_MS = 25_000;
+
+/**
+ * Enveloppe PROPRE à l'étape des bornes, accordée UNIQUEMENT par le cron de veille.
+ *
+ * ⚠️ POURQUOI ELLE EXISTE — MESURÉ LES 16 ET 17/09/2026. Deux passes consécutives à
+ * `[bornes] 0/N grappe(s) interrogée(s) · 0 lieu(x) mesuré(s)`, et le reste à mesurer qui
+ * MONTE (14 → 21) au lieu de descendre. Le budget restant à la FIN de la passe était
+ * remarquablement stable — 7 409 ms puis 7 722 ms — donc l'amont consomme ~17,5 s des 25 s
+ * de façon reproductible, et l'étape des bornes, qui est en avant-dernier, a besoin de
+ * `DELAI_MAX_MS` (15 s) D'UN COUP pour seulement COMMENCER une requête. Elle ne partait
+ * plus jamais.
+ *
+ * ⚠️ CE N'EST PAS UN ACCIDENT DE RÉGLAGE, C'ÉTAIT ÉCRIT AU-DESSUS : le commentaire de
+ * `BUDGET_GEOCODAGE_CRON_MS` dit que `mesurerDistances` « enchaîne PLUSIEURS séries (situer,
+ * rattraper les adresses, raffiner) sous le même budget partagé » et qu'« une série de huit
+ * requêtes vaut ~40 s dans le pire cas ». Vingt-cinq secondes n'ont jamais pu couvrir les
+ * séries amont ET la queue — les bornes figuraient dans la liste des étapes couvertes sans
+ * qu'aucun chiffre ne leur soit réservé. La promesse était dans le commentaire, pas dans le
+ * budget.
+ *
+ * ⚠️ POURQUOI UNE ENVELOPPE À PART PLUTÔT QU'UN BUDGET PARTAGÉ PLUS GRAND. Le commentaire
+ * ci-dessus l'interdit explicitement : agrandir le budget partagé oblige à re-dériver le
+ * pire cas contre les 60 s d'une fonction Vercel, et « vouloir un débit plus haut = ajouter
+ * une PASSE, JAMAIS agrandir celle-ci ». Cette enveloppe ne touche donc pas au partagé : le
+ * cron de VEILLE a `maxDuration = 300`, il peut offrir vingt secondes de plus sans approcher
+ * son mur. Le cron de GÉOCODAGE, lui, n'a que 60 s : il ne la reçoit PAS et garde exactement
+ * le comportement d'avant.
+ *
+ * ⚠️ POURQUOI PAS UN SIMPLE DÉPLACEMENT DE L'ÉTAPE EN TÊTE DE PASSE — c'était ma première
+ * idée, et elle est FAUSSE. `bornesLe` ne se pose qu'UNE fois par lieu, et `raffinerPositions`
+ * (qui tourne juste avant) fait passer les entreprises du centre-ville à leur vraie position.
+ * Mesurer les bornes AVANT lui les figerait, définitivement, depuis le centre-ville — pour
+ * chaque entreprise nouvellement arrivée, puisqu'une entreprise épinglée au centre est
+ * justement la première candidate au raffinage. On aurait échangé une étape affamée contre
+ * une donnée fausse.
+ *
+ * Vingt secondes : `DELAI_MAX_MS` (15 s) pour la requête, plus de quoi écrire les lignes de
+ * la grappe. La garde interne ne lance jamais une requête qu'elle ne peut pas finir, donc
+ * l'enveloppe est une BORNE, pas une réservation dépensée d'office : une passe sans bornes à
+ * mesurer ne coûte qu'un `SELECT`.
+ */
+export const BUDGET_BORNES_VEILLE_MS = 20_000;

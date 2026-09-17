@@ -1888,7 +1888,7 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       restants**, en deux grappes. Les grappes que le budget avait laissées de côté ont bien
       été servies par les passes suivantes : le découpage n'était pas en cause, comme annoncé.
 
-- [ ] 🟠 **`[BORNES-02]`** **La dernière étape de la passe de distances peut être affamée, et
+- [x] 🟠 **`[BORNES-02]`** ✅ **Corrigé le 2026-09-17, sur feu vert de Marc (« corrige les bornes »).** **La dernière étape de la passe de distances pouvait être affamée, et
       elle l'a été.** Même passe, même ligne de journal :
       `[bornes] 0/2 grappe(s) interrogée(s) · 0 borne(s) vue(s) · 0 lieu(x) mesuré(s)` avec
       `bornes=0/14` et, à la fin, `budget restant=7409 ms`.
@@ -1930,8 +1930,47 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       une étape placée en avant-dernier derrière un poste qui grossit finit toujours par ne plus
       jamais tourner. Coût : les placements Nominatim perdent jusqu'à 15 s les jours où des
       bornes restent à mesurer — et ils ne placent rien en ce moment.
-      ⚠️ **Non corrigé : c'est un défaut préexistant, hors du périmètre demandé.** Attend un feu
-      vert de Marc.
+      ⚠️ **CORRECTION DE MON ATTRIBUTION.** J'ai écrit que « l'essentiel part dans les recherches
+      Nominatim ». C'est une DÉDUCTION, pas une mesure : le journal donne le budget restant en
+      fin de passe, jamais la durée de chaque étape. Et un candidat sérieux que j'avais manqué
+      vit entre les deux — `adressesDepuisRegistre` n'est bornée par RIEN (son commentaire le
+      dit : « aucun accès réseau, cette passe n'est donc bornée par rien ») et travaille sur
+      1 042 entreprises contre 28 821 établissements, un volume qui a grandi exactement comme
+      l'amont s'est renchéri. Ce qui est MESURÉ : l'amont, dans son ensemble, consomme ~17,5 s
+      des 25 s, de façon reproductible. Qui exactement, on ne le sait pas.
+      ✅ **CORRECTIF LIVRÉ — une enveloppe DÉDIÉE, pas un déplacement d'étape.**
+      `BUDGET_BORNES_VEILLE_MS` (20 s) est accordée à `mesurerBornes` par le SEUL cron de
+      veille, dont la route est à `maxDuration = 300`. Le cron de géocodage (60 s) ne la reçoit
+      pas et garde exactement le comportement d'avant. Le budget partagé n'est PAS touché — son
+      propre commentaire l'interdit sans re-dériver le pire cas contre le mur de 60 s, et écrit
+      noir sur blanc : « vouloir un débit plus haut = ajouter une PASSE, JAMAIS agrandir
+      celle-ci ».
+      ⚠️ **Pourquoi PAS le déplacement en tête de passe que je recommandais hier — j'avais
+      tort.** `bornesLe` ne se pose qu'UNE fois par lieu, et `raffinerPositions` tourne juste
+      avant : mesurer les bornes AVANT lui les figerait DÉFINITIVEMENT depuis le centre-ville,
+      et pas pour un cas marginal — une entreprise épinglée au centre à l'étape « 0 bis » est
+      précisément la PREMIÈRE candidate au raffinage de la même passe (le tri prend le
+      `geocodeLe` le plus ancien, et elle porte `EPOQUE_A_RETENTER`). On aurait troqué une étape
+      affamée contre une donnée fausse sur chaque nouvelle entreprise.
+      Verrou : `tests/budgetPasse.test.ts`, quatre invariants — l'enveloppe suffit à COMMENCER
+      une requête, elle est accordée par la veille ET consommée par l'étape (les deux moitiés,
+      sinon c'est le trou de `[FERMETURE-03]`), le cron 60 s ne la reçoit pas, et le mur de la
+      route qui l'accorde tient le budget partagé plus l'enveloppe avec une marge de 2×.
+      Cinq mutations, cinq rouges distincts.
+      ⚠️ **Ce que ça ne prouve pas** : que les 21 lieux seront mesurés. Ça se vérifie sur la
+      ligne `[bornes]` de la prochaine passe, pas sur un déploiement vert.
+- [ ] 🟡 **`[DISTANCES-01]`** **Une étape de la passe de distances n'est bornée par RIEN, et
+      son volume grandit.** Découvert en corrigeant `[BORNES-02]` — signalé, non corrigé.
+      `adressesDepuisRegistre` (lib/actions.ts) ne reçoit aucun budget : son commentaire
+      l'assume (« aucun accès réseau, cette passe n'est donc bornée par rien et comble TOUTES
+      les adresses manquantes d'un coup »). L'argument tenait quand le registre était petit ;
+      au 2026-09-17 elle traite 1 042 entreprises contre 28 821 établissements, et le budget
+      partagé qu'elle traverse en a ~17,5 s de consommés. Tant qu'elle reste rapide, rien à
+      faire — mais **rien ne le mesure**, et c'est ça le défaut : une étape sans borne dans un
+      budget partagé est invisible jusqu'au jour où elle le mange.
+      **Remède recommandé** : publier la durée de CHAQUE étape dans la ligne `[distances]`.
+      Le diagnostic deviendrait certain au lieu d'être déduit — c'est exactement ce qui a
+      manqué ici, et ce qui m'a fait accuser Nominatim sans preuve.
 - [x] 🟡 **`[TRAJETS-03]`** ✅ **Livré le 2026-09-16, sur « accélère les trajets » (Marc).** **Le débit des durées était plafonné par la PASSE, pas par le budget
       — et la justification de la constante a rôti.** `MATRICE_MAX_PAR_PASSE` = 12, avec en
       commentaire « douze par nuit couvrent le stock d'entreprises placées en trois jours ».

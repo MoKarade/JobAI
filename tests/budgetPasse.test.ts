@@ -26,6 +26,7 @@ import {
   DELAI_MESURE_AUTO_MS,
 } from "../lib/synchro";
 import { DELAI_MAX_MS, DELAI_SERVEUR_S, INSTANCES_OVERPASS } from "../lib/overpass";
+import { BUDGET_BORNES_VEILLE_MS, BUDGET_GEOCODAGE_CRON_MS } from "../lib/geocodageCron";
 
 /** Les pages qui déclenchent la passe de fond, et doivent donc lui survivre. */
 const PAGES = ["app/carte/page.tsx", "app/page.tsx"] as const;
@@ -124,5 +125,58 @@ describe("le budget par défaut", () => {
     const source = lire("lib/actions.ts");
     expect(source).toContain("options.budgetGeocodageMs ?? BUDGET_PASSE_PAGE_MS");
     expect(source).not.toContain("options.budgetGeocodageMs ?? null");
+  });
+});
+
+describe("l'étape des bornes a une enveloppe À ELLE, et seulement là où le mur l'autorise", () => {
+  // ⚠️ CE QUI EST VERROUILLÉ ICI A DÉJÀ COÛTÉ LA MESURE, EN PRODUCTION.
+  //
+  // Les 16 et 17/09/2026, deux passes consécutives ont rendu `[bornes] 0/N grappe(s)
+  // interrogée(s) · 0 lieu(x) mesuré(s)`, et le reste à mesurer MONTAIT (14 → 21). Le budget
+  // restant en fin de passe était remarquablement stable (7 409 ms, puis 7 722 ms) : l'amont
+  // consomme ~17,5 s des 25 s partagés, et l'étape des bornes, qui vient en avant-dernier, a
+  // besoin de `DELAI_MAX_MS` D'UN COUP pour seulement COMMENCER une requête — une requête
+  // tuée en vol ne rapporte rien. Elle ne partait donc plus jamais, sans qu'une ligne change
+  // et sans qu'aucune erreur ne soit levée.
+  //
+  // ⚠️ ET LE REMÈDE N'EST PAS DE LA REMONTER EN TÊTE DE PASSE. `bornesLe` ne se pose qu'une
+  // fois par lieu, et `raffinerPositions` tourne juste avant : mesurer les bornes AVANT lui
+  // les figerait depuis le centre-ville pour toute entreprise fraîchement épinglée. On aurait
+  // troqué une étape affamée contre une donnée fausse.
+
+  it("l'enveloppe suffit à COMMENCER une requête — sinon elle ne sert à rien", () => {
+    // Le seuil n'est pas décoratif : sous `DELAI_MAX_MS`, la garde interne refuse de partir
+    // et l'enveloppe ne fait que déplacer la famine sans la corriger.
+    expect(BUDGET_BORNES_VEILLE_MS).toBeGreaterThanOrEqual(DELAI_MAX_MS);
+    // Et il reste de quoi écrire les lignes de la grappe une fois la réponse arrivée.
+    expect(BUDGET_BORNES_VEILLE_MS - DELAI_MAX_MS).toBeGreaterThanOrEqual(2_000);
+  });
+
+  it("⚠️ elle est accordée par le cron de VEILLE, et le bornes step la CONSOMME", () => {
+    // Les deux moitiés, parce qu'une seule ne prouve rien : une enveloppe que personne ne
+    // passe est morte, et une enveloppe passée que l'étape ignore l'est tout autant. C'est
+    // le trou exact de `[FERMETURE-03]` — un mécanisme vert, testé, et mort à l'arrivée.
+    expect(lire("lib/veilleComplete.ts")).toContain("budgetBornesMs: BUDGET_BORNES_VEILLE_MS");
+    expect(lire("lib/actions.ts")).toMatch(/mesurerBornes\(\s*options\.budgetBornesMs/);
+  });
+
+  it("⚠️ le cron de GÉOCODAGE ne la reçoit PAS — son mur est à 60 s", () => {
+    // Elle s'ajoute au budget partagé : l'accorder là où la fonction n'a que 60 s referait
+    // le calcul que `BUDGET_GEOCODAGE_CRON_MS` interdit de refaire à la légère, et un mur
+    // atteint tue le processus sans exécuter le moindre `catch`.
+    const source = lire("app/api/cron/geocodage/route.ts");
+    expect(source).not.toContain("budgetBornesMs");
+    const m = source.match(/export const maxDuration = (\d+)/);
+    expect(m).not.toBeNull();
+    expect(Number(m?.[1])).toBe(60);
+  });
+
+  it("⚠️ la route qui l'accorde a le mur qui la rend sûre, avec marge", () => {
+    // Un plafond ne se suppose pas : le budget partagé PLUS l'enveloppe doivent tenir
+    // largement sous le mur, parce que l'ingestion tourne AVANT dans la même invocation.
+    const m = lire("app/api/cron/veille/route.ts").match(/export const maxDuration = (\d+)/);
+    expect(m).not.toBeNull();
+    const murMs = Number(m?.[1]) * 1000;
+    expect(BUDGET_GEOCODAGE_CRON_MS + BUDGET_BORNES_VEILLE_MS).toBeLessThan(murMs / 2);
   });
 });

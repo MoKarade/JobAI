@@ -33,7 +33,11 @@ import { mesurerLieuxInconnus } from "./mesureLieux";
 import type { RegistreLieux } from "./ingest/lieux";
 import { EPOQUE_A_RETENTER } from "./travaux";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "./synchro";
-import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
+import {
+  MAX_SITUATIONS_CRON,
+  BUDGET_GEOCODAGE_CRON_MS,
+  BUDGET_BORNES_VEILLE_MS,
+} from "./geocodageCron";
 import { executerPasse } from "./ingest/passe";
 import { CLE_METIERS, METIERS_DEFAUT, normaliserMetiers } from "./metiersRetenus";
 import { villesRefusees } from "./ingest/pipeline";
@@ -287,6 +291,12 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
         const m = await mesurerDistances({
           maxSituations: MAX_SITUATIONS_CRON,
           budgetGeocodageMs: BUDGET_GEOCODAGE_CRON_MS,
+          // ⚠️ SEUL CE CHEMIN L'ACCORDE, et c'est son `maxDuration` qui l'autorise : la route
+          // du cron de veille est à 300 s, celle du cron de géocodage à 60. Voir
+          // `BUDGET_BORNES_VEILLE_MS` — sans elle, l'étape des bornes n'a jamais reçu les 15 s
+          // d'un coup qu'il lui faut pour COMMENCER une requête, et le reste à mesurer montait
+          // au lieu de descendre (mesuré les 16 et 17/09/2026).
+          budgetBornesMs: BUDGET_BORNES_VEILLE_MS,
         });
         localisation = m.ok
           ? `${m.placees} placée(s) au centre-ville, ${m.villesRattrapees} ville(s) rattrapée(s), ${m.situees} située(s), ${m.adressesRattrapees} adresse(s) récupérée(s), ${m.precisees} précisée(s), ${m.bornesMesurees} borne(s) mesurée(s), ${m.detailsEnrichis} fiche(s) enrichie(s), ${m.mesurees} mesurée(s)`

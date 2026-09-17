@@ -6,6 +6,47 @@
 
 ---
 
+## Session 2026-09-17 — `[BORNES-02]` : l'étape affamée reçoit une enveloppe à elle
+
+Marc, après le contrôle : « corrige les bornes ».
+
+**Ce qui est livré** : `BUDGET_BORNES_VEILLE_MS` (20 s), une enveloppe DÉDIÉE à
+`mesurerBornes`, accordée par le SEUL cron de veille — dont la route est à
+`maxDuration = 300`. Le cron de géocodage (60 s) ne la reçoit pas et garde exactement le
+comportement d'avant. Le budget partagé de 25 s n'est pas touché.
+
+**⚠️ Le remède que je recommandais hier était FAUX, et c'est le point à retenir.** J'avais
+écrit « remonter `mesurerBornes` AVANT les étapes Nominatim ». En lisant le code : `bornesLe`
+ne se pose qu'UNE fois par lieu, et `raffinerPositions` tourne juste avant. Mesurer les bornes
+avant lui les figerait définitivement depuis le centre-ville — et pas dans un cas marginal :
+une entreprise épinglée au centre à l'étape « 0 bis » est la PREMIÈRE candidate au raffinage de
+la même passe (le tri prend le `geocodeLe` le plus ancien, et elle porte `EPOQUE_A_RETENTER`).
+On aurait troqué une étape affamée contre une donnée fausse sur chaque nouvelle entreprise.
+
+**⚠️ Et le budget partagé ne pouvait pas être agrandi.** Son propre commentaire l'interdit :
+l'agrandir oblige à re-dériver le pire cas contre le mur de 60 s d'une fonction Vercel, et il
+écrit « vouloir un débit plus haut = ajouter une PASSE, JAMAIS agrandir celle-ci ». D'où
+l'enveloppe à part, accordée uniquement là où le mur l'autorise.
+
+**⚠️ Correction de mon attribution d'hier.** J'ai dit « l'essentiel part dans les recherches
+Nominatim ». C'était une déduction, pas une mesure : le journal donne le budget restant en fin
+de passe, jamais la durée par étape. Un candidat que j'avais manqué vit entre les deux —
+`adressesDepuisRegistre` n'est bornée par RIEN et traite 1 042 entreprises contre 28 821
+établissements. Ce qui est mesuré : l'amont, dans son ensemble, consomme ~17,5 s des 25 s.
+Qui exactement, personne ne le sait — d'où `[DISTANCES-01]` au backlog (publier la durée de
+chaque étape), signalé et non corrigé.
+
+**Verrou** : `tests/budgetPasse.test.ts`, quatre invariants — l'enveloppe suffit à COMMENCER
+une requête, elle est accordée par la veille ET consommée par l'étape (les deux moitiés, sinon
+c'est le trou de `[FERMETURE-03]`), le cron 60 s ne la reçoit pas, et le mur de la route qui
+l'accorde tient budget partagé + enveloppe avec une marge de 2×. Cinq mutations, cinq rouges
+distincts.
+
+**⚠️ Ce que ça ne prouve pas** : que les 21 lieux seront mesurés. Ça se lit sur la ligne
+`[bornes]` de la prochaine passe (fenêtre 11:00–12:00 UTC), pas sur un déploiement vert.
+
+---
+
 ## Contrôle 2026-09-17 (12:06 UTC) — l'accélération tient, et ma prédiction sur les bornes est fausse
 
 **Aucune ligne de code changée.** Contrôle de la première passe tournant avec la borne à 40.
