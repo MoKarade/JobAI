@@ -57,16 +57,36 @@ export interface Observation {
   fermee: boolean;
 }
 
-/** Jours entre deux dates `AAAA-MM-JJ`. PURE, et sans fuseau : deux dates civiles. */
-export function joursEntre(debut: string, fin: string): number {
-  const [a1, m1, j1] = debut.split("-").map(Number);
-  const [a2, m2, j2] = fin.split("-").map(Number);
-  if (a1 === undefined || m1 === undefined || j1 === undefined) return 0;
-  if (a2 === undefined || m2 === undefined || j2 === undefined) return 0;
-  // `Date.UTC` et non `new Date(chaîne)` : on compare deux dates CIVILES, et un fuseau
-  // n'a rien à faire ici — c'est ce qui rend le calcul stable où que tourne le serveur.
-  const ms = Date.UTC(a2, m2 - 1, j2) - Date.UTC(a1, m1 - 1, j1);
-  return Math.round(ms / 86_400_000);
+/**
+ * Jours entre deux dates `AAAA-MM-JJ`, ou `null` si l'une n'en est pas une.
+ * PURE, et sans fuseau : deux dates CIVILES, stables où que tourne le serveur.
+ *
+ * ⚠️ CETTE FONCTION EXISTAIT EN DEUX EXEMPLAIRES, ET ILS NE DISAIENT PAS LA MÊME CHOSE
+ * (`[DUREE-03]`, corrigé le 2026-09-17). Celui-ci gardait par `=== undefined` — or
+ * `"pas-une-date".split("-").map(Number)` rend trois `NaN`, qui ne sont PAS `undefined` : le
+ * garde ne tirait jamais et la fonction rendait `NaN`. L'écran a affiché « repérée il y a NaN
+ * jours » — un doute fabriqué, présenté avec l'autorité d'une mesure.
+ *
+ * L'autre exemplaire (`lib/relances.ts`) répondait DÉJÀ juste à la même question, avec un
+ * `Date.parse` et un `null` explicite. On garde donc SA réponse et on supprime la copie : deux
+ * implémentations d'une règle, c'est une règle et demie, et c'est le mode de panne le plus
+ * répété de ce dépôt.
+ *
+ * ⚠️ `null`, PAS `0`. Zéro est une mesure — « le même jour » — et une date illisible n'autorise
+ * à affirmer ni la durée, ni son absence.
+ *
+ * ⚠️ CE QU'ELLE NE REFUSE PAS, et je l'avais écrit faux avant de le mesurer : un JOUR qui
+ * déborde son mois est REPORTÉ, pas rejeté — `2026-02-30` devient le 2 mars, exactement comme
+ * l'ancien `Date.UTC`. Sont refusés : un mois hors bornes (`2026-13-01`), une chaîne vide, une
+ * chaîne qui n'est pas une date, et une forme non ISO (`2026-2-3`). C'est une limite CONNUE,
+ * écrite ici pour que personne ne la redécouvre comme un défaut : les dates de ce dépôt sont
+ * écrites par l'app elle-même, jamais saisies à la main.
+ */
+export function joursEntre(debut: string, fin: string): number | null {
+  const d = Date.parse(`${debut}T00:00:00Z`);
+  const f = Date.parse(`${fin}T00:00:00Z`);
+  if (Number.isNaN(d) || Number.isNaN(f)) return null;
+  return Math.round((f - d) / 86_400_000);
 }
 
 /**
@@ -106,7 +126,7 @@ export function observer(
       categorie: categorieOffre(o.poste, "", o.noc ?? null, metiers),
       premiereVue: suivi.premiereVue,
       derniereVue: suivi.derniereVue,
-      jours: Math.max(0, joursEntre(suivi.premiereVue, suivi.derniereVue)),
+      jours: Math.max(0, joursEntre(suivi.premiereVue, suivi.derniereVue) ?? 0),
       fermee: o.perimeeLe !== null,
     });
   }

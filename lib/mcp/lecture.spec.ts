@@ -244,11 +244,11 @@ function etatVeille(
     if (suivi) {
       confirmees += 1;
       const j = joursEntre(suivi.derniereVue, veille.aujourdhui);
-      if (Number.isFinite(j) && (plusVieille === null || j > plusVieille)) plusVieille = j;
+      if (j !== null && (plusVieille === null || j > plusVieille)) plusVieille = j;
       continue;
     }
     const j = joursEntre(o.dateReperage, veille.aujourdhui);
-    if (!Number.isFinite(j)) continue;
+    if (j === null) continue;
     if (j < 7) age.moins7 += 1;
     else if (j < 30) age.de7a30 += 1;
     else if (j < 90) age.de30a90 += 1;

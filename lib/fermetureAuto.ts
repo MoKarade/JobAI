@@ -206,7 +206,8 @@ export function fermeturesAutomatiques(params: {
     if (journal[o.id] !== undefined) continue;
     if (marcYATouche(o)) continue;
     const jours = joursEntre(o.dateReperage, aujourdhui);
-    if (!Number.isFinite(jours) || jours < seuil) continue;
+    // `null` = date illisible. Elle ne prouve PAS qu'une offre est vieille : on passe.
+    if (jours === null || jours < seuil) continue;
     candidates.push({ id: o.id, entreprise: o.entreprise, poste: o.poste, jours });
   }
 

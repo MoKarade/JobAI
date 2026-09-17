@@ -86,13 +86,14 @@ export function fraicheurOffre(
   if (suivi) return null;
 
   const jours = joursEntre(offre.dateReperage, aujourdhui);
-  // ⚠️ `joursEntre` rend NaN sur une date malformée, pas 0 : son garde teste `undefined`,
-  // or `"pas-une-date".split("-").map(Number)` rend trois NaN, qui ne sont pas `undefined`.
-  // Mesuré en écrivant le test ci-contre. Sans cette ligne, l'écran afficherait « repérée
-  // il y a NaN jours » — un doute fabriqué, affiché avec l'autorité d'une mesure. On se
-  // TAIT plutôt : une date illisible n'autorise à affirmer ni la fraîcheur, ni le doute.
-  // (Le défaut de `joursEntre` lui-même est au BACKLOG — il n'appartient pas à ce lot.)
-  if (!Number.isFinite(jours)) return null;
+  // ⚠️ Une date illisible rend `null`, et on se TAIT. Sans cette ligne, l'écran afficherait
+  // « repérée il y a NaN jours » — un doute fabriqué, présenté avec l'autorité d'une mesure ;
+  // une date illisible n'autorise à affirmer ni la fraîcheur, ni le doute.
+  // ⚠️ Cette garde a été écrite quand `joursEntre` rendait `NaN` malgré un garde qui croyait
+  // l'attraper (`[DUREE-03]`). Le défaut est corrigé à la source depuis le 2026-09-17 — la
+  // fonction rend `null`, un type que le compilateur impose de traiter. La garde RESTE :
+  // c'est elle qui décide quoi FAIRE de l'illisible ici, et ce choix-là est propre à cet écran.
+  if (jours === null) return null;
   if (jours < JOURS_AVANT_DOUTE) return null;
 
   return {

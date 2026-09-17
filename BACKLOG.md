@@ -1733,13 +1733,32 @@ avoir l'offre, parce que ça m'étonne certaines devraient être périmées ».
       âge. Ce sont les mieux notées du suivi (88, 85, 84, 82, 80…) ; les retirer sur une
       supposition ferait l'inverse de ce que Marc demande — il veut cliquer pour vérifier.
       L'alternative écartée : un seuil d'âge qui périme automatiquement.
-- [ ] 🔧 **`[DUREE-03]`** `joursEntre` (`lib/dureeVie.ts`) rend **NaN**, pas 0, sur une date
+- [x] 🔧 **`[DUREE-03]`** ✅ **Livré le 2026-09-17, et le vrai défaut était la DUPLICATION.** `joursEntre` (`lib/dureeVie.ts`) rendait **NaN**, pas 0, sur une date
       malformée : son garde teste `undefined`, or `"pas-une-date".split("-").map(Number)`
       rend trois `NaN`, qui ne sont pas `undefined`. Trouvé en écrivant
       `tests/fraicheur.test.ts` (le libellé sortait avec « il y a NaN jours » dedans).
       `lib/fraicheur.ts` se protège par `Number.isFinite`, mais `observer`/`survie` restent
       exposés — en pratique ils ne lisent que des dates écrites par l'app. Bug PRÉEXISTANT,
       non causé par ce lot, **non corrigé sans feu vert**.
+      ✅ **CORRIGÉ, et pas comme prévu.** En ouvrant le fichier : cette fonction existait en
+      **DEUX exemplaires** dans `lib/`, et l'autre (`lib/relances.ts`) répondait DÉJÀ juste à la
+      même question — `Date.parse`, `null` explicite. Le défaut de fond n'était donc pas le
+      garde, c'était que personne ne savait qu'une réponse correcte existait à côté. C'est SA
+      version qui a gagné ; la copie a disparu. `dureeVie.joursEntre` rend désormais
+      `number | null`.
+      ⚠️ **`null`, pas `0`** : zéro est une MESURE (« le même jour »), et une date illisible
+      n'autorise à affirmer ni la durée ni son absence.
+      ⚠️ **Le compilateur a énuméré les consommateurs** — cinq sites, tous déjà gardés par
+      `Number.isFinite` (des gardes écrits À CAUSE du NaN). Ils passent à `=== null` : même
+      comportement, mais le type l'impose au lieu de compter sur la vigilance.
+      ⚠️ **ET J'AI ÉCRIT UNE AFFIRMATION FAUSSE AVANT DE LA MESURER** : « `Date.parse` refuse
+      `2026-02-30` ». Non — il le REPORTE au 2 mars, exactement comme l'ancien `Date.UTC`.
+      Mesuré, corrigé dans le commentaire, et figé par un test qui écrit la vraie frontière
+      (mois hors bornes et forme non ISO refusés ; jour qui déborde reporté). Une limite connue
+      vaut mieux qu'une limite redécouverte comme un défaut.
+      Verrou : `tests/dureeVie.test.ts`, cinq cas dont l'unicité de l'exemplaire. Deux
+      mutations — le défaut d'origine fait rougir SIX tests dans TROIS fichiers (dont des tests
+      préexistants de `relances` et `fraicheur`), la copie réintroduite en fait rougir un.
 
 ---
 

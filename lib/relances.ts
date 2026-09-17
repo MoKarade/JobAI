@@ -41,13 +41,16 @@ export type EtatRelance =
   /** Rien à surveiller : pas encore envoyée, déjà répondue, ou historique. */
   | "sans-objet";
 
-/** Nombre de jours entiers entre deux dates AAAA-MM-JJ. Négatif si `fin` précède `debut`. */
-export function joursEntre(debut: string, fin: string): number | null {
-  const d = Date.parse(`${debut}T00:00:00Z`);
-  const f = Date.parse(`${fin}T00:00:00Z`);
-  if (Number.isNaN(d) || Number.isNaN(f)) return null;
-  return Math.round((f - d) / 86_400_000);
-}
+/**
+ * Nombre de jours entiers entre deux dates AAAA-MM-JJ. Négatif si `fin` précède `debut`.
+ *
+ * ⚠️ RÉ-EXPORTÉE, PLUS RÉÉCRITE (`[DUREE-03]`, 2026-09-17). Ce fichier en portait sa propre
+ * copie, correcte, pendant que celle de `lib/dureeVie.ts` gardait par `=== undefined` et
+ * rendait `NaN` sur une date illisible. Deux réponses à la même question dans le même `lib/` :
+ * c'est celle-ci qui a gagné, et l'autre a disparu. Les appelants d'ici ne changent pas.
+ */
+import { joursEntre } from "./dureeVie";
+export { joursEntre };
 
 /**
  * Où en est cette candidature ?

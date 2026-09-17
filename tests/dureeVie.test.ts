@@ -10,6 +10,8 @@
 // tomber, au lieu de publier un chiffre plausible.
 
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   joursEntre,
   observer,
@@ -249,5 +251,52 @@ describe("rapportDureeVie", () => {
     expect(r.horsVeille).toBe(1);
     expect(r.parEmployeur.map((g) => g.nom)).toEqual(["Employeur"]);
     expect(r.parCategorie).toHaveLength(1);
+  });
+});
+
+describe("joursEntre — une date illisible ne rend ni 0 ni NaN (DUREE-03)", () => {
+  // ⚠️ LE DÉFAUT : le garde testait `=== undefined`, or `"pas-une-date".split("-").map(Number)`
+  // rend trois `NaN`, qui n'en sont pas. Le garde ne tirait JAMAIS et la fonction rendait NaN —
+  // l'écran a affiché « repérée il y a NaN jours », un doute fabriqué présenté avec l'autorité
+  // d'une mesure.
+  //
+  // ⚠️ ET CETTE FONCTION EXISTAIT EN DEUX EXEMPLAIRES, qui ne disaient pas la même chose :
+  // `lib/relances.ts` répondait déjà juste, avec `Date.parse` et un `null` explicite. C'est
+  // SA réponse qui a gagné, et la copie a disparu. Une règle, un exemplaire.
+
+  it("⚠️ rend `null`, jamais `NaN` — le cas qui a fabriqué le « NaN jours » à l'écran", () => {
+    expect(joursEntre("pas-une-date", "2026-09-17")).toBeNull();
+    expect(joursEntre("2026-09-17", "")).toBeNull();
+  });
+
+  it("⚠️ `null` et NON `0` : zéro est une MESURE — « le même jour »", () => {
+    // Dégrader l'illisible vers la valeur de repos rendrait les deux indistinguables, et
+    // « il y a 0 jour » serait une affirmation que rien ne soutient.
+    expect(joursEntre("2026-09-17", "2026-09-17")).toBe(0);
+    expect(joursEntre("n'importe quoi", "2026-09-17")).not.toBe(0);
+  });
+
+  it("⚠️ ce qui est refusé, et ce qui ne l'est PAS — mesuré, pas supposé", () => {
+    // J'avais écrit que `Date.parse` refusait `2026-02-30`. FAUX, mesuré : il le REPORTE au
+    // 2 mars, exactement comme l'ancien `Date.UTC`. Ce test fige la vraie frontière, pour que
+    // personne ne redécouvre le report comme un défaut — les dates de ce dépôt sont écrites
+    // par l'app, jamais saisies à la main.
+    expect(joursEntre("2026-13-01", "2026-03-05")).toBeNull(); // mois hors bornes : refusé
+    expect(joursEntre("2026-2-3", "2026-03-05")).toBeNull(); // forme non ISO : refusée
+    expect(joursEntre("2026-02-30", "2026-03-05")).toBe(3); // jour qui déborde : REPORTÉ
+  });
+
+  it("non-régression : le calcul juste ne bouge pas, années bissextiles comprises", () => {
+    expect(joursEntre("2026-07-01", "2026-07-15")).toBe(14);
+    expect(joursEntre("2024-02-28", "2024-03-01")).toBe(2);
+    expect(joursEntre("2026-07-15", "2026-07-01")).toBe(-14);
+  });
+
+  it("⚠️ un seul exemplaire : `lib/relances.ts` ré-exporte celui-ci, il ne le réécrit pas", () => {
+    // Le défaut de fond n'était pas le garde, c'était la DUPLICATION — l'un des deux
+    // exemplaires était correct depuis toujours, et personne ne le savait.
+    const src = readFileSync(resolve(process.cwd(), "lib/relances.ts"), "utf8");
+    expect(src).toContain('import { joursEntre } from "./dureeVie"');
+    expect(src).not.toMatch(/function joursEntre/);
   });
 });
