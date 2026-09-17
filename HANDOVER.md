@@ -52,11 +52,42 @@ gardé et non supposé.
 les bornes. Il retombe sur le reliquat du budget partagé, c'est-à-dire le comportement d'avant
 `[BORNES-02]`. C'est le cron de veille nocturne qui fait ce travail, et lui seul.
 
-⚠️ **Effet en prod NON VÉRIFIÉ.** Aucune passe de cron n'a encore tourné avec ces valeurs, et
-le bouton ne peut plus servir à le tester — par conception. La prochaine passe du cron
-(`0 11 * * *`, partie à 11:31:50 les 16 et 17/09) tranchera. Ce qu'il faudra lire : la ligne
-`[bornes] … grappe(s) interrogée(s) · … lieu(x) mesuré(s)`, et, en cas d'échec, l'étendue de
-boîte et le temps d'abandon désormais journalisés.
+### Vérification en prod, 20:11:47 UTC — une moitié prouvée, l'autre pas
+
+Marc a relancé la veille depuis `/sources`. La passe a tourné sur `dpl_2kWJAm4z…` (= `dd0bc6a`).
+
+```
+[bornes] 0/1 grappe(s) interrogée(s) · 0 borne(s) vue(s) · 0 lieu(x) mesuré(s)
+[distances] … bornes=0/3 … budget restant=1346 ms
+```
+
+✅ **La moitié 2 est PROUVÉE, et c'est un succès malgré les zéros.** `0/1 interrogée(s)` veut
+dire que l'étape a REFUSÉ de partir : plus d'enveloppe sur ce chemin, `budgetRestant()` à
+1 346 ms, garde `reste < DELAI_MAX_MS` → on ne lance pas une requête qu'on ne peut pas finir.
+Et AUCUNE ligne d'échec, donc aucune requête partie. Le bouton ne peut plus atteindre le mur
+de 60 s de sa fonction. C'était une correction écrite hier soir sur lecture de code ; elle est
+maintenant OBSERVÉE.
+
+⚠️ **Et la lecture piège est « 0 mesuré = c'est cassé ».** Non : sur ce chemin, zéro est la
+bonne réponse. Le signal d'un échec serait une ligne `[bornes] grappe de N lieu(x) non
+mesurée`, qui n'existe pas ici.
+
+**Le bouton ne PEUT PAS porter les bornes, et le chiffre le dit.** La passe de distances a
+consommé 33,6 s de ses 35 s (`budget restant=1346 ms`). Une enveloppe de bornes vaut désormais
+30 s (25 s de patience + 5 s d'écriture) : ~64 s pour la seule étape de distances, avant même
+l'ingestion, contre un mur de 60 s. Ce n'est donc pas un réglage à ajuster — ça ne rentre pas.
+
+⚠️ **La moitié 1 — la patience à 25 s — reste NON VÉRIFIÉE.** Seul le cron de veille (300 s)
+l'exerce, et il ne tourne qu'à 11:31 UTC. Contrôle armé pour le 2026-09-18 11:42 UTC
+(`trig_01Lq99uELJWrmJwQs6eeBGRR`). Ce qu'il faudra lire : `lieu(x) mesuré(s) > 0` ⇒ clos ; sinon
+la ligne d'échec porte maintenant l'étendue de la boîte et le temps d'abandon, et c'est ce qui
+départage « le service fait la queue » (abandon À 25 000 ms) de « la requête ou le réseau »
+(abandon bien avant).
+
+**Au passage, `[VEILLE-42]` tient** : toujours aucun nom de l'île de Montréal chez les lieux
+inconnus, `sherrington` est passé de ×5 à ×7 (la file grossit, la règle ne la touche pas).
+Et `saint-pie` est passé d'« inconnu » à « hors région » — pas par la bande (J n'est pas
+rejetée) mais par le REGISTRE MESURÉ, qui a grandi de 402 à 414 entrées dans la même passe.
 
 ---
 

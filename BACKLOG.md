@@ -1043,8 +1043,16 @@
       appellent des remèdes opposés.
       ⚠️ **Conséquence à savoir** : le bouton de `/sources` ne mesure plus les bornes (il
       retombe sur le reliquat du budget partagé, comme avant `[BORNES-02]`). C'est le cron de
-      veille nocturne qui fait ce travail. **Effet en prod NON VÉRIFIÉ** : la prochaine passe
-      du cron tranchera.
+      veille nocturne qui fait ce travail.
+      ✔ **Moitié 2 VÉRIFIÉE en prod le 2026-09-17 à 20:11:47** (passe relancée par Marc) :
+      `[bornes] 0/1 grappe(s) interrogée(s)`, aucune ligne d'échec, `budget restant=1346 ms`.
+      L'étape a REFUSÉ de partir — c'est le succès, pas la panne : plus d'enveloppe sur ce
+      chemin, donc plus de risque d'atteindre le mur de 60 s. Et le bouton ne peut PAS porter
+      les bornes : la passe de distances a consommé 33,6 s de ses 35 s, une enveloppe vaut
+      désormais 30 s, soit ~64 s pour la seule étape contre un mur de 60. Ça ne se règle pas,
+      ça ne rentre pas.
+      ⚠️ **Moitié 1 (patience 25 s) TOUJOURS NON VÉRIFIÉE** : seul le cron de veille l'exerce.
+      Contrôle armé au 2026-09-18 11:42 UTC.
 
 - [ ] **[VEILLE-42]** ⚠️ **La moitie des offres quebecoises du flux tombent en « lieu
       inconnu »**, et la liste est dominee par des municipalites de l'ile de Montreal que
