@@ -1013,6 +1013,16 @@
       candidat serieux. A trancher sur l'inventaire de valeurs, pas avant. Bloque
       [VEILLE-40].
 
+- [ ] **[BORNES-03]** ⚠️ **L'enveloppe de `[BORNES-02]` a réglé la FAMINE, et découvert la
+      panne qu'elle cachait.** Passe du 2026-09-17 19:41:30 : `[bornes] 1/1 grappe(s)
+      interrogée(s)` — l'étape DÉMARRE enfin, ce qu'elle ne faisait plus depuis deux jours.
+      Mais : `grappe de 7 lieu(x) non mesurée : This operation was aborted · This operation was
+      aborted · fetch failed` et `0 lieu(x) mesuré(s)`. Le problème n'est donc plus le budget
+      mais l'appel Overpass lui-même (abandon + échec réseau). ⚠️ Ne pas conclure d'ici que
+      l'enveloppe était inutile : elle a fait passer l'étape de « jamais lancée » à « lancée et
+      en échec », ce qui est justement ce qui rend la panne VISIBLE. Trouvé en chemin en
+      vérifiant `[VEILLE-42]` — **signalé, non corrigé**, hors périmètre demandé.
+
 - [ ] **[VEILLE-42]** ⚠️ **La moitie des offres quebecoises du flux tombent en « lieu
       inconnu »**, et la liste est dominee par des municipalites de l'ile de Montreal que
       `HORS_PORTEE` ignore faute de contenir « montreal » : Saint-Laurent, Cote-Saint-Luc,
@@ -1076,6 +1086,14 @@
       Gain : **707 offres/passe (19,1 %)** cessent de disputer les 40 places de
       `MAX_LIEUX_INCONNUS_FLUX`. ⚠️ Le gain en PLACES est borné par le nombre de NOMS distincts
       parmi ces 707, que l'instrument ne mesure pas — non annoncé comme un gain.
+      ✅ **EFFET VÉRIFIÉ EN PRODUCTION le 2026-09-17 à 19:41:30 UTC** (passe lancée par Marc
+      depuis `/sources`, déploiement `cfc9b36`), avec contrôle négatif : `mont-royal×6` et
+      `pointe-aux-trembles×4`, présents en « lieu inconnu » à l'audit du matin (ligne 2255
+      ci-dessous), ont DISPARU ; `sherrington×5` — que la règle ne vise pas — est inchangé au
+      compte exact. C'est lui qui fait la preuve : seules, deux disparitions s'expliqueraient
+      par une passe différente. `hors-région` 4 → 6, `lieu-inconnu` 40 → 39.
+      `saint-michel×3` reste en lieu inconnu — le cas d'homonymie que la règle devait éviter
+      d'écraser, et qu'elle n'a pas écrasé.
       Reste ouvert : `J`, soit 48 % de la queue, volontairement non triée.
 
 - [x] **[VEILLE-40]** ✅ **Fait, vérifié à l'audit du 2026-09-17** : `selectionnerSources` pousse `sourceGuichetFlux(flux).source` (lib/ingest/passe.ts), et la production le confirme (`sources=2`, `ingérées=8/1600`). Les conditions posées ici ont été tenues — `[VEILLE-32]` livré, passe complète obtenue. Brancher le flux Guichet sur `selectionnerSources`, **après** une

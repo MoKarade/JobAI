@@ -53,7 +53,46 @@ tests dont l'anti-vacuité du ratchet.
 **Reste ouvert** : `J`, 48 % de la queue, volontairement non triée. Et le ratchet interdit `G`
 et `J` dans la liste — les ajouter doit forcer à relire la mesure, pas à re-baser le test.
 
-### Vérification en production, 19:45 UTC — ce qui est prouvé et ce qui ne l'est pas
+### ✅ EFFET VÉRIFIÉ EN PRODUCTION, 19:41:30 UTC — avec son contrôle négatif
+
+Marc a lancé la passe depuis `/sources`. Elle a tourné sur `dpl_7N9Cvsx…` (= `cfc9b36`).
+
+**Le témoin d'avant est écrit dans le dépôt** — `BACKLOG.md` ligne 2255, consigné à l'audit du
+matin, AVANT la règle : « `mont-royal×6`, `pointe-aux-trembles×4`, `sherrington×5` tombent
+encore en lieu inconnu ».
+
+**La passe de 19:41:30 rend** :
+
+```
+[veille] bouton-app — ingérées=2/1600 … hors-région=6 … lieu-inconnu=39 …
+[veille] lieux refusés — inconnus : sherrington×5 · grande-riviere×3 · saint-michel×3 ·
+         gaspe×2 · parc-bon-air×2 · … · woburn×1
+```
+
+| Nom | Avant la règle | Après |
+|---|---|---|
+| `mont-royal` | ×6 en lieu inconnu | **absent** |
+| `pointe-aux-trembles` | ×4 en lieu inconnu | **absent** |
+| `sherrington` | ×5 en lieu inconnu | **×5, inchangé** |
+
+⚠️ **C'est `sherrington` qui fait la preuve, pas les deux disparitions.** Seules, elles
+s'expliqueraient aussi par une passe qui ne contient tout simplement pas ces offres. Le même
+compte exact sur un nom que la règle NE vise PAS dit que la tranche de flux est comparable —
+donc que ce qui a disparu a été RETIRÉ, pas absent. Un contrôle négatif, pas un avant/après nu.
+
+Compteurs : `hors-région` 4 → **6**, `lieu-inconnu` 40 → **39** (le total nommé fait bien 39).
+Ils vont dans le bon sens mais ne prouvent rien seuls — ce sont les comptes du pipeline, sur ce
+que la source lui a déjà transmis ; la règle, elle, agit en amont dans la source.
+
+⚠️ **`saint-michel×3` est TOUJOURS là, et c'est une bonne nouvelle.** C'est le cas d'homonymie
+que la règle devait éviter d'écraser (arrondissement de Montréal vs Saint-Michel-de-Bellechasse
+et autres). Son maintien dit que son code postal n'est pas en bande `H` : la règle ne l'a pas
+pris pour ce qu'il n'est pas.
+
+**Contrôle de demain 11:42 UTC retiré** (`trig_01Sn1k2gJhyABCWHB3FFr8UN`) : il n'a plus d'objet,
+la réponse est là.
+
+### Ce qui était écrit à 19:45 UTC, avant la passe de Marc
 
 **Prouvé** : CI verte et déploiement `READY` sur `cfc9b36`, aliasé sur `emploi.hubperso.com`.
 Et la non-contamination de l'instrument, vérifiée sur la production APRÈS la mise en ligne :
