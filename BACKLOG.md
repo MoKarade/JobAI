@@ -315,6 +315,13 @@
 - [ ] 👤 **`[CV-07]`** Poser `ANTHROPIC_API_KEY` dans l'environnement Vercel. **Sans elle,
       l'extraction ne tourne pas** — elle rend un échec nommé, jamais un profil inventé, et
       le CV reste stocké pour être ré-analysé d'un clic ensuite.
+      ✔ **MARC S'EN CHARGE (décision du 2026-09-17).**
+      ⚠️ **ET « D'UN CLIC » ÉTAIT FAUX JUSQU'À CE SOIR** — c'est en préparant ce geste que je
+      l'ai vu. `reanalyserCv` était écrite, correcte, testée… et appelée par AUCUN composant.
+      Le seul chemin restant était de re-téléverser le fichier, c'est-à-dire exactement ce que
+      le commentaire de l'écran voulait éviter. Le bouton existe maintenant
+      (`components/ReanalyseCv.tsx`), sur les CV en échec d'extraction ou sans proposition.
+      Sans lui, la clé serait arrivée sans rien débloquer de ce qui est déjà déposé.
 - [ ] 🔧 **`[CV-08]`** La Routine quotidienne porte ses termes de recherche dans son PROMPT,
       hors du dépôt : un CV validé enrichit `profil.recherches` sans changer ce qu'elle tape
       le matin. Divergence réelle, nommée dans l'ADR-0009. La fermer suppose que la Routine
@@ -335,6 +342,9 @@
       d'essai `scripts/sonder-sources.ts`, qui en lit le PREMIER élément. Le commentaire a été
       corrigé pour dire ce qui est vrai ; le raccordement reste à faire le jour où le canal
       revit. **Aucune ligne de comportement n'a changé.**
+      ⚠️ **ÉCARTÉ PAR MARC le 2026-09-17** : interrogé sur le lot à deux mains (je livre
+      l'endpoint, il change une ligne de prompt), il ne l'a pas retenu. L'item reste ouvert
+      sans travail de ma part.
 - [x] 🔧 **`[CV-09]`** ✅ **Livré le 2026-09-17** (« continue les tâches backlog »). Aucun test
       ne couvrait `lib/cv/actions.ts` ni `lib/cv/depot.ts` — **471 lignes qui écrivent à partir
       d'un document personnel, sans un seul verrou** (la logique PURE, elle, l'était déjà :
@@ -364,6 +374,7 @@
       reproduire.
 - [ ] 🔧 **`[CV-10]`** Un PDF SCANNÉ reste illisible (pas de reconnaissance de caractères).
       L'app le dit et propose le remède ; c'est une limite, pas un bug.
+      ⚠️ **ÉCARTÉ PAR MARC le 2026-09-17**, interrogé explicitement. Reste une limite assumée.
 - [x] 🔧 **`[CV-11]`** ✅ **Livré le 2026-09-17 : 1 854 → 491 lignes.** Les 153 leçons de la §9 (1 536 lignes, 83 % du fichier) sont déménagées VERBATIM dans `docs/LESSONS.md` ; la §9 garde leur RÈGLE, une ligne chacune, reprise au caractère près du gras que chaque incident avait déjà produit. ⚠️ **C'est une perte assumée** : un `CLAUDE.md` ne charge rien hors de son arbre, donc les histoires n'arrivent plus en session. ⚠️ **Et le plafond de 150 n'est pas atteint** — 153 règles ne se réduisent qu'en en supprimant, et chacune a été payée par un incident ; l'en-tête le dit maintenant au lieu d'annoncer un plafond que le fichier violait depuis toujours. Vérifié par trois contrôles : corps présent verbatim, 153/153 règles dans l'index, tout ce qui n'est pas la §9 inchangé. ~~`CLAUDE.md` fait **1 854 lignes** pour un « plafond assumé : 150 » — il en faisait 867 quand cet item a été écrit, donc il a DOUBLÉ depuis (re-mesuré à l'audit du 2026-09-17).~~ Il se
       charge à chaque session : le distiller vers `docs/LESSONS.md` en gardant ici les seules
       règles qui changent la façon de coder.
@@ -994,7 +1005,11 @@
       `ResultatSource.note`. Non-regression : la source est INERTE par defaut (liste vide),
       donc aucune offre existante ne change de note — verifie par test, pas suppose.
 
-- [ ] **[ROUTINE-01]** ⚠️ **Supprimer la Routine est POSSIBLE, et ça coûte la source la
+- [x] **[ROUTINE-01]** ✅ **TRANCHÉ PAR MARC le 2026-09-17 : la Routine est GARDÉE.** La
+      mesure des deux côtés lui a été reposée (source alignée à ~64 % coordination/technique
+      contre un Guichet large à filtrer) ; il garde le complément. L'app permet toujours de la
+      supprimer — l'item se ferme comme décision prise, pas comme travail fait.
+      ⚠️ **Supprimer la Routine est POSSIBLE, et ça coûte la source la
       plus alignée sur le profil — arbitrage de Marc, mesuré des deux côtés (2026-08-20).**
       Ce qu'elle dépose, passé au barème lui-même (268 offres distinctes sur
       9 lots) : **54 % coordination seule, 4 % la combinaison visee, 6 % technicien, 5 %
@@ -1203,7 +1218,10 @@
       par une passe différente. `hors-région` 4 → 6, `lieu-inconnu` 40 → 39.
       `saint-michel×3` reste en lieu inconnu — le cas d'homonymie que la règle devait éviter
       d'écraser, et qu'elle n'a pas écrasé.
-      Reste ouvert : `J`, soit 48 % de la queue, volontairement non triée.
+      ✅ **`J` TRANCHÉ PAR MARC le 2026-09-17 : on ne la rejette pas.** 48 % de la queue
+      restent donc non triés, et c'est une décision, plus une question ouverte — 4,6 % de part
+      régionale, soit une offre sur vingt-deux qu'on ne verrait jamais disparaître. Rouvrir
+      demanderait une mesure neuve, pas une préférence.
 
 - [x] **[VEILLE-40]** ✅ **Fait, vérifié à l'audit du 2026-09-17** : `selectionnerSources` pousse `sourceGuichetFlux(flux).source` (lib/ingest/passe.ts), et la production le confirme (`sources=2`, `ingérées=8/1600`). Les conditions posées ici ont été tenues — `[VEILLE-32]` livré, passe complète obtenue. Brancher le flux Guichet sur `selectionnerSources`, **après** une
       passe de diagnostic qui rend `flux-termine` (celle du 19 août s'est arrêtée sur

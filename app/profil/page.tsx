@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Cadre } from "@/components/Cadre";
 import { RevueProfil } from "@/components/RevueProfil";
+import { ReanalyseCv } from "@/components/ReanalyseCv";
 import { TeleversementCv } from "@/components/TeleversementCv";
 import { listerCvs, profilActif, propositionDe } from "@/lib/cv/depot";
 import { calculerEcarts } from "@/lib/cv/proposition";
@@ -256,6 +257,15 @@ export default async function Profil() {
                     le même fichier en boucle sans savoir ce qui cloche. */}
                 {c.erreurExtraction ? (
                   <span className="cv__erreur">{c.erreurExtraction}</span>
+                ) : null}
+                {/* ⚠️ ET LE GESTE QUI VA AVEC LA RAISON. Dire « la clé API est absente » sans
+                    offrir de relancer laissait un seul chemin : re-déposer le fichier —
+                    exactement ce que le commentaire ci-dessus voulait éviter. Le bouton
+                    n'apparaît que là où il SERT : une extraction ratée, ou un CV qui n'a
+                    rien à valider. Le proposer sur un CV déjà analysé coûterait un appel au
+                    modèle pour rien. */}
+                {c.erreurExtraction !== null || !c.aUneProposition ? (
+                  <ReanalyseCv id={c.id} />
                 ) : null}
               </li>
             ))}

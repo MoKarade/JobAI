@@ -134,6 +134,10 @@ volontairement.
 - **Rejeter `J` aussi** — 1 784 offres gagnées, mais 4,6 % de part régionale. Le prix d'un faux
   rejet (une offre invisible à jamais, sans trace) n'est pas celui d'un faux maintien (une place
   de quota).
+  ✅ **TRANCHÉ PAR MARC le 2026-09-17 : `J` reste acceptée.** La recommandation lui a été posée
+  avec les deux chiffres et l'asymétrie des erreurs ; il a retenu de ne pas parier contre une
+  offre régionale sur vingt-deux. Ce n'est donc plus une alternative en attente mais une
+  DÉCISION — la rouvrir demanderait une mesure neuve, pas une préférence.
 - **Poser la bande AVANT la liste blanche** — plus simple et plus rentable en apparence ; perdrait
   les 44 offres régionales à code hors bande, mesurées.
 - **Élargir `HORS_PORTEE` avec les noms de l'île de Montréal** — c'est `[VEILLE-33]` : la liste
