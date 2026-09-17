@@ -298,8 +298,33 @@
       hors du dépôt : un CV validé enrichit `profil.recherches` sans changer ce qu'elle tape
       le matin. Divergence réelle, nommée dans l'ADR-0009. La fermer suppose que la Routine
       LISE le profil (endpoint dédié, gardé comme `/api/ingest/depot`).
-- [ ] 🔧 **`[CV-09]`** Aucun test ne couvre `lib/cv/actions.ts` ni `lib/cv/depot.ts` (I/O).
-      La logique PURE l'est (46 tests) ; les actions ne le sont pas.
+- [x] 🔧 **`[CV-09]`** ✅ **Livré le 2026-09-17** (« continue les tâches backlog »). Aucun test
+      ne couvrait `lib/cv/actions.ts` ni `lib/cv/depot.ts` — **471 lignes qui écrivent à partir
+      d'un document personnel, sans un seul verrou** (la logique PURE, elle, l'était déjà :
+      46 tests). Deux fichiers, 15 cas, 4 mutations prouvées.
+      · **La session, revérifiée par les QUATRE actions** — c'était une PROMESSE écrite dans
+        l'en-tête du module (« un point d'entrée POST généré par Next est appelable
+        directement, le middleware ne le couvre pas ») et rien ne la tenait. L'assertion porte
+        AUSSI sur le fait qu'aucune n'a touché au dépôt avant de refuser : un refus qui arrive
+        après l'écriture est décoratif.
+      · **La paire OPPOSÉE de `televerserCv`** — une LECTURE ratée ne stocke rien (sans texte,
+        rien à ré-analyser), une EXTRACTION ratée stocke QUAND MÊME avec sa raison (jeter le
+        fichier punirait Marc d'une panne de clé qui n'est pas la sienne). Trois lignes
+        d'écart, comportements inverses, et les intervertir ne casse rien de visible.
+      · **Les TROIS issues de `propositionDe`** — « absente » et « illisible » se répondent
+        différemment (la seconde se répare par une ré-analyse) ; la première version les
+        rabattait toutes deux sur `null`.
+      · **`null` ≠ liste vide** — « base non configurée » et « aucun CV » ne se disent pas
+        pareil, avec le contrôle négatif qui rend `[]` quand la base est là.
+      ⚠️ Ce que ces tests NE prouvent PAS, et c'est écrit dedans : le SQL. La fausse base est
+      un objet thenable, pas un moteur — la logique de DÉCISION est éprouvée, le SQL réel
+      l'est ailleurs (`tests/oauthStore.test.ts`, sur une vraie Postgres).
+      ⚠️ **Le garde-fou n°5 a tiré DEUX fois sur ce lot, et il avait raison les deux fois** :
+      d'abord sur une fausse chaîne de connexion posée « juste pour tester » (le vecteur exact
+      qu'il surveille — remplacée par `vi.stubEnv`), puis sur le COMMENTAIRE qui citait la
+      ligne fautive pour l'expliquer. Une garde d'absence sur du source contredit
+      mécaniquement une bonne explication ; la phrase décrit désormais la forme sans la
+      reproduire.
 - [ ] 🔧 **`[CV-10]`** Un PDF SCANNÉ reste illisible (pas de reconnaissance de caractères).
       L'app le dit et propose le remède ; c'est une limite, pas un bug.
 - [x] 🔧 **`[CV-11]`** ✅ **Livré le 2026-09-17 : 1 854 → 491 lignes.** Les 153 leçons de la §9 (1 536 lignes, 83 % du fichier) sont déménagées VERBATIM dans `docs/LESSONS.md` ; la §9 garde leur RÈGLE, une ligne chacune, reprise au caractère près du gras que chaque incident avait déjà produit. ⚠️ **C'est une perte assumée** : un `CLAUDE.md` ne charge rien hors de son arbre, donc les histoires n'arrivent plus en session. ⚠️ **Et le plafond de 150 n'est pas atteint** — 153 règles ne se réduisent qu'en en supprimant, et chacune a été payée par un incident ; l'en-tête le dit maintenant au lieu d'annoncer un plafond que le fichier violait depuis toujours. Vérifié par trois contrôles : corps présent verbatim, 153/153 règles dans l'index, tout ce qui n'est pas la §9 inchangé. ~~`CLAUDE.md` fait **1 854 lignes** pour un « plafond assumé : 150 » — il en faisait 867 quand cet item a été écrit, donc il a DOUBLÉ depuis (re-mesuré à l'audit du 2026-09-17).~~ Il se
@@ -2203,6 +2228,15 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       le `hookTimeout` de 10 s par défaut, pas le test. Remède probable : un `hookTimeout`
       explicite sur ce fichier (le seul qui démarre un moteur Postgres). Non corrigé —
       découvert en chemin, hors périmètre du contrôle.
+      ✅ **CORRIGÉ le 2026-09-17** (« continue les tâches backlog »), comme prévu :
+      `beforeAll`/`afterAll` reçoivent **30 s** — ~16× le coût mesuré en isolation (1,8 s),
+      assez pour absorber la contention, assez peu pour qu'un VRAI blocage échoue encore vite.
+      Posé sur CE fichier et pas dans `vitest.config.ts` : relever le défaut global couvrirait
+      les 97 autres, qui n'ont aucune raison de dépasser 10 s, et un `beforeAll` qui pend
+      ailleurs cesserait de se voir.
+      ⚠️ **Aucune garde ne verrouille la valeur, et c'est dit** : un test qui asserterait
+      « 30 s » serait tautologique, un test qui prouverait la contention serait lui-même
+      instable. Ce qui tient le rôle est le gate — si le flake revient, il se reverra là.
 
 - [x] 🟠 **`[LIEN-03]`** ✅ **Livré le 2026-09-17, sur signalement de Marc** (« il y a des jobs
       périmés qui devraient plus être là, tu check pas assez bien à chaque jour »).

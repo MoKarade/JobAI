@@ -20,6 +20,34 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 
+/**
+ * Le temps accordé au DÉMARRAGE de la base, en millisecondes (`[TEST-FLAKE-01]`).
+ *
+ * ⚠️ CE N'EST PAS UN PANSEMENT SUR UN TEST LENT, C'EST LA BONNE UNITÉ POUR CE FICHIER-CI.
+ * Le 2026-09-16, le gate a rougi ici sur « Hook timed out in 10000ms ». Relancé SEUL dans la
+ * foulée : vert en **1,8 s**. Ce n'est donc pas le test qui est lent, c'est la CONTENTION de
+ * la suite complète — ce fichier est le seul du dépôt à démarrer un vrai moteur Postgres
+ * (PGlite) et à rejouer toutes les migrations, pendant que quatre-vingt-quinze autres
+ * fichiers tournent en parallèle. Le défaut de 10 s de Vitest est calibré pour un `beforeAll`
+ * ordinaire ; celui-ci ne l'est pas.
+ *
+ * ⚠️ TRENTE SECONDES, ET PAS PLUS. C'est ~16× le coût mesuré en isolation — assez pour
+ * absorber une contention même forte, assez peu pour qu'un VRAI blocage (migration qui pend,
+ * moteur qui ne démarre jamais) échoue encore vite au lieu d'immobiliser le gate. Un timeout
+ * généreux au point de ne plus jamais tirer serait le même défaut dans l'autre sens.
+ *
+ * ⚠️ POSÉ ICI ET PAS DANS `vitest.config.ts` : relever le défaut GLOBAL couvrirait aussi les
+ * quatre-vingt-quinze fichiers qui n'ont aucune raison de dépasser dix secondes, et un
+ * `beforeAll` qui pend ailleurs cesserait de se voir. La cause est propre à ce fichier, la
+ * correction aussi.
+ *
+ * ⚠️ AUCUNE GARDE NE VERROUILLE CETTE VALEUR, et c'est dit plutôt que tu. Un test qui
+ * asserterait « le timeout vaut 30 s » serait tautologique, et un test qui prouverait la
+ * contention serait lui-même instable. Ce qui tient le rôle, c'est le gate : si le flake
+ * revient, il se reverra là où il s'est vu.
+ */
+const DELAI_DEMARRAGE_MS = 30_000;
+
 let pg: PGlite;
 
 beforeAll(async () => {
@@ -33,11 +61,11 @@ beforeAll(async () => {
       if (sql.length > 0) await pg.exec(sql);
     }
   }
-});
+}, DELAI_DEMARRAGE_MS);
 
 afterAll(async () => {
   await pg.close();
-});
+}, DELAI_DEMARRAGE_MS);
 
 const DEMAIN = new Date(Date.now() + 3_600_000).toISOString();
 const HIER = new Date(Date.now() - 3_600_000).toISOString();
