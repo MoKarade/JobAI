@@ -12,6 +12,7 @@
 
 import { computeScore } from "../scoring";
 import { normaliserLieu, situer } from "./region";
+import { texteVilleAnnoncee, villeDepuisRaisons } from "../raisons";
 import { aJuger, verdictsFermes, type RegistreLieux } from "./lieux";
 import type { Offre } from "../types";
 import type { OffreBrute } from "./types";
@@ -421,52 +422,6 @@ export function trier(
   return { retenues, souslePlancher, doublons, horsRegion, lieuInconnu, refusees };
 }
 
-/**
- * Le début de la justification qui porte la ville annoncée.
- *
- * Exporté pour que `raisonsAutomatiques` l'ÉCRIVE et que `villeDepuisRaisons` la RELISE
- * depuis la même constante : deux littéraux qui doivent coïncider finissent toujours par
- * diverger, et ici la divergence serait muette (plus aucune ville relue, sans erreur).
- * Un test prouve l'aller-retour.
- */
-export const PREFIXE_VILLE_ANNONCEE = "Annoncée à ";
-
-/** La longueur qu'`OffreSchema` accepte pour `ville` — la relecture s'y tient. */
-const LONGUEUR_MAX_VILLE = 120;
-
-/**
- * La ville qu'une offre déjà suivie porte dans ses justifications.
- *
- * POURQUOI CETTE FONCTION EXISTE
- * Les 40 premières offres déposées sont entrées AVANT que la colonne `ville` soit écrite :
- * elles l'ont donc vide, et sans ville leur employeur n'est pas géocodable — pas de
- * position, pas de distance, pas d'épingle sur la carte. Mais l'information n'est pas
- * perdue : au moment du tri, on a écrit « Annoncée à Lévis — … » dans leurs justifications.
- *
- * ⚠️ CE N'EST PAS UNE DÉDUCTION. La ville n'est pas devinée depuis le nom de l'employeur ni
- * depuis le texte de l'annonce : elle est RELUE là où notre propre code l'avait recopiée
- * telle que la source l'annonçait. C'est la même donnée, à un autre endroit — pas une
- * reconstitution, et donc pas une entorse au garde-fou n°3.
- *
- * Rend `null` quand aucune justification ne porte de ville : mieux vaut une offre qui reste
- * insituable et le DIT qu'une ville approximative écrite en base.
- */
-export function villeDepuisRaisons(raisons: readonly Offre["raisons"][number][]): string | null {
-  for (const r of raisons) {
-    if (!r.texte.startsWith(PREFIXE_VILLE_ANNONCEE)) continue;
-    // Le tiret cadratin sépare la ville du reste de la phrase. Un tiret ASCII ne
-    // conviendrait pas : c'est « — » que le code écrit.
-    const reste = r.texte.slice(PREFIXE_VILLE_ANNONCEE.length);
-    const fin = reste.indexOf(" — ");
-    // BORNÉE à la longueur que le schéma accepte pour `ville`. Sans tiret cadratin, tout
-    // le reste de la phrase serait pris pour un nom de lieu — et ce texte part ensuite
-    // vers Nominatim. Ni la création d'offre ni le rattrapage ne repassent par
-    // `OffreSchema`, donc la borne doit être ici.
-    const ville = (fin === -1 ? reste : reste.slice(0, fin)).trim().slice(0, LONGUEUR_MAX_VILLE);
-    if (ville !== "") return ville;
-  }
-  return null;
-}
 
 /** Une ville à écrire sur une offre DÉJÀ suivie qui n'en avait pas. */
 export interface VilleACompleter {
@@ -558,10 +513,10 @@ function raisonsAutomatiques(brute: OffreBrute, note: number): Offre["raisons"] 
   if (brute.ville.trim() !== "") {
     r.push({
       ton: "reserve",
-      // Le préfixe vient de la constante partagée : `villeDepuisRaisons` relit cette
-      // phrase pour rattraper une ville manquante, et deux littéraux finiraient par
-      // diverger en silence.
-      texte: `${PREFIXE_VILLE_ANNONCEE}${brute.ville.trim()} — la distance reste à mesurer, elle n'est pas déduite du nom de la ville.`,
+      // La phrase vient de `lib/raisons.ts`, qui la construit, la relit (`villeDepuisRaisons`)
+      // et décide quand l'écran a encore le droit de la montrer (`raisonsAffichables`). Trois
+      // gestes sur la même phrase : séparés, ils divergent en silence.
+      texte: texteVilleAnnoncee(brute.ville),
     });
   }
   if (note >= 70) {

@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import type { Offre } from "../lib/types";
 import { CHAMPS_TEXTE_TIERS, vueOffre } from "../lib/mcp/vue";
+import { texteVilleAnnoncee } from "../lib/raisons";
 import {
   FiltresSchema,
   MAX_RESULTATS,
@@ -43,6 +44,22 @@ const offre = (p: Partial<Offre> = {}): Offre => ({ ...BASE, ...p });
 const filtres = (p: Record<string, unknown> = {}) => FiltresSchema.parse(p);
 
 describe("vueOffre — ce qui sort de l'app, et ce qui n'en sort pas", () => {
+  it("⚠️ ne relaie PAS une réserve que la mesure a démentie (`[LIEN-04]`)", () => {
+    // C'est la surface qu'on oublie : elle ne se REGARDE pas, elle se LIT dans une
+    // conversation — donc une réserve périmée y devient une affirmation que je répète à Marc
+    // comme un fait. Deux écrans avaient été corrigés sans elle dans le premier jet.
+    const annoncee = texteVilleAnnoncee("Thetford Mines");
+    const brute = { ton: "reserve", texte: "Trouvée automatiquement : jamais lue." } as const;
+
+    const mesuree = vueOffre(offre({ km: 81.2, raisons: [brute, { ton: "reserve", texte: annoncee }] }));
+    expect(mesuree.reserves).toEqual([brute.texte]);
+
+    // Et le contrôle : tant que la distance est inconnue, la réserve dit vrai et sort.
+    const inconnue = vueOffre(offre({ km: null, raisons: [brute, { ton: "reserve", texte: annoncee }] }));
+    expect(inconnue.reserves).toEqual([brute.texte, annoncee]);
+  });
+
+
   it("compose CHAMP PAR CHAMP : un champ ajouté au modèle interne n'est pas publié", () => {
     // C'est tout l'intérêt de la forme à part. Un `{ ...offre }` publierait chaque champ
     // futur sans qu'aucune décision ne soit prise — la faute « composer par étalement laisse

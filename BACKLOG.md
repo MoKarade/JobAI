@@ -2261,7 +2261,19 @@ vérifier l'état d'une annonce moi-même.
       ⚠️ Attention en corrigeant : `villeDepuisRaisons` RELIT cette phrase pour rattraper une
       ville manquante (`PREFIXE_VILLE_ANNONCEE`). La retirer des données casserait ce
       rattrapage — c'est un consommateur, pas une décoration.
-      Signalé, non corrigé : hors du périmètre demandé.
+      ✅ **CORRIGÉ le 2026-09-17** (« continue les tâches backlog »). ⚠️ **Le remède recommandé
+      ci-dessus était PIÉGÉ et n'a pas été appliqué tel quel** : cesser d'écrire la phrase
+      aurait cassé `villeDepuisRaisons` en silence — la ville n'a aucun autre porteur pour les
+      offres entrées avant la colonne `ville`. Ce qui est corrigé n'est donc pas la DONNÉE mais
+      l'AFFIRMATION qu'on en tire : `raisonsAffichables(raisons, km)` masque la réserve dès que
+      la distance est mesurée, et la phrase reste en base pour le rattrapage.
+      La règle vit dans un module FEUILLE (`lib/raisons.ts`, sans dépendance, importable par un
+      composant client) avec l'écriture et la relecture de la même phrase — trois gestes qui
+      doivent coïncider. **TROIS** surfaces la consomment : la carte, la fiche, et la vue MCP —
+      celle-là ne se regarde pas, elle se LIT dans une conversation, et je l'avais oubliée au
+      premier jet. `0 km` est traité comme une MESURE, pas comme un inconnu.
+      Trois mutations prouvées : filtre toujours actif (supprime la fonctionnalité), `!km` à la
+      place de `km === null` (le zéro effacé), vue MCP débranchée.
 
 ---
 

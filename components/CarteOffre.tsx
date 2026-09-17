@@ -23,6 +23,7 @@ import Link from "next/link";
 import type { Offre } from "@/lib/types";
 import { palier, PALIERS_DISTANCE_KM } from "@/lib/scoring";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
+import { raisonsAffichables } from "@/lib/raisons";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { lienDeOffre } from "@/lib/lienOffre";
 import { MOT_DOUTE, type Fraicheur } from "@/lib/fraicheur";
@@ -49,6 +50,7 @@ export function CarteOffre({
   fraicheur?: Fraicheur;
 }) {
   const [ouverte, setOuverte] = useState(false);
+  const raisonsVues = raisonsAffichables(offre.raisons, offre.km);
   const idDetail = useId();
 
   const p = palier(offre.score);
@@ -132,9 +134,13 @@ export function CarteOffre({
           rendu ET de l'arbre d'accessibilité, ce qui est exactement ce qu'annonce
           `aria-expanded={false}`. Le monter/démonter ferait perdre l'état à chaque bascule. */}
       <div id={idDetail} className="carte__detail" hidden={!ouverte}>
-        {offre.raisons.length > 0 ? (
+        {/* ⚠️ `raisonsAffichables`, PAS `offre.raisons` (`[LIEN-04]`). Une réserve écrite à
+            l'ingestion continue d'affirmer au présent : « la distance reste à mesurer »
+            s'affichait à côté d'un `km` mesuré. La règle vit dans `lib/raisons.ts` — trois
+            surfaces la montrent, trois copies de la condition auraient divergé. */}
+        {raisonsVues.length > 0 ? (
           <ul className="carte__raisons">
-            {offre.raisons.map((r, i) => (
+            {raisonsVues.map((r, i) => (
               <li key={i} className={`raison raison--${r.ton}`}>
                 {r.texte}
               </li>

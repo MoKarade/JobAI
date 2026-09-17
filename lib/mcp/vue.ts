@@ -22,6 +22,7 @@
 // garde-fous, en silence. On nettoie par ALLOWLIST DE CLÉS, jamais par balayage.
 
 import type { Offre } from "../types";
+import { raisonsAffichables } from "../raisons";
 import { sanitizePromptText } from "../promptSafety";
 
 /**
@@ -88,7 +89,15 @@ export function vueOffre(o: Offre): OffreVue {
     histo: o.histo,
     perimeeLe: o.perimeeLe,
     userNote: o.userNote,
-    atouts: o.raisons.filter((r) => r.ton === "atout").map((r) => r.texte),
-    reserves: o.raisons.filter((r) => r.ton === "reserve").map((r) => r.texte),
+    // ⚠️ `raisonsAffichables`, PAS `o.raisons` (`[LIEN-04]`). C'est la surface qu'on oublie :
+    // elle ne se regarde pas, elle se LIT dans une conversation — donc une réserve périmée y
+    // devient une affirmation que je relaie à Marc comme un fait. « la distance reste à
+    // mesurer » à côté d'un `km` mesuré est exactement ça.
+    atouts: raisonsAffichables(o.raisons, o.km)
+      .filter((r) => r.ton === "atout")
+      .map((r) => r.texte),
+    reserves: raisonsAffichables(o.raisons, o.km)
+      .filter((r) => r.ton === "reserve")
+      .map((r) => r.texte),
   };
 }

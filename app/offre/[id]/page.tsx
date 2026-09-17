@@ -16,6 +16,7 @@ import { ControlesOffre } from "@/components/ControlesOffre";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { lienDeOffre } from "@/lib/lienOffre";
 import { fraicheurOffre } from "@/lib/fraicheur";
+import { raisonsAffichables } from "@/lib/raisons";
 import { aujourdhui } from "@/lib/ajout";
 import { lireEtat } from "@/lib/etat";
 import { CLE_JOURNAL } from "@/lib/veilleComplete";
@@ -72,8 +73,13 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
   // l'offre — une panne de lecture d'état ne doit pas emporter la fiche, d'où le repli.
   const journal = await lireEtat<JournalVeille>(CLE_JOURNAL, {}).catch(() => ({}) as JournalVeille);
   const fraicheur = fraicheurOffre(offre, journal[offre.id], aujourdhui(new Date()));
-  const atouts = offre.raisons.filter((r) => r.ton === "atout");
-  const reserves = offre.raisons.filter((r) => r.ton === "reserve");
+  // ⚠️ `raisonsAffichables`, PAS `offre.raisons` (`[LIEN-04]`). C'est SUR CETTE FICHE que le
+  // défaut a été vu : `km: 81.2` et « Annoncée à Thetford Mines — la distance reste à
+  // mesurer » côte à côte. La règle vit dans `lib/raisons.ts`, avec l'écriture et la
+  // relecture de la même phrase.
+  const vues = raisonsAffichables(offre.raisons, offre.km);
+  const atouts = vues.filter((r) => r.ton === "atout");
+  const reserves = vues.filter((r) => r.ton === "reserve");
 
   return (
     <Cadre actif={null}>

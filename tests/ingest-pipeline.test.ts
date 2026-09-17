@@ -11,11 +11,11 @@ import { brutesParIdStocke, cleCanonique, idsStockesVus, liensARafraichir,
   FIT_ROLE_PLANCHER,
   idOffre,
   trier,
-  villeDepuisRaisons,
   villesACompleter,
   villesARattraper,
   villesRefusees,
 } from "../lib/ingest/pipeline";
+import { villeDepuisRaisons } from "../lib/raisons";
 import { OffreSchema, type Offre } from "../lib/types";
 import { SEED } from "../lib/seed";
 import type { OffreBrute } from "../lib/ingest/types";
