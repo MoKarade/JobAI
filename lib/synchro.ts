@@ -301,6 +301,31 @@ export const CLE_VEILLE = "veille-auto";
  */
 export const DELAI_VEILLE_MS = 45 * 1000;
 
+/**
+ * Âge au-delà duquel le cron de GÉOCODAGE considère la veille en retard et la reprend.
+ *
+ * ⚠️ UNE SECONDE QUESTION, DONC UNE SECONDE CONSTANTE — c'est tout `[VEILLE-13]`.
+ * `DELAI_VEILLE_MS` répond à « une passe est-elle en train de tourner ? » (anti-rafale, 45 s).
+ * Le filet de reprise pose une question DIFFÉRENTE : « la veille a-t-elle manqué son tour ? ».
+ * Les deux ont partagé un seul nombre, et le jour où il est passé de 20 h à 45 s pour la
+ * première raison — bonne raison, voir ci-dessus — la seconde est devenue TOUJOURS VRAIE. Le
+ * filet partait donc chaque nuit, en écrivant « veille en retard » alors que rien ne l'était.
+ * Un avertissement permanent est un avertissement mort : c'est le bruit qui rend un vrai
+ * signal invisible, l'inverse exact du but du filet.
+ *
+ * ⚠️ VINGT HEURES SE DÉRIVENT DE L'ÉCART ENTRE LES DEUX CRONS, pas d'un chiffre rond.
+ * `vercel.json` les pose à 11:00 et 03:00, soit **16 h** du premier au second (le plan hobby
+ * fait partir le cron dans l'heure — mesuré à 11:31 les 16 et 17/09, ce qui RÉDUIT l'écart à
+ * ~15,5 h et n'est donc pas le cas contraignant). Le seuil doit donc dépasser 16 h, sinon le
+ * filet part chaque nuit ; et rester bien sous 39 h, l'âge qu'atteint la veille au premier
+ * 03:00 qui suit un tour manqué, sinon le filet ne part jamais. Vingt heures laissent quatre
+ * heures de marge au-dessus du plancher et dix-neuf sous le plafond.
+ *
+ * ⚠️ SI L'HEURE D'UN CRON BOUGE DANS `vercel.json`, CE NOMBRE SE RE-DÉRIVE. Un test le
+ * verrouille contre l'écart réel des deux crons, lu dans le fichier.
+ */
+export const DELAI_RATTRAPAGE_VEILLE_MS = 20 * 60 * 60 * 1000;
+
 /** Clé de la temporisation de la mesure des distances. */
 export const CLE_DISTANCES = "distances-auto";
 

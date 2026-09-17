@@ -255,6 +255,22 @@
       autre budget que celui prévu ici ; (d) le commentaire de la route dit encore « 20 h ».
       Correctif probable : un délai PROPRE au filet (« reprendre si la veille a plus de N heures »)
       au lieu de réutiliser l'anti-rafale de 45 s, qui protège d'autre chose.
+      ✅ **CORRIGÉ le 2026-09-17** (« continue les tâches backlog »), exactement comme prévu :
+      `DELAI_RATTRAPAGE_VEILLE_MS` (20 h) répond à « la veille a-t-elle manqué son tour ? »,
+      `DELAI_VEILLE_MS` (45 s) reste sur « une passe tourne-t-elle en ce moment ? ». Deux
+      questions, deux constantes — le partage était la cause racine.
+      **20 h est DÉRIVÉ, pas rond** : les crons sont à 11:00 et 03:00, soit 16 h d'écart ; le
+      seuil doit dépasser 16 h (sinon le filet part chaque nuit) et rester sous 40 h (l'âge de
+      la veille au premier 03:00 qui suit un tour manqué, sinon le filet ne part jamais). Un
+      test le verrouille contre ces deux bornes.
+      ⚠️ **Conséquence qui dépasse le bruit corrigé** : le chemin de géocodage DÉDIÉ
+      (`MAX_SITUATIONS_CRON`, `BUDGET_GEOCODAGE_CRON_MS`) redevient emprunté chaque nuit — il
+      ne l'était plus depuis un mois. Ça rend une SECONDE passe de géocodage par jour, et c'est
+      exactement la ressource que `[VEILLE-42]` a montrée saturée (3 705 offres non placées
+      pour 40 places de mesure par passe).
+      ⚠️ Le test qui affirmait « le géocodage la reprend CHAQUE JOUR » décrivait le DÉFAUT,
+      pas une intention — son propre commentaire l'avouait (« ce test ne vérifie plus un
+      arbitrage entre crons »). Il a été re-décidé, pas re-basé, avec son histoire écrite dedans.
 
 ## Chantier #08 — CV et profil (ADR-0009) 🟩
 

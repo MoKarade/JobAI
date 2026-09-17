@@ -12,6 +12,13 @@
 // de lancer une passe ?), pas le dialecte SQL.
 
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+/** Le source d'un fichier du dépôt — pour les gardes de câblage. */
+function lire(chemin: string): string {
+  return readFileSync(resolve(process.cwd(), chemin), "utf8");
+}
 import { appliquerSeed,
   CLE_SEED,
   DELAI_PASSE_AUTO_MS,
@@ -19,6 +26,7 @@ import { appliquerSeed,
   empreinteSeed,
   reserverPasse,
   CLE_VEILLE,
+  DELAI_RATTRAPAGE_VEILLE_MS,
   DELAI_VEILLE_MS,
 } from "../lib/synchro";
 import { SEED } from "../lib/seed";
@@ -285,19 +293,56 @@ describe("reprise de la veille par le cron de géocodage", () => {
     expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, aussitot)).toBe(false);
   });
 
-  it("QUAND LE CRON DE VEILLE EST MORT : le géocodage la reprend, chaque jour", async () => {
+  it("QUAND LE CRON DE VEILLE EST MORT : le géocodage la reprend dès la nuit suivante", async () => {
     // Le cas vécu. Dernière passe il y a trois jours, plus rien depuis.
     const derniere = new Date("2026-08-11T15:00:00Z");
     const { db } = baseSimulee({ cle: CLE_VEILLE, valeur: String(derniere.getTime()) });
 
     const nuit1 = new Date("2026-08-14T03:00:00Z");
-    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, nuit1)).toBe(true);
+    expect(await reserverPasse(db, CLE_VEILLE, DELAI_RATTRAPAGE_VEILLE_MS, nuit1)).toBe(true);
+  });
 
-    // Et le régime est STABLE : 24 h plus tard, il reprend encore. Depuis que le délai est
-    // court, ce test ne vérifie plus un arbitrage entre crons — il vérifie que la reprise
-    // n'est jamais refusée, ce qui reste exactement ce qu'on attend d'elle.
-    const nuit2 = new Date(nuit1.getTime() + 24 * H);
-    expect(await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, nuit2)).toBe(true);
+  it("⚠️ QUAND TOUT VA BIEN : le filet ne part PAS, et c'est ce qu'il avait cessé de faire", () => {
+    // ⚠️ CE TEST A CHANGÉ DE CONCEPTION LE 2026-09-17, ET CE N'EST PAS UN RE-BASEMENT
+    // (`[VEILLE-13]`). Il affirmait « le géocodage la reprend CHAQUE JOUR », et son propre
+    // commentaire l'avouait : « ce test ne vérifie plus un arbitrage entre crons ». C'était
+    // la description d'un défaut, pas d'une intention : le filet employait
+    // `DELAI_VEILLE_MS`, qui valait 20 h quand il a été écrit et qui est passé à 45 s pour
+    // une raison SANS RAPPORT (l'anti-rafale du bouton). Sa condition est devenue toujours
+    // vraie — « veille en retard » écrit chaque nuit alors que rien ne l'était, et le chemin
+    // de géocodage dédié jamais emprunté.
+    //
+    // La forme est déclarative, pas une simulation de base : c'est l'ARITHMÉTIQUE du seuil
+    // qui décide, et elle se lit mieux que trois `reserverPasse` enchaînés.
+    const ECART_CRONS_H = 16; // 11:00 → 03:00, cf. `vercel.json`
+    const AGE_APRES_UN_TOUR_MANQUE_H = ECART_CRONS_H + 24;
+
+    // Une nuit normale : la veille d'hier a 16 h, le filet doit se taire.
+    expect(DELAI_RATTRAPAGE_VEILLE_MS).toBeGreaterThan(ECART_CRONS_H * H);
+    // Un tour manqué : à la nuit SUIVANTE la veille a 40 h, le filet doit partir.
+    expect(DELAI_RATTRAPAGE_VEILLE_MS).toBeLessThan(AGE_APRES_UN_TOUR_MANQUE_H * H);
+    // Et il reste une vraie marge au-dessus du plancher : le plan hobby fait partir le cron
+    // DANS L'HEURE (mesuré à 11:31), ce qui raccourcit l'écart — un seuil collé à 16 h
+    // repartirait chaque nuit au premier cron un peu tardif.
+    expect(DELAI_RATTRAPAGE_VEILLE_MS - ECART_CRONS_H * H).toBeGreaterThanOrEqual(2 * H);
+  });
+
+  it("⚠️ les deux questions ne partagent plus une constante", () => {
+    // La cause racine, verrouillée : `DELAI_VEILLE_MS` répond à « une passe tourne-t-elle
+    // en ce moment ? », le filet à « la veille a-t-elle manqué son tour ? ». Un seul nombre
+    // pour deux questions, et la seconde se casse quand on règle la première.
+    expect(DELAI_RATTRAPAGE_VEILLE_MS).not.toBe(DELAI_VEILLE_MS);
+    // Et la route du géocodage emploie bien le SECOND : sans ça, la constante existerait
+    // sans que rien ne la lise — un correctif vert et mort à l'arrivée.
+    //
+    // ⚠️ ANCRÉE SUR L'APPEL, PAS SUR L'ABSENCE DU NOM DANS LE FICHIER. Mon premier jet
+    // écrivait `not.toContain("DELAI_VEILLE_MS")` et rougissait sur MON PROPRE COMMENTAIRE,
+    // qui raconte le défaut et doit donc nommer l'ancienne constante. Une garde d'absence
+    // sur du source contredit mécaniquement une bonne explication : ce qui se vérifie, c'est
+    // ce que le code APPELLE.
+    const route = lire("app/api/cron/geocodage/route.ts");
+    expect(route).toMatch(/reserverPasse\(\s*db,\s*CLE_VEILLE,\s*DELAI_RATTRAPAGE_VEILLE_MS/);
+    expect(route).not.toMatch(/reserverPasse\([^)]*\bDELAI_VEILLE_MS\b/);
   });
 
   it("deux déclencheurs simultanés : un seul passe", async () => {

@@ -27,7 +27,7 @@ import {
   CLE_DISTANCES,
   CLE_VEILLE,
   DELAI_MESURE_AUTO_MS,
-  DELAI_VEILLE_MS,
+  DELAI_RATTRAPAGE_VEILLE_MS,
   reserverPasse,
 } from "@/lib/synchro";
 import { executerVeilleComplete } from "@/lib/veilleComplete";
@@ -52,15 +52,24 @@ export async function GET(requete: Request) {
   // nuit. Un travail quotidien ne doit pas dépendre d'un déclencheur unique dont le silence
   // ne se voit pas.
   //
-  // La réservation (`CLE_VEILLE`, 20 h) arbitre : si la veille a tourné dans les vingt
-  // dernières heures — donc si son propre cron fonctionne — on ne prend rien et on fait
-  // simplement notre travail habituel. Ce filet ne coûte donc rien quand tout va bien.
+  // La réservation (`CLE_VEILLE`, `DELAI_RATTRAPAGE_VEILLE_MS` = 20 h) arbitre : si la veille
+  // a tourné dans les vingt dernières heures — donc si son propre cron fonctionne — on ne
+  // prend rien et on fait simplement notre travail habituel. Ce filet ne coûte donc rien
+  // quand tout va bien.
+  //
+  // ⚠️ IL A COÛTÉ, PENDANT UN MOIS, ET LE COMMENTAIRE CI-DESSUS DISAIT DÉJÀ VRAI — c'est ça
+  // qui l'a rendu invisible (`[VEILLE-13]`). Le délai employé ici était `DELAI_VEILLE_MS`,
+  // qui valait bien 20 h à l'écriture de ce filet et qui est passé à 45 s le 17/08 pour une
+  // raison SANS RAPPORT (l'anti-rafale du bouton). La condition est alors devenue toujours
+  // vraie : le filet partait chaque nuit en annonçant un retard qui n'existait pas, et le
+  // chemin de géocodage dédié plus bas — celui qui a ses propres budgets — n'était JAMAIS
+  // emprunté. Deux questions différentes ne partagent pas une constante.
   //
   // ⚠️ ET ON REND LA MAIN APRÈS. `executerVeilleComplete` fait DÉJÀ la passe de distances
   // à la fin : enchaîner la nôtre dans la même invocation, ce serait deux travaux sous le
   // même mur de 60 s. Un seul travail par invocation, comme avant.
   try {
-    if (await reserverPasse(db, CLE_VEILLE, DELAI_VEILLE_MS, new Date())) {
+    if (await reserverPasse(db, CLE_VEILLE, DELAI_RATTRAPAGE_VEILLE_MS, new Date())) {
       console.warn("[cron/geocodage] veille en retard — reprise depuis ce cron");
       const v = await executerVeilleComplete("cron-geocodage-rattrapage");
       return NextResponse.json(
