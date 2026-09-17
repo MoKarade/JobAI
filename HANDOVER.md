@@ -6,6 +6,29 @@
 
 ---
 
+## Mesure 2026-09-17 (17:31 UTC) — `[LIEN-03]` a tiré : 226 liens rafraîchis
+
+Passe lancée par Marc depuis `/sources`. `[veille] bouton-app — … liens=226 sources=2`.
+
+**226 offres suivies portaient un lien périmé.** ⚠️ À lire avec son dénominateur : 226 sur les
+**1 548** offres que le flux a re-présentées ce jour-là (~15 %), pas 226 sur ce que Marc
+regarde. Avant/après sur ses 17 offres ouvertes notées 60+ : **une seule** a changé,
+`Groupe DSD Inc` (`49422722` → `50155497`). Le gros du rattrapage est dans la longue traîne.
+
+**L'écart n'est pas cosmétique** : 730 000 numéros d'annonce séparent les deux liens — c'est une
+autre annonce, republiée plus tard. Et la règle est conservatrice : sur 17 offres, elle n'a
+réécrit que celle qui avait bougé.
+
+**⚠️ Ce qui reste ouvert.** Marc a écrit « des jobs périmés », au pluriel ; le correctif n'en
+explique qu'un dans sa liste. S'il en voit encore, il faut qu'il en NOMME un : `jobbank.gc.ca`
+est injoignable depuis la session (HTTP 000), je ne peux pas vérifier l'état d'une annonce.
+
+**`[BORNES-02]`** : `bornes=0/0` — plus aucun lieu à mesurer (21 restaient le matin). ⚠️ Par
+quel chemin, je ne peux pas le dire : une passe déclenchée par une PAGE a 35 s de budget contre
+25 s pour le cron, et a pu suffire sans l'enveloppe. Le verdict viendra du prochain cron.
+
+---
+
 ## Session 2026-09-17 (suite) — `[LIEN-03]` : le lien suivait la première annonce, pas l'offre
 
 Marc : « il y a des jobs périmés qui devraient plus être là, tu check pas assez bien à chaque

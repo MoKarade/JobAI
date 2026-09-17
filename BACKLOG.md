@@ -2063,3 +2063,36 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       Marc considère comme mort, l'entrée reste — avec le bon lien. Le délai de péremption
       reste à 2 jours (son choix, 2026-09-17) : le descendre à 1 ferait fermer des offres
       vivantes au premier hoquet du flux, incident déjà vécu (40 offres périmées en 3 jours).
+
+### `[LIEN-03]` — mesuré en production le 2026-09-17, 17:31 UTC (passe lancée par Marc)
+
+    [veille] bouton-app — ingérées=8/1600 périmées=0 revenues=3 doublons=1548
+             hors-région=4 sous-plancher=0 lieu-inconnu=40 en-sursis=209 liens=226 sources=2
+
+**`liens=226`** : le correctif a tiré. 226 offres suivies portaient un lien qui ne
+correspondait plus à l'annonce que la source publie aujourd'hui.
+
+⚠️ **ET LE CHIFFRE SE LIT AVEC SON DÉNOMINATEUR.** 226 sur les **1 548** offres que le flux a
+re-présentées ce jour-là, soit **~15 %** — pas 226 sur ce que Marc regarde. Vérifié par un
+avant/après sur ses 17 offres ouvertes notées 60+ : **une seule** a changé de lien,
+`Groupe DSD Inc` (`49422722` → `50155497`). Les seize autres pointaient déjà sur l'annonce
+courante. Le gros du rattrapage est donc dans la longue traîne qu'il ne consulte pas.
+
+**Ce que ça prouve quand même** : l'écart n'est pas cosmétique. 730 000 numéros d'annonce
+séparent l'ancien lien du nouveau — c'est une AUTRE annonce, republiée plus tard, et l'ancienne
+est selon toute vraisemblance fermée. La règle est aussi conservatrice qu'annoncé : sur 17
+offres, elle n'a réécrit que celle qui avait vraiment bougé.
+
+⚠️ **CE QUE ÇA N'EXPLIQUE PAS.** Marc a écrit « des jobs périmés », au pluriel, et le correctif
+ne rend compte que d'UN cas dans sa liste. Si l'écran continue de lui montrer des annonces
+fermées, la cause restante est ailleurs — il faut alors qu'il NOMME une offre précise, parce
+que `jobbank.gc.ca` est injoignable depuis la session (HTTP 000) et que je ne peux pas
+vérifier l'état d'une annonce moi-même.
+
+- ✅ **`[BORNES-02]`** — `bornes=0/0` sur la passe de 17:31:14 : plus AUCUN lieu à mesurer (il
+      en restait 21 le 17/09 au matin). ⚠️ Je ne peux pas dire QUEL chemin les a drainés : une
+      passe déclenchée par une PAGE dispose de `BUDGET_PASSE_PAGE_MS` (35 s), bien plus que les
+      25 s du cron, et a pu y suffire sans l'enveloppe. Le verdict sur l'enveloppe elle-même
+      viendra du prochain cron de veille.
+- ℹ️ `[trajets] sautée : Budget Routes du jour épuisé (41/50 éléments)` — attendu : 40 pris par
+      la passe de 11:31 plus un clic. La marge de 10 réservée aux clics joue son rôle.
