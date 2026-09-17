@@ -212,24 +212,74 @@ export function cleCanonique(entreprise: string, titre: string): string {
  * Résout dans LES DEUX SENS : base longue/brute courte (l'id de la brute EST la canonique
  * de la stockée) et base courte/brute longue (la canonique de la brute EST l'id stocké).
  */
-export function idsStockesVus(
+export function brutesParIdStocke(
   brutes: readonly OffreBrute[],
   connues: readonly { id: string; entreprise: string; poste: string }[],
-): Set<string> {
+): Map<string, OffreBrute> {
   const idStockeParCle = new Map<string, string>();
   for (const o of connues) {
     idStockeParCle.set(o.id, o.id);
     idStockeParCle.set(cleCanonique(o.entreprise, o.poste), o.id);
   }
-  const vus = new Set<string>();
+  const vus = new Map<string, OffreBrute>();
   for (const b of brutes) {
     const entreprise = b.entreprise.trim() || "Employeur non nommé";
     const stocke =
       idStockeParCle.get(idOffre(entreprise, b.titre)) ??
       idStockeParCle.get(cleCanonique(entreprise, b.titre));
-    if (stocke !== undefined) vus.add(stocke);
+    // La PREMIÈRE occurrence gagne, comme pour les doublons de `trier` : les récoltes
+    // arrivent dans l'ordre de priorité des sources, et deux annonces du même poste dans un
+    // même lot ne doivent pas rendre le résultat dépendant de l'ordre d'itération.
+    if (stocke !== undefined && !vus.has(stocke)) vus.set(stocke, b);
   }
   return vus;
+}
+
+/** Les identifiants seuls — la moitié dont le balayage a besoin pour compter les absences. */
+export function idsStockesVus(
+  brutes: readonly OffreBrute[],
+  connues: readonly { id: string; entreprise: string; poste: string }[],
+): Set<string> {
+  return new Set(brutesParIdStocke(brutes, connues).keys());
+}
+
+/**
+ * Les offres suivies dont le LIEN a changé depuis la dernière fois qu'on les a vues.
+ *
+ * ⚠️ POURQUOI CETTE FONCTION EXISTE — MARC, 2026-09-17 : « il y a des jobs périmés qui
+ * devraient plus être là, tu check pas assez bien à chaque jour ». Mesuré : le balayage
+ * confirmait bien ses offres tous les jours, et le compteur d'absences faisait son travail.
+ * Ce qui ne bougeait pas, c'était le LIEN : une offre déjà connue est comptée « doublon »
+ * par `trier` et RIEN d'elle n'était jamais réécrit. Le Guichet republiant le même poste
+ * sous un NOUVEAU numéro d'annonce, l'entrée restait ouverte — à juste titre, la source la
+ * publie — mais pointait sur une annonce fermée. Marc cliquait, tombait sur une offre
+ * expirée, et concluait que la vérification quotidienne ne marchait pas. Elle marchait ;
+ * c'est l'adresse qu'elle ne mettait pas à jour.
+ *
+ * ⚠️ DEUX REFUS D'ÉCRASEMENT, et ils ne protègent pas la même chose.
+ *   · un lien VIDE ne remplace jamais un lien connu — une source qui n'en donne pas ne doit
+ *     pas faire perdre celui qu'on avait ;
+ *   · un lien IDENTIQUE ne produit aucune ligne — le cas nominal (l'annonce n'a pas bougé)
+ *     ne doit rien écrire du tout, sinon la passe quotidienne réécrit tout le suivi pour
+ *     rien.
+ *
+ * ⚠️ ET SEUL LE LIEN. `statut`, `prio`, `dateEnvoi` et `userNote` appartiennent à Marc
+ * (garde-fou n°2) ; la ville, la note et la description sont hors de ce lot — changer la
+ * ville déplacerait l'épingle et la distance, changer la note relève du protocole §11.
+ */
+export function liensARafraichir(
+  connues: readonly { id: string; lien: string }[],
+  vues: ReadonlyMap<string, OffreBrute>,
+): { id: string; lien: string }[] {
+  const majs: { id: string; lien: string }[] = [];
+  for (const o of connues) {
+    const brute = vues.get(o.id);
+    if (brute === undefined) continue;
+    const lien = brute.lien.trim();
+    if (lien === "" || lien === o.lien) continue;
+    majs.push({ id: o.id, lien });
+  }
+  return majs;
 }
 
 /**

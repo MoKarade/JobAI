@@ -6,6 +6,36 @@
 
 ---
 
+## Session 2026-09-17 (suite) — `[LIEN-03]` : le lien suivait la première annonce, pas l'offre
+
+Marc : « il y a des jobs périmés qui devraient plus être là, tu check pas assez bien à chaque
+jour ».
+
+**⚠️ La plainte désigne le balayage ; la mesure désigne autre chose.** `resume_suivi` :
+`confirmees` 1 635, `jamaisConfirmees` 0, `plusVieilleVueJours` **4** — aucune offre ouverte
+n'est restée plus de quatre jours sans être revue, pour un seuil de péremption à 2 jours. Le
+balayage fait son travail. Ce qui ne bougeait pas, c'est le **LIEN** : une offre déjà connue est
+comptée « doublon » par `trier`, et **rien d'elle n'était jamais réécrit**. Le Guichet republie
+le même poste sous un nouveau numéro d'annonce : l'entrée restait ouverte à juste titre, en
+pointant sur l'annonce fermée vue la première fois.
+
+**Livré** : `liensARafraichir` (PURE), à partir du MÊME matcheur que le marquage « vue »
+(`brutesParIdStocke`). Deux refus d'écrasement (lien vide, lien identique), **seul le lien**
+écrit — ni statut, ni priorité, ni date d'envoi, ni note (garde-fou n°2), ni ville, ni note de
+fit. Branché dans les DEUX chemins d'écriture, sinon le défaut rouvrait par la porte d'à côté
+(`[FERMETURE-03]`). La ligne `[veille]` porte maintenant `liens=N`.
+
+**⚠️ Ce que je n'ai pas pu mesurer** : `jobbank.gc.ca` est injoignable depuis la session
+(HTTP 000 sur cinq URL du suivi), donc l'AMPLEUR reste inconnue — combien des 17 offres ouvertes
+notées 60+ pointent sur une annonce fermée. Le mécanisme est établi par le code, pas le nombre.
+La preuve viendra de `liens=N` à la prochaine passe.
+
+**Décision de Marc au passage** : le délai de péremption reste à 2 jours. Le descendre à 1
+fermerait des offres vivantes au premier hoquet du flux — incident déjà vécu (40 offres périmées
+en 3 jours sur une panne d'infrastructure).
+
+---
+
 ## Session 2026-09-17 — `[BORNES-02]` : l'étape affamée reçoit une enveloppe à elle
 
 Marc, après le contrôle : « corrige les bornes ».

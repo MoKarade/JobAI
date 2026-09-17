@@ -2023,3 +2023,43 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       le `hookTimeout` de 10 s par défaut, pas le test. Remède probable : un `hookTimeout`
       explicite sur ce fichier (le seul qui démarre un moteur Postgres). Non corrigé —
       découvert en chemin, hors périmètre du contrôle.
+
+- [x] 🟠 **`[LIEN-03]`** ✅ **Livré le 2026-09-17, sur signalement de Marc** (« il y a des jobs
+      périmés qui devraient plus être là, tu check pas assez bien à chaque jour »).
+      **MESURÉ AVANT DE CODER, et le diagnostic n'est pas celui que la plainte désigne.** Le
+      balayage FAIT son travail tous les jours : `resume_suivi` donne `confirmees` 1 635,
+      `jamaisConfirmees` 0, `plusVieilleVueJours` **4** — aucune offre ouverte n'est restée
+      plus de quatre jours sans être revue, et le seuil de péremption est à 2 jours sous
+      couverture complète. Ce qui ne bougeait PAS, c'est le **LIEN** : une offre déjà connue
+      est comptée « doublon » par `trier`, et **rien d'elle n'était jamais réécrit**. Le
+      Guichet republiant le même poste sous un NOUVEAU numéro d'annonce, l'entrée restait
+      ouverte — à juste titre, la source la publie — en pointant sur l'annonce FERMÉE vue la
+      première fois. Marc cliquait, tombait sur une offre expirée, et concluait que la
+      vérification quotidienne ne marchait pas. Elle marchait ; c'est l'adresse qu'elle ne
+      mettait pas à jour.
+      Le stock le rend visible : sur les 17 offres ouvertes notées 60+, sept portent
+      `dateReperage: 2026-08-20` — vingt-huit jours, sur un support où une annonce tient
+      rarement plus de trente.
+      ✅ **CORRECTIF.** `liensARafraichir` (PURE, `lib/ingest/pipeline.ts`) rend les offres
+      suivies dont le lien a changé depuis la dernière vue, à partir du MÊME matcheur que le
+      marquage « vue » (`brutesParIdStocke`, qui résout aussi les variantes de raison
+      sociale) — une règle, deux consommateurs, jamais deux copies. Deux refus d'écrasement :
+      un lien VIDE ne remplace jamais celui qu'on a, un lien IDENTIQUE ne produit aucune
+      écriture (le cas nominal ne touche pas la base). **Seul le lien** : ni `statut`, ni
+      `prio`, ni `dateEnvoi`, ni `userNote` (garde-fou n°2), ni la ville (elle déplacerait
+      l'épingle et la distance), ni la note (protocole §11).
+      Branché dans les DEUX chemins d'écriture — `lib/veilleComplete.ts` et
+      `app/api/ingest/depot/route.ts` — parce qu'un seul aurait rouvert le défaut par la porte
+      d'à côté, exactement comme `[FERMETURE-03]`.
+      Observabilité : la ligne `[veille]` porte désormais `liens=N`. Sans elle, « le correctif
+      a tiré » et « il n'y avait rien à rafraîchir » produiraient le même silence.
+      Verrou : `tests/ingest-pipeline.test.ts` — six cas purs plus quatre de branchement
+      (chaque chemin écrit le lien, et n'écrit QUE lui). Six mutations, six rouges distincts.
+      ⚠️ **CE QUE JE N'AI PAS PU MESURER** : l'état réel des annonces. `jobbank.gc.ca` est
+      injoignable depuis la session (mesuré : HTTP 000 sur cinq URL du suivi), donc je ne peux
+      pas dire COMBIEN des 17 pointaient sur une annonce fermée. Le mécanisme est établi par
+      le code ; son ampleur ne l'est pas. La preuve viendra de `liens=N` à la prochaine passe.
+      ⚠️ **Et ce que ça ne corrige pas** : si le Guichet continue de republier un poste que
+      Marc considère comme mort, l'entrée reste — avec le bon lien. Le délai de péremption
+      reste à 2 jours (son choix, 2026-09-17) : le descendre à 1 ferait fermer des offres
+      vivantes au premier hoquet du flux, incident déjà vécu (40 offres périmées en 3 jours).

@@ -201,6 +201,16 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
       await db.update(offers).set({ ville, majLe: new Date() }).where(eq(offers.id, id));
     }
 
+    // ⚠️ LES LIENS REVUS, ET RIEN D'AUTRE DE L'OFFRE. Marc, 2026-09-17 : « il y a des jobs
+    // périmés qui devraient plus être là ». L'entrée restait ouverte à juste titre — la
+    // source publiait toujours ce poste — mais son lien était celui de la PREMIÈRE annonce
+    // vue, et le Guichet republie sous un nouveau numéro : Marc cliquait sur une annonce
+    // fermée. `liensARafraichir` ne rend une ligne que si le lien a VRAIMENT changé, donc
+    // cette boucle est vide le jour où rien n'a bougé.
+    for (const { id, lien } of rapport.liens) {
+      await db.update(offers).set({ lien, majLe: new Date() }).where(eq(offers.id, id));
+    }
+
     // Les péremptions : une DATE de constat, jamais un drapeau. Le suivi de Marc n'est pas
     // touché — la veille n'écrit que `perimeeLe` (garde-fou n°2).
     for (const id of rapport.perimees) {
@@ -245,7 +255,8 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
         ` périmées=${rapport.perimees.length} revenues=${rapport.revenues.length}` +
         ` doublons=${rapport.tri.doublons} hors-région=${rapport.tri.horsRegion}` +
         ` sous-plancher=${rapport.tri.souslePlancher} lieu-inconnu=${rapport.tri.lieuInconnu}` +
-        ` en-sursis=${rapport.enSursis} sources=${rapport.sources.length}`,
+        ` en-sursis=${rapport.enSursis} liens=${rapport.liens.length}` +
+        ` sources=${rapport.sources.length}`,
     );
 
     // ⚠️ LE MOTIF SANS SON OBJET NE DIAGNOSTIQUE RIEN. « lieu-inconnu=47 » a été lu par Marc

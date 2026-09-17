@@ -5,7 +5,9 @@
 // vérifiées alors que personne ne les a lues. Les trois se testent ici.
 
 import { describe, it, expect } from "vitest";
-import { cleCanonique, idsStockesVus,
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { brutesParIdStocke, cleCanonique, idsStockesVus, liensARafraichir,
   FIT_ROLE_PLANCHER,
   idOffre,
   trier,
@@ -557,4 +559,96 @@ describe("idsStockesVus — le marquage « vue » résout vers l'id STOCKÉ (fix
     expect(idsStockesVus([b("Qualtech", T)], connues).size).toBe(0);
     expect(idsStockesVus([b("Laserax", "Coordonnateur")], connues).size).toBe(0);
   });
+});
+
+describe("liensARafraichir — le lien suit l'annonce, le reste ne bouge pas", () => {
+  // ⚠️ POURQUOI CE BLOC EXISTE. Marc, 2026-09-17 : « il y a des jobs périmés qui devraient
+  // plus être là, tu check pas assez bien à chaque jour ». Mesuré : le balayage confirmait
+  // bien ses offres tous les jours — c'est le LIEN qui ne bougeait jamais. Une offre déjà
+  // connue est comptée « doublon » par `trier`, et RIEN d'elle n'était réécrit : son adresse
+  // restait celle de la PREMIÈRE annonce vue, alors que le Guichet republie le même poste
+  // sous un nouveau numéro. L'entrée était ouverte à juste titre, et menait à une annonce
+  // fermée.
+  const T = "Coordonnateur de projet";
+  const ID = idOffre("EllisDon Corporation", T);
+  const connues = [{ id: ID, entreprise: "EllisDon Corporation", poste: T, lien: "https://x.test/1" }];
+  const b = (entreprise: string, titre: string, lien: string) =>
+    ({ refSource: "r", titre, entreprise, ville: "Québec", lien,
+       description: "", publieeLe: null, adresse: "", adresseSource: null, adresseUrl: null }) as never;
+
+  it("⚠️ une annonce republiée sous un NOUVEAU numéro réécrit le lien", () => {
+    const vues = brutesParIdStocke([b("EllisDon Corporation", T, "https://x.test/2")], connues);
+    expect(liensARafraichir(connues, vues)).toEqual([{ id: ID, lien: "https://x.test/2" }]);
+  });
+
+  it("⚠️ un lien INCHANGÉ n'écrit rien — le cas nominal ne touche pas la base", () => {
+    // Sans ce refus, la passe quotidienne réécrirait tout le suivi chaque jour pour rien.
+    const vues = brutesParIdStocke([b("EllisDon Corporation", T, "https://x.test/1")], connues);
+    expect(liensARafraichir(connues, vues)).toEqual([]);
+  });
+
+  it("⚠️ un lien VIDE ne remplace jamais celui qu'on avait", () => {
+    // Une source qui ne donne pas d'adresse ne doit pas faire PERDRE celle qu'on tient.
+    const vues = brutesParIdStocke([b("EllisDon Corporation", T, "   ")], connues);
+    expect(liensARafraichir(connues, vues)).toEqual([]);
+  });
+
+  it("une offre que le lot ne contient pas n'est pas touchée", () => {
+    const vues = brutesParIdStocke([b("Qualtech", T, "https://x.test/9")], connues);
+    expect(liensARafraichir(connues, vues)).toEqual([]);
+  });
+
+  it("la variante de raison sociale est résolue — même matcheur que le marquage « vue »", () => {
+    // Une règle, deux consommateurs : si la résolution divergeait, une offre serait comptée
+    // vue sans que son lien suive, et le défaut reviendrait pour cette moitié-là.
+    const vues = brutesParIdStocke([b("Ellisdon", T, "https://x.test/3")], connues);
+    expect(liensARafraichir(connues, vues)).toEqual([{ id: ID, lien: "https://x.test/3" }]);
+  });
+
+  it("⚠️ deux annonces du même poste dans un lot : la PREMIÈRE gagne, comme pour les doublons", () => {
+    // Sinon le lien écrit dépendrait de l'ordre d'itération, et les sources sont classées
+    // par fiabilité — la première est celle qu'on veut.
+    const vues = brutesParIdStocke(
+      [b("EllisDon Corporation", T, "https://x.test/2"), b("Ellisdon", T, "https://x.test/3")],
+      connues,
+    );
+    expect(liensARafraichir(connues, vues)).toEqual([{ id: ID, lien: "https://x.test/2" }]);
+  });
+});
+
+/** Même découpage que `tests/liensOffreCables.test.ts` : par ligne, suffisant ici. */
+function sansCommentaires(source: string): string {
+  return source
+    .split("\n")
+    .filter((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l))
+    .join("\n");
+}
+
+describe("⚠️ le branchement — les DEUX chemins d'écriture appliquent la règle", () => {
+  // La leçon de `[FERMETURE-03]`, payée le 2026-09-15 : un mécanisme peut calculer juste,
+  // rendre juste, passer un test d'intégration qui traverse la passe, et n'atteindre JAMAIS
+  // la base. Ce qui compte n'est pas ce que la fonction REND, c'est ce que la persistance
+  // parcourt. Deux chemins écrivent des offres confirmées ; les deux doivent rafraîchir.
+  const CHEMINS = ["lib/veilleComplete.ts", "app/api/ingest/depot/route.ts"] as const;
+
+  for (const f of CHEMINS) {
+    it(`${f} écrit le lien rafraîchi`, () => {
+      const src = sansCommentaires(readFileSync(resolve(process.cwd(), f), "utf8"));
+      expect(src).toMatch(/\.set\(\{\s*lien/);
+      // Et la source de ces lignes est la règle PARTAGÉE, jamais une comparaison locale —
+      // deux copies d'une même règle sont déjà divergentes le jour où on les écrit.
+      expect(src).toMatch(/rapport\.liens|liensARafraichir\(/);
+    });
+
+    it(`${f} n'écrit QUE le lien — le suivi appartient à Marc (garde-fou n°2)`, () => {
+      // Le vrai risque de ce lot : élargir le `set` « pendant qu'on y est » et écraser un
+      // statut, une priorité, une date d'envoi ou une note que Marc a saisis.
+      const src = sansCommentaires(readFileSync(resolve(process.cwd(), f), "utf8"));
+      const set = src.match(/\.set\(\{\s*lien[^}]*\}/);
+      expect(set).not.toBeNull();
+      for (const champ of ["statut", "prio", "dateEnvoi", "userNote", "score", "ville"]) {
+        expect(set![0]).not.toContain(champ);
+      }
+    });
+  }
 });

@@ -30,7 +30,13 @@ import { db } from "@/lib/db";
 import { offerReasons, offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { colonnesOffre } from "@/lib/persistance";
-import { idsStockesVus, cleCanonique, trier, villesACompleter } from "@/lib/ingest/pipeline";
+import {
+  brutesParIdStocke,
+  cleCanonique,
+  liensARafraichir,
+  trier,
+  villesACompleter,
+} from "@/lib/ingest/pipeline";
 import { verdictsFermes, type RegistreLieux } from "@/lib/ingest/lieux";
 import { LotDeposeSchema } from "@/lib/ingest/depotSchema";
 import { appliquerBalayage, type JournalVeille } from "@/lib/veille";
@@ -202,8 +208,19 @@ export async function POST(requete: Request) {
     // l'autre graphie prenait des absences pendant qu'elle était sous nos yeux. Deux
     // copies de la règle « vue » avaient déjà divergé ; il n'en reste qu'une, partagée.
     const idsDeposes = new Set(tri.retenues.map((o) => o.id));
-    for (const id of idsStockesVus(brutes, connues)) idsDeposes.add(id);
+    const revues = brutesParIdStocke(brutes, connues);
+    for (const id of revues.keys()) idsDeposes.add(id);
     const vues = apresAjout.filter((o) => idsDeposes.has(o.id));
+
+    // ⚠️ LE MÊME RAFRAÎCHISSEMENT DE LIEN QUE LA PASSE QUOTIDIENNE, et il est ici POUR NE PAS
+    // DIVERGER. Ce point d'entrée confirme les offres d'un lot poussé par la Routine ; s'il
+    // les marquait « vues » sans réécrire leur lien, une offre republiée sous un nouveau
+    // numéro d'annonce resterait ouverte avec une adresse morte — exactement le défaut que
+    // Marc a signalé le 2026-09-17, rouvert par la porte d'à côté. Une seule règle
+    // (`liensARafraichir`), deux consommateurs.
+    for (const { id, lien } of liensARafraichir(connues, revues)) {
+      await db.update(offers).set({ lien, majLe: new Date() }).where(eq(offers.id, id));
+    }
     // ⚠️ PAS DE FERMETURE D'OFFICE ICI, ET C'EST UN CHOIX. `lib/fermetureAuto.ts` tourne
     // dans la passe QUOTIDIENNE (`lib/ingest/passe.ts`), qui voit le suivi entier tous les
     // jours. Ce point d'entrée-ci reçoit un lot poussé par la Routine : il confirme ce que

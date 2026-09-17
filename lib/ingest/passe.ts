@@ -22,7 +22,16 @@ import {
 } from "../veille";
 import { fermeturesAutomatiques, type FermetureAuto } from "../fermetureAuto";
 import type { Offre } from "../types";
-import { cleCanonique, idsStockesVus, lieuxAMesurer, trier, villesACompleter, type Tri, type VilleACompleter } from "./pipeline";
+import {
+  brutesParIdStocke,
+  cleCanonique,
+  liensARafraichir,
+  lieuxAMesurer,
+  trier,
+  villesACompleter,
+  type Tri,
+  type VilleACompleter,
+} from "./pipeline";
 import { verdictsFermes, type RegistreLieux } from "./lieux";
 import { RECHERCHES_GUICHET, sourceGuichet } from "./sources";
 import { sourceDepotFichier } from "./depotFichier";
@@ -114,6 +123,12 @@ export interface RapportPasse {
    * les deux produisent des passes qui ont l'air identiques dans le rapport.
    */
   couvertureComplete: boolean;
+  /**
+   * Les offres suivies dont le LIEN a changé depuis la dernière vue, et leur nouvelle
+   * adresse. Voir `liensARafraichir` : vide quand rien n'a bougé, et SEUL le lien y figure —
+   * le suivi de Marc n'est jamais touché (garde-fou n°2).
+   */
+  liens: { id: string; lien: string }[];
   /**
    * Les offres que la passe a fermées D'OFFICE, faute qu'aucun balayage ne puisse les
    * confirmer, et le motif quand elle s'en est abstenue.
@@ -346,11 +361,20 @@ export async function executerPasse(
   // INCONNUE, pas une offre qu'il a déjà jugée digne d'intérêt). La faire passer par
   // `trier` l'écarterait, elle ne serait jamais marquée vue, et elle se périmerait au
   // troisième jour alors qu'elle est publiée sous nos yeux.
-  // `idsStockesVus` résout chaque brute vers l'ID STOCKÉ, variantes de raison sociale
+  // `brutesParIdStocke` résout chaque brute vers l'ID STOCKÉ, variantes de raison sociale
   // comprises — le calcul « id de la brute » d'avant laissait une offre suivie prendre des
   // absences pendant qu'une autre source la re-publiait sous « X » au lieu de « X inc. ».
+  const revues = brutesParIdStocke(brutes, connues);
   const idsVus = new Set(tri.retenues.map((o) => o.id));
-  for (const id of idsStockesVus(brutes, connues)) idsVus.add(id);
+  for (const id of revues.keys()) idsVus.add(id);
+
+  // ⚠️ LE LIEN SE RAFRAÎCHIT, LE RESTE NON. Marc, 2026-09-17 : « il y a des jobs périmés qui
+  // devraient plus être là ». Une offre déjà connue est comptée « doublon » par `trier`, et
+  // rien d'elle n'était jamais réécrit : son lien restait celui de la PREMIÈRE annonce vue,
+  // alors que le Guichet republie le même poste sous un nouveau numéro. L'entrée était donc
+  // ouverte à juste titre — la source la publie — mais son adresse menait à une annonce
+  // fermée. Voir `liensARafraichir` pour les deux refus d'écrasement.
+  const liens = liensARafraichir(connues, revues);
 
   const apresAjout = [...connues, ...tri.retenues];
   const vues = apresAjout.filter((o) => idsVus.has(o.id));
@@ -448,6 +472,11 @@ export async function executerPasse(
     offres: offresFinales,
     journal: balayage.journal,
     couvertureComplete,
+    /**
+     * Les liens que cette passe a vus changer. Vide le jour où rien n'a bougé — c'est le
+     * cas nominal, et il ne doit produire aucune écriture.
+     */
+    liens,
     fermetureAuto: fermeture,
     resume: aucuneSourceEnSucces
       ? "balayage suspendu : aucune source n'a répondu — compteurs d'absences inchangés"
