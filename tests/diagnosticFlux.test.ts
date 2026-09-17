@@ -78,6 +78,10 @@ const FLUX = `<source>${[
   // discriminant : avec une seule, un tally qui ignorerait le code et poserait toujours la
   // même clé rendrait exactement le même résultat.
   offre({ ref: "6", ville: "Toronto", code: "M5H 2N2" }),
+  // ⚠️ CELLE-CI SERAIT `hors-region` EN PRODUCTION (bande rejetée, ADR-0018) et doit rester
+  // `lieu-inconnu` ICI. Voir la garde dédiée plus bas : c'est ce qui garde le contraste
+  // falsifiable.
+  offre({ ref: "7", ville: "Sainte-Bidule-des-Monts", code: "H9X 1A1" }),
 ].join("")}</source>`;
 
 async function mesurer() {
@@ -95,7 +99,7 @@ describe("diagnostic_flux — le code postal des offres NON PLACÉES", () => {
     // Le témoin d'abord : sans lui, l'égalité ci-dessous serait satisfaite par un flux qui
     // n'aurait produit aucun lieu inconnu, et la garde ne mesurerait rien.
     expect(r.fin).toBe("flux-termine");
-    expect(r.verdicts["lieu-inconnu"]).toBe(3);
+    expect(r.verdicts["lieu-inconnu"]).toBe(4);
     expect(r.verdicts["dans-la-region"]).toBe(1);
     expect(r.verdicts["hors-region"]).toBe(2);
 
@@ -107,8 +111,13 @@ describe("diagnostic_flux — le code postal des offres NON PLACÉES", () => {
 
     // Ni le code de l'offre acceptée (G1V) ni celui de la rejetée (H3B) n'y figurent : c'est
     // ce qui distingue ce compte des onze inventaires, qui décrivent les RETENUES.
-    expect(r.lettresInconnues.map((c) => c.nom).sort()).toEqual(["(vide)", "J"]);
-    expect(r.regionsInconnues.map((c) => c.nom).sort()).toEqual(["(vide)", "J0M", "J9T"]);
+    expect(r.lettresInconnues.map((c) => c.nom).sort()).toEqual(["(vide)", "H", "J"]);
+    expect(r.regionsInconnues.map((c) => c.nom).sort()).toEqual([
+      "(vide)",
+      "H9X",
+      "J0M",
+      "J9T",
+    ]);
   });
 
   it("compte À PART la bande des offres jugées hors région PAR LEUR NOM", async () => {
@@ -125,6 +134,27 @@ describe("diagnostic_flux — le code postal des offres NON PLACÉES", () => {
     // trois comptes, aucun recouvrement.
     expect(r.lettresHorsRegion.map((c) => c.nom)).not.toContain("G");
     expect(r.lettresHorsRegion.map((c) => c.nom)).not.toContain("J");
+  });
+
+  it("N'APPLIQUE PAS la règle de bande — sinon le contraste devient circulaire", async () => {
+    // ⚠️ GARDE D'UNE OMISSION DÉLIBÉRÉE, la plus fragile de ce fichier : rien dans le code ne
+    // « manque » ici, et c'est précisément ce qui donne envie de le « corriger ».
+    //
+    // `situer` accepte un code postal depuis l'ADR-0018 ; cet instrument est le SEUL appelant
+    // du dépôt qui ne le passe pas. Un instrument qui incorpore la règle qu'il sert à
+    // calibrer ne peut plus la falsifier : la bande rejetée basculerait de `lieu-inconnu`
+    // vers `hors-region`, `lettresHorsRegion` se remplirait de ses propres rejets, et le
+    // contraste sur lequel la règle est calibrée mesurerait la règle elle-même.
+    const r = await mesurer();
+    // L'offre à bande rejetée est ICI dans la population non placée, pas dans la lointaine.
+    expect(r.lettresInconnues.find((c) => c.nom === "H")?.n).toBe(1);
+    // ⚠️ ET LE COMPTE `H` DES LOINTAINES RESTE À UN — celui de Montréal, rejetée par son NOM.
+    // C'est la forme qui discrimine : `H` FIGURE légitimement des deux côtés, et une garde
+    // écrite « H absent des lointaines » serait fausse. Ce qui trahirait la contamination,
+    // c'est ce compte passant à DEUX : la bande aurait alimenté la mesure qui la calibre.
+    expect(r.lettresHorsRegion.find((c) => c.nom === "H")?.n).toBe(1);
+    // Et ce compte EST le rendement de la règle sur cette passe : c'est le bénéfice du choix.
+    expect(r.verdicts["hors-region"]).toBe(2);
   });
 
   it("compte `(vide)` une offre sans code postal, au lieu de l'abandonner", async () => {

@@ -122,6 +122,53 @@ function nommeUneMunicipalite(lieu: string): boolean {
   return MUNICIPALITES.some((m) => lieu.includes(m));
 }
 
+/**
+ * Les bandes postales rejetées quand AUCUNE règle de nom n'a su placer l'offre (ADR-0018).
+ *
+ * ⚠️ MESURÉE, JAMAIS RÉCITÉE. Écrire « H est l'île de Montréal » de mémoire aurait été une
+ * table inventée — celle que `[VEILLE-42]` refusait depuis un mois, et qui peut condamner en
+ * silence une bande que la région utilise. Ce qui décide ici est un CONTRASTE entre deux
+ * populations que le flux place par leur NOM, sans que le code postal n'intervienne :
+ *
+ *   Passe complète du 2026-09-17 (`fin: "flux-termine"`, 42 957 offres lues)
+ *   ┌───────┬──────────────┬──────────────┬────────────┬────────────────┐
+ *   │ bande │ dans-région  │ hors-région  │ décidables │ part régionale │
+ *   ├───────┼──────────────┼──────────────┼────────────┼────────────────┤
+ *   │   G   │        1 401 │          390 │      1 791 │        78,2 %  │
+ *   │   J   │           43 │          884 │        927 │         4,6 %  │
+ *   │   H   │            1 │          745 │        746 │         0,13 % │
+ *   └───────┴──────────────┴──────────────┴────────────┴────────────────┘
+ *
+ * LE CRITÈRE, écrit pour être re-appliqué et pas seulement constaté : au moins ~500 offres
+ * décidables — sinon l'échantillon ne dit rien — ET une part régionale sous 1 %. Une seule
+ * bande le passe aujourd'hui.
+ *
+ * ⚠️ POURQUOI PAS `J`, qui gagnerait pourtant 1 784 offres par passe. Sa part régionale est
+ * de 4,6 % : une offre sur vingt-deux. Un faux rejet coûte une offre que Marc ne verra jamais
+ * et dont RIEN ne signalera l'absence ; un non-rejet coûte une place de quota. Les deux
+ * erreurs n'ont pas le même prix, et c'est ça qui tranche, pas le volume.
+ *
+ * ⚠️ `E` et `A` n'y sont pas non plus : ZÉRO décidable, donc aucune évidence. Ne rien savoir
+ * d'une bande n'est pas une raison de la rejeter.
+ *
+ * Re-mesurer : `diagnostic_flux`, puis lire `lettresHorsRegion` contre l'inventaire
+ * `postalcode-lettre` (`champ: "postalcode-lettre"`, qui porte les RETENUES).
+ */
+export const BANDES_HORS_REGION = ["H"] as const;
+
+/**
+ * Cette bande postale est-elle de celles qu'on rejette ? PURE.
+ *
+ * ⚠️ ÉCHEC OUVERT, et c'est voulu : un code absent, vide ou malformé rend `false`, donc
+ * `lieu-inconnu` plutôt qu'un rejet. Un code qu'on ne sait pas lire n'autorise à affirmer
+ * rien du tout — et le défaut prudent d'une règle qui REJETTE est de ne pas rejeter.
+ */
+export function bandeHorsRegion(codePostal: string): boolean {
+  const bande = codePostal.trim().slice(0, 1).toUpperCase();
+  if (bande === "") return false;
+  return (BANDES_HORS_REGION as readonly string[]).includes(bande);
+}
+
 /** Sans accent, en minuscules, ponctuation ramenée à des espaces. */
 export function normaliserLieu(s: string): string {
   return s
@@ -159,6 +206,14 @@ export function situer(
    * d'avant, ce qui laisse tous les appelants — et tous les tests — inchangés.
    */
   resolus: ReadonlyMap<string, "dans-la-region" | "hors-region"> = new Map(),
+  /**
+   * Le code postal de l'offre, quand la source en donne un (ADR-0018).
+   *
+   * ⚠️ Il n'est lu qu'EN DERNIER RECOURS, après toutes les règles de nom — voir le bas de
+   * cette fonction. Un défaut vide garde le comportement exact d'avant, ce qui laisse
+   * inchangés les appelants qui n'en ont pas (le dépôt manuel, les scripts de sonde).
+   */
+  codePostal = "",
 ): VerdictRegion {
   const lieu = normaliserLieu(ville);
   if (lieu === "") return "lieu-inconnu";
@@ -180,6 +235,17 @@ export function situer(
   if (appoint !== "" && nommeUneMunicipalite(appoint)) {
     if (!HORS_PORTEE.some((h) => appoint.includes(h))) return "dans-la-region";
   }
+
+  // ⚠️ LA BANDE POSTALE EN DERNIER, ET C'EST LA MOITIÉ DE LA DÉCISION (ADR-0018).
+  //
+  // Placée ici — après la liste noire, la liste blanche, le registre MESURÉ et le repli sur
+  // la description — elle ne tranche QUE ce que personne d'autre n'a su trancher. C'est ce
+  // qui rend son coût d'aujourd'hui nul par CONSTRUCTION et pas seulement faible : les 44
+  // offres régionales qui portent un code hors bande (l'employeur y met son siège social,
+  // pas le lieu de travail) sont acceptées par leur NOM plusieurs étapes plus haut, et la
+  // bande ne les voit jamais. La poser plus haut les perdrait toutes — c'est l'alternative
+  // que l'ADR rejette, mesure à l'appui.
+  if (bandeHorsRegion(codePostal)) return "hors-region";
 
   return "lieu-inconnu";
 }

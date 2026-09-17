@@ -160,6 +160,18 @@ export async function diagnostiquerFlux(
     maxRetenues: MAX_RETENUES_DIAGNOSTIC,
     inventaire: INVENTAIRE_FLUX,
     garder: (o: OffreBrute, brut: string) => {
+      // ⚠️ SANS LE CODE POSTAL, ET C'EST DÉLIBÉRÉ — NE PAS « CORRIGER » (ADR-0018).
+      //
+      // `situer` accepte un quatrième argument depuis la règle de bande, et cet appel-ci est
+      // le SEUL du dépôt qui ne le passe pas. Un instrument qui incorpore la règle qu'il sert
+      // à calibrer ne peut plus la falsifier : `lettresHorsRegion` se remplirait des offres
+      // que la bande vient de rejeter, le contraste deviendrait circulaire, et on lirait dans
+      // le résultat la règle qu'on cherche à vérifier.
+      //
+      // CONSÉQUENCE À DIRE TOUT HAUT : les `verdicts` ci-dessous ne sont PAS l'état de la
+      // production. Ils décrivent ce que les règles de NOM seules savent placer. Bénéfice de
+      // ce choix : le compte d'une bande rejetée dans `lettresInconnues` EST exactement le
+      // rendement de la règle sur cette passe.
       const v = situer(o.ville, o.description);
       verdicts[v] = (verdicts[v] ?? 0) + 1;
       if (v === "lieu-inconnu") {

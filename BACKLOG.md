@@ -1059,6 +1059,24 @@
       bande ne tranche que pour les noms que personne ne connaît. Coût : `situer` doit recevoir
       le code postal, qui vit dans le bloc BRUT — changement de signature sur tous ses
       appelants, donc un lot à part et un ADR.
+      ✅ **RÈGLE LIVRÉE le 2026-09-17 (ADR-0018), sur demande de Marc « fais la règle de bande ».**
+      Le contraste a été mesuré d'abord (`lettresHorsRegion`, la bande des offres jugées
+      lointaines PAR LEUR NOM — verdict indépendant du code postal, donc non circulaire) :
+      | bande | dans-région | hors-région | décidables | part régionale |
+      |---|---|---|---|---|
+      | G | 1 401 | 390 | 1 791 | 78,2 % |
+      | J | 43 | 884 | 927 | 4,6 % |
+      | H | 1 | 745 | 746 | **0,13 %** |
+      **Une seule bande passe le critère** (≥ ~500 décidables ET part régionale < 1 %) : `H`.
+      `J` est refusée malgré ses 1 784 offres — parier contre une régionale sur vingt-deux
+      coûte une offre que Marc ne verra jamais, et rien ne signalera son absence.
+      La bande est lue **EN DERNIER**, après la liste noire, la liste blanche, le registre
+      mesuré et le repli sur la description : coût NUL par construction sur les 44 offres
+      régionales à code hors bande, qui sont acceptées par leur nom bien avant.
+      Gain : **707 offres/passe (19,1 %)** cessent de disputer les 40 places de
+      `MAX_LIEUX_INCONNUS_FLUX`. ⚠️ Le gain en PLACES est borné par le nombre de NOMS distincts
+      parmi ces 707, que l'instrument ne mesure pas — non annoncé comme un gain.
+      Reste ouvert : `J`, soit 48 % de la queue, volontairement non triée.
 
 - [x] **[VEILLE-40]** ✅ **Fait, vérifié à l'audit du 2026-09-17** : `selectionnerSources` pousse `sourceGuichetFlux(flux).source` (lib/ingest/passe.ts), et la production le confirme (`sources=2`, `ingérées=8/1600`). Les conditions posées ici ont été tenues — `[VEILLE-32]` livré, passe complète obtenue. Brancher le flux Guichet sur `selectionnerSources`, **après** une
       passe de diagnostic qui rend `flux-termine` (celle du 19 août s'est arrêtée sur

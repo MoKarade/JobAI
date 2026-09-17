@@ -249,6 +249,9 @@ export function analyserJobGuichet(job: string): OffreBrute | null {
     titre,
     entreprise: champ(job, "company"),
     ville,
+    // Le flux le porte sur 100 % de ses offres (mesuré) : c'est ce qui rend la règle de bande
+    // applicable du tout (ADR-0018).
+    codePostal: champ(job, "postalcode"),
     lien,
     description: champ(job, "description"),
     publieeLe: jourDe(champ(job, "date")),

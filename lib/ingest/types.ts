@@ -37,6 +37,16 @@ export interface OffreBrute {
   adresseSource?: "annonce" | "recherche" | null;
   /** La page où l'adresse a été trouvée. Exigée quand elle vient d'une recherche. */
   adresseUrl?: string | null;
+  /**
+   * Code postal annoncé, VERBATIM. Vide quand la source n'en donne pas (ADR-0018).
+   *
+   * ⚠️ PORTÉ PAR L'OFFRE, et pas lu au vol dans le bloc brut par le seul appelant qui le
+   * voit. `situer` est consulté à TROIS endroits — le pré-filtre de la source, la liste des
+   * villes à mesurer, le tri — et une règle nourrie d'entrées différentes selon l'appelant
+   * est une règle et demie : le mode de panne le plus répété de ce dépôt. Optionnel parce
+   * que le dépôt manuel n'en a pas, et son absence rend le comportement d'avant.
+   */
+  codePostal?: string;
   /** URL publique de l'offre. Une offre sans lien n'est pas retenue. */
   lien: string;
   /** Texte de l'annonce, quand la source le donne. Sert à la note, jamais affiché brut. */

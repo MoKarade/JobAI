@@ -36,7 +36,7 @@ function job(champs: Record<string, string>): string {
 }
 
 /** Une offre du flux, paramétrée par ce qui décide de son sort. */
-function offre(o: { ref: string; ville: string; noc?: string; titre?: string }): string {
+function offre(o: { ref: string; ville: string; noc?: string; titre?: string; code?: string }): string {
   return job({
     title: o.titre ?? "Technicien en génie mécanique",
     date: "2026-08-18 09:12:00",
@@ -47,6 +47,7 @@ function offre(o: { ref: string; ville: string; noc?: string; titre?: string }):
     state: "QC",
     country: "CA",
     ...(o.noc === undefined ? {} : { noc2021: o.noc }),
+    ...(o.code === undefined ? {} : { postalcode: o.code }),
     description: "Poste en usine, quart de jour.",
   });
 }
@@ -153,6 +154,34 @@ describe("sourceGuichetFlux — le lieu inconnu PASSE, sinon la mesure ne l'appr
     expect(r.offres.map((o) => o.ville)).toEqual(["Sainte-Bidule-des-Monts"]);
     expect(bilan?.lieuInconnuRapporte).toBe(1);
     expect(bilan?.regionales).toBe(0);
+  });
+
+  it("la BANDE POSTALE écarte ce lieu inconnu, et libère sa place de mesure (ADR-0018)", async () => {
+    // ⚠️ LE CÂBLAGE DE BOUT EN BOUT, pas la règle elle-même (testée dans `ingest-region`).
+    // La règle peut être juste et n'atteindre personne : `situer` est appelé ici avec le code
+    // postal seulement si l'analyseur l'a porté sur `OffreBrute`. C'est exactement la classe
+    // `[FERMETURE-03]` — calculé juste, jamais livré — et un scan de source ne la verrait pas.
+    //
+    // Le CONTRASTE est la garde : la MÊME offre, seul le code postal change.
+    const sansCode = `<source>${offre({ ref: "1", ville: "Sainte-Bidule-des-Monts", noc: "22301" })}</source>`;
+    const avecCode = `<source>${offre({
+      ref: "1",
+      ville: "Sainte-Bidule-des-Monts",
+      noc: "22301",
+      code: "H3B 1A1",
+    })}</source>`;
+
+    const avant = await interroger(sansCode, ["22"]);
+    expect(avant.bilan?.lieuInconnuRapporte).toBe(1);
+    expect(avant.bilan?.horsRegion).toBe(0);
+
+    const apres = await interroger(avecCode, ["22"]);
+    expect(apres.r.ok).toBe(true);
+    if (!apres.r.ok) return;
+    expect(apres.r.offres).toHaveLength(0);
+    expect(apres.bilan?.horsRegion).toBe(1);
+    // Et la place de mesure est rendue — c'est le gain que l'ADR chiffre, pas le refus.
+    expect(apres.bilan?.lieuInconnuRapporte).toBe(0);
   });
 
   it("une offre DU domaine à lieu inconnu ne consomme PAS le quota", async () => {

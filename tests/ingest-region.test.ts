@@ -9,7 +9,13 @@
 // « Québec » est aussi le nom de la province, et il apparaît dans « Montréal, Québec ».
 
 import { describe, it, expect } from "vitest";
-import { estDansLaRegion, normaliserLieu, situer } from "../lib/ingest/region";
+import {
+  BANDES_HORS_REGION,
+  bandeHorsRegion,
+  estDansLaRegion,
+  normaliserLieu,
+  situer,
+} from "../lib/ingest/region";
 import { trier } from "../lib/ingest/pipeline";
 import type { OffreBrute } from "../lib/ingest/types";
 
@@ -163,5 +169,56 @@ describe("« Quebec Province » n'est pas la ville de Québec (VEILLE-33)", () =
     // « Montréal, Québec » contient « quebec » : sans la priorité au rejet, toute offre
     // montréalaise entrerait. C'est écrit dans `situer`, et ça doit le rester.
     expect(situer("Montréal, Québec")).toBe("hors-region");
+  });
+});
+
+describe("la bande postale — le dernier recours, quand aucun nom ne sait placer (ADR-0018)", () => {
+  it("rejette un lieu inconnu dont la bande est mesurée jamais régionale", () => {
+    // Sans le code, l'offre reste « lieu inconnu » et consomme une des 40 places de mesure.
+    expect(situer("Saint-Machin-des-Bois")).toBe("lieu-inconnu");
+    expect(situer("Saint-Machin-des-Bois", "", new Map(), "H3B 1A1")).toBe("hors-region");
+  });
+
+  it("ne touche PAS une offre qu'un NOM a su placer — c'est ce qui rend son coût nul", () => {
+    // ⚠️ LE CŒUR DE L'ADR, mesuré : 44 offres régionales portent un code hors bande (siège
+    // social de l'employeur). Elles sont acceptées par leur nom AVANT que la bande ne soit
+    // lue. Poser la bande plus haut les perdrait toutes — c'est l'alternative rejetée.
+    expect(situer("Lévis", "", new Map(), "H3B 1A1")).toBe("dans-la-region");
+    // Et une mesure du registre gagne aussi : elle porte sur CE nom, la bande sur une classe.
+    const mesure = new Map<string, "dans-la-region" | "hors-region">([["val-machin", "dans-la-region"]]);
+    expect(situer("Val-Machin", "", mesure, "H3B 1A1")).toBe("dans-la-region");
+    // Le repli sur la description aussi : il accepte sur un nom, la bande n'a plus à trancher.
+    expect(situer("Poste à distance", "Usine située à Beaupré", new Map(), "H3B 1A1")).toBe(
+      "dans-la-region",
+    );
+  });
+
+  it("ÉCHOUE OUVERT : un code absent, vide ou illisible ne rejette rien", () => {
+    // Un code qu'on ne sait pas lire n'autorise à affirmer rien du tout, et le défaut prudent
+    // d'une règle qui REJETTE est de ne pas rejeter.
+    expect(bandeHorsRegion("")).toBe(false);
+    expect(bandeHorsRegion("   ")).toBe(false);
+    expect(bandeHorsRegion("3B1 H1A")).toBe(false);
+    expect(situer("Saint-Machin-des-Bois", "", new Map(), "")).toBe("lieu-inconnu");
+    expect(situer("Saint-Machin-des-Bois", "", new Map(), "3B1")).toBe("lieu-inconnu");
+  });
+
+  it("lit la bande quel que soit la casse et les espaces du code", () => {
+    expect(bandeHorsRegion("h3b1a1")).toBe(true);
+    expect(bandeHorsRegion("  H3B 1A1 ")).toBe(true);
+  });
+
+  it("RATCHET — ni `G` ni `J` ne sont rejetées, et les chiffres disent pourquoi", () => {
+    // ⚠️ CETTE ASSERTION EST FAITE POUR ROUGIR. Mesuré le 2026-09-17 sur une passe complète :
+    //   · `G` porte 1 401 des 1 445 offres régionales — c'est la bande de la région (78,2 %
+    //     de ses décidables sont dedans). La rejeter viderait la veille.
+    //   · `J` est à 4,6 % (43 régionales sur 927 décidables). La rejeter gagnerait 1 784
+    //     offres par passe et parierait contre une sur vingt-deux — un faux rejet coûte une
+    //     offre que Marc ne verra jamais, et dont rien ne signalera l'absence.
+    // Ajouter l'une des deux doit forcer à relire la mesure, pas à re-baser ce test.
+    expect(BANDES_HORS_REGION).not.toContain("G");
+    expect(BANDES_HORS_REGION).not.toContain("J");
+    // Anti-vacuité : une liste vide satisferait les deux lignes ci-dessus sans rien protéger.
+    expect(BANDES_HORS_REGION.length).toBeGreaterThan(0);
   });
 });

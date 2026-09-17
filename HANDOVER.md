@@ -6,6 +6,55 @@
 
 ---
 
+## Session 2026-09-17 (nuit) — `[VEILLE-42]` : la règle de bande, calibrée puis livrée
+
+Marc : « fais la règle de bande ». Livrée, avec son ADR-0018 — mais en deux temps, parce que
+le premier n'existait pas encore.
+
+**Le contraste qui manquait, et qu'aucun compte ne donnait.** `lettresInconnues` décrit la
+queue à trier, l'inventaire des retenues décrit la région — aucun des deux ne dit quelle bande
+est LOINTAINE. J'ai donc d'abord ajouté `lettresHorsRegion` : la bande des offres que
+`HORS_PORTEE` rejette **par le nom de leur ville**, verdict indépendant du code postal, donc
+non circulaire. Mesuré sur une passe complète (42 957 offres, `fin: "flux-termine"`) :
+
+| bande | dans-région | hors-région | décidables | part régionale | non placées |
+|---|---|---|---|---|---|
+| G | 1 401 | 390 | 1 791 | **78,2 %** | 1 210 |
+| J | 43 | 884 | 927 | **4,6 %** | 1 784 |
+| H | 1 | 745 | 746 | **0,13 %** | 707 |
+
+**Une seule bande est rejetée : `H`.** Critère écrit pour être re-appliqué : ≥ ~500 décidables
+(sinon l'échantillon ne dit rien) ET part régionale sous 1 %. `G` est la bande de la région.
+`J` gagnerait 1 784 offres par passe et parierait contre une régionale sur vingt-deux — refusé :
+un faux rejet coûte une offre que Marc ne verra jamais et dont rien ne signalera l'absence, un
+non-rejet coûte une place de quota. Les deux erreurs n'ont pas le même prix.
+
+**La bande est lue EN DERNIER** — après la liste noire, la liste blanche, le registre mesuré et
+le repli sur la description. C'est ce qui rend son coût **nul par construction** : les 44 offres
+régionales à code hors bande (siège social de l'employeur) sont acceptées par leur NOM plusieurs
+étapes avant. La poser plus haut les perdrait toutes, et c'est l'alternative que l'ADR rejette.
+
+**Le gain, dit honnêtement.** 707 offres par passe (19,1 % des non placées) cessent de disputer
+les **40** places de `MAX_LIEUX_INCONNUS_FLUX`. ⚠️ Le quota se consomme par NOM, pas par offre :
+le gain en places est borné par le nombre de noms distincts parmi ces 707, que l'instrument ne
+mesure pas. Je ne l'annonce donc pas comme un gain chiffré.
+
+**L'instrument n'applique PAS la règle, et un test le verrouille.** Un instrument qui incorpore
+la règle qu'il calibre ne peut plus la falsifier. Conséquence à dire tout haut : **les
+`verdicts` de `diagnostic_flux` ne sont pas l'état de la production** — ils décrivent ce que les
+règles de NOM seules savent placer. Bénéfice : le compte de `H` dans `lettresInconnues` EST
+exactement le rendement de la règle.
+
+**Cinq mutations, toutes discriminantes** : bande posée avant la liste blanche → l'offre placée
+par son nom est perdue ; analyseur qui cesse de porter le code → la règle n'atteint plus
+personne ; instrument qui applique la règle → le contraste se contamine ; liste vidée → trois
+tests dont l'anti-vacuité du ratchet.
+
+**Reste ouvert** : `J`, 48 % de la queue, volontairement non triée. Et le ratchet interdit `G`
+et `J` dans la liste — les ajouter doit forcer à relire la mesure, pas à re-baser le test.
+
+---
+
 ## Session 2026-09-17 (fin) — `[VEILLE-42]` : l'instrument avant la règle
 
 **Ce qui est livré : une MESURE, pas un correctif.** `diagnostic_flux` rend deux comptes de

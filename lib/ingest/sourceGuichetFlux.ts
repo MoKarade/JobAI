@@ -200,7 +200,7 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
           budgetMs,
           maxRetenues,
           garder: (offre: OffreBrute, brut: string) => {
-            const lieu = situer(offre.ville, offre.description, verdicts);
+            const lieu = situer(offre.ville, offre.description, verdicts, offre.codePostal);
             if (lieu === "hors-region") {
               horsRegion++;
               return false;

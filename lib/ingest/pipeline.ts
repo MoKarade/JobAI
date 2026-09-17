@@ -95,7 +95,7 @@ export function lieuxAMesurer(
     // trancher — par la liste blanche OU par un verdict ferme du registre — n'a rien à
     // faire ici. Sans ce partage, la liste de travail et la décision divergeraient, et on
     // paierait des requêtes pour des noms qui ne changent rien.
-    if (situer(b.ville, b.description, fermes) !== "lieu-inconnu") continue;
+    if (situer(b.ville, b.description, fermes, b.codePostal) !== "lieu-inconnu") continue;
     const nom = normaliserLieu(b.ville);
     if (nom === "") continue;
     if (!aJuger(registre[nom], aujourdhui)) continue;
@@ -338,7 +338,7 @@ export function trier(
     // un seuil — « inconnue » et « à 2 000 km » y sont traitées pareil. C'est ainsi
     // qu'un poste de campement minier au Manitoba est entré à 68/100 lors de la
     // première sonde sur les vraies sources.
-    const lieu = situer(brute.ville, brute.description, lieuxResolus);
+    const lieu = situer(brute.ville, brute.description, lieuxResolus, brute.codePostal);
     if (lieu === "hors-region") {
       horsRegion++;
       refusees.push({ entreprise, titre: brute.titre, ville: brute.ville, motif: "hors-region" });
