@@ -1174,7 +1174,7 @@
       cumulée). Deux mutations, deux rouges — dont le repli ASYMÉTRIQUE, qui casse tout le
       corpus accentué : c'est le piège que l'ADR nomme.
 
-- [ ] **[VEILLE-33]** La liste blanche de `situer()` compare par SOUS-CHAÎNE : « Quebec
+- [x] **[VEILLE-33]** ✅ **Livré le 2026-09-17.** La liste blanche de `situer()` comparait par SOUS-CHAÎNE : « Quebec
       Province » est accepté « dans la région » parce qu'il contient « quebec ». Trouvé le
       2026-08-18 sur une offre réelle (Eco-services TGL, mine souterraine) dont l'annonce
       disait « situé au Saguenay ». Le lot l'a corrigée à la lecture, mais rien dans le code
@@ -1197,6 +1197,23 @@
       registre ([VEILLE-31]) plutôt qu'à accepter. Reste à vérifier contre les ~130 entrées
       qu'aucune autre ne porte la même ambiguïté. §8 s'applique (logique d'admission).
 
+- [x] **[VEILLE-33-FIX]** ✅ **Le correctif, livré le 2026-09-17.** `nommeUneMunicipalite`
+      (lib/ingest/region.ts, PURE) refuse un lieu dont le qualificatif en fait la PROVINCE
+      (`PROVINCE_PAS_LA_VILLE`) avant de consulter la liste blanche.
+      ⚠️ **Une frontière de MOT n'aurait rien changé** : « quebec » est un mot entier dans
+      « Quebec Province » comme dans « Quebec City ». Ce qui distingue la ville de la province
+      n'est pas la forme du nom mais le QUALIFICATIF qui l'accompagne — d'où une liste de
+      qualificatifs, et non un motif plus strict. La comparaison par sous-chaîne RESTE, parce
+      qu'elle est ce qui attrape « Quebec City, QC » et « Lévis, QC ».
+      ⚠️ **Verdict `lieu-inconnu`, jamais `hors-region`** : on ne sait pas où est l'offre, et ce
+      fichier refuse de parier dans les deux sens. Le registre mesuré reste libre de trancher.
+      ⚠️ **Une règle, DEUX consommateurs** : le champ `ville` ET le repli par la description.
+      Deux copies du même `some(includes)` auraient divergé — c'est la classe de défaut déjà
+      payée ici (les quatre listes de colonnes, `idsStockesVus`). La mutation qui laisse
+      l'ancienne règle sur le seul repli rougit.
+      Verrou : `tests/ingest-region.test.ts`, cinq cas dont deux de non-régression (les vraies
+      villes avec suffixe de source entrent toujours ; le rejet passe toujours AVANT
+      l'acceptation, sinon toute offre montréalaise entre). Trois mutations, trois rouges.
 - [ ] **[VEILLE-06]** Lire l'annonce de chaque offre retenue (`get_job_details`) et en tirer
       les QUATRE champs qu'elle porte ensemble : description, salaire, adresse, séniorité.
       La description entre dans le dépôt (le schéma la porte déjà, on l'envoie vide).

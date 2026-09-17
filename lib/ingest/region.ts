@@ -91,6 +91,37 @@ const HORS_PORTEE = [
   "nouvelle-ecosse", "saskatchewan", "terre-neuve", "newfoundland", "yukon", "nunavut",
 ] as const;
 
+/**
+ * Ce qui fait d'une occurrence de « quebec » la PROVINCE, et non la ville.
+ *
+ * ⚠️ POURQUOI CETTE LISTE EXISTE — `[VEILLE-33]`, trouvé le 2026-08-18 sur une offre réelle.
+ * L'acceptation compare par SOUS-CHAÎNE, et il le faut : les sources écrivent « Quebec City,
+ * QC », « Lévis, QC », « Saint-Augustin-de-Desmaures, QC ». Mais « Quebec Province » contient
+ * lui aussi « quebec » — et il a été accepté « dans la région » pour une offre dont l'annonce
+ * disait « situé au Saguenay ».
+ *
+ * Une frontière de MOT n'y changerait rien : « quebec » y est un mot entier dans les deux cas.
+ * Ce qui distingue la ville de la province n'est pas la forme du nom, c'est le QUALIFICATIF qui
+ * l'accompagne — d'où une liste de qualificatifs, et non un motif plus strict.
+ *
+ * Le verdict qui en résulte est `lieu-inconnu`, pas `hors-region` : on ne sait pas où est
+ * l'offre, et ce fichier refuse justement de parier dans les deux sens. Le registre mesuré
+ * (`resolus`) reste libre de trancher ensuite.
+ */
+const PROVINCE_PAS_LA_VILLE = ["province"] as const;
+
+/**
+ * Ce lieu nomme-t-il une municipalité de la région ? PURE.
+ *
+ * ⚠️ UNE RÈGLE, DEUX CONSOMMATEURS. Elle sert au champ `ville` ET au repli sur la description :
+ * deux copies du même `some(includes)` finiraient par diverger, et c'est précisément ce qui
+ * s'est passé ailleurs dans ce dépôt (les quatre listes de colonnes, `idsStockesVus`).
+ */
+function nommeUneMunicipalite(lieu: string): boolean {
+  if (PROVINCE_PAS_LA_VILLE.some((q) => lieu.includes(q))) return false;
+  return MUNICIPALITES.some((m) => lieu.includes(m));
+}
+
 /** Sans accent, en minuscules, ponctuation ramenée à des espaces. */
 export function normaliserLieu(s: string): string {
   return s
@@ -135,7 +166,7 @@ export function situer(
   // Le rejet passe AVANT l'acceptation : « Québec » apparaît dans « Montréal, Québec »
   // (la province), et sans cette priorité toute offre montréalaise entrerait.
   if (HORS_PORTEE.some((h) => lieu.includes(h))) return "hors-region";
-  if (MUNICIPALITES.some((m) => lieu.includes(m))) return "dans-la-region";
+  if (nommeUneMunicipalite(lieu)) return "dans-la-region";
 
   // Ce que la MESURE a tranché pour ce nom exact. Correspondance stricte, pas par
   // sous-chaîne comme les listes : le registre est keyé sur la chaîne normalisée complète,
@@ -146,7 +177,7 @@ export function situer(
   // Dernier recours : la description mentionne parfois la ville quand le champ est vague
   // (« Canada », « Remote »). On ne s'en sert QUE pour accepter, jamais pour rejeter.
   const appoint = normaliserLieu(texteAppoint);
-  if (appoint !== "" && MUNICIPALITES.some((m) => appoint.includes(m))) {
+  if (appoint !== "" && nommeUneMunicipalite(appoint)) {
     if (!HORS_PORTEE.some((h) => appoint.includes(h))) return "dans-la-region";
   }
 

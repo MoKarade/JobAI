@@ -128,3 +128,40 @@ describe("normalisation", () => {
     expect(normaliserLieu("Saint-Augustin-de-Desmaures (QC)")).toBe("saint-augustin-de-desmaures qc");
   });
 });
+
+describe("« Quebec Province » n'est pas la ville de Québec (VEILLE-33)", () => {
+  // ⚠️ TROUVÉ SUR UNE OFFRE RÉELLE le 2026-08-18 : une annonce disant « situé au Saguenay »
+  // portait « Quebec Province » en champ ville, et l'acceptation par sous-chaîne l'a fait
+  // entrer « dans la région ». Une frontière de MOT n'y changerait rien — « quebec » est un
+  // mot entier des deux côtés. Ce qui distingue la ville de la province est le QUALIFICATIF.
+
+  it("⚠️ le cas mesuré : la province n'entre pas", () => {
+    expect(situer("Quebec Province")).toBe("lieu-inconnu");
+  });
+
+  it("⚠️ et le verdict est « inconnu », jamais « hors région » — on ne sait pas où c'est", () => {
+    // Ce fichier refuse de parier DANS LES DEUX SENS : dire « hors région » affirmerait que
+    // l'offre est loin, ce que rien ne prouve. `lieu-inconnu` la laisse au registre mesuré.
+    expect(situer("Province de Québec")).toBe("lieu-inconnu");
+  });
+
+  it("la même règle vaut sur le repli par la DESCRIPTION, pas seulement sur le champ ville", () => {
+    // Deux sites d'acceptation, une seule règle : sans ça, la porte se rouvre par le repli.
+    expect(situer("Remote", "Poste basé en Quebec Province, déplacements fréquents")).toBe(
+      "lieu-inconnu",
+    );
+  });
+
+  it("non-régression : les vraies villes, suffixes de source compris, entrent toujours", () => {
+    // C'est ce que la comparaison par sous-chaîne sert à attraper, et il ne faut pas le casser.
+    for (const v of ["Québec", "Quebec City, QC", "Lévis, QC", "Saint-Augustin-de-Desmaures"]) {
+      expect(situer(v), v).toBe("dans-la-region");
+    }
+  });
+
+  it("non-régression : le rejet passe toujours AVANT l'acceptation", () => {
+    // « Montréal, Québec » contient « quebec » : sans la priorité au rejet, toute offre
+    // montréalaise entrerait. C'est écrit dans `situer`, et ça doit le rester.
+    expect(situer("Montréal, Québec")).toBe("hors-region");
+  });
+});
