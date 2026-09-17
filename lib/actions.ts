@@ -68,6 +68,7 @@ import {
 } from "./registre";
 import { BUDGET_PASSE_PAGE_MS } from "./synchro";
 import { creerChrono } from "./jalons";
+import { trancherParQuota } from "./quota";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -690,6 +691,17 @@ async function pistesPourAbsents(noms: readonly string[]): Promise<string[]> {
 /** Ce qu'une passe de raffinement des positions a donné. */
 interface Raffinage {
   candidates: number;
+  /**
+   * Éligibles que le QUOTA de la passe a laissées de côté (`[V-ROUTINE-QUOTA]`).
+   *
+   * ⚠️ SANS CE COMPTE, `precisees=3/8` NE DIT RIEN DE CE QU'ON VEUT SAVOIR. La file est
+   * tranchée à `MAX_SITUATIONS_CRON` AVANT d'être comptée : le dénominateur vaut donc au
+   * plus 8, quoi qu'il arrive. « Il n'y avait que 3 candidates » et « il y en avait 300 et
+   * huit ont été servies » rendent alors la MÊME ligne, alors qu'elles appellent des gestes
+   * opposés — ne rien faire, ou ajouter une passe. Les deux comptes se disent donc ensemble,
+   * comme `lieuInconnuRapporte` et `lieuInconnuIgnore` le font déjà pour le flux.
+   */
+  sansTentative: number;
   /** Repassées de « centre-ville » à leur vraie position. */
   precisees: number;
   /** Toujours introuvables sous ce nom : elles retomberont en queue de file. */
@@ -759,12 +771,15 @@ async function raffinerPositions(
   budgetMs: number | null,
 ): Promise<Raffinage> {
   const maintenant = new Date();
-  const lignes = (await db.select().from(entreprisesLieux))
+  const eligibles = (await db.select().from(entreprisesLieux))
     .filter((l) => positionARaffiner(l, maintenant))
     // La moins récemment tentée d'abord : la file tourne, et un cas insoluble retombe en
     // queue au lieu de consommer le quota des autres à chaque passage.
-    .sort((a, b) => a.geocodeLe.getTime() - b.geocodeLe.getTime())
-    .slice(0, max);
+    .sort((a, b) => a.geocodeLe.getTime() - b.geocodeLe.getTime());
+  // ⚠️ LA TRANCHE ET LE RESTE SORTENT DU MÊME APPEL, et c'est tout l'objet du correctif :
+  // après un `slice` posé à part, l'information « combien attendaient » n'existe plus nulle
+  // part, et un compte calculé deux lignes plus bas finit par dériver du `slice`.
+  const { servies: lignes, sansTentative } = trancherParQuota(eligibles, max);
 
   const tentables = lignes
     .map((l) => ({ nom: l.nom, ville: villeDe(l.nom), adresse: l.adresse }))
@@ -772,6 +787,7 @@ async function raffinerPositions(
 
   const vide: Raffinage = {
     candidates: tentables.length,
+    sansTentative,
     precisees: 0,
     toujoursAuCentre: 0,
     horsRayon: 0,
@@ -930,6 +946,7 @@ async function raffinerPositions(
 
   return {
     candidates: tentables.length,
+    sansTentative,
     precisees,
     toujoursAuCentre: introuvablesFinal.length,
     horsRayon,
@@ -1398,6 +1415,7 @@ export async function mesurerDistances(
     //           à venir, et les dizaines déjà posées au centre y resteraient à vie.
     let raffinage: Raffinage = {
       candidates: 0,
+      sansTentative: 0,
       precisees: 0,
       toujoursAuCentre: 0,
       horsRayon: 0,
@@ -1509,6 +1527,8 @@ export async function mesurerDistances(
         `${registre.ambigues > 0 ? ` (${registre.ambigues} ambigues)` : ""}` +
         `${registre.absentes > 0 ? ` (${registre.absentes} absentes)` : ""} ` +
         `precisees=${raffinage.precisees}/${raffinage.candidates}` +
+        // Le second compte se dit AVEC le premier : voir `Raffinage.sansTentative`.
+        `${raffinage.sansTentative > 0 ? ` (+${raffinage.sansTentative} en attente de quota)` : ""}` +
         `${raffinage.parAdresse > 0 ? ` (${raffinage.parAdresse} par adresse)` : ""}` +
         // ⚠️ NE PAS DIRE « NON CONFIGURÉ » QUAND ON N'A RIEN DEMANDÉ.
         //

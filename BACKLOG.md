@@ -1606,6 +1606,20 @@ RESTE — à observer sur les prochains dépôts (rien à coder) :
       faute de quota (`candidates − servies`) — un `N/8` seul ne distingue pas « il n'y avait
       que 3 candidates » de « il y en avait 300 et 8 ont été servies », qui sont les deux
       situations que cet item veut départager.
+      ✅ **PRÉALABLE LIVRÉ le 2026-09-17**, dans la foulée. La ligne porte désormais
+      `precisees=N/M (+K en attente de quota)`, et `K` se compte sur la file ENTIÈRE.
+      ⚠️ **La cause était une LIGNE D'ORDRE** : `raffinerPositions` tranchait à
+      `MAX_SITUATIONS_CRON` AVANT de compter, donc le dénominateur valait au plus 8 quoi
+      qu'il arrive. Le correctif n'est pas « compter plus tôt » — ça redériverait au premier
+      remaniement — mais `trancherParQuota` (`lib/quota.ts`, pure), qui rend la tranche ET le
+      reste du MÊME appel, sur la MÊME entrée : le défaut ne peut plus revenir par
+      inadvertance, il faudrait défaire la fonction.
+      ⚠️ Le compte dit « en attente », jamais « écartées » : la file est triée par
+      « la moins récemment tentée d'abord », donc ces candidates repassent — c'est une FILE,
+      pas un refus. Un quota à zéro rend « tout attend », pas « rien à faire ».
+      Trois mutations : compte pris sur la tranche, quota nul traité comme 1, `slice` reposé à
+      part. **Reste à faire pour clore l'item** : lire ce `+K` sur une passe chargée, et voir
+      si le tri par date sert bien les plus anciennes.
 
 **[CARTE-03-GOOGLE] — Google Maps Geocoding, troisième repli.** ADR-0007. Marc a choisi
 Google Maps Geocoding (sur 4 options présentées) pour les entreprises que Nominatim ET le
