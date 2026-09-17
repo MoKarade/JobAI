@@ -1906,6 +1906,32 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       (l'ORDRE est la politique d'allocation d'un budget partagé), ou lui réserver sa propre
       enveloppe. Ne rien changer tant que le compte descend — une étape qui avance n'est pas
       une étape à réparer.
+      🔴 **MA PRÉDICTION EST DÉMENTIE — mesure du 2026-09-17, 11:31 UTC.** J'avais écrit « pas
+      un blocage, ça finira tout seul ». Deuxième passe consécutive à `0 lieu(x) mesuré(s)`, et
+      le reste ne descend pas : il **MONTE**, `bornes=0/14` (16/09) → `bornes=0/21` (17/09).
+      La condition d'action que j'avais moi-même posée (« si le compte cesse de descendre »)
+      est donc dépassée : il ne stagne pas, il croît.
+      **CE QUI L'EXPLIQUE, et c'est structurel, pas accidentel.** Le budget restant à la FIN de
+      la passe est remarquablement stable — 7 409 ms le 16/09, 7 722 ms le 17/09 — donc ce qui
+      PRÉCÈDE consomme ~17,5 s des 25 s (`BUDGET_GEOCODAGE_CRON_MS`) de façon reproductible.
+      L'essentiel part dans les recherches Nominatim (`situerLot`, plafonné à
+      `MAX_SITUATIONS_CRON` = 8, ~2 s l'appel) — qui ont rendu `situées=0/10` les deux jours :
+      du temps dépensé sans rien placer, pendant que l'étape suivante a besoin de 15 s d'un
+      coup pour seulement COMMENCER. Et les DEUX passes quotidiennes ont le même budget et le
+      même ordre, donc elles s'affament de la même façon : il n'y a pas de « seconde chance »,
+      c'est ce que je supposais et c'était faux.
+      **Pourquoi ça marchait avant** : les 1 286 mesures ont été prises quand le travail en
+      amont était moins cher. Le registre a grandi (`registre=0/1042`, 1 005 absentes), l'amont
+      s'est renchéri, et l'étape des bornes est passée SOUS le seuil — sans qu'aucune ligne ne
+      change. C'est « drainer avant d'alimenter » : l'alimenteur (les entreprises nouvellement
+      placées) tourne, le drainage n'a plus jamais de budget.
+      **Remède recommandé** : remonter `mesurerBornes` AVANT les étapes Nominatim, en la gardant
+      gatée sur son propre besoin. L'ORDRE est la politique d'allocation d'un budget partagé ;
+      une étape placée en avant-dernier derrière un poste qui grossit finit toujours par ne plus
+      jamais tourner. Coût : les placements Nominatim perdent jusqu'à 15 s les jours où des
+      bornes restent à mesurer — et ils ne placent rien en ce moment.
+      ⚠️ **Non corrigé : c'est un défaut préexistant, hors du périmètre demandé.** Attend un feu
+      vert de Marc.
 - [x] 🟡 **`[TRAJETS-03]`** ✅ **Livré le 2026-09-16, sur « accélère les trajets » (Marc).** **Le débit des durées était plafonné par la PASSE, pas par le budget
       — et la justification de la constante a rôti.** `MATRICE_MAX_PAR_PASSE` = 12, avec en
       commentaire « douze par nuit couvrent le stock d'entreprises placées en trois jours ».
@@ -1945,6 +1971,12 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       mur y laisserait des éléments réservés pour un travail à moitié écrit — du budget perdu,
       jamais une ligne fausse, et la passe suivante refait le reliquat. Si ça se produit, le
       remède est de grouper les écritures en une seule, pas de redescendre la borne.
+      ✅ **MESURÉ AU PREMIER PASSAGE — 2026-09-17, 11:31 UTC** :
+      `[trajets] 40 durée(s) remplie(s) · 241 restante(s) pour les passes suivantes`.
+      La borne tient, aucun refus de budget, aucune coupure au mur (le risque ci-dessus ne
+      s'est pas matérialisé sur le cron de veille, qui a 300 s). Attendu 237, mesuré 241 : le
+      stock GROSSIT d'environ quatre par jour (offres ingérées puis entreprises placées), donc
+      le drainage NET est ~36/jour et l'horizon reste ~7 jours.
 - [ ] 🟡 **`[TEST-FLAKE-01]`** **Bug préexistant, vu au gate du 2026-09-16.**
       `tests/oauthStore.test.ts` a échoué sur `Hook timed out in 10000ms` — son `beforeAll`
       démarre une base PGlite en mémoire et applique les migrations. Relancé SEUL dans la

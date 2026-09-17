@@ -6,6 +6,44 @@
 
 ---
 
+## Contrôle 2026-09-17 (12:06 UTC) — l'accélération tient, et ma prédiction sur les bornes est fausse
+
+**Aucune ligne de code changée.** Contrôle de la première passe tournant avec la borne à 40.
+
+**`[TRAJETS-03]` fait ce qui était annoncé.** Cron de veille du 2026-09-17, 11:31:50 UTC :
+
+    [trajets] 40 durée(s) remplie(s) · 241 restante(s) pour les passes suivantes
+
+La borne tient, aucun refus de budget, aucune coupure au mur — le risque du mur de 60 s ne
+concerne que le cron de géocodage en reprise, et il ne s'est pas présenté. Attendu 237, mesuré
+241 : le stock GROSSIT d'environ quatre par jour (offres ingérées puis entreprises placées), le
+drainage NET est donc ~36/jour et l'horizon reste ~7 jours.
+
+**🔴 `[BORNES-02]` : ce que j'ai écrit hier est DÉMENTI par la mesure.** J'avais écrit « ce
+n'est pas un blocage, la passe tourne deux fois par jour, ça finira tout seul ». Deuxième passe
+consécutive à `0 lieu(x) mesuré(s)`, et le reste à mesurer ne descend pas — il **MONTE** :
+`bornes=0/14` le 16/09, `bornes=0/21` le 17/09. La condition d'action que j'avais moi-même
+posée (« si le compte cesse de descendre ») est dépassée.
+
+**Ce qui l'explique, et c'est structurel.** Le budget restant à la FIN de la passe est
+remarquablement stable — 7 409 ms puis 7 722 ms — donc l'amont consomme ~17,5 s des 25 s de
+façon reproductible. L'essentiel part dans les recherches Nominatim (`situerLot`, 8 appels à
+~2 s), qui ont rendu `situées=0/10` les deux jours : du temps dépensé sans rien placer, pendant
+que l'étape suivante a besoin de 15 s d'un coup pour seulement COMMENCER une requête Overpass.
+Et les DEUX passes quotidiennes ont le même budget et le même ordre : elles s'affament de la
+même façon. La « seconde chance » que je supposais n'existe pas.
+
+Pourquoi ça marchait avant : les 1 286 mesures ont été prises quand l'amont était moins cher.
+Le registre a grandi (1 005 entreprises absentes), l'amont s'est renchéri, et l'étape est passée
+SOUS le seuil sans qu'une seule ligne ne change.
+
+**Remède recommandé, NON APPLIQUÉ** (défaut préexistant, hors périmètre) : remonter
+`mesurerBornes` AVANT les étapes Nominatim. L'ORDRE est la politique d'allocation d'un budget
+partagé ; une étape placée en avant-dernier derrière un poste qui grossit finit toujours par ne
+plus jamais tourner. Attend le feu vert de Marc.
+
+---
+
 ## Session 2026-09-16 — `[TRAJETS-03]` : le débit des durées passe de ~23 jours à ~7
 
 Marc, après le contrôle du matin : « accélère les trajets ».
