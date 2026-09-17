@@ -402,3 +402,50 @@ describe("conditions d'emploi (ADR-0014 D2)", () => {
     expect(perm.total).toBeGreaterThan(temp.total);
   });
 });
+
+describe("les accents ne coupent plus le barème (ADR-0017)", () => {
+  // ⚠️ POURQUOI CE BLOC EXISTE, ET CE QU'IL NE PROUVE PAS.
+  //
+  // `normaliserTitre` repliait la casse et l'écriture inclusive, pas les accents — alors que
+  // cinq mots du barème en portent (`chargé de projet`, `chef d'équipe`, `électromécanique`…).
+  // Un titre « Charge de projet » tombait donc à `horsSujet`, 8 sur 40.
+  //
+  // ⚠️ Le gain MESURÉ le 2026-09-17 était NUL : sur les 33 offres du suivi dont le titre
+  // contient « charge de projet », ZÉRO n'était écrite sans accent, et le SEED entier (53) ne
+  // bougeait pas d'un point. On ne livre donc pas pour un gain, on livre pour fermer un
+  // SILENCE : les listes de mots sont saisies par Marc depuis `/profil`, et le jour où il y
+  // écrit « Ingénieur », la moitié des annonces cesserait de matcher sans qu'une seule ligne
+  // ne rougisse. Voir `docs/adr/0017-…`.
+
+  const profil = PROFIL_DEFAUT;
+
+  it("⚠️ un titre SANS accent atteint un mot du barème QUI EN PORTE — le cas que ça ferme", () => {
+    // « chargé de projet » est dans `motsCoordination`, « automatisation » dans `motsTechnique`.
+    expect(scoreFitRole("Charge de projet automatisation", "", profil)).toBe(
+      profil.pointsRole.combinaison,
+    );
+  });
+
+  it("non-régression : un titre ACCENTUÉ continue de matcher, c'est tout le corpus d'aujourd'hui", () => {
+    expect(scoreFitRole("Chargé de projet automatisation", "", profil)).toBe(
+      profil.pointsRole.combinaison,
+    );
+  });
+
+  it("⚠️ le repli vaut DANS LES DEUX SENS : un mot de profil sans accent trouve un titre accentué", () => {
+    // Marc saisit ses mots à la main depuis `/profil` ; rien ne garantit leur graphie. Un repli
+    // posé sur le seul titre laisserait ce cas-là muet.
+    const sansAccent = { ...profil, motsCoordination: ["charge de projet"], motsTechnique: ["automatisation"] };
+    expect(scoreFitRole("Chargé de projet automatisation", "", sansAccent)).toBe(
+      profil.pointsRole.combinaison,
+    );
+  });
+
+  it("non-régression : l'écriture inclusive marche toujours, accents compris", () => {
+    // Le correctif précédent du même mécanisme. Les deux replis doivent tenir ENSEMBLE :
+    // « Chargé(e) » perd sa marque ET son accent avant la comparaison.
+    expect(scoreFitRole("Charge(e) de projets automatisation", "", profil)).toBe(
+      profil.pointsRole.combinaison,
+    );
+  });
+});

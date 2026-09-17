@@ -1139,7 +1139,7 @@
       anglais (`automation`, `robotic`, `plc`) mais pas `engineering`, `mechanical`, `design`,
       `manufacturing`.
 
-- [ ] **[VEILLE-34]** ⚠️ **`normaliserTitre` ne retire PAS les accents, et les mots-clés du
+- [x] **[VEILLE-34]** ✅ **Livré le 2026-09-17 (ADR-0017), et son chiffre ne s'est PAS reproduit — voir plus bas.** ⚠️ **`normaliserTitre` ne retirait PAS les accents, et les mots-clés du
       barème en portent.** Mesuré le 2026-08-18 sur le lot réel : `motsCoordination` contient
       « chargé de projet » ; un titre écrit « Charge de projet » (sans accent) ne matche pas.
       Ce n'est pas un cas d'école — **ZipRecruiter rend une bonne part de ses titres
@@ -1155,6 +1155,24 @@
       côtés de la comparaison), mais elle touche `lib/scoring.ts` : §8 s'applique, ADR et audit
       sur les 38 offres du seed AVANT toute ligne. À traiter dans le MÊME ADR que [VEILLE-32] —
       les deux corrigent la même fonction et leurs effets se cumulent.
+      ✅ **LIVRÉ — `docs/adr/0017-le-bareme-cesse-de-buter-sur-un-accent.md`.** Repli des accents
+      dans `normaliserTitre`, appliqué **des DEUX côtés** : les mots du profil y passent aussi,
+      parce qu'ils sont saisis par Marc depuis `/profil` et que rien ne garantit leur graphie.
+      ⚠️ **ET LE CHIFFRE DE CET ITEM NE SE REPRODUIT PAS.** Il annonçait « 4 offres passent de
+      `fitRole` 8 à 28 », en citant Davie, Solution SFT et TEHORA. Re-mesuré le 2026-09-17 sur
+      la base réelle : les 33 offres du suivi dont le titre contient « charge de projet » sont
+      **toutes accentuées** (Davie est en base sous « Chargé de projet, maintenance », note 76,
+      pas 8), les 2 offres « electromeca » aussi, et le `SEED` entier (53) ne bouge **pas d'un
+      point**. Le ticket avait été mesuré quand ZipRecruiter était une source ; elle ne l'est
+      plus. **Le gain d'aujourd'hui est donc NUL, et c'est écrit dans l'ADR** pour que personne
+      ne le cite plus tard comme une victoire.
+      **Livré quand même, pour le SILENCE que ça ferme** : le jour où Marc ajoute « Ingénieur »
+      ou « Chargé d'affaires » à ses listes depuis `/profil`, une moitié des annonces cesserait
+      de matcher sans qu'une ligne ne rougisse.
+      Verrou : `tests/scoring.test.ts`, quatre cas (titre sans accent qui atteint un mot
+      accentué, non-régression accentuée, repli dans les deux sens, écriture inclusive
+      cumulée). Deux mutations, deux rouges — dont le repli ASYMÉTRIQUE, qui casse tout le
+      corpus accentué : c'est le piège que l'ADR nomme.
 
 - [ ] **[VEILLE-33]** La liste blanche de `situer()` compare par SOUS-CHAÎNE : « Quebec
       Province » est accepté « dans la région » parce qu'il contient « quebec ». Trouvé le

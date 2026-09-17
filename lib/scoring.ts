@@ -57,6 +57,18 @@ export const RAYON_MAX_KM = PROFIL_DEFAUT.rayonMaxKm;
 export function normaliserTitre(s: string): string {
   return s
     .toLowerCase()
+    // ⚠️ LES ACCENTS SE REPLIENT AUSSI (ADR-0017). Cinq mots du barème en portent
+    // (`chargé de projet`, `chef d'équipe`, `électromécanique`…) : sans ce repli, un titre
+    // écrit « Charge de projet » ou « Electromecanicien » ne les atteint pas et tombe à
+    // `horsSujet` — 8 sur 40, la note d'un métier sans rapport. Même mécanisme que le `(e)`
+    // ci-dessous, laissé à moitié corrigé.
+    //
+    // ⚠️ ET ELLE DOIT S'APPLIQUER DES DEUX CÔTÉS. `scoreFitRole` replie les mots du profil par
+    // CETTE fonction avant de comparer. Un repli asymétrique serait PIRE que pas de repli : il
+    // ferait cesser de matcher les titres accentués, qui sont aujourd'hui la totalité du
+    // corpus (mesuré le 2026-09-17 : 33 offres « chargé de projet », 0 sans accent).
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
     .replace(/\((?:e|s|es|ne|nes|trice|trices|ice|ices|euse|euses|rice|rices)\)/g, "")
     .replace(/\s+/g, " ");
 }
@@ -64,8 +76,11 @@ export function normaliserTitre(s: string): string {
 /** 40 pts — le poste combine-t-il coordination d'équipe ET contenu technique ? */
 export function scoreFitRole(titre: string, description = "", profil: Profil = PROFIL_DEFAUT): number {
   const t = normaliserTitre(`${titre} ${description}`);
-  const coord = profil.motsCoordination.some((m) => t.includes(m));
-  const tech = profil.motsTechnique.some((m) => t.includes(m));
+  // Les mots du profil passent par LA MÊME fonction que le titre (ADR-0017) : ils sont saisis
+  // par Marc depuis `/profil`, donc rien ne garantit leur graphie — et comparer une forme
+  // repliée à une forme brute ne trouverait plus rien.
+  const coord = profil.motsCoordination.some((m) => t.includes(normaliserTitre(m)));
+  const tech = profil.motsTechnique.some((m) => t.includes(normaliserTitre(m)));
   // « technicien » sans encadrement = recul hiérarchique par rapport au poste actuel.
   const technicien = /\btechnicien/.test(t) && !coord;
 
