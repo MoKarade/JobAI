@@ -286,7 +286,7 @@
       La logique PURE l'est (46 tests) ; les actions ne le sont pas.
 - [ ] 🔧 **`[CV-10]`** Un PDF SCANNÉ reste illisible (pas de reconnaissance de caractères).
       L'app le dit et propose le remède ; c'est une limite, pas un bug.
-- [ ] 🔧 **`[CV-11]`** `CLAUDE.md` fait **1 854 lignes** pour un « plafond assumé : 150 » — il en faisait 867 quand cet item a été écrit, donc il a DOUBLÉ depuis (re-mesuré à l'audit du 2026-09-17). Il se
+- [x] 🔧 **`[CV-11]`** ✅ **Livré le 2026-09-17 : 1 854 → 491 lignes.** Les 153 leçons de la §9 (1 536 lignes, 83 % du fichier) sont déménagées VERBATIM dans `docs/LESSONS.md` ; la §9 garde leur RÈGLE, une ligne chacune, reprise au caractère près du gras que chaque incident avait déjà produit. ⚠️ **C'est une perte assumée** : un `CLAUDE.md` ne charge rien hors de son arbre, donc les histoires n'arrivent plus en session. ⚠️ **Et le plafond de 150 n'est pas atteint** — 153 règles ne se réduisent qu'en en supprimant, et chacune a été payée par un incident ; l'en-tête le dit maintenant au lieu d'annoncer un plafond que le fichier violait depuis toujours. Vérifié par trois contrôles : corps présent verbatim, 153/153 règles dans l'index, tout ce qui n'est pas la §9 inchangé. ~~`CLAUDE.md` fait **1 854 lignes** pour un « plafond assumé : 150 » — il en faisait 867 quand cet item a été écrit, donc il a DOUBLÉ depuis (re-mesuré à l'audit du 2026-09-17).~~ Il se
       charge à chaque session : le distiller vers `docs/LESSONS.md` en gardant ici les seules
       règles qui changent la façon de coder.
 
