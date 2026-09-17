@@ -1022,6 +1022,29 @@
       l'enveloppe était inutile : elle a fait passer l'étape de « jamais lancée » à « lancée et
       en échec », ce qui est justement ce qui rend la panne VISIBLE. Trouvé en chemin en
       vérifiant `[VEILLE-42]` — **signalé, non corrigé**, hors périmètre demandé.
+      ✅ **CORRIGÉ le 2026-09-17 sur demande de Marc (« corrige les bornes »)**, en deux
+      parties — parce que l'enquête a trouvé un SECOND défaut, le mien :
+      1. **La patience passe de 15 à 25 s.** Ce qui absorbe la FILE D'ATTENTE d'Overpass est
+         l'écart entre notre patience et le budget d'exécution accordé au serveur ; il était
+         de 3 s, soit le PLANCHER que son propre test impose. C'est la même signature qu'en
+         août. 25 s est le PLAFOND que `BUDGET_PASSE_PAGE_MS` (35 s) autorise — pas un chiffre
+         rond : l'assertion est désormais exactement à son seuil, et la prochaine hausse
+         forcera à trancher « les bornes sont le travail du seul cron de veille ».
+      2. ⚠️ **L'enveloppe de `[BORNES-02]` était accordée à des chemins qui ne peuvent pas la
+         payer — défaut introduit par moi.** Elle était lue EN DUR dans
+         `executerVeilleComplete`, sous un commentaire affirmant « seul le cron de veille
+         l'accorde, son mur est à 300 s ». Faux : cette fonction a TROIS appelants, dont le
+         cron de GÉOCODAGE (60 s) et le bouton de `/sources` (60 s). Le test censé l'interdire
+         scannait le fichier de la route de géocodage — qui ne nomme pas la constante, il
+         APPELLE la fonction qui la lisait : **vert, et aveugle**. L'enveloppe est désormais un
+         paramètre passé par la route qui connaît son propre mur.
+      Le journal d'échec porte maintenant l'étendue de la boîte et le temps d'abandon : « le
+      service fait la queue » et « notre boîte est trop grande » rendaient le MÊME message et
+      appellent des remèdes opposés.
+      ⚠️ **Conséquence à savoir** : le bouton de `/sources` ne mesure plus les bornes (il
+      retombe sur le reliquat du budget partagé, comme avant `[BORNES-02]`). C'est le cron de
+      veille nocturne qui fait ce travail. **Effet en prod NON VÉRIFIÉ** : la prochaine passe
+      du cron tranchera.
 
 - [ ] **[VEILLE-42]** ⚠️ **La moitie des offres quebecoises du flux tombent en « lieu
       inconnu »**, et la liste est dominee par des municipalites de l'ile de Montreal que

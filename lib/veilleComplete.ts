@@ -33,11 +33,7 @@ import { mesurerLieuxInconnus } from "./mesureLieux";
 import type { RegistreLieux } from "./ingest/lieux";
 import { EPOQUE_A_RETENTER } from "./travaux";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "./synchro";
-import {
-  MAX_SITUATIONS_CRON,
-  BUDGET_GEOCODAGE_CRON_MS,
-  BUDGET_BORNES_VEILLE_MS,
-} from "./geocodageCron";
+import { MAX_SITUATIONS_CRON, BUDGET_GEOCODAGE_CRON_MS } from "./geocodageCron";
 import { executerPasse } from "./ingest/passe";
 import { CLE_METIERS, METIERS_DEFAUT, normaliserMetiers } from "./metiersRetenus";
 import { villesRefusees } from "./ingest/pipeline";
@@ -106,7 +102,25 @@ export type ResultatVeille =
  * Quand deux chemins peuvent lancer la même passe, savoir LEQUEL l'a lancée est la première
  * question qu'on se pose en cas d'anomalie — et la seule qu'un journal muet ne répond pas.
  */
-export async function executerVeilleComplete(declencheur: string): Promise<ResultatVeille> {
+export async function executerVeilleComplete(
+  declencheur: string,
+  /**
+   * Ce que l'APPELANT peut offrir à l'étape des bornes, en millisecondes.
+   *
+   * ⚠️ IL LE DÉCIDE PARCE QUE LUI SEUL CONNAÎT SON MUR, et c'est la correction d'un défaut
+   * que j'ai introduit avec `[BORNES-02]` le 2026-09-17. L'enveloppe était accordée ICI,
+   * en dur, avec un commentaire affirmant « seul le cron de veille l'accorde, son
+   * `maxDuration` est à 300 s ». C'était FAUX : cette fonction a TROIS appelants, et deux
+   * tournent sous un mur de 60 s — le cron de GÉOCODAGE (rattrapage de veille) et le bouton
+   * de `/sources`. Tous deux recevaient vingt secondes de plus qu'ils ne pouvaient payer,
+   * et un mur Vercel atteint tue le processus sans exécuter le moindre `catch`.
+   *
+   * La promesse était dans le commentaire, la condition nulle part — la classe « promesse de
+   * verrou = verrou codé dans le même commit ». Elle est désormais dans la SIGNATURE : un
+   * appelant qui ne la passe pas ne l'a pas, et le compilateur montre les trois sites.
+   */
+  budgetBornesMs?: number,
+): Promise<ResultatVeille> {
   if (!process.env.DATABASE_URL) {
     return { ok: false, statut: 503, erreur: "base non configurée" };
   }
@@ -302,12 +316,12 @@ export async function executerVeilleComplete(declencheur: string): Promise<Resul
         const m = await mesurerDistances({
           maxSituations: MAX_SITUATIONS_CRON,
           budgetGeocodageMs: BUDGET_GEOCODAGE_CRON_MS,
-          // ⚠️ SEUL CE CHEMIN L'ACCORDE, et c'est son `maxDuration` qui l'autorise : la route
-          // du cron de veille est à 300 s, celle du cron de géocodage à 60. Voir
-          // `BUDGET_BORNES_VEILLE_MS` — sans elle, l'étape des bornes n'a jamais reçu les 15 s
-          // d'un coup qu'il lui faut pour COMMENCER une requête, et le reste à mesurer montait
-          // au lieu de descendre (mesuré les 16 et 17/09/2026).
-          budgetBornesMs: BUDGET_BORNES_VEILLE_MS,
+          // ⚠️ CE QUE L'APPELANT A OFFERT, JAMAIS UNE CONSTANTE LUE ICI. Voir le paramètre
+          // de cette fonction : seule la route qui connaît son propre mur peut décider, et
+          // deux des trois appelants tournent sous 60 s. `undefined` fait retomber l'étape
+          // sur le reliquat du budget partagé, c'est-à-dire le comportement d'avant
+          // `[BORNES-02]` — affamée, mais sans jamais risquer le mur.
+          budgetBornesMs,
         });
         localisation = m.ok
           ? `${m.placees} placée(s) au centre-ville, ${m.villesRattrapees} ville(s) rattrapée(s), ${m.situees} située(s), ${m.adressesRattrapees} adresse(s) récupérée(s), ${m.precisees} précisée(s), ${m.bornesMesurees} borne(s) mesurée(s), ${m.detailsEnrichis} fiche(s) enrichie(s), ${m.mesurees} mesurée(s)`

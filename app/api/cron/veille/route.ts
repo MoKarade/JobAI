@@ -33,6 +33,7 @@ import { db } from "@/lib/db";
 import { CLE_VEILLE, DELAI_VEILLE_MS, reserverPasse } from "@/lib/synchro";
 import { autoriserCron } from "@/lib/cronAuth";
 import { executerVeilleComplete } from "@/lib/veilleComplete";
+import { BUDGET_BORNES_VEILLE_MS } from "@/lib/geocodageCron";
 
 export const dynamic = "force-dynamic";
 /**
@@ -76,7 +77,12 @@ export async function GET(requete: Request) {
     );
   }
 
-  const r = await executerVeilleComplete("cron-veille");
+  // ⚠️ L'ENVELOPPE DES BORNES EST ACCORDÉE ICI, ET NULLE PART AILLEURS — parce que c'est
+  // ICI que le mur est écrit (`maxDuration = 300`, quelques lignes plus haut). Les deux
+  // autres appelants d'`executerVeilleComplete` tournent sous 60 s et ne la passent pas :
+  // leur étape des bornes retombe sur le reliquat du budget partagé. Accordée depuis la
+  // fonction partagée, elle l'était aussi pour eux — le défaut de `[BORNES-02]`.
+  const r = await executerVeilleComplete("cron-veille", BUDGET_BORNES_VEILLE_MS);
   if (!r.ok) {
     return NextResponse.json(
       { ok: false, erreur: r.erreur },

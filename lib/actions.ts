@@ -1019,11 +1019,24 @@ async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
     if (reste !== null && reste < DELAI_MAX_MS) break;
 
     interrogees++;
+    const debutGrappe = Date.now();
     const r = await chercherBornesBoite(g.boite);
     if (!r.ok) {
       // On NE marque AUCUNE ligne de cette grappe : elles repasseront. Le journal garde la
       // trace, parce qu'une source qui tombe tout le temps doit finir par se voir.
-      console.error(`[bornes] grappe de ${g.lieux.length} lieu(x) non mesurée : ${r.raison}`);
+      //
+      // ⚠️ AVEC L'ÉTENDUE ET LE TEMPS PASSÉ, depuis le 2026-09-17. La ligne d'avant disait
+      // « grappe de 7 lieu(x) non mesurée : This operation was aborted · … » — vrai, et
+      // insuffisant pour choisir un remède : « le service fait la queue » et « notre boîte
+      // est trop grande pour lui » produisent le MÊME message, et appellent des corrections
+      // opposées (attendre plus / découper plus). Le motif sans son objet ne diagnostique
+      // rien, et ce dépôt l'a déjà payé sur « lieu-inconnu=47 ».
+      const kmGrappe = (g.boite.latMax - g.boite.latMin) * 111;
+      console.error(
+        `[bornes] grappe de ${g.lieux.length} lieu(x) non mesurée` +
+          ` — boîte ~${kmGrappe.toFixed(0)} km, abandon après ${Date.now() - debutGrappe} ms` +
+          ` (patience ${DELAI_MAX_MS} ms) : ${r.raison}`,
+      );
       echecs += g.lieux.length;
       continue;
     }

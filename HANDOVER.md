@@ -6,6 +6,60 @@
 
 ---
 
+## Session 2026-09-17 (nuit, suite) — `[BORNES-03]` : la patience, et un défaut que j'avais posé
+
+Marc : « corrige les bornes ». Deux correctifs, parce que l'enquête a trouvé un second défaut
+qui n'était pas celui qu'on cherchait.
+
+**1. La patience passe de 15 à 25 s.** Ce qui absorbe la file d'attente d'Overpass n'est pas la
+durée en soi mais l'ÉCART entre notre patience et le budget d'exécution accordé au serveur
+(`DELAI_SERVEUR_S = 12`). Il était de 3 s — exactement le plancher que le test du dépôt impose.
+Le correctif d'août avait porté ce plancher de 1 s à 3 s et s'était arrêté là ; la même
+signature est revenue le 17/09 (« This operation was aborted » ×2, « fetch failed » ×1).
+⚠️ **25 s est le PLAFOND que les budgets existants autorisent**, pas un chiffre rond :
+`BUDGET_PASSE_PAGE_MS` vaut 35 s et exige qu'il reste 10 s pour le reste de la passe.
+L'assertion est donc désormais EXACTEMENT à son seuil — la prochaine hausse la fera rougir, et
+c'est voulu : elle obligera à trancher « la mesure des bornes est le travail du SEUL cron de
+veille », au lieu de consommer la marge en silence.
+⚠️ **Ne pas « gagner de la marge » en baissant `DELAI_SERVEUR_S`** : le total ne bouge pas. Le
+serveur ne compte pas la file dans son `[timeout:N]`, donc ça ne fait que déplacer l'échec de
+« nous abandonnons » vers « il renonce », en risquant de couper une requête qui aboutissait.
+
+**2. ⚠️ L'enveloppe de `[BORNES-02]` était accordée à des chemins qui ne peuvent pas la payer —
+et c'est moi qui l'ai posée hier.** Elle était lue EN DUR dans `executerVeilleComplete`, sous un
+commentaire affirmant « seul le cron de veille l'accorde, son `maxDuration` est à 300 s ». Cette
+fonction a TROIS appelants : le cron de veille (300 s), le cron de GÉOCODAGE en rattrapage
+(60 s) et le bouton de `/sources` (60 s). Les deux derniers recevaient vingt secondes de plus
+qu'ils ne pouvaient payer — et un mur Vercel atteint tue le processus sans exécuter le moindre
+`catch`. La promesse était dans le commentaire, la condition nulle part.
+
+⚠️ **Et le test censé l'interdire était VERT et AVEUGLE.** Il vérifiait que
+`app/api/cron/geocodage/route.ts` ne contient pas « budgetBornesMs » — ce fichier ne nomme pas
+la constante, il APPELLE la fonction qui la lisait. Une garde qui scanne les appelants ne peut
+pas voir un défaut qui vit dans l'appelé. Elle porte maintenant sur la fonction PARTAGÉE, et sur
+les DEUX appelants à 60 s (le bouton n'était surveillé par rien).
+
+**3. Le journal d'échec devient diagnosticable** : il porte l'étendue de la boîte et le temps
+d'abandon. « Le service fait la queue » et « notre boîte est trop grande pour lui » rendaient le
+même message et appellent des remèdes opposés (attendre plus / découper plus).
+
+**Quatre mutations, toutes discriminantes** : la fonction partagée qui ré-accorde l'enveloppe ;
+le bouton qui la réclame ; l'enveloppe ré-écrite en dur au lieu d'être dérivée ; la patience
+poussée à 45 s, qui fait rougir l'invariant du budget de page — la preuve que le plafond est
+gardé et non supposé.
+
+⚠️ **Conséquence à savoir, et ce n'est pas un détail** : le bouton de `/sources` ne mesure plus
+les bornes. Il retombe sur le reliquat du budget partagé, c'est-à-dire le comportement d'avant
+`[BORNES-02]`. C'est le cron de veille nocturne qui fait ce travail, et lui seul.
+
+⚠️ **Effet en prod NON VÉRIFIÉ.** Aucune passe de cron n'a encore tourné avec ces valeurs, et
+le bouton ne peut plus servir à le tester — par conception. La prochaine passe du cron
+(`0 11 * * *`, partie à 11:31:50 les 16 et 17/09) tranchera. Ce qu'il faudra lire : la ligne
+`[bornes] … grappe(s) interrogée(s) · … lieu(x) mesuré(s)`, et, en cas d'échec, l'étendue de
+boîte et le temps d'abandon désormais journalisés.
+
+---
+
 ## Session 2026-09-17 (nuit) — `[VEILLE-42]` : la règle de bande, calibrée puis livrée
 
 Marc : « fais la règle de bande ». Livrée, avec son ADR-0018 — mais en deux temps, parce que

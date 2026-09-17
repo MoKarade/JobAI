@@ -5,6 +5,8 @@
 // deux nombres pourraient diverger sans qu'aucun test ne le remarque (même risque que
 // `lib/cronAuth.ts`).
 
+import { DELAI_MAX_MS } from "./overpass";
+
 /**
  * Employeurs situés par passage de cron.
  *
@@ -75,9 +77,16 @@ export const BUDGET_GEOCODAGE_CRON_MS = 25_000;
  * justement la première candidate au raffinage. On aurait échangé une étape affamée contre
  * une donnée fausse.
  *
- * Vingt secondes : `DELAI_MAX_MS` (15 s) pour la requête, plus de quoi écrire les lignes de
- * la grappe. La garde interne ne lance jamais une requête qu'elle ne peut pas finir, donc
- * l'enveloppe est une BORNE, pas une réservation dépensée d'office : une passe sans bornes à
- * mesurer ne coûte qu'un `SELECT`.
+ * ⚠️ DÉRIVÉE DE `DELAI_MAX_MS`, PLUS ÉCRITE EN DUR. Les deux valeurs étaient deux constantes
+ * indépendantes (15 s et 20 s) que seule la discipline gardait cohérentes : relever la
+ * patience sans relever l'enveloppe fait passer la garde interne `reste < DELAI_MAX_MS` sous
+ * son seuil, et l'étape cesse de partir — la famine EXACTE que cette enveloppe existe pour
+ * corriger, réintroduite par un nombre oublié. Le lien est donc dans le code.
+ *
+ * La marge par-dessus la requête sert à écrire les lignes de la grappe. La garde interne ne
+ * lance jamais une requête qu'elle ne peut pas finir, donc l'enveloppe est une BORNE, pas une
+ * réservation dépensée d'office : une passe sans bornes à mesurer ne coûte qu'un `SELECT`.
  */
-export const BUDGET_BORNES_VEILLE_MS = 20_000;
+export const MARGE_ECRITURE_BORNES_MS = 5_000;
+
+export const BUDGET_BORNES_VEILLE_MS = DELAI_MAX_MS + MARGE_ECRITURE_BORNES_MS;

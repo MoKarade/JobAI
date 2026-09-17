@@ -26,7 +26,11 @@ import {
   DELAI_MESURE_AUTO_MS,
 } from "../lib/synchro";
 import { DELAI_MAX_MS, DELAI_SERVEUR_S, INSTANCES_OVERPASS } from "../lib/overpass";
-import { BUDGET_BORNES_VEILLE_MS, BUDGET_GEOCODAGE_CRON_MS } from "../lib/geocodageCron";
+import {
+  BUDGET_BORNES_VEILLE_MS,
+  BUDGET_GEOCODAGE_CRON_MS,
+  MARGE_ECRITURE_BORNES_MS,
+} from "../lib/geocodageCron";
 
 /** Les pages qui déclenchent la passe de fond, et doivent donc lui survivre. */
 const PAGES = ["app/carte/page.tsx", "app/page.tsx"] as const;
@@ -152,23 +156,63 @@ describe("l'étape des bornes a une enveloppe À ELLE, et seulement là où le m
     expect(BUDGET_BORNES_VEILLE_MS - DELAI_MAX_MS).toBeGreaterThanOrEqual(2_000);
   });
 
-  it("⚠️ elle est accordée par le cron de VEILLE, et le bornes step la CONSOMME", () => {
+  it("⚠️ elle est accordée par la ROUTE du cron de veille, et le bornes step la CONSOMME", () => {
     // Les deux moitiés, parce qu'une seule ne prouve rien : une enveloppe que personne ne
     // passe est morte, et une enveloppe passée que l'étape ignore l'est tout autant. C'est
     // le trou exact de `[FERMETURE-03]` — un mécanisme vert, testé, et mort à l'arrivée.
-    expect(lire("lib/veilleComplete.ts")).toContain("budgetBornesMs: BUDGET_BORNES_VEILLE_MS");
+    //
+    // ⚠️ LA CIBLE A CHANGÉ DE FICHIER LE 2026-09-17, ET CE N'EST PAS UN RE-BASEMENT. Cette
+    // assertion visait `lib/veilleComplete.ts`, où la constante était lue EN DUR — et c'était
+    // justement le défaut : cette fonction a TROIS appelants, dont deux sous un mur de 60 s.
+    // Le fait défendu est inchangé (« la route à 300 s accorde, l'étape consomme ») ; c'est
+    // l'endroit où il est vrai qui a bougé.
+    expect(lire("app/api/cron/veille/route.ts")).toContain("BUDGET_BORNES_VEILLE_MS");
     expect(lire("lib/actions.ts")).toMatch(/mesurerBornes\(\s*options\.budgetBornesMs/);
   });
 
-  it("⚠️ le cron de GÉOCODAGE ne la reçoit PAS — son mur est à 60 s", () => {
+  it("⚠️ la fonction PARTAGÉE ne l'accorde à personne — elle la reçoit", () => {
+    // ⚠️ LE DÉFAUT QUE LE TEST D'À CÔTÉ NE POUVAIT PAS VOIR, introduit par `[BORNES-02]`.
+    // `executerVeilleComplete` lisait `BUDGET_BORNES_VEILLE_MS` chez elle, sous un
+    // commentaire affirmant « seul le cron de veille l'accorde ». Faux : elle a TROIS
+    // appelants. Un scan du fichier du cron de géocodage restait vert — il ne nomme pas la
+    // constante, il APPELLE la fonction qui la lisait. La garde doit donc porter sur la
+    // fonction partagée, pas sur ses appelants.
+    const partagee = lire("lib/veilleComplete.ts");
+    expect(partagee).not.toContain("BUDGET_BORNES_VEILLE_MS");
+    // Et elle la reçoit bien de l'extérieur : sans ce second volet, supprimer le paramètre
+    // satisferait l'assertion ci-dessus en retirant la fonctionnalité.
+    expect(partagee).toMatch(/budgetBornesMs\?: number/);
+  });
+
+  it("⚠️ les DEUX appelants à 60 s ne la passent pas — le mur tue sans `catch`", () => {
     // Elle s'ajoute au budget partagé : l'accorder là où la fonction n'a que 60 s referait
     // le calcul que `BUDGET_GEOCODAGE_CRON_MS` interdit de refaire à la légère, et un mur
     // atteint tue le processus sans exécuter le moindre `catch`.
-    const source = lire("app/api/cron/geocodage/route.ts");
-    expect(source).not.toContain("budgetBornesMs");
-    const m = source.match(/export const maxDuration = (\d+)/);
+    //
+    // ⚠️ DEUX, PAS UN : le bouton de `/sources` (`lib/actionsVeille.ts`) appelle la même
+    // fonction et n'était surveillé par rien. Une garde qui n'énumère qu'un appelant sur
+    // trois laisse passer exactement ce qu'elle prétend interdire.
+    for (const f of ["app/api/cron/geocodage/route.ts", "lib/actionsVeille.ts"]) {
+      expect(lire(f)).not.toContain("budgetBornesMs");
+      expect(lire(f)).not.toContain("BUDGET_BORNES_VEILLE_MS");
+    }
+    // Anti-vacuité : ces fichiers doivent VRAIMENT appeler la passe, sinon l'absence
+    // ci-dessus est satisfaite par du code qui ne fait rien.
+    for (const f of ["app/api/cron/geocodage/route.ts", "lib/actionsVeille.ts"]) {
+      expect(lire(f)).toContain("executerVeilleComplete(");
+    }
+    const m = lire("app/api/cron/geocodage/route.ts").match(/export const maxDuration = (\d+)/);
     expect(m).not.toBeNull();
     expect(Number(m?.[1])).toBe(60);
+  });
+
+  it("⚠️ l'enveloppe est DÉRIVÉE de la patience, pas écrite à côté d'elle", () => {
+    // Deux constantes indépendantes tenues cohérentes par la discipline : relever la
+    // patience sans relever l'enveloppe fait repasser la garde `reste < DELAI_MAX_MS` sous
+    // son seuil et l'étape cesse de partir — la famine que l'enveloppe corrige, réintroduite
+    // par un nombre oublié. Le lien doit être dans le code, pas dans un commentaire.
+    expect(lire("lib/geocodageCron.ts")).toContain("DELAI_MAX_MS + MARGE_ECRITURE_BORNES_MS");
+    expect(BUDGET_BORNES_VEILLE_MS - DELAI_MAX_MS).toBe(MARGE_ECRITURE_BORNES_MS);
   });
 
   it("⚠️ la route qui l'accorde a le mur qui la rend sûre, avec marge", () => {

@@ -53,8 +53,29 @@ export const INSTANCES_OVERPASS: readonly string[] = [
  * La boîte interrogée couvre TOUTE la région (une seule requête pour le lot entier, voir
  * `boiteEnglobante`), mais `amenity=charging_station` est un jeu minuscule : Overpass le
  * sert par son index spatial, et l'étendue pèse beaucoup moins que le nombre de requêtes.
+ *
+ * ⚠️ 15 → 25 s LE 2026-09-17, ET LA RAISON EST LA MARGE, PAS LA DURÉE. La même signature
+ * exactement est revenue en production le 17/09 à 19:41 — « This operation was aborted » ×2,
+ * « fetch failed » ×1, zéro lieu mesuré — sur le premier passage réel depuis que l'étape a
+ * cessé d'être affamée (`[BORNES-02]`). Or ce qui absorbe la FILE D'ATTENTE, c'est l'écart
+ * entre notre patience et le budget d'exécution qu'on accorde au serveur : il était de 3 s,
+ * c'est-à-dire le PLANCHER que son propre test impose. Corriger le 1 s d'août en 3 s avait
+ * laissé la garde à sa limite, ce qui n'est pas une marge, c'est un espoir.
+ *
+ * ⚠️ ET C'EST LE PLAFOND QUE LES BUDGETS EXISTANTS AUTORISENT, pas un chiffre choisi rond.
+ * `BUDGET_PASSE_PAGE_MS` vaut 35 s et son invariant exige qu'il reste 10 s pour le reste de
+ * la passe : 25 s est donc la patience maximale compatible, et l'assertion est désormais
+ * EXACTEMENT à son plancher. Aller plus loin n'est pas interdit — mais ce serait décider que
+ * la mesure des bornes est le travail du SEUL cron de veille, et ça se tranche avec Marc au
+ * lieu de se consommer en silence en déplaçant un nombre.
+ *
+ * ⚠️ NE PAS « OPTIMISER » EN BAISSANT `DELAI_SERVEUR_S` POUR GAGNER DE LA MARGE : le total
+ * ne change pas. Le serveur ne compte pas la file dans son `[timeout:N]`, donc abaisser son
+ * budget d'exécution ne rend pas une seconde d'attente — ça ne fait que déplacer l'échec de
+ * « nous abandonnons » vers « il renonce », en ajoutant le risque de couper une requête qui
+ * aurait abouti.
  */
-export const DELAI_MAX_MS = 15_000;
+export const DELAI_MAX_MS = 25_000;
 
 /**
  * Le rayon d'une requête RÉGIONALE, en degrés de latitude approximatifs.
