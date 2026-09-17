@@ -6,6 +6,44 @@
 
 ---
 
+## Session 2026-09-17 (soir) — trois lots du backlog, « fais tout à la suite »
+
+**`[VEILLE-34]` — le barème cesse de buter sur un accent** (ADR-0017, protocole §11 respecté :
+cadrage puis audit sur le SEED entier AVANT toute ligne). `normaliserTitre` replie désormais les
+accents, **des deux côtés** — les mots du profil y passent aussi, parce que Marc les saisit
+depuis `/profil`.
+⚠️ **Le gain d'aujourd'hui est NUL, et l'ADR le dit** : les 33 offres du suivi dont le titre
+contient « charge de projet » sont TOUTES accentuées, les 2 « electromeca » aussi, et le SEED ne
+bouge pas d'un point. Le chiffre du ticket (« 4 offres de 8 à 28 ») avait été mesuré quand
+ZipRecruiter était une source. On livre pour le SILENCE que ça ferme, pas pour un gain.
+
+**`[VEILLE-33]` — « Quebec Province » n'est plus la ville de Québec.** Une frontière de mot
+n'aurait rien changé (« quebec » est un mot entier des deux côtés) : c'est le QUALIFICATIF qui
+distingue, d'où `PROVINCE_PAS_LA_VILLE`. Verdict `lieu-inconnu`, jamais `hors-region` — on ne
+sait pas où est l'offre. Une règle, deux consommateurs (le champ `ville` ET le repli par la
+description).
+
+**`[CV-11]` — le `CLAUDE.md` passe de 1 854 à 496 lignes.** Les 153 leçons de la §9 (1 536
+lignes, 83 % du fichier) sont dans `docs/LESSONS.md`, VERBATIM ; la §9 garde leur RÈGLE, une
+ligne chacune, reprise au caractère près du gras que chaque incident avait déjà produit.
+⚠️ **Perte assumée** : les histoires n'arrivent plus en session, il faut aller les lire.
+⚠️ **Le plafond de 150 n'est pas atteint et ne le sera pas** — l'en-tête le dit maintenant au
+lieu d'annoncer un chiffre que le fichier violait depuis toujours.
+⚠️ **Le rituel change** : ajouter une leçon = DEUX écritures dans le même commit, l'histoire
+dans `docs/LESSONS.md` et la règle en §9.
+
+**Vérifications** : gate complet vert aux trois lots (1 655 puis 1 660 tests). Mutations —
+2 pour `[VEILLE-34]` (dont le repli asymétrique, qui casse tout le corpus accentué), 3 pour
+`[VEILLE-33]`, et trois contrôles mécaniques pour `[CV-11]` (corps verbatim, 153/153 règles,
+reste du fichier inchangé).
+
+**⚠️ Ce qui reste à surveiller** : aucun des trois lots n'a d'effet mesurable sur la prochaine
+passe — `[VEILLE-34]` a un gain nul aujourd'hui, `[VEILLE-33]` attend un cas qui ne se présente
+peut-être pas, `[CV-11]` ne touche pas le produit. Ne pas les compter comme vérifiés en
+production tant qu'un cas réel ne les a pas exercés.
+
+---
+
 ## Mesure 2026-09-17 (17:31 UTC) — `[LIEN-03]` a tiré : 226 liens rafraîchis
 
 Passe lancée par Marc depuis `/sources`. `[veille] bouton-app — … liens=226 sources=2`.
