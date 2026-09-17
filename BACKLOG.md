@@ -59,8 +59,29 @@
       (fait par Marc). L'auto-merge et la protection de branche sont sans objet depuis
       l'ADR-0002. ⚠️ Reste optionnel : ne laisser que « Allow squash merging » si des PR
       réapparaissent un jour (le merge de la PR #1 s'est fait en merge commit).
-- [ ] 🔧 **`[B-07]`** Supprimer la branche distante `claude/hopeful-lovelace-4d09zx`
+- [ ] 👤 **`[B-07]`** Supprimer la branche distante `claude/hopeful-lovelace-4d09zx`
       (ancienne branche par défaut, sans usage) — 👤 accord de Marc requis avant suppression.
+      ✔ **ACCORD DONNÉ le 2026-09-17 (« supprimer la branche »), VÉRIFICATION FAITE, et la
+      suppression REFUSÉE PAR L'ENVIRONNEMENT.**
+      Ce qui a été vérifié avant d'essayer, parce qu'une suppression ne se rejoue pas :
+      · un seul commit, `a2b1025 « Initial commit »` du 2026-07-28, absent de `main` ;
+      · deux fichiers seulement qu'elle a et que `main` n'a pas — `app/hub/summary/route.ts`
+        et `lib/hubToken.ts`, tous deux le SQUELETTE `app-template` (`id: "app-template"`,
+        « À PERSONNALISER AU FORK »). `main` porte ses vraies versions
+        (`app/api/hub/summary/route.ts`, `lib/hubSummary.ts`) ;
+      · aucune PR, ouverte ou fermée, ne la référence ;
+      · le diff `main` → branche est −93 519 / +1 604 : c'est l'état d'AVANT le projet.
+      **Rien d'unique à perdre. La suppression est sûre.**
+      ⚠️ **`git push origin --delete` rend HTTP 403**, quatre tentatives avec temporisation.
+      Ce n'est pas un incident réseau : le proxy git de la session pousse des branches mais
+      refuse d'en SUPPRIMER une, et le connecteur GitHub n'expose aucun outil de suppression
+      de branche. **Le geste revient donc à Marc** — un clic sur
+      `https://github.com/MoKarade/JobAI/branches`, avec la vérification ci-dessus en main.
+      ⚠️ Et j'ai failli l'annoncer faite : le premier essai passait par `| tail`, qui MASQUE
+      le code de sortie — `exit=0` sur un push en échec. La règle du dépôt existe déjà
+      (« ne jamais juger un `git push` via `| tail` ») ; c'est `git ls-remote` qui a tranché.
+      ⚠️ Constaté au passage, **non traité** (hors périmètre de cet item) : seize autres
+      branches `claude/**` traînent sur le distant.
 
 ## Chantier #01 — V1 : port fidèle + hub ✅
 
