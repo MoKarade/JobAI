@@ -6,6 +6,48 @@
 
 ---
 
+## Session 2026-09-17 (nuit, fin) — trois items du backlog, « continue les tâches backlog »
+
+**`[LIEN-04]` — une réserve démentie par la mesure cesse d'être affichée.** La fiche de
+`groupe-dsd-inc-…` montrait `km: 81.2` et « Annoncée à Thetford Mines — la distance reste à
+mesurer » côte à côte. ⚠️ Le remède que le ticket recommandait (« cesser de stocker la
+phrase ») est PIÉGÉ : elle est le seul porteur de la ville pour les offres entrées avant la
+colonne `ville`, et `villeDepuisRaisons` la relit. La phrase porte une DONNÉE et une
+AFFIRMATION ; seule la seconde se périme. On garde la donnée, on masque l'affirmation
+(`raisonsAffichables`, dans le module feuille `lib/raisons.ts` avec l'écriture et la relecture
+de la même phrase). ⚠️ **TROIS** surfaces la consomment, et c'est la troisième qui compte : la
+vue MCP, que j'avais oubliée au premier jet — elle ne se REGARDE pas, elle se LIT dans une
+conversation, donc une réserve périmée y devient un fait que je relaie.
+
+**`[VEILLE-13]` — deux questions cessent de partager une constante.** Le filet de reprise du
+cron de géocodage demandait « la veille a-t-elle manqué son tour ? » avec `DELAI_VEILLE_MS`,
+qui valait 20 h à l'écriture du filet et est passé à 45 s le 17/08 pour l'anti-rafale du
+bouton. Condition toujours vraie ⇒ « veille en retard » écrit chaque nuit depuis un mois, pour
+rien. `DELAI_RATTRAPAGE_VEILLE_MS` (20 h) sépare les deux questions ; 20 h est DÉRIVÉ de
+l'écart des crons (11:00 → 03:00 = 16 h de plancher ; 40 h de plafond, l'âge au premier 03:00
+qui suit un tour manqué).
+⚠️ **Conséquence qui dépasse le bruit corrigé** : le chemin de géocodage DÉDIÉ redevient
+emprunté chaque nuit — il ne l'était plus depuis un mois. Ça rend une **seconde passe de
+géocodage par jour**, et c'est exactement la ressource que `[VEILLE-42]` a montrée saturée
+(3 705 offres non placées pour 40 places de mesure par passe).
+
+**`[DISTANCES-01]` — la passe dit où est passé son budget.** Neuf jalons, une ligne dédiée
+`[distances] budget par étape — …`, ordre chronologique (l'étape qui affame celles qui la
+suivent est une relation d'ORDRE), zéros affichés. ⚠️ Le lot ne BORNE rien : l'étape non bornée
+est désormais MESURÉE. Borner se décidera sur le chiffre — décider maintenant reproduirait la
+faute qu'on corrige. C'est ce qui manquait quelques heures plus tôt, quand j'ai attribué ~17,5 s
+à Nominatim par déduction sur le reliquat, sans preuve.
+
+**Onze mutations au total sur les trois lots**, toutes discriminantes. Et deux gardes ont dû
+être re-formées en chemin : l'une rougissait sur mon PROPRE commentaire (`not.toContain` sur un
+nom que l'explication doit citer — re-ancrée sur l'APPEL), l'autre encodait le défaut plutôt
+qu'une intention (« le géocodage la reprend CHAQUE JOUR », re-décidée et non re-basée).
+
+⚠️ **À vérifier à la prochaine passe** : la ligne `budget par étape` et le silence du filet de
+reprise. Rien de tout ça n'est encore observé en production.
+
+---
+
 ## Session 2026-09-17 (nuit, suite) — `[BORNES-03]` : la patience, et un défaut que j'avais posé
 
 Marc : « corrige les bornes ». Deux correctifs, parce que l'enquête a trouvé un second défaut
