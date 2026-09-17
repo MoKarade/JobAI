@@ -298,6 +298,22 @@
       hors du dépôt : un CV validé enrichit `profil.recherches` sans changer ce qu'elle tape
       le matin. Divergence réelle, nommée dans l'ADR-0009. La fermer suppose que la Routine
       LISE le profil (endpoint dédié, gardé comme `/api/ingest/depot`).
+      ✔ **PRÉCISÉ le 2026-09-17, en cherchant quoi faire du backlog.** La divergence a un
+      SECOND site, DANS le dépôt cette fois : `RECHERCHES_GUICHET_CANDIDATES`
+      (`lib/ingest/sources.ts`) portait en commentaire « VIENT DU PROFIL (ADR-0009) — la
+      veille doit chercher ce que Marc EST », et lisait `PROFIL_DEFAUT`, c'est-à-dire le
+      profil DU CODE. Un CV validé change le profil ACTIF, en base, et n'a jamais touché
+      cette valeur.
+      ⚠️ **Ce n'est pas réparable à cet endroit** : une constante de module est évaluée à
+      l'import, le profil actif est une lecture de base ASYNCHRONE. La promesse se tient au
+      point d'APPEL, quand une passe construit ses sources — c'est là que le raccordement
+      devra vivre.
+      ⚠️ **Et la divergence est DORMANTE** : `RECHERCHES_GUICHET` est vide depuis le
+      2026-07-31 (le flux RSS du Guichet ne répond à aucune des cinq adresses testées), donc
+      la veille n'interroge aucun terme par ce canal. Le seul consommateur restant est le banc
+      d'essai `scripts/sonder-sources.ts`, qui en lit le PREMIER élément. Le commentaire a été
+      corrigé pour dire ce qui est vrai ; le raccordement reste à faire le jour où le canal
+      revit. **Aucune ligne de comportement n'a changé.**
 - [x] 🔧 **`[CV-09]`** ✅ **Livré le 2026-09-17** (« continue les tâches backlog »). Aucun test
       ne couvrait `lib/cv/actions.ts` ni `lib/cv/depot.ts` — **471 lignes qui écrivent à partir
       d'un document personnel, sans un seul verrou** (la logique PURE, elle, l'était déjà :
@@ -1469,6 +1485,15 @@ FAIT le 2026-08-12 (tout gaté, discrimination prouvée par stash) :
       ouvertes périment, le correctif est côté ROUTINE (re-recherche nommée des offres en
       péril, bornée ~10 req/jour) — PAS un seuil plus haut (il retarderait symétriquement
       la péremption honnête).
+      ✔ **RELEVÉ le 2026-09-17** (`resume_suivi`) : **1 653 suivies, 640 périmées (38,7 %),
+      0 jamais confirmée, `plusVieilleVueJours` = 4**. Le signal que l'item cherche — « des
+      offres encore ouvertes périment » — s'observe par les RÉSURRECTIONS, une offre périmée
+      que la veille retrouve : trois passes du jour donnent `revenues=3`, puis `0`, puis `0`.
+      ⚠️ **Rare, mais non nul, et trois passes ne sont pas une semaine.** Je ne conclus donc
+      pas, et surtout je ne déclenche pas le correctif prescrit (la re-recherche nommée côté
+      Routine) : rien dans ce relevé ne le justifie aujourd'hui. Ce qu'il faut suivre est le
+      compteur `revenues` du journal de veille — s'il monte, l'item a sa preuve ; s'il reste
+      à zéro sur une semaine, il se ferme.
 
 ### [CARTE-03] — 115 offres, 93 sur la carte, 60 « sans adresse » : le débit du géocodage
 
@@ -1531,6 +1556,21 @@ git) :
       baisse. Un reliquat qui ne baisse PLUS après plusieurs passes = ces employeurs sont
       introuvables sur les deux services publics — une limite des DONNÉES, pas du code ; le
       dire à Marc plutôt que de rouvrir `MAX_VILLES_PAR_PASSE`.
+      ✔ **RELEVÉ le 2026-09-17 (deux passes, 19:41 et 20:11 UTC)** :
+      `registre=1/1044 (38 ambigues) (1005 absentes)` puis `registre=0/1042 (38 ambigues)
+      (1004 absentes)` ; `precisees=3/8 (3 par Google)` puis `5/8 (1 par adresse, 1 par
+      Google)`. La mécanique avance toujours ; le reliquat d'absentes bouge d'UNE unité sur
+      ~1 004.
+      ⚠️ **Deux passes à trente minutes d'intervalle ne sont PAS « plusieurs jours »** : le
+      critère de l'item ne peut pas être appliqué là-dessus, et je ne le déclare donc pas.
+      Ce qui EST acquis, c'est l'ordre de grandeur (≈1 000 employeurs absents du registre,
+      38 ambigus) et le fait que la série est désormais lisible passe après passe.
+      ✅ **MAIS LA QUESTION D'ORIGINE, ELLE, EST TRANCHÉE.** Cet item naît de « 115 offres,
+      93 sur la carte, 60 sans adresse — c'est inacceptable » (Marc, 2026-08-12). Mesuré au
+      2026-09-17 par `resume_suivi` : **1 653 offres suivies, 12 non situées** — 99,3 % sont
+      plaçables. Le reliquat d'employeurs sans ADRESSE PRÉCISE (≈1 004) est une autre
+      question : il ne retire personne de la carte, il laisse l'épingle au centre-ville, et
+      l'écran le DIT (pointillé + fiche).
 
 ### [CARTE-03] suite — Google Maps Geocoding + plafond de la Routine
 
@@ -1557,6 +1597,15 @@ RESTE — à observer sur les prochains dépôts (rien à coder) :
 - [ ] **[V-ROUTINE-QUOTA]** Vérifier que le tri par date change vraiment QUI obtient une
       tentative d'adresse un jour chargé, et que le compte « sans tentative » rapporté à
       l'étape 5 est cohérent avec le nombre d'offres du jour.
+      ⚠️ **NON VÉRIFIABLE EN L'ÉTAT, constaté le 2026-09-17** — et c'est le constat qui fait
+      avancer l'item. Le journal publie `precisees=N/8` (8 = `MAX_SITUATIONS_CRON`) mais
+      AUCUN compte « sans tentative », et rien ne dit QUELLES candidates ont été servies ni
+      dans quel ordre. La question posée ici n'a donc pas d'instrument, exactement comme
+      `[VEILLE-42]` avant son contraste et `[DISTANCES-01]` avant ses jalons.
+      **Préalable** : publier, dans la ligne `[distances]`, le nombre de candidates ÉCARTÉES
+      faute de quota (`candidates − servies`) — un `N/8` seul ne distingue pas « il n'y avait
+      que 3 candidates » de « il y en avait 300 et 8 ont été servies », qui sont les deux
+      situations que cet item veut départager.
 
 **[CARTE-03-GOOGLE] — Google Maps Geocoding, troisième repli.** ADR-0007. Marc a choisi
 Google Maps Geocoding (sur 4 options présentées) pour les entreprises que Nominatim ET le

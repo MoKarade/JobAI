@@ -88,12 +88,24 @@ function messageErreur(err: unknown): string {
 export const RECHERCHES_GUICHET: readonly string[] = [];
 
 /**
- * Ce qu'on interrogerait si le flux répondait. Gardé pour le banc d'essai de la sonde.
+ * Ce qu'on interrogerait si le flux répondait. Gardé pour le banc d'essai de la sonde
+ * (`scripts/sonder-sources.ts`, son unique consommateur — et il n'en lit que le premier).
  *
- * ⚠️ VIENT DU PROFIL (ADR-0009), pas d'une liste écrite ici. C'est le point de la
- * manœuvre : la veille doit chercher ce que Marc EST. Recopier ces termes en dur
- * garantissait qu'un CV mis à jour ne changerait jamais ce qu'on interroge le matin —
- * la moitié exacte de sa demande serait restée lettre morte.
+ * ⚠️ CE COMMENTAIRE A PROMIS PENDANT UN MOIS CE QUE LA LIGNE NE PEUT PAS TENIR, corrigé le
+ * 2026-09-17. Il disait « VIENT DU PROFIL (ADR-0009), pas d'une liste écrite ici — la veille
+ * doit chercher ce que Marc EST ». La ligne lit `PROFIL_DEFAUT`, c'est-à-dire le profil DU
+ * CODE : un CV validé change le profil ACTIF (en base) et ne touche jamais cette valeur.
+ *
+ * Et ce n'est pas un oubli réparable ici : une constante de module est évaluée à
+ * l'import, alors que le profil actif est une LECTURE DE BASE, asynchrone
+ * (`profilActif`, lib/cv/depot.ts). La promesse n'est pas tenable à cet endroit — elle
+ * se tient au point d'APPEL, quand une passe construit ses sources.
+ *
+ * ⚠️ AUCUN CHEMIN VIVANT N'EN DÉPEND AUJOURD'HUI, et c'est ce qui a rendu l'écart
+ * invisible : `RECHERCHES_GUICHET` est vide (le flux RSS ne répond pas, voir ci-dessus),
+ * donc la veille n'interroge AUCUN terme par ce canal. La divergence est réelle mais
+ * dormante — elle se réveillerait le jour où ce canal revivrait, et c'est `[CV-08]` qui
+ * porte le raccordement.
  */
 export const RECHERCHES_GUICHET_CANDIDATES: readonly string[] = PROFIL_DEFAUT.recherches;
 
