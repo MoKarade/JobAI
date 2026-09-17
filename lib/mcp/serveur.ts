@@ -144,7 +144,9 @@ export function creerServeur(io: EntreesSorties): McpServer {
         "avec des TITRES RÉELS pour chacun, et un échantillon. Sert à DÉCIDER quels métiers " +
         "ingérer (ADR-0012). ⚠️ Ne lis pas `fin` en diagonale : seul « flux-termine » " +
         "autorise à conclure — sous toute autre fin, les comptes ne sont que le début d'une " +
-        "mesure. Par défaut l'outil rend le résumé et la table des professions ; `champ` " +
+        "mesure. Il rend aussi, par leur CODE POSTAL, les offres qu'il n'a pas su placer " +
+        "(`lettresInconnues`, `regionsInconnues`) — à lire avec `verdicts['lieu-inconnu']` " +
+        "pour dénominateur. Par défaut l'outil rend le résumé et la table des professions ; `champ` " +
         "permet d'en demander une autre (postalcode-region, education, salary…). Chaque " +
         "appel relit le flux : n'en fais pas plusieurs pour rien.",
       inputSchema: { champ: z.string().max(40).optional() },
@@ -167,6 +169,13 @@ export function creerServeur(io: EntreesSorties): McpServer {
         retenues: r["retenues"],
         secondes: r["secondes"],
         verdicts: r["verdicts"],
+        // ⚠️ LA POPULATION « LIEU INCONNU », VUE PAR SON CODE POSTAL (`[VEILLE-42]`). Les
+        // inventaires ci-dessous portent sur les offres RETENUES ; ces deux-ci portent sur
+        // celles qu'on n'a PAS su placer — la population inverse, et la seule sur laquelle une
+        // règle de tri géographique puisse se concevoir. Elles se lisent avec leur
+        // dénominateur, `verdicts["lieu-inconnu"]`, juste au-dessus.
+        lettresInconnues: r["lettresInconnues"],
+        regionsInconnues: r["regionsInconnues"],
         inventairesDisponibles: Object.keys(inventaires),
         champ: cle,
         // « Le champ demandé n'existe pas » et « il n'a aucune valeur » sont deux choses

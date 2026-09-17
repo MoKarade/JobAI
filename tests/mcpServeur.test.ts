@@ -172,6 +172,26 @@ describe("diagnostic_flux — la table qui décide, pas les onze inventaires", (
     expect(r.exemples).toBeNull();
     expect(r.inventairesDisponibles).toEqual(["noc2021"]);
   });
+
+  it("RELAIE le code postal des offres non placées, avec son dénominateur", async () => {
+    // ⚠️ CALCULÉ JUSTE, JAMAIS LIVRÉ — la classe `[FERMETURE-03]`. Les deux comptes de
+    // `[VEILLE-42]` sont les seuls du rapport qui décrivent les offres qu'on n'a PAS su
+    // placer ; s'ils s'arrêtent à la frontière de l'outil, la mesure existe et personne ne
+    // la voit. `verdicts` part avec eux : un compte de classes sans son dénominateur se lit
+    // comme une proportion.
+    const { client } = await brancher({
+      diagnostiquerFlux: async () => ({
+        fin: "flux-termine",
+        verdicts: { "lieu-inconnu": 3 },
+        lettresInconnues: [{ nom: "J", n: 2 }, { nom: "(vide)", n: 1 }],
+        regionsInconnues: [{ nom: "J9T", n: 1 }],
+      }),
+    });
+    const r = corps(await client.callTool({ name: "diagnostic_flux", arguments: {} }));
+    expect(r.lettresInconnues).toEqual([{ nom: "J", n: 2 }, { nom: "(vide)", n: 1 }]);
+    expect(r.regionsInconnues).toEqual([{ nom: "J9T", n: 1 }]);
+    expect(r.verdicts).toEqual({ "lieu-inconnu": 3 });
+  });
 });
 
 describe("l'écriture — l'exception de l'ADR-0011, vue du protocole", () => {

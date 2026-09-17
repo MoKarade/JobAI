@@ -121,17 +121,40 @@ export async function diagnostiquerFlux(
     "lieu-inconnu": 0,
   };
   const inconnues = new Map<string, number>();
+  // ⚠️ DEUX TALLIES SUR LA POPULATION « LIEU INCONNU », ET ELLE N'EN AVAIT AUCUN.
+  //
+  // `[VEILLE-42]` mesure que ~51 % des offres québécoises du flux y tombent, et son remède
+  // annoncé est le CODE POSTAL — une région de tri n'a pas d'homonyme, là où « Saint-Laurent »
+  // en a un dans la région. Mais l'inventaire existant (`inventaireRetenues`) porte sur les
+  // offres DÉJÀ ACCEPTÉES : il ne dit rien de celles qu'on n'a pas su placer. Concevoir la
+  // règle sur lui, c'est la concevoir sur la population inverse de celle qu'elle doit trier —
+  // le piège nommé « un échantillon décrit la population dont il est TIRÉ ».
+  //
+  // D'où ces deux comptes, et pas un seul : la LETTRE (la bande postale — `H` est l'île de
+  // Montréal, `G` couvre la région de Québec) dit s'il existe un rejet franc à faire, et la
+  // RÉGION DE TRI (les trois premiers caractères) dit si la queue est courte ou longue. Le
+  // dénominateur est `verdicts["lieu-inconnu"]`, publié juste à côté : un compte sans lui se
+  // lirait comme une proportion.
+  const fsaInconnues = new Map<string, number>();
+  const lettresInconnues = new Map<string, number>();
 
   const rapport = await lireFluxGuichet(recuperer, {
     budgetMs,
     maxRetenues: MAX_RETENUES_DIAGNOSTIC,
     inventaire: INVENTAIRE_FLUX,
-    garder: (o: OffreBrute) => {
+    garder: (o: OffreBrute, brut: string) => {
       const v = situer(o.ville, o.description);
       verdicts[v] = (verdicts[v] ?? 0) + 1;
       if (v === "lieu-inconnu") {
         const nom = o.ville.trim() === "" ? "(vide)" : o.ville.trim();
         inconnues.set(nom, (inconnues.get(nom) ?? 0) + 1);
+        // Le bloc BRUT est le seul endroit qui porte le code postal : `OffreBrute` est un
+        // contrat fermé et ne le transporte pas. Même raison que dans `sourceGuichetFlux`.
+        const code = lireChamp(brut, "postalcode").replace(/\s+/g, "").toUpperCase();
+        const fsa = code.slice(0, 3) === "" ? "(vide)" : code.slice(0, 3);
+        const lettre = code.slice(0, 1) === "" ? "(vide)" : code.slice(0, 1);
+        fsaInconnues.set(fsa, (fsaInconnues.get(fsa) ?? 0) + 1);
+        lettresInconnues.set(lettre, (lettresInconnues.get(lettre) ?? 0) + 1);
       }
       return v === "dans-la-region";
     },
@@ -193,6 +216,17 @@ export async function diagnostiquerFlux(
     verdicts,
     // Groupées et triées par fréquence : quarante-sept lignes ne se lisent pas, trois lignes
     // comptées désignent le correctif.
+    // ⚠️ LA MÊME POPULATION QUE `villesInconnues`, VUE PAR SON CODE POSTAL. À lire avec son
+    // dénominateur, `verdicts["lieu-inconnu"]` — un compte de classes n'est pas une proportion.
+    // La LETTRE d'abord : c'est elle qui dit s'il existe un rejet franc et sans homonyme à
+    // faire (une bande postale ne se confond avec aucune autre), et elle tient en dix lignes.
+    lettresInconnues: [...lettresInconnues.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([nom, n]) => ({ nom, n })),
+    regionsInconnues: [...fsaInconnues.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 25)
+      .map(([nom, n]) => ({ nom, n })),
     villesInconnues: [...inconnues.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 25)

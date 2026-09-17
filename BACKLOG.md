@@ -1028,6 +1028,16 @@
       6 531 québécoises, soit 50,7 % — contre 3 366 / 50,8 % la veille. **La proportion est
       structurelle, pas un artefact d'un jour** : c'est ce qui justifie d'y mettre le
       travail de [VEILLE-43] plutôt que d'attendre qu'elle se résorbe.
+      ✔ **INSTRUMENT LIVRÉ le 2026-09-17, la RÈGLE reste à écrire.** Le remède annoncé — trier
+      par `postalcode` — ne pouvait pas se concevoir : les onze inventaires du diagnostic
+      portent sur les offres RETENUES, c'est-à-dire la population INVERSE de celle qu'une
+      règle de tri doit trancher (« un échantillon décrit la population dont il est TIRÉ »).
+      Écrire une bande postale de mémoire aurait été une table inventée, capable d'admettre en
+      silence des offres lointaines. `diagnostic_flux` rend donc désormais `lettresInconnues`
+      (la bande, non tronquée) et `regionsInconnues` (la région de tri, top 25) sur la seule
+      population « lieu inconnu », à lire avec `verdicts["lieu-inconnu"]` pour dénominateur.
+      Trois discriminations prouvées par mutation. **Prochaine étape : appeler l'outil, lire
+      la distribution, et n'écrire la règle que si elle tombe sur du mesuré.**
 
 - [x] **[VEILLE-40]** ✅ **Fait, vérifié à l'audit du 2026-09-17** : `selectionnerSources` pousse `sourceGuichetFlux(flux).source` (lib/ingest/passe.ts), et la production le confirme (`sources=2`, `ingérées=8/1600`). Les conditions posées ici ont été tenues — `[VEILLE-32]` livré, passe complète obtenue. Brancher le flux Guichet sur `selectionnerSources`, **après** une
       passe de diagnostic qui rend `flux-termine` (celle du 19 août s'est arrêtée sur

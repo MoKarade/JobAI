@@ -6,6 +6,40 @@
 
 ---
 
+## Session 2026-09-17 (fin) — `[VEILLE-42]` : l'instrument avant la règle
+
+**Ce qui est livré : une MESURE, pas un correctif.** `diagnostic_flux` rend deux comptes de
+plus — `lettresInconnues` (la bande postale, non tronquée) et `regionsInconnues` (la région de
+tri, top 25) — calculés sur la seule population « lieu inconnu », et relayés par l'outil MCP.
+
+**Pourquoi je n'ai pas écrit la règle tout de suite.** Le remède annoncé par le ticket est le
+code postal, et il est juste : une région de tri n'a pas d'homonyme, là où « Saint-Laurent »
+en a un dans la région (`[VEILLE-33]`). Mais il n'y avait rien pour le concevoir : les onze
+inventaires du diagnostic (`inventaireRetenues`) portent sur les offres DÉJÀ ACCEPTÉES,
+c'est-à-dire la population INVERSE de celle qu'une règle de tri doit trancher. Écrire une
+bande postale de mémoire aurait produit une table inventée, capable d'admettre en silence des
+offres lointaines — exactement ce que le garde-fou « no fake data » interdit. L'instrument
+part donc en premier, et la règle se décidera sur la distribution mesurée.
+
+**À lire avec son dénominateur.** `verdicts["lieu-inconnu"]` est publié juste à côté : un
+compte de classes n'est pas une proportion. Et l'égalité de totalité est gardée sur
+`lettresInconnues`, pas sur `regionsInconnues` — ce dernier est tronqué au top 25, donc son
+total serait court dès que la queue s'allonge, c'est-à-dire quand la mesure devient utile.
+
+**Trois discriminations prouvées par mutation** (sauvegarde par `cp`, jamais `git checkout`) :
+le tally remonté d'un cran décrit tout le flux (5 au lieu de 3) ; une offre sans code postal
+abandonnée en silence fait tomber le compte `(vide)` ; le relais MCP retiré rend `undefined`.
+
+**Reste à faire, et c'est la moitié qui compte** : appeler `diagnostic_flux` sur une passe
+complète, lire `lettresInconnues` / `regionsInconnues`, et n'écrire la règle de rejet que si
+la distribution la justifie. Tant que ce n'est pas fait, `[VEILLE-42]` reste ouvert — la
+mesure existe, le tri non.
+
+**Mesuré avant le lot** (passe complète, `fin: "flux-termine"`) : `dans-la-region: 1443`,
+`hors-region: 2020`, `lieu-inconnu: 3683`.
+
+---
+
 ## Session 2026-09-17 (soir) — trois lots du backlog, « fais tout à la suite »
 
 **`[VEILLE-34]` — le barème cesse de buter sur un accent** (ADR-0017, protocole §11 respecté :
