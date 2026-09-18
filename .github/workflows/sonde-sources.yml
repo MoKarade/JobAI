@@ -22,30 +22,44 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # [CI-PERSIST-CREDS] `actions/checkout` v2+ écrit le GITHUB_TOKEN dans la config git du
+          # runner POUR TOUT LE RESTE DU RUN : n'importe quelle étape suivante, y compris une
+          # action tierce, peut le lire. Vérifié un par un : aucun workflow de ce dépôt ne fait
+          # de `git push` ni d'appel `gh`, donc aucun n'a besoin du jeton persisté.
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Sonder les sources actuelles
-        run: npx tsx scripts/sonder-sources.ts
+        # [CI-NPX-NO-INSTALL] `--no-install` : sans lui, `npx` TÉLÉCHARGE le paquet depuis le
+        # registre quand il ne le trouve pas localement, puis exécute ses scripts de cycle de vie
+        # — la surface que `--ignore-scripts` ferme à l'étape d'installation, rouverte ici, et sur
+        # une version NON figée (le registre sert la dernière). Avec le drapeau, npx n'utilise que
+        # le binaire de `node_modules/.bin`, donc la version qu'épingle le lockfile, et échoue
+        # franchement s'il manque au lieu d'aller le chercher. Mesuré le 18/09 : `npx --no-install tsx --version` rend « tsx v4.23.1 », le binaire local (`tsx` est une devDependency).
+        # ⚠️ Vérifié aussi que l'étape d'installation vit dans le MÊME job — sans elle, le drapeau
+        # transformerait un téléchargement silencieux en échec.
+        run: npx --no-install tsx scripts/sonder-sources.ts
 
       - name: Sonder les sources québécoises
-        run: npx tsx scripts/sonder-quebec.ts
+        run: npx --no-install tsx scripts/sonder-quebec.ts
 
       # Ajoutée le 2026-08-05 : « ça fait plusieurs jours y'a pas assez d'offres ». Les
       # sources actives ne produisent rien ; celle-ci cherche celles qui répondent
       # VRAIMENT, à commencer par les données ouvertes du Canada — nommément autorisées
       # par le garde-fou n°4.
       - name: Sonder les sources ouvertes (données ouvertes, API publiques)
-        run: npx tsx scripts/sonder-ouvert.ts
+        run: npx --no-install tsx scripts/sonder-ouvert.ts
 
       # Ajoutée le 2026-08-05 : « quand tu ne trouves pas l'adresse exacte je veux une
       # recherche web ou maps pour trouver ». Web et Maps sont hors d'atteinte (clé
       # payante ou moissonnage interdit) ; cette sonde mesure les deux sources GRATUITES
       # et OFFICIELLES qui restent — Overpass par nom, et le registre des entreprises.
       - name: Sonder les sources d'ADRESSE (Overpass par nom, registre du Québec)
-        run: npx tsx scripts/sonder-adresses.ts
+        run: npx --no-install tsx scripts/sonder-adresses.ts

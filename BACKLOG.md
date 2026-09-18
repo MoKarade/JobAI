@@ -8,6 +8,31 @@
 
 ---
 
+## Chantier #49 — la chaîne de build : le GITHUB_TOKEN restait lisible tout le run  ✅
+
+Lot L2 de l'audit multi-outils du 2026-09-18, livré le même jour.
+
+- Les **3** étapes `actions/checkout` portent `persist-credentials: false`. La v2+ écrit le
+  `GITHUB_TOKEN` dans la config git du runner POUR TOUT LE RESTE DU RUN : n'importe quelle
+  étape suivante, y compris une action tierce, peut le lire. Vérifié un par un qu'**aucun**
+  workflow de ce dépôt ne fait de `git push` ni d'appel `gh`.
+- Les **3** `npm ci` portent `--ignore-scripts`. ⚠️ **MESURÉ avant d'être posé** : `npm ci
+  --ignore-scripts` puis typecheck, build et **1 742 tests** — tous verts.
+- `S8543` (version d'un `npm install -g` non figée) et `S7637` (action tierce non épinglée au
+  SHA) sont **sans objet ici** : ce dépôt n'a aucun `npm install -g` et n'utilise que des
+  actions `actions/*`. ⚠️ Le document d'audit annonçait `S8543 × 5` — re-mesuré à **zéro**.
+  Deux des trois comptes équivalents de FinanceAI valaient zéro aussi : les commandes de
+  re-mesure valent mieux que les chiffres, comme le dit le §7 du document.
+
+- [ ] 🔧 **`[CI-CURL-PROTO]` `githubactions:S6506` sur `sonde-registre.yml`** (S) — HORS
+  PÉRIMÈTRE du lot L2, signalé et non corrigé. L'`URL` est bien en `https://` (l. 74) : le
+  risque n'est pas le protocole de départ mais le `-L` de `curl`, qui suit une redirection
+  **pouvant rétrograder en HTTP**. Le correctif tient en un drapeau —
+  `--proto '=https' --proto-redir '=https'` — et vaut aussi pour les autres `curl` de ce
+  dépôt (Nominatim, Overpass) : à faire en un seul passage plutôt qu'un site à la fois.
+
+---
+
 ## Chantier #00 — Bootstrap 🟦
 
 - [x] 👤 **`[B-01]`** Créer le dépôt **`MoKarade/JobAI` en PRIVÉ**. ✅ 2026-07-28 : fait par
