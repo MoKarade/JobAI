@@ -1700,9 +1700,40 @@ RESTE — à observer sur les prochains dépôts (rien à coder) :
       DONNÉES ». Faux ici : le reliquat ne baisse pas parce que **huit** sont tentées par
       passe. C'est une limite de DÉBIT, pas de données — et sans ce `+K`, on aurait conclu
       l'inverse en toute bonne foi.
-      **Reste pour clore** : vérifier que le tri « la moins récemment tentée d'abord » sert
-      bien les plus anciennes (le compte ne le dit pas), et décider si 8 doit bouger — c'est
-      un arbitrage de quota Nominatim, donc une décision de Marc.
+      **Reste pour clore** : ~~vérifier que le tri « la moins récemment tentée d'abord » sert
+      bien les plus anciennes (le compte ne le dit pas)~~ **FAIT, voir ci-dessous**, et décider
+      si 8 doit bouger — c'est un arbitrage de quota Nominatim, donc une décision de Marc.
+      ✅ **LE TRI EST VÉRIFIÉ, ET LA VÉRIFICATION A TROUVÉ UN DÉFAUT — 2026-09-18.** Oui, la
+      file est bien triée « la moins récemment tentée d'abord ». Non, elle ne servait pas les
+      plus anciennes : le quota était **tranché AVANT** que les éligibles sans ville soient
+      écartées.
+      **Le mécanisme, en entier.** Une éligible dont `villeDe` ne rend rien prenait une place
+      de la tranche, puis était retirée juste après (sans ville, Nominatim chercherait la
+      raison sociale dans le monde entier). Aucune requête ne partait pour elle ⇒ son
+      `geocodeLe` n'était jamais marqué ⇒ elle restait la plus ancienne ⇒ elle reprenait la
+      même place à la passe suivante, **indéfiniment**. Avec huit places pour 1 087 attentes,
+      chaque bloqueuse coûtait **un huitième du débit, pour toujours**.
+      ⚠️ **ET LE JOURNAL NE POUVAIT PAS LE MONTRER** : `precisees=N/M` avec `M < 8` se lit
+      « il n'y avait que M candidates ». C'est la même cécité que celle que le préalable de
+      cet item venait de corriger sur le dénominateur — corrigée d'un côté, intacte de l'autre.
+      **Correctif** : `choisirARaffiner` (`lib/travaux.ts`, PURE) fait le tri, la résolution
+      de ville et le quota **du même appel**, dans le bon ordre, et rend la ville AVEC la
+      ligne retenue (la rechercher chez l'appelant, c'est la faire diverger un jour). Elle
+      réutilise `trancherParQuota` plutôt que de refaire la tranche à la main.
+      **Un troisième compte paraît dans la ligne `[distances]` : `(K sans ville connue)`**,
+      dit à PART de `en attente de quota` parce que le geste est opposé — une « en attente »
+      repassera toute seule, une « sans ville » n'avancera jamais tant que la ville manque.
+      Les additionner ferait lire « ça avance lentement » là où il faut retrouver une donnée.
+      ⚠️ **CE QUE JE NE PRÉTENDS PAS** : que le défaut mordait le 2026-09-18. Ce jour-là
+      `candidates=8`, donc aucune place perdue sur CETTE passe — le défaut est certain dans le
+      code, sa portée réelle est inconnue. Le nouveau compte est justement ce qui la rendra
+      visible. Attendre `(K sans ville connue)` dans le prochain relevé : `0` ⇒ la file était
+      saine, `K > 0` ⇒ K places étaient gelées depuis toujours.
+      ⚠️ **Et `+1079` va MÉCANIQUEMENT baisser de K** : `sansTentative` ne compte plus que les
+      tentables. Ce n'est pas la file qui se vide, c'est le compte qui cesse de mélanger deux
+      populations — ne pas le lire comme un progrès.
+      Quatre mutations jouées, quatre rouges : ordre d'origine restauré (3 cas), tri retiré,
+      `sansVille` fondu dans `sansTentative`, `villeDe` consultée hors éligibles.
 
 **[CARTE-03-GOOGLE] — Google Maps Geocoding, troisième repli.** ADR-0007. Marc a choisi
 Google Maps Geocoding (sur 4 options présentées) pour les entreprises que Nominatim ET le

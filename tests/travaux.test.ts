@@ -14,6 +14,7 @@ import {
   DELAI_RETENTE_POSITION_MS,
   adresseARattraper,
   bornesAMesurer,
+  choisirARaffiner,
   detailsAEnrichir,
   distanceAMesurer,
   positionARaffiner,
@@ -198,5 +199,99 @@ describe("distance à mesurer", () => {
 
   it("non sur une offre périmée — mesurer un poste fermé ne sert personne", () => {
     expect(distanceAMesurer(offre({ km: null, perimeeLe: "2026-08-01" }))).toBe(false);
+  });
+});
+
+// ── `choisirARaffiner` — QUI obtient une tentative, et qui bloque la file ──────────────
+//
+// Le défaut que ces cas verrouillent est une LIGNE D'ORDRE, pas une arithmétique : la file
+// était tranchée à `max` AVANT que les entrées sans ville soient écartées. Une éligible sans
+// ville consommait donc une place, sans qu'aucune requête parte — donc sans que son
+// `geocodeLe` soit marqué, donc en revenant en tête de file à la passe suivante, pour
+// toujours. Mesuré en production le 2026-09-18 : huit places pour 1 087 attentes.
+
+describe("choisir qui raffiner", () => {
+  const ilYaDesJours = (n: number) => new Date(MAINTENANT.getTime() - n * 24 * 60 * 60 * 1000);
+
+  function candidate(nom: string, jours: number): LieuTravail & { nom: string } {
+    return { ...lieu({ precision: "ville", geocodeLe: ilYaDesJours(jours) }), nom };
+  }
+
+  /** Toutes ont une ville : le cas nominal, où seul l'ordre est en jeu. */
+  const villePartout = () => "Québec";
+
+  it("sert les plus anciennement tentées d'abord — l'invariant de rotation de la file", () => {
+    const lieux = [candidate("recente", 8), candidate("ancienne", 40), candidate("moyenne", 20)];
+    const choix = choisirARaffiner(lieux, villePartout, MAINTENANT, 2);
+    expect(choix.servies.map((s) => s.lieu.nom)).toEqual(["ancienne", "moyenne"]);
+    expect(choix.sansTentative).toBe(1);
+  });
+
+  it("n'examine que les éligibles — une position exacte ou trop fraîche reste dehors", () => {
+    const lieux = [
+      candidate("a-raffiner", 40),
+      { ...lieu({ precision: "exacte" }), nom: "deja-exacte" },
+      candidate("trop-fraiche", 1),
+    ];
+    const choix = choisirARaffiner(lieux, villePartout, MAINTENANT, 10);
+    expect(choix.servies.map((s) => s.lieu.nom)).toEqual(["a-raffiner"]);
+    expect(choix.sansTentative).toBe(0);
+    expect(choix.sansVille).toBe(0);
+  });
+
+  it("une éligible SANS VILLE ne consomme aucune place du quota", () => {
+    // Les deux bloqueuses sont les PLUS ANCIENNES : sous l'ancien ordre elles prenaient les
+    // deux places et la passe ne partait avec rien.
+    const lieux = [
+      candidate("bloqueuse-1", 90),
+      candidate("bloqueuse-2", 80),
+      candidate("servable-1", 40),
+      candidate("servable-2", 30),
+    ];
+    const villeDe = (nom: string) => (nom.startsWith("bloqueuse") ? null : "Québec");
+    const choix = choisirARaffiner(lieux, villeDe, MAINTENANT, 2);
+    expect(choix.servies.map((s) => s.lieu.nom)).toEqual(["servable-1", "servable-2"]);
+  });
+
+  it("compte les sans-ville À PART — elles n'attendent pas leur tour, elles attendent une donnée", () => {
+    const lieux = [candidate("muette", 90), candidate("a", 40), candidate("b", 30)];
+    const villeDe = (nom: string) => (nom === "muette" ? null : "Québec");
+    const choix = choisirARaffiner(lieux, villeDe, MAINTENANT, 1);
+    expect(choix.sansVille).toBe(1);
+    // ⚠️ Le point du cas : `sansTentative` ne compte QUE `b`. Y ajouter `muette` dirait
+    // « ça avance lentement » là où il faut retrouver une ville.
+    expect(choix.sansTentative).toBe(1);
+  });
+
+  it("la ville retenue voyage avec la ligne — elle n'est résolue qu'une fois", () => {
+    const lieux = [candidate("usine", 40)];
+    const choix = choisirARaffiner(lieux, (nom) => `Ville de ${nom}`, MAINTENANT, 5);
+    expect(choix.servies).toEqual([{ lieu: lieux[0], ville: "Ville de usine" }]);
+  });
+
+  it("ne demande la ville qu'une fois par éligible, et jamais pour une non-éligible", () => {
+    const appels: string[] = [];
+    const lieux = [
+      candidate("eligible-1", 40),
+      candidate("eligible-2", 30),
+      { ...lieu({ precision: "exacte" }), nom: "hors-jeu" },
+    ];
+    choisirARaffiner(
+      lieux,
+      (nom) => {
+        appels.push(nom);
+        return "Québec";
+      },
+      MAINTENANT,
+      1,
+    );
+    expect(appels).toEqual(["eligible-1", "eligible-2"]);
+  });
+
+  it("quota nul : rien n'est servi et tout attend — un arrêt, pas une erreur", () => {
+    const lieux = [candidate("a", 40), candidate("b", 30)];
+    const choix = choisirARaffiner(lieux, villePartout, MAINTENANT, 0);
+    expect(choix.servies).toEqual([]);
+    expect(choix.sansTentative).toBe(2);
   });
 });

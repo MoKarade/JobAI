@@ -55,8 +55,8 @@ import {
   EPOQUE_A_RETENTER,
   adresseARattraper,
   bornesAMesurer,
+  choisirARaffiner,
   detailsAEnrichir,
-  positionARaffiner,
 } from "./travaux";
 import {
   adresseLisible,
@@ -68,7 +68,6 @@ import {
 } from "./registre";
 import { BUDGET_PASSE_PAGE_MS } from "./synchro";
 import { creerChrono } from "./jalons";
-import { trancherParQuota } from "./quota";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -702,6 +701,16 @@ interface Raffinage {
    * comme `lieuInconnuRapporte` et `lieuInconnuIgnore` le font déjà pour le flux.
    */
   sansTentative: number;
+  /**
+   * Éligibles dont la VILLE reste introuvable (`[V-ROUTINE-QUOTA]`, 2026-09-18).
+   *
+   * ⚠️ DIT À PART DE `sansTentative`, PARCE QUE LE GESTE EST OPPOSÉ. Une « en attente de
+   * quota » repassera toute seule — il suffit d'ajouter une passe ou de relever la borne.
+   * Une « sans ville » ne repassera JAMAIS : faute de ville on ne l'interroge pas, donc son
+   * `geocodeLe` n'avance pas, donc elle reste en tête de file indéfiniment. Les additionner
+   * ferait lire « ça avance lentement » là où il faut retrouver une donnée.
+   */
+  sansVille: number;
   /** Repassées de « centre-ville » à leur vraie position. */
   precisees: number;
   /** Toujours introuvables sous ce nom : elles retomberont en queue de file. */
@@ -771,23 +780,27 @@ async function raffinerPositions(
   budgetMs: number | null,
 ): Promise<Raffinage> {
   const maintenant = new Date();
-  const eligibles = (await db.select().from(entreprisesLieux))
-    .filter((l) => positionARaffiner(l, maintenant))
-    // La moins récemment tentée d'abord : la file tourne, et un cas insoluble retombe en
-    // queue au lieu de consommer le quota des autres à chaque passage.
-    .sort((a, b) => a.geocodeLe.getTime() - b.geocodeLe.getTime());
-  // ⚠️ LA TRANCHE ET LE RESTE SORTENT DU MÊME APPEL, et c'est tout l'objet du correctif :
-  // après un `slice` posé à part, l'information « combien attendaient » n'existe plus nulle
-  // part, et un compte calculé deux lignes plus bas finit par dériver du `slice`.
-  const { servies: lignes, sansTentative } = trancherParQuota(eligibles, max);
+  // ⚠️ LA SÉLECTION ENTIÈRE SORT DU MÊME APPEL — tri, quota, et résolution de la ville.
+  // Tranche puis filtre, c'était l'ordre d'avant, et il laissait une éligible sans ville
+  // occuper une place à vie (aucune requête ⇒ `geocodeLe` jamais marqué ⇒ retour en tête).
+  // Voir `choisirARaffiner` pour le détail ; la règle est pure et testée à part.
+  const { servies, sansTentative, sansVille } = choisirARaffiner(
+    await db.select().from(entreprisesLieux),
+    villeDe,
+    maintenant,
+    max,
+  );
 
-  const tentables = lignes
-    .map((l) => ({ nom: l.nom, ville: villeDe(l.nom), adresse: l.adresse }))
-    .filter((e): e is { nom: string; ville: string; adresse: string | null } => e.ville !== null);
+  const tentables = servies.map(({ lieu, ville }) => ({
+    nom: lieu.nom,
+    ville,
+    adresse: lieu.adresse,
+  }));
 
   const vide: Raffinage = {
     candidates: tentables.length,
     sansTentative,
+    sansVille,
     precisees: 0,
     toujoursAuCentre: 0,
     horsRayon: 0,
@@ -947,6 +960,7 @@ async function raffinerPositions(
   return {
     candidates: tentables.length,
     sansTentative,
+    sansVille,
     precisees,
     toujoursAuCentre: introuvablesFinal.length,
     horsRayon,
@@ -1416,6 +1430,7 @@ export async function mesurerDistances(
     let raffinage: Raffinage = {
       candidates: 0,
       sansTentative: 0,
+      sansVille: 0,
       precisees: 0,
       toujoursAuCentre: 0,
       horsRayon: 0,
@@ -1529,6 +1544,10 @@ export async function mesurerDistances(
         `precisees=${raffinage.precisees}/${raffinage.candidates}` +
         // Le second compte se dit AVEC le premier : voir `Raffinage.sansTentative`.
         `${raffinage.sansTentative > 0 ? ` (+${raffinage.sansTentative} en attente de quota)` : ""}` +
+        // ⚠️ LE TROISIÈME AUSSI, ET SURTOUT LUI. Une éligible sans ville ne tourne pas dans
+        // la file : elle ne se verrait donc nulle part, alors que c'est le seul des trois
+        // comptes qui désigne un blocage DURABLE.
+        `${raffinage.sansVille > 0 ? ` (${raffinage.sansVille} sans ville connue)` : ""}` +
         `${raffinage.parAdresse > 0 ? ` (${raffinage.parAdresse} par adresse)` : ""}` +
         // ⚠️ NE PAS DIRE « NON CONFIGURÉ » QUAND ON N'A RIEN DEMANDÉ.
         //

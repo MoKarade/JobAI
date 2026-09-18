@@ -63,10 +63,23 @@ describe("le câblage dans le raffinage des positions", () => {
     // Le mode de panne de ce correctif est le retour du `slice` séparé : le compte
     // recommencerait à décrire la tranche au lieu de la file. La garde vise donc la FORME de
     // l'appel, parce que c'est elle qui rend le défaut impossible.
-    const source = readFileSync(resolve(process.cwd(), "lib/actions.ts"), "utf8");
-    expect(source).toMatch(/const \{ servies: lignes, sansTentative \} = trancherParQuota\(/);
-    // Et le compte part bien dans les journaux : calculé sans être écrit, il ne répondrait à
-    // personne — c'est toute la raison d'être de l'item.
-    expect(source).toContain("en attente de quota");
+    //
+    // ⚠️ ELLE A CHANGÉ DE FICHIER LE 2026-09-18, ET C'EST UNE RE-DÉCISION, PAS UN RE-BASEMENT.
+    // Elle lisait `lib/actions.ts`, où l'appel vivait. La sélection est passée dans
+    // `choisirARaffiner` (`lib/travaux.ts`) parce que trancher AVANT d'écarter les éligibles
+    // sans ville laissait celles-ci occuper une place à vie. Le FAIT défendu n'a pas bougé —
+    // la tranche et le reste sortent du même appel —, seul son domicile a changé.
+    const selection = readFileSync(resolve(process.cwd(), "lib/travaux.ts"), "utf8");
+    expect(selection).toMatch(/const \{ servies, sansTentative \} = trancherParQuota\(/);
+
+    // Et la passe CONSOMME cette sélection au lieu de refaire la tranche chez elle.
+    const passe = readFileSync(resolve(process.cwd(), "lib/actions.ts"), "utf8");
+    expect(passe).toMatch(/const \{ servies, sansTentative, sansVille \} = choisirARaffiner\(/);
+
+    // Les comptes partent bien dans les journaux : calculés sans être écrits, ils ne
+    // répondraient à personne — c'est toute la raison d'être de l'item. Les DEUX, parce que
+    // le second est le seul qui désigne un blocage durable.
+    expect(passe).toContain("en attente de quota");
+    expect(passe).toContain("sans ville connue");
   });
 });

@@ -22,6 +22,8 @@
 // Fonctions PURES : aucun accès à la base, l'instant est un paramètre. C'est ce qui permet
 // à la requête SQL et au gate d'une page d'appliquer littéralement la MÊME règle.
 
+import { trancherParQuota } from "./quota";
+
 /** Ce dont la décision a besoin — volontairement le strict minimum. */
 export interface LieuTravail {
   precision: "exacte" | "ville";
@@ -91,6 +93,79 @@ export const DELAI_RETENTE_POSITION_MS = 7 * 24 * 60 * 60 * 1000;
 export function positionARaffiner(l: LieuTravail, maintenant: Date): boolean {
   if (l.precision !== "ville") return false;
   return maintenant.getTime() - l.geocodeLe.getTime() >= DELAI_RETENTE_POSITION_MS;
+}
+
+/** Ce qu'une sélection de raffinage a retenu, et ce qu'elle a laissé — dans le MÊME retour. */
+export interface ChoixRaffinage<T> {
+  /** Servies cette passe, avec la ville qui a permis de les retenir (résolue une seule fois). */
+  servies: { lieu: T; ville: string }[];
+  /**
+   * Tentables que le QUOTA laisse pour une prochaine passe. Elles repasseront : le tri les
+   * remet en tête au tour suivant. C'est une FILE, pas un refus.
+   */
+  sansTentative: number;
+  /**
+   * Éligibles dont la VILLE reste introuvable — et c'est une situation opposée à la
+   * précédente, d'où un compte séparé.
+   *
+   * ⚠️ Celles-ci ne repasseront PAS d'elles-mêmes : faute de ville, on ne les interroge pas,
+   * donc leur `geocodeLe` n'avance jamais, donc elles restent éternellement en tête de file.
+   * Les additionner à `sansTentative` dirait « elles attendent leur tour » alors qu'elles
+   * attendent une DONNÉE — deux gestes opposés (ajouter une passe, ou retrouver la ville).
+   */
+  sansVille: number;
+}
+
+/**
+ * Qui obtient une tentative de raffinage cette passe. PURE.
+ *
+ * ⚠️ LE QUOTA SE DÉPENSE SUR CE QU'ON PEUT RÉELLEMENT INTERROGER, ET C'EST LE CORRECTIF.
+ * L'ordre précédent était : trancher à `max`, PUIS écarter celles sans ville. Une éligible
+ * sans ville consommait donc une place — sans qu'aucune requête parte, donc sans que son
+ * `geocodeLe` soit marqué, donc en revenant en tête de file à la passe suivante. Elle
+ * reprenait la même place indéfiniment. Avec huit places pour plus d'un millier d'attentes
+ * (mesuré le 2026-09-18 : `precisees=4/8 (+1079 en attente de quota)`), chaque bloqueuse
+ * coûtait un huitième du débit, pour toujours, et le journal ne pouvait pas le montrer : un
+ * `precisees=N/M` avec M < 8 se lit « il n'y avait que M candidates ».
+ *
+ * La ville est résolue UNE fois par éligible et voyage avec la ligne retenue — la rechercher
+ * une seconde fois chez l'appelant, c'est la faire diverger un jour.
+ *
+ * ⚠️ `villeDe` est appelée au plus une fois par ÉLIGIBLE (et non par servie) : elle doit
+ * rester bon marché. Aucun accès réseau ni base ici — c'est une lecture de ce que la passe a
+ * déjà en mémoire.
+ */
+export function choisirARaffiner<T extends LieuTravail & { nom: string }>(
+  lieux: readonly T[],
+  villeDe: (nom: string) => string | null,
+  maintenant: Date,
+  max: number,
+): ChoixRaffinage<T> {
+  const eligibles = lieux
+    .filter((l) => positionARaffiner(l, maintenant))
+    // La moins récemment tentée d'abord : la file tourne, et un cas insoluble retombe en
+    // queue au lieu de consommer le quota des autres à chaque passage.
+    .sort((a, b) => a.geocodeLe.getTime() - b.geocodeLe.getTime());
+
+  const tentables: { lieu: T; ville: string }[] = [];
+  let sansVille = 0;
+  for (const lieu of eligibles) {
+    const ville = villeDe(lieu.nom);
+    // Sans ville, Nominatim chercherait la raison sociale dans le monde entier et rendrait
+    // n'importe quoi : on ne demande pas. Même règle que `employeursASituer`.
+    if (ville === null) {
+      sansVille++;
+      continue;
+    }
+    tentables.push({ lieu, ville });
+  }
+
+  // ⚠️ LE QUOTA S'APPLIQUE ICI, ET PAS UNE LIGNE PLUS HAUT. C'est tout le correctif : la
+  // borne se dépense sur ce qu'on peut interroger. `trancherParQuota` reste la seule
+  // écriture de « la tranche ET le reste, du même appel » — la refaire à la main ici, c'est
+  // la faire diverger au premier remaniement.
+  const { servies, sansTentative } = trancherParQuota(tentables, max);
+  return { servies, sansTentative, sansVille };
 }
 
 /**

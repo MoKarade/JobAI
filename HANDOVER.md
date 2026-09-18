@@ -6,6 +6,47 @@
 
 ---
 
+## Session 2026-09-18 — `[V-ROUTINE-QUOTA]` : la file servait les plus anciennes, sauf celles qui la bloquaient
+
+Marc : « continue les tâches backlog ». Ce qui restait d'actionnable sans décision de sa part
+était la seconde moitié de `[V-ROUTINE-QUOTA]` — « vérifier que le tri sert bien les plus
+anciennes ». La vérification a trouvé un défaut.
+
+**LE DÉFAUT EST UNE LIGNE D'ORDRE, LA MÊME FAMILLE QUE CELLE CORRIGÉE LA VEILLE.**
+`raffinerPositions` triait la file (la moins récemment tentée d'abord), **tranchait à huit**,
+puis écartait celles dont la ville est inconnue. Une éligible sans ville prenait donc une
+place, sans qu'aucune requête ne parte pour elle — donc sans que son `geocodeLe` soit marqué,
+donc en revenant en tête de file à la passe suivante. **Indéfiniment.** Avec huit places pour
+1 087 attentes (mesuré hier), chaque bloqueuse coûtait un huitième du débit, pour toujours.
+
+⚠️ **Et le journal ne pouvait pas le dire** : `precisees=N/M` avec `M < 8` se lit « il n'y
+avait que M candidates ». C'est exactement la cécité que le préalable de cet item venait de
+corriger sur le dénominateur — réparée d'un côté, intacte de l'autre, à six lignes d'écart.
+
+**Correctif.** `choisirARaffiner` (`lib/travaux.ts`, PURE) fait le tri, la résolution de ville
+et le quota **du même appel**, dans le bon ordre. Elle réutilise `trancherParQuota` au lieu de
+refaire la tranche à la main, et rend la ville **avec** la ligne retenue — la rechercher chez
+l'appelant, c'est la faire diverger un jour.
+
+**Un troisième compte paraît dans la ligne `[distances]`** : `(K sans ville connue)`, dit à
+part de `en attente de quota`. Les deux appellent des gestes opposés — une « en attente »
+repassera toute seule, une « sans ville » n'avancera jamais tant que la ville manque. Les
+additionner ferait lire « ça avance lentement » là où il faut retrouver une donnée.
+
+⚠️ **CE QUE JE NE PRÉTENDS PAS.** Que le défaut mordait hier : la passe du 2026-09-18 affichait
+`candidates=8`, donc aucune place perdue ce jour-là. Le défaut est certain dans le code, sa
+portée réelle est **inconnue** — et le nouveau compte est précisément ce qui la rendra visible.
+Au prochain relevé : `0` ⇒ la file était saine, `K > 0` ⇒ K places étaient gelées depuis
+toujours.
+
+⚠️ **Le `+1079` va baisser mécaniquement de K**, parce que `sansTentative` ne compte plus que
+les tentables. Ce n'est pas la file qui se vide, c'est le compte qui cesse de mélanger deux
+populations. Ne pas le lire comme un progrès.
+
+**Vérifications** : quatre mutations, quatre rouges (ordre d'origine restauré — 3 cas rouges —,
+tri retiré, `sansVille` fondu dans `sansTentative`, `villeDe` consultée hors éligibles). Gate
+complet vert.
+
 ## Contrôle 2026-09-18 (11:31:50 UTC) — six mesures armées la veille, et deux d'entre elles me contredisent
 
 Le contrôle programmé a lu la passe `cron-veille` du matin (`dep=dpl_6xoBitLR4kTXgxcftkZvqAw6MpXq`).
