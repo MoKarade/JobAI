@@ -72,14 +72,26 @@ describe("le câblage dans le raffinage des positions", () => {
     const selection = readFileSync(resolve(process.cwd(), "lib/travaux.ts"), "utf8");
     expect(selection).toMatch(/const \{ servies, sansTentative \} = trancherParQuota\(/);
 
-    // Et la passe CONSOMME cette sélection au lieu de refaire la tranche chez elle.
+    // Et les DEUX passes CONSOMMENT cette sélection au lieu de refaire la tranche chez elles.
+    // `[QUOTA-VILLE-02]` : le rattrapage des adresses portait le même défaut d'ordre, écrit
+    // deux cents lignes plus haut. Nommer les deux ici est ce qui empêche qu'une seule des
+    // deux files reparte en copie privée.
     const passe = readFileSync(resolve(process.cwd(), "lib/actions.ts"), "utf8");
     expect(passe).toMatch(/const \{ servies, sansTentative, sansVille \} = choisirARaffiner\(/);
+    expect(passe).toMatch(
+      /const \{ servies, sansTentative, sansVille \} = choisirARattraperAdresse\(/,
+    );
 
     // Les comptes partent bien dans les journaux : calculés sans être écrits, ils ne
-    // répondraient à personne — c'est toute la raison d'être de l'item. Les DEUX, parce que
-    // le second est le seul qui désigne un blocage durable.
-    expect(passe).toContain("en attente de quota");
-    expect(passe).toContain("sans ville connue");
+    // répondraient à personne — c'est toute la raison d'être de l'item. DEUX comptes, et
+    // DEUX lignes de journal : on exige donc deux occurrences de chacun, sinon une des deux
+    // files pourrait cesser de publier sans que rien ne rougisse.
+    //
+    // ⚠️ LE MOTIF PORTE L'INTERPOLATION, PAS SEULEMENT LE TEXTE — sinon il compte la PROSE.
+    // Premier jet : `/en attente de quota/g` rendait TROIS occurrences, la troisième étant
+    // le commentaire qui explique le champ. Ancré sur `.sansVille}`, il ne peut matcher que
+    // du code.
+    expect(passe.match(/\.sansTentative\} en attente de quota/g)).toHaveLength(2);
+    expect(passe.match(/\.sansVille\} sans ville connue/g)).toHaveLength(2);
   });
 });

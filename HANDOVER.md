@@ -6,6 +6,44 @@
 
 ---
 
+## Session 2026-09-18 (suite) — `[QUOTA-VILLE-02]` : le défaut jumeau, et une règle au lieu de deux
+
+Marc : « fais QUOTA-VILLE-02 aussi ». Feu vert explicite sur le défaut signalé une heure plus
+tôt — le même ordre fautif dans `rattraperAdresses` que celui corrigé dans `raffinerPositions`.
+
+⚠️ **ET ÇA PASSE OUTRE LA CONDITION QUE L'ITEM SE POSAIT À LUI-MÊME.** Il disait « publier
+d'abord le compte, lire un relevé, puis corriger ». Marc a tranché l'inverse, c'est raisonnable
+— le correctif est gratuit, le défaut structurel — mais le coût se dit : **on ne saura jamais
+combien de places le rattrapage d'adresses gelait AVANT.** Le compte part avec le correctif.
+
+**Une règle, deux consommateurs.** Plutôt que de corriger une seconde copie, le corps de
+sélection est devenu unique : `choisirDansLaFile` (`lib/travaux.ts`, PURE), avec deux enveloppes
+nommées qui ne diffèrent que par leur **prédicat d'éligibilité**. C'est la duplication qui avait
+produit ce défaut en double ; en laisser deux, c'était accepter qu'elles re-divergent.
+
+**Les deux comptes paraissent aussi sur la ligne des adresses.** Sans `(+K en attente de quota)`,
+`adresses=N/M` avait exactement la cécité que `precisees=N/M` avait — `M` vaut au plus le quota.
+
+⚠️ **Le commentaire de `rattraperAdresses` avait raison sur la moitié qu'il traitait.** « Trier
+par `geocodeLe` + marquer à chaque tentative fait tourner la file » est vrai **quand une requête
+part**. Il ne protégeait de rien quand aucune ne part — le cas « pas de ville », c'est-à-dire la
+boucle exacte qu'il croyait avoir fermée. Il n'a pas été corrigé mais ÉTENDU : il raconte
+maintenant les deux moitiés.
+
+### Correction de ce que j'ai écrit ce matin
+
+⚠️ J'avais écrit, pour `[V-ROUTINE-QUOTA]` : « `K > 0` ⇒ K places étaient gelées depuis
+toujours ». **C'est trop fort**, et quelqu'un en tirerait un chiffre faux. `sansVille` compte les
+éligibles sans ville sur **toute la file**, pas seulement en tête — or seules celles tombant dans
+les `max` premières gelaient une place. La lecture juste est asymétrique : **`K = 0` conclut**
+(aucune place ne pouvait être gelée), **`K > 0` ne conclut pas**. Corrigé dans le BACKLOG et dans
+le contrôle programmé de 03:08, qui portait la même formule.
+
+**Vérifications** : trois mutations, trois rouges (prédicat recopié de travers — 4 cas —, tranche
+reposée sur les éligibles — 9 cas —, file des adresses cessant de publier). Gate complet vert.
+⚠️ Et la garde de câblage a failli compter la PROSE : `/en attente de quota/g` rendait trois
+occurrences, la troisième étant un commentaire. Le motif porte désormais l'interpolation.
+
 ## Session 2026-09-18 — `[V-ROUTINE-QUOTA]` : la file servait les plus anciennes, sauf celles qui la bloquaient
 
 Marc : « continue les tâches backlog ». Ce qui restait d'actionnable sans décision de sa part

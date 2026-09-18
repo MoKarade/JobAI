@@ -1727,8 +1727,15 @@ RESTE — à observer sur les prochains dépôts (rien à coder) :
       ⚠️ **CE QUE JE NE PRÉTENDS PAS** : que le défaut mordait le 2026-09-18. Ce jour-là
       `candidates=8`, donc aucune place perdue sur CETTE passe — le défaut est certain dans le
       code, sa portée réelle est inconnue. Le nouveau compte est justement ce qui la rendra
-      visible. Attendre `(K sans ville connue)` dans le prochain relevé : `0` ⇒ la file était
-      saine, `K > 0` ⇒ K places étaient gelées depuis toujours.
+      visible.
+      ⚠️ **CORRECTION DE CE QUE J'AI ÉCRIT CI-DESSUS LE 2026-09-18** : « `K > 0` ⇒ K places
+      étaient gelées depuis toujours » est **trop fort**, et un lecteur en tirerait un chiffre
+      faux. `sansVille` compte les éligibles sans ville sur **toute la file**, pas seulement en
+      tête. Or seules celles qui tombaient dans les `max` premières gelaient une place. La
+      lecture juste est asymétrique : **`K = 0` est concluant** (aucune place ne pouvait être
+      gelée), **`K > 0` ne l'est pas** (il faudrait savoir combien de ces K étaient parmi les
+      plus anciennes). Mesurer ça exigerait un quatrième compte dont le coût dépasse l'intérêt,
+      maintenant que le défaut est fermé.
       ⚠️ **Et `+1079` va MÉCANIQUEMENT baisser de K** : `sansTentative` ne compte plus que les
       tentables. Ce n'est pas la file qui se vide, c'est le compte qui cesse de mélanger deux
       populations — ne pas le lire comme un progrès.
@@ -1762,6 +1769,32 @@ RESTE — à observer sur les prochains dépôts (rien à coder) :
       c'est se priver de la mesure qui dit s'il fallait le corriger.
       ➜ Le troisième consommateur de `villeDe`, `adressesDepuisRegistre`, est SAIN : il n'a
       aucun quota (c'est l'étape non bornée de `[DISTANCES-01]`), donc rien à trancher.
+      ✅ **LIVRÉ le 2026-09-18, sur feu vert explicite de Marc (« fais QUOTA-VILLE-02 aussi »).**
+      ⚠️ **ET ÇA PASSE OUTRE LA CONDITION QUE CET ITEM SE POSAIT** (« publier d'abord le compte,
+      lire un relevé, puis corriger »). C'est la décision de Marc, elle est raisonnable — le
+      correctif est gratuit et le défaut structurel — mais elle a un coût qu'il faut dire :
+      **on ne saura jamais combien de places le rattrapage d'adresses gelait avant.** Le compte
+      part avec le correctif, donc il ne mesurera plus que l'après.
+      **Ce qui a été fait** : le corps de sélection est devenu UNIQUE pour les deux files —
+      `choisirDansLaFile` (`lib/travaux.ts`, PURE), et deux enveloppes nommées qui ne diffèrent
+      que par leur **prédicat d'éligibilité** (`choisirARaffiner` / `choisirARattraperAdresse`).
+      Corriger deux copies en aurait laissé deux à re-diverger ; c'est d'ailleurs la duplication
+      qui avait produit ce défaut en double.
+      **Les deux comptes paraissent aussi sur la ligne des adresses** :
+      `adresses=N/M (+K en attente de quota) (K' sans ville connue) (…)`. Sans le premier, `M`
+      avait exactement la cécité que `precisees=N/M` avait — il vaut au plus le quota.
+      ⚠️ **Le commentaire de `rattraperAdresses` disait déjà le bon raisonnement, et il reste
+      dans le code avec ce qui le complète** : trier par `geocodeLe` + marquer à chaque
+      tentative fait tourner la file **quand une requête part**. Il ne protégeait de rien quand
+      aucune ne part — le cas « pas de ville ». Le commentaire n'a pas été corrigé mais ÉTENDU :
+      il raconte maintenant les deux moitiés, la juste et celle qui manquait.
+      Trois mutations, trois rouges : prédicat d'éligibilité recopié de travers (4 cas), tranche
+      reposée sur les éligibles au lieu des tentables (9 cas), file des adresses cessant de
+      publier son compte.
+      ⚠️ **Et la garde de câblage a failli compter la PROSE** : `/en attente de quota/g` rendait
+      TROIS occurrences dans `lib/actions.ts` — la troisième étant le commentaire qui explique
+      le champ. Le motif porte désormais l'interpolation (`.sansVille} sans ville connue`), donc
+      il ne peut matcher que du code. Piège déjà nommé dans les leçons du hub, re-payé ici.
 
 **[CARTE-03-GOOGLE] — Google Maps Geocoding, troisième repli.** ADR-0007. Marc a choisi
 Google Maps Geocoding (sur 4 options présentées) pour les entreprises que Nominatim ET le

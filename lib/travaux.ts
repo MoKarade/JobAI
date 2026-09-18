@@ -95,8 +95,8 @@ export function positionARaffiner(l: LieuTravail, maintenant: Date): boolean {
   return maintenant.getTime() - l.geocodeLe.getTime() >= DELAI_RETENTE_POSITION_MS;
 }
 
-/** Ce qu'une sélection de raffinage a retenu, et ce qu'elle a laissé — dans le MÊME retour. */
-export interface ChoixRaffinage<T> {
+/** Ce qu'une sélection de file a retenu, et ce qu'elle a laissé — dans le MÊME retour. */
+export interface ChoixFile<T> {
   /** Servies cette passe, avec la ville qui a permis de les retenir (résolue une seule fois). */
   servies: { lieu: T; ville: string }[];
   /**
@@ -117,16 +117,22 @@ export interface ChoixRaffinage<T> {
 }
 
 /**
- * Qui obtient une tentative de raffinage cette passe. PURE.
+ * Qui obtient une tentative cette passe, pour une file de lieux bornée par un quota. PURE.
  *
  * ⚠️ LE QUOTA SE DÉPENSE SUR CE QU'ON PEUT RÉELLEMENT INTERROGER, ET C'EST LE CORRECTIF.
- * L'ordre précédent était : trancher à `max`, PUIS écarter celles sans ville. Une éligible
- * sans ville consommait donc une place — sans qu'aucune requête parte, donc sans que son
- * `geocodeLe` soit marqué, donc en revenant en tête de file à la passe suivante. Elle
- * reprenait la même place indéfiniment. Avec huit places pour plus d'un millier d'attentes
- * (mesuré le 2026-09-18 : `precisees=4/8 (+1079 en attente de quota)`), chaque bloqueuse
- * coûtait un huitième du débit, pour toujours, et le journal ne pouvait pas le montrer : un
- * `precisees=N/M` avec M < 8 se lit « il n'y avait que M candidates ».
+ * L'ordre précédent — dans LES DEUX files, `[V-ROUTINE-QUOTA]` puis `[QUOTA-VILLE-02]` —
+ * était : trancher à `max`, PUIS écarter celles sans ville. Une éligible sans ville
+ * consommait donc une place, sans qu'aucune requête parte, donc sans que son `geocodeLe`
+ * soit marqué, donc en revenant en tête de file à la passe suivante. Elle reprenait la même
+ * place indéfiniment. Avec huit places pour plus d'un millier d'attentes (mesuré le
+ * 2026-09-18 : `precisees=4/8 (+1079 en attente de quota)`), chaque bloqueuse coûtait un
+ * huitième du débit, pour toujours — et le journal ne pouvait pas le montrer : un `N/M` avec
+ * `M` inférieur au quota se lit « il n'y avait que M candidates ».
+ *
+ * ⚠️ UNE SEULE RÈGLE, DEUX CONSOMMATEURS, ET C'EST DÉLIBÉRÉ. Le raffinage des positions et le
+ * rattrapage des adresses ont porté le MÊME défaut, écrit deux fois à deux cents lignes
+ * d'écart. Corriger deux copies en laisse deux à re-diverger ; ce corps est donc unique, et
+ * seul le PRÉDICAT D'ÉLIGIBILITÉ distingue les deux files.
  *
  * La ville est résolue UNE fois par éligible et voyage avec la ligne retenue — la rechercher
  * une seconde fois chez l'appelant, c'est la faire diverger un jour.
@@ -135,14 +141,14 @@ export interface ChoixRaffinage<T> {
  * rester bon marché. Aucun accès réseau ni base ici — c'est une lecture de ce que la passe a
  * déjà en mémoire.
  */
-export function choisirARaffiner<T extends LieuTravail & { nom: string }>(
+export function choisirDansLaFile<T extends LieuTravail & { nom: string }>(
   lieux: readonly T[],
+  eligible: (l: T) => boolean,
   villeDe: (nom: string) => string | null,
-  maintenant: Date,
   max: number,
-): ChoixRaffinage<T> {
+): ChoixFile<T> {
   const eligibles = lieux
-    .filter((l) => positionARaffiner(l, maintenant))
+    .filter(eligible)
     // La moins récemment tentée d'abord : la file tourne, et un cas insoluble retombe en
     // queue au lieu de consommer le quota des autres à chaque passage.
     .sort((a, b) => a.geocodeLe.getTime() - b.geocodeLe.getTime());
@@ -166,6 +172,26 @@ export function choisirARaffiner<T extends LieuTravail & { nom: string }>(
   // la faire diverger au premier remaniement.
   const { servies, sansTentative } = trancherParQuota(tentables, max);
   return { servies, sansTentative, sansVille };
+}
+
+/** Qui obtient une tentative de RAFFINAGE DE POSITION cette passe (`[V-ROUTINE-QUOTA]`). */
+export function choisirARaffiner<T extends LieuTravail & { nom: string }>(
+  lieux: readonly T[],
+  villeDe: (nom: string) => string | null,
+  maintenant: Date,
+  max: number,
+): ChoixFile<T> {
+  return choisirDansLaFile(lieux, (l) => positionARaffiner(l, maintenant), villeDe, max);
+}
+
+/** Qui obtient une tentative de RATTRAPAGE D'ADRESSE cette passe (`[QUOTA-VILLE-02]`). */
+export function choisirARattraperAdresse<T extends LieuTravail & { nom: string }>(
+  lieux: readonly T[],
+  villeDe: (nom: string) => string | null,
+  maintenant: Date,
+  max: number,
+): ChoixFile<T> {
+  return choisirDansLaFile(lieux, (l) => adresseARattraper(l, maintenant), villeDe, max);
 }
 
 /**

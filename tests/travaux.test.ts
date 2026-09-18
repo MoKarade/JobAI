@@ -15,6 +15,7 @@ import {
   adresseARattraper,
   bornesAMesurer,
   choisirARaffiner,
+  choisirARattraperAdresse,
   detailsAEnrichir,
   distanceAMesurer,
   positionARaffiner,
@@ -293,5 +294,80 @@ describe("choisir qui raffiner", () => {
     const choix = choisirARaffiner(lieux, villePartout, MAINTENANT, 0);
     expect(choix.servies).toEqual([]);
     expect(choix.sansTentative).toBe(2);
+  });
+});
+
+// ── `choisirARattraperAdresse` — la file JUMELLE, `[QUOTA-VILLE-02]` ───────────────────
+//
+// Le rattrapage des adresses portait EXACTEMENT le même défaut d'ordre que le raffinage,
+// écrit deux fois à deux cents lignes d'écart. Les deux files partagent désormais un seul
+// corps (`choisirDansLaFile`) et ne diffèrent que par leur prédicat d'éligibilité — ce que
+// le dernier cas de ce bloc vérifie, parce que c'est la seule chose qui peut se recopier de
+// travers.
+
+describe("choisir à qui rattraper une adresse", () => {
+  const ilYaDesJours = (n: number) => new Date(MAINTENANT.getTime() - n * 24 * 60 * 60 * 1000);
+
+  /** Position exacte, adresse manquante, tentée il y a longtemps : le cas nominal. */
+  function sansAdresse(nom: string, jours: number): LieuTravail & { nom: string } {
+    return {
+      ...lieu({ precision: "exacte", adresse: null, geocodeLe: ilYaDesJours(jours) }),
+      nom,
+    };
+  }
+
+  const villePartout = () => "Québec";
+
+  it("sert les plus anciennement tentées d'abord", () => {
+    const lieux = [sansAdresse("recente", 2), sansAdresse("ancienne", 40), sansAdresse("moyenne", 9)];
+    const choix = choisirARattraperAdresse(lieux, villePartout, MAINTENANT, 2);
+    expect(choix.servies.map((s) => s.lieu.nom)).toEqual(["ancienne", "moyenne"]);
+    expect(choix.sansTentative).toBe(1);
+  });
+
+  it("une éligible SANS VILLE ne consomme aucune place — le défaut de `[QUOTA-VILLE-02]`", () => {
+    // Les deux bloqueuses sont les PLUS ANCIENNES : sous l'ancien ordre elles prenaient les
+    // deux places et la passe partait sans rien interroger.
+    const lieux = [
+      sansAdresse("bloqueuse-1", 90),
+      sansAdresse("bloqueuse-2", 80),
+      sansAdresse("servable-1", 40),
+      sansAdresse("servable-2", 30),
+    ];
+    const villeDe = (nom: string) => (nom.startsWith("bloqueuse") ? null : "Québec");
+    const choix = choisirARattraperAdresse(lieux, villeDe, MAINTENANT, 2);
+    expect(choix.servies.map((s) => s.lieu.nom)).toEqual(["servable-1", "servable-2"]);
+    expect(choix.sansVille).toBe(2);
+    expect(choix.sansTentative).toBe(0);
+  });
+
+  it("n'examine pas celles qui ont déjà une adresse, ni les trop fraîches", () => {
+    const lieux = [
+      sansAdresse("a-rattraper", 40),
+      { ...lieu({ precision: "exacte", adresse: "1 rue Connue", geocodeLe: ilYaDesJours(40) }), nom: "deja-adressee" },
+      sansAdresse("trop-fraiche", 0),
+    ];
+    const choix = choisirARattraperAdresse(lieux, villePartout, MAINTENANT, 10);
+    expect(choix.servies.map((s) => s.lieu.nom)).toEqual(["a-rattraper"]);
+  });
+
+  it("⚠️ les DEUX files partagent le corps, JAMAIS le prédicat", () => {
+    // Le mode de panne d'une règle partagée est le prédicat recopié de travers : les deux
+    // enveloppes appelleraient le même corps avec la même éligibilité, et l'une servirait
+    // les candidates de l'autre. Ce cas le rend impossible — aucun des deux lieux n'est
+    // éligible aux deux files.
+    const pourAdresse = sansAdresse("sans-adresse", 40);
+    const pourPosition = {
+      ...lieu({ precision: "ville", adresse: null, geocodeLe: ilYaDesJours(40) }),
+      nom: "au-centre-ville",
+    };
+    const lieux = [pourAdresse, pourPosition];
+
+    expect(
+      choisirARattraperAdresse(lieux, villePartout, MAINTENANT, 10).servies.map((s) => s.lieu.nom),
+    ).toEqual(["sans-adresse"]);
+    expect(
+      choisirARaffiner(lieux, villePartout, MAINTENANT, 10).servies.map((s) => s.lieu.nom),
+    ).toEqual(["au-centre-ville"]);
   });
 });

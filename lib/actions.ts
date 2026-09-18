@@ -53,9 +53,9 @@ import { ETENDUE_VIDE_SUSPECTE_KM, grapperPourBornes, proximiteBorne } from "./b
 import { DELAI_MAX_MS, ETENDUE_MAX_DEG, chercherBornesBoite } from "./overpass";
 import {
   EPOQUE_A_RETENTER,
-  adresseARattraper,
   bornesAMesurer,
   choisirARaffiner,
+  choisirARattraperAdresse,
   detailsAEnrichir,
 } from "./travaux";
 import {
@@ -267,6 +267,21 @@ export async function passeGeocodage(): Promise<ResultatPasse> {
 interface Rattrapage {
   /** Combien de lignes remplissaient les conditions au début de la passe. */
   candidates: number;
+  /**
+   * Tentables que le QUOTA laisse pour une prochaine passe (`[QUOTA-VILLE-02]`).
+   *
+   * Sans lui, `adresses=N/M` a la même cécité que `precisees=N/M` avait : `M` vaut au plus
+   * le quota, donc « il n'y avait que M candidates » et « il y en avait trois cents » rendent
+   * la même ligne.
+   */
+  sansTentative: number;
+  /**
+   * Éligibles dont la VILLE reste introuvable — dit à PART, parce que le geste est opposé.
+   *
+   * Une « en attente de quota » repassera toute seule ; une « sans ville » n'avancera jamais
+   * tant que la ville manque, faute de requête qui marquerait son `geocodeLe`.
+   */
+  sansVille: number;
   /** Combien ont réellement gagné leur adresse. */
   ecrites: number;
   /** Trouvées, mais trop loin du point déjà épinglé : un homonyme, écarté à raison. */
@@ -287,30 +302,44 @@ async function rattraperAdresses(
   // c'est précisément ce qui a affamé ce rattrapage pendant des jours. La table compte
   // quelques dizaines de lignes ; les lire toutes pour appliquer un prédicat PARTAGÉ coûte
   // moins qu'une seconde implémentation.
-  const toutes = await db.select().from(entreprisesLieux);
   const maintenant = new Date();
-  const lignes = toutes
-    .filter((l) => adresseARattraper(l, maintenant))
-    // LA MOINS RÉCEMMENT TENTÉE D'ABORD — et c'est ce qui fait CONVERGER le rattrapage.
-    //
-    // Sans `ORDER BY`, Postgres sert les lignes dans l'ordre du heap : le même lot
-    // reviendrait à chaque passage et le fond de la file n'aurait jamais son tour. Trier
-    // par nom ne suffirait pas non plus — une entreprise qu'OpenStreetMap ne connaîtra
-    // JAMAIS resterait éternellement en tête et consommerait le quota à la place des
-    // autres. En triant par `geocodeLe`, et en le marquant à CHAQUE tentative (réussie ou
-    // non, voir plus bas), la file tourne : tout le monde passe, et un cas insoluble
-    // retombe naturellement en queue au lieu de bloquer les suivants.
-    .sort((a, b) => a.geocodeLe.getTime() - b.geocodeLe.getTime())
-    .slice(0, max);
+  // LA MOINS RÉCEMMENT TENTÉE D'ABORD — et c'est ce qui fait CONVERGER le rattrapage.
+  //
+  // Sans `ORDER BY`, Postgres sert les lignes dans l'ordre du heap : le même lot reviendrait
+  // à chaque passage et le fond de la file n'aurait jamais son tour. Trier par nom ne
+  // suffirait pas non plus — une entreprise qu'OpenStreetMap ne connaîtra JAMAIS resterait
+  // éternellement en tête et consommerait le quota à la place des autres. En triant par
+  // `geocodeLe`, et en le marquant à CHAQUE tentative (réussie ou non, voir plus bas), la
+  // file tourne : tout le monde passe, et un cas insoluble retombe en queue.
+  //
+  // ⚠️ CE RAISONNEMENT ÉTAIT JUSTE POUR UN ÉCHEC, ET FAUX POUR UNE ABSENCE DE VILLE
+  // (`[QUOTA-VILLE-02]`). Le tri et le marquage font bien tourner la file quand une requête
+  // PART. Mais cette fonction tranchait à `max` AVANT d'écarter les éligibles sans ville :
+  // celles-là prenaient une place sans qu'aucune requête ne parte, donc sans marquage, donc
+  // en revenant en tête à la passe suivante — la boucle exacte que le commentaire ci-dessus
+  // croyait avoir fermée. Le même défaut vivait dans `raffinerPositions` ; la sélection est
+  // désormais UNE règle pour les deux files (`choisirDansLaFile`), et le quota se dépense
+  // sur ce qu'on peut réellement interroger.
+  const { servies, sansTentative, sansVille } = choisirARattraperAdresse(
+    await db.select().from(entreprisesLieux),
+    villeDe,
+    maintenant,
+    max,
+  );
 
   // La position DÉJÀ VALIDÉE sert de référent : c'est elle qu'on cherche à confirmer.
-  const referent = new Map(lignes.map((l) => [l.nom, { lat: l.lat, lon: l.lon }]));
+  const referent = new Map(servies.map(({ lieu }) => [lieu.nom, { lat: lieu.lat, lon: lieu.lon }]));
 
-  const tentables = lignes
-    .map((l) => ({ nom: l.nom, ville: villeDe(l.nom) }))
-    .filter((e): e is { nom: string; ville: string } => e.ville !== null);
+  const tentables = servies.map(({ lieu, ville }) => ({ nom: lieu.nom, ville }));
 
-  const vide: Rattrapage = { candidates: tentables.length, ecrites: 0, horsRayon: 0, sansReponse: 0 };
+  const vide: Rattrapage = {
+    candidates: tentables.length,
+    sansTentative,
+    sansVille,
+    ecrites: 0,
+    horsRayon: 0,
+    sansReponse: 0,
+  };
   // Aucune candidate GÉOCODABLE : ce n'est pas un échec, c'est qu'aucune des entreprises
   // sans adresse n'a de ville connue. Le compte le dit — il vaut 0 sur 0, pas 0 sur six.
   if (tentables.length === 0) return vide;
@@ -369,7 +398,7 @@ async function rattraperAdresses(
     ecrites++;
   }
 
-  return { candidates: tentables.length, ecrites, horsRayon, sansReponse };
+  return { candidates: tentables.length, sansTentative, sansVille, ecrites, horsRayon, sansReponse };
 }
 
 /**
@@ -1385,7 +1414,14 @@ export async function mesurerDistances(
 
     // 1 bis. Récupérer les adresses manquantes des entreprises déjà situées — sans quoi
     //        la colonne resterait vide pour tout ce qui existait avant elle.
-    let adresses: Rattrapage = { candidates: 0, ecrites: 0, horsRayon: 0, sansReponse: 0 };
+    let adresses: Rattrapage = {
+      candidates: 0,
+      sansTentative: 0,
+      sansVille: 0,
+      ecrites: 0,
+      horsRayon: 0,
+      sansReponse: 0,
+    };
     try {
       adresses = await rattraperAdresses(villeDe, maxSituations, budgetRestant());
     } catch (err) {
@@ -1536,6 +1572,10 @@ export async function mesurerDistances(
       `[distances] passe terminée — placées=${placees} mesurées=${majs.length} situées=${situees}/${manquants.length} ` +
         `villes=${aRattraper.length} ` +
         `adresses=${adresses.ecrites}/${adresses.candidates}` +
+        // Les deux mêmes comptes que côté raffinage, et pour la même raison : un `N/M` seul
+        // ne distingue pas « il n'y avait que M candidates » de « il y en avait mille ».
+        `${adresses.sansTentative > 0 ? ` (+${adresses.sansTentative} en attente de quota)` : ""}` +
+        `${adresses.sansVille > 0 ? ` (${adresses.sansVille} sans ville connue)` : ""}` +
         `${adresses.horsRayon > 0 ? ` (${adresses.horsRayon} hors rayon)` : ""}` +
         `${adresses.sansReponse > 0 ? ` (${adresses.sansReponse} sans réponse)` : ""} ` +
         `registre=${registre.trouvees}/${registre.candidates}` +
