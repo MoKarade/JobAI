@@ -22,6 +22,16 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    // [PWA-ANDROID] `id` FIXE l'identité de l'installation. Sans lui, l'identité EST le
+    // `start_url` : le jour où il change, Android ne met pas à jour l'app installée — il en
+    // installe une DEUXIÈME, et la première reste sur l'écran d'accueil sans jamais bouger.
+    // La valeur est celle du `start_url` ACTUEL, donc c'est un no-op aujourd'hui : le but est
+    // d'épingler ce qui était implicite.
+    id: "/",
+    // [PWA-ANDROID] Un lien venu d'ailleurs (le hub, une notification) RÉUTILISE la fenêtre
+    // déjà ouverte au lieu d'en empiler une seconde. `focus-existing` a été écarté : il
+    // ramène la fenêtre au premier plan SANS naviguer, donc en ignorant l'URL demandée.
+    launch_handler: { client_mode: "navigate-existing" },
     name: "JobAI",
     short_name: "JobAI",
     description: "Suivi et analyse de recherche d’emploi — région de Québec.",

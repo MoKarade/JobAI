@@ -8,6 +8,23 @@
 
 ---
 
+## Installable sur le téléphone (Marc, 18/09/2026 — Android) ✅
+
+- [x] **`id` et `launch_handler: navigate-existing` au manifeste.** Sans `id`, l'identité de
+  l'installation EST le `start_url` : le jour où il change, Android installe une SECONDE app au
+  lieu de mettre à jour la première. `navigate-existing` fait qu'un lien venu du hub réutilise la
+  fenêtre ouverte plutôt que d'en empiler une. Garde : `tests/pwaManifeste.test.ts`, 3
+  perturbations prouvées.
+- [x] **Rien d'autre à faire ici, et c'est une mesure** : le manifeste avait déjà ses icônes 192,
+  512 et maskable-512 DISTINCTES, et son service worker était bien enregistré. Sur les sept dépôts
+  du parc, seul FinanceAI n'était pas installable (une unique icône SVG, que Chrome refuse pour
+  fabriquer le WebAPK).
+- [ ] **⏸️ La bascule « le lien du hub ouvre l'app installée » n'est pas vérifiable d'ici** : elle
+  dépend de la version de Chrome, de l'installation réelle et d'un réglage système. C'est le
+  téléphone de Marc qui tranche. Côté hub, le verrou était un `target="_blank"` retiré là-bas.
+
+---
+
 ## Chantier #49 — la chaîne de build : le GITHUB_TOKEN restait lisible tout le run  ✅
 
 Lot L2 de l'audit multi-outils du 2026-09-18, livré le même jour.
