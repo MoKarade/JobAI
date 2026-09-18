@@ -6,6 +6,73 @@
 
 ---
 
+## Session 2026-09-18 (suite 5) — la veille n'a plus qu'une source, et un garde a trouvé une vraie fuite
+
+Marc : « enlève tout ce qui ne rend rien à la recherche ». Quatre canaux nommés, puis « go ».
+**Lot 1 sur 4** : la suppression. Les lots 2 (importer les 7 203 offres québécoises), 3
+(distance amorcée par la ville puis la bande postale) et 4 (l'écran : filtre km, tri par note)
+restent à faire.
+
+### Ce qui a été supprimé, et ce que chaque canal rendait
+
+| Canal | Mesure du 2026-09-18 |
+|---|---|
+| Recherches RSS du Guichet par mot-clé | liste **vide** — les adresses ne répondent pas |
+| Pages carrières d'ATS (Greenhouse, Lever, Recruitee, Workable, SmartRecruiters) | **aucune entreprise déclarée**, jamais : la source interrogeait le vide |
+| Dépôt `data/depot/` + `POST /api/ingest/depot` + `INGEST_TOKEN` | dernier lot le **21/08**, hors fenêtre depuis trois semaines |
+| Routine claude.ai qui l'alimentait | **aucune** des 60 Routines du compte ne pointait sur JobAI |
+
+Reste le **flux complet du Guichet** : 42 894 offres vues par passe. `selectionnerSources`
+n'a plus ni rotation ni curseur — une source, ou aucune. **−8 644 lignes, +627.**
+
+### 🔴 Le garde de PII a trouvé une vraie fuite, et il ne l'aurait jamais trouvée avant
+
+Les motifs « courriel nominatif » et « profil LinkedIn personnel » ne tournaient que sur
+`data/depot/*.json`. Ce dossier supprimé, **ils auraient scanné une liste vide en restant
+verts** — une garde dont la population disparaît ne se supprime pas avec elle, elle se
+re-pointe. Élargis aux 369 fichiers versionnés, ils ont trouvé **du premier coup** le vrai
+nom, le vrai courriel et le vrai identifiant LinkedIn du recruteur Randstad : recopiés de
+l'annonce du 12/08 dans les fixtures de `tests/expurger.test.ts`, dans un dépôt **public**,
+invisibles depuis cinq semaines. Remplacés par des valeurs de même FORME sans personne
+derrière. ⚠️ **L'historique git les garde** — c'est irréversible, et c'est le prix déjà payé ;
+ce qui change est qu'aucune nouvelle ne passera.
+
+⚠️ **L'exemption du champ `adresse` a été retirée avec les dépôts** : `piiGuard` ne neutralise
+désormais plus rien nulle part. Une exception qui survit à sa raison est un trou qui attend.
+
+### Les tests bâtis sur le dépôt : re-pointés, pas supprimés
+
+`tests/ingest-passe-suspension.test.ts` (les 4 invariants de l'incident du 12/08 — balayage
+suspendu, fermeture d'office, couverture incomplète, `perimees` est la liste que la base
+écrit) était monté sur des lots temporaires dans `data/depot/`. Il injecte maintenant un
+**flux stub** : plus de disque, plus de `process.chdir`, mêmes invariants. Un cas NEUF s'y
+ajoute — une passe sans source demandée suspend aussi (échec fermé) : le cas n'existait pas
+tant que le dépôt était toujours là.
+
+⚠️ **Deux listes écrites à la main sont devenues des listes DÉCOUVERTES.**
+`tests/ingest-pipeline.test.ts` balaie désormais le dépôt pour trouver les chemins qui
+écrivent le lien d'une offre, au lieu d'en nommer deux. Prouvé par mutation : un faux site
+d'écriture ajouté ailleurs fait rougir le test.
+
+### Points d'attention
+
+- **`[PERSIST-02]`, découvert et NON corrigé** (hors périmètre, au BACKLOG) : la liste de
+  `tests/persistance.test.ts` est incomplète — `app/api/mcp/route.ts` et `lib/cv/actions.ts`
+  écrivent dans `offers` sans y figurer. Écritures ciblées, donc probablement pas un défaut,
+  mais personne ne l'a tranché et la liste prétend être complète.
+- **`expurgerLot` est orpheline** et gardée délibérément (annotée dans le code) :
+  `[VEILLE-06]` en aura besoin, et une boucle réécrite à côté divergerait de `expurgerPII`.
+- **`INGEST_TOKEN` peut rester posé dans Vercel** : plus aucune route ne le lit. Le retirer
+  est du ménage, pas une urgence.
+- `docs/ROUTINE-DEPOT.md` et `docs/veille-prompt.md` portent un bandeau **RÉCIT DATÉ**. Ils
+  décrivent un canal supprimé ; leur mesure des sept sources reste la raison du choix actuel.
+
+**Vérifications** : gate complet vert (typecheck · 1 708 tests · lint · build). Trois
+mutations : flux qui cesse de republier l'offre suivie ⇒ rouge ; faux chemin d'écriture ⇒
+rouge ; PII réaliste posée dans un fichier versionné ⇒ rouge sur les deux motifs.
+
+---
+
 ## Session 2026-09-18 (suite 4) — les deux défauts sont fermés, et l'un des deux l'est par CLASSE
 
 Marc : « go ». Feu vert sur `[REDIR-01]` et `[ENV-VIDE-01]`, signalés une heure plus tôt.

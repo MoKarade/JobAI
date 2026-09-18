@@ -12,7 +12,6 @@ import {
   PAUSE_SONDE_MS,
   PLAFOND_LECTURE_OCTETS,
   TAILLE_ECHANTILLON,
-  compterOffres,
   echantillonner,
   sonder,
   verdictDe,
@@ -67,48 +66,29 @@ describe("echantillonner — voir le contenu, pas seulement le format", () => {
   });
 });
 
-describe("compterOffres — on réutilise l'analyseur de production", () => {
-  it("compte les offres d'un corps Greenhouse réel", () => {
-    const corps = JSON.stringify({
-      jobs: [
-        { id: 1, title: "Chargé de projets", location: { name: "Québec, QC" }, absolute_url: "https://e.test/1", content: "<p>Texte</p>" },
-        { id: 2, title: "Technicien", location: { name: "Lévis, QC" }, absolute_url: "https://e.test/2", content: "<p>Texte</p>" },
-      ],
-    });
-    expect(compterOffres(corps, "greenhouse")).toBe(2);
-  });
-
-  it("rend 0 — et non null — sur une réponse VALIDE mais sans offre", () => {
-    // La distinction fait tout le verdict : 0 = la source répond et n'a rien à donner.
-    expect(compterOffres(JSON.stringify({ jobs: [] }), "greenhouse")).toBe(0);
-  });
-
-  it("SÉPARE « pas pu compter » de « compté zéro » — la même règle que code null vs 403", () => {
-    // `null` quand aucune famille ne s'applique…
-    expect(compterOffres("peu importe", undefined)).toBeNull();
-    // …et `null` AUSSI sur un corps illisible : une page HTML servie à la place du JSON
-    // (challenge anti-robot, page d'erreur) n'est pas « zéro offre », c'est « on n'a pas pu
-    // lire ». Rendre 0 ici ferait passer un blocage pour une source vide, et le verdict
-    // « joignable-mais-vide » mentirait avec assurance.
-    expect(compterOffres("<html>pas du json</html>", "greenhouse")).toBeNull();
-    // Le vrai 0 reste distinct : réponse valide, aucune offre.
-    expect(compterOffres(JSON.stringify({ jobs: [] }), "greenhouse")).toBe(0);
-  });
-});
+// ⚠️ LE BLOC `compterOffres` A ÉTÉ RETIRÉ LE 2026-09-18 avec la fonction : elle comptait
+// les offres d'un corps d'ATS en réutilisant l'analyseur de PRODUCTION, et les analyseurs
+// d'ATS ont été supprimés. Ce que ce bloc défendait et qui reste vrai ailleurs : « pas pu
+// compter » et « compté zéro » sont deux verdicts différents, et les confondre fait passer
+// un blocage pour une source vide. Le champ `offres` existe encore pour cette raison.
 
 describe("la liste des candidats", () => {
-  it("sonde les cinq ATS avec le TÉMOIN NÉGATIF, jamais avec 36 employeurs", () => {
-    // Sonder les vrais jetons serait la DÉCOUVERTE que [VEILLE-35] a retirée.
-    const ats = CANDIDATS.filter((c) => c.id.startsWith("ats:"));
-    expect(ats.length).toBe(5);
-    for (const c of ats) expect(c.url).toContain("nexistepasdutout999");
+  it("⚠️ plus aucun candidat d'ATS — et le cas le DIT plutôt que de disparaître", () => {
+    // Les six candidats d'ATS (cinq familles au témoin négatif, plus le jeton SmartRecruiters
+    // constaté chez Robotiq) ont été retirés le 2026-09-18 avec la source. Ce cas remplace
+    // « sonde les cinq ATS avec le TÉMOIN NÉGATIF, jamais avec 36 employeurs » : supprimé
+    // sans trace, rien n'empêcherait de les remettre un jour EN SONDANT DE VRAIS JETONS —
+    // c'est-à-dire en refaisant la DÉCOUVERTE que `[VEILLE-35]` avait retirée.
+    expect(CANDIDATS.filter((c) => c.id.startsWith("ats:"))).toEqual([]);
+    expect(CANDIDATS.filter((c) => c.id.startsWith("jeton:"))).toEqual([]);
   });
 
   it("porte une RÉSERVE partout où un résultat pourrait être mal lu", () => {
-    // SmartRecruiters (200 sur un nom bidon) et les quatre agrégateurs (un robots.txt n'est
-    // pas une autorisation d'ingérer) : sans la réserve, le rapport se lit à l'envers.
+    // Les quatre agrégateurs : un robots.txt n'est PAS une autorisation d'ingérer, et sans
+    // la réserve le rapport se lit à l'envers. (`ats:smartrecruiters` figurait ici jusqu'au
+    // 2026-09-18 — son 200 sur un nom bidon était le cas d'école ; le candidat a disparu
+    // avec la source, la règle non.)
     for (const id of [
-      "ats:smartrecruiters",
       "agregateur:indeed",
       "agregateur:linkedin",
       "agregateur:jobillico",
@@ -131,15 +111,6 @@ describe("la liste des candidats", () => {
   it("interroge les agrégateurs sur leur robots.txt — leur joignabilité n'apprend rien", () => {
     for (const c of CANDIDATS.filter((x) => x.id.startsWith("agregateur:"))) {
       expect(c.url, `${c.id} devrait viser robots.txt`).toMatch(/\/robots\.txt$/);
-    }
-  });
-
-  it("les candidats ATS portent leur FAMILLE — sans quoi le discriminant est mort", () => {
-    // Défaut mesuré au premier passage réel : `offres` valait null partout, parce
-    // qu'aucun candidat ne portait `famille`. Le discriminant « 200 avec offres » vs
-    // « 200 sans offre » était testé unitairement et JAMAIS exercé en production.
-    for (const c of CANDIDATS.filter((x) => x.id.startsWith("ats:"))) {
-      expect(c.famille, `famille manquante : ${c.id}`).toBeTruthy();
     }
   });
 

@@ -74,18 +74,6 @@ export interface OffreBrute {
 }
 
 /** Ce qu'une passe sur UNE source a donné. Un échec est dit, jamais confondu avec un vide. */
-/**
- * L'identifiant de la source « dépôt de fichiers ».
- *
- * ⚠️ IL VIT DANS CE MODULE-CI, ET C'EST UNE CONTRAINTE DE BUNDLE, PAS UN GOÛT.
- * Son propriétaire naturel serait `depotFichier.ts` — mais celui-ci importe `node:fs`, et
- * `lib/rapportVeille.ts` (qui doit reconnaître le dépôt parmi les sources pour en dire la
- * fraîcheur) est tiré jusque dans le bundle CLIENT par le bouton de veille. L'y importer
- * embarquerait Node dans le navigateur. `types.ts` n'a aucune dépendance : les deux côtés
- * peuvent le lire. Une chaîne recopiée des deux côtés, elle, finirait par diverger — et la
- * fraîcheur deviendrait muette sans qu'aucune erreur ne le signale.
- */
-export const ID_SOURCE_DEPOT = "depot-fichier";
 
 export type ResultatSource =
   | {
@@ -148,26 +136,7 @@ export interface Source {
 /** L'accès réseau, injecté. Rend le corps en texte, ou lève. */
 export type Recuperateur = (url: string, entetes?: Record<string, string>) => Promise<string>;
 
-/** Familles d'ATS dont l'API publique est documentée et stable. */
-export const FAMILLES_ATS = [
-  "greenhouse",
-  "lever",
-  "recruitee",
-  "workable",
-  "smartrecruiters",
-] as const;
-export type FamilleAts = (typeof FAMILLES_ATS)[number];
-
-/**
- * Le rattachement d'une entreprise à son ATS.
- *
- * `jeton` est l'identifiant de l'entreprise CHEZ l'ATS (« robotiq » dans
- * `boards-api.greenhouse.io/v1/boards/robotiq/jobs`). Il ne se devine pas de façon fiable :
- * il se DÉCOUVRE en interrogeant, et ne s'inscrit que si la réponse est valide. Inscrire un
- * jeton supposé ferait échouer la source à chaque passe, sans qu'on sache pourquoi.
- */
-export interface AtsEntreprise {
-  entreprise: string;
-  famille: FamilleAts;
-  jeton: string;
-}
+// ⚠️ `FAMILLES_ATS`, `FamilleAts` et `AtsEntreprise` ont été supprimés le 2026-09-18 avec la
+// source qu'ils décrivaient. Aucune entreprise d'ATS n'a jamais été inscrite : le type
+// existait, la liste des rattachements est restée vide un mois, et la source interrogeait
+// donc le vide à chaque passe. Un type sans producteur est une intention jamais livrée.

@@ -83,27 +83,30 @@ interface Trouvaille {
 }
 
 /**
- * Neutralise la VALEUR du champ `adresse` d'un fichier de dépôt — et elle seule.
+ * Cette ligne documente-t-elle l'adresse du PROPRIÉTAIRE plutôt que celle d'un tiers ?
  *
- * Appliquée UNIQUEMENT aux `data/depot/*.json`, qui portent des adresses d'entreprise
- * recopiées d'annonces publiques. Le reste de la ligne, et tout le reste du fichier,
- * continuent d'être scannés normalement.
+ * `AUTHORIZED_EMAIL` est, par définition, l'adresse de Marc : c'est la variable qui dit qui
+ * a le droit d'entrer. Elle est écrite volontairement dans `docs/DEPLOIEMENT.md`, et la
+ * signaler comme une fuite de PII de tiers serait un faux positif permanent — le genre qui
+ * finit par faire ignorer la garde.
  *
- * La clé est ancrée (`"adresse"` suivi de deux-points) : `adresseSource` ou `adresse_x` ne
- * matchent pas. Une exemption qui déborde sur des clés voisines cesserait d'être une
- * exception pour devenir un trou.
+ * L'exception est bornée à la LIGNE qui nomme la variable : un courriel nominatif posé
+ * ailleurs, dans le même fichier, reste détecté.
  */
-export function retirerAdressesDeDepot(contenu: string): string {
-  return contenu.replace(/"adresse"\s*:\s*"(?:[^"\\]|\\.)*"/g, '"adresse": ""');
+function estAdresseDuProprietaire(ligne: string): boolean {
+  return /AUTHORIZED_EMAIL/.test(ligne);
 }
 
 function chercher(motif: RegExp, fichiers: readonly string[]): Trouvaille[] {
   const trouvailles: Trouvaille[] = [];
   for (const f of fichiers) {
-    const brut = readFileSync(resolve(process.cwd(), f), "utf8");
-    // Seuls les DÉPÔTS voient leur champ `adresse` neutralisé — voir
-    // `retirerAdressesDeDepot`. Partout ailleurs, le contenu est scanné tel quel.
-    const contenu = f.startsWith("data/depot/") ? retirerAdressesDeDepot(brut) : brut;
+    // ⚠️ AUCUNE EXEMPTION, ET C'EST NEUF (2026-09-18). Le scan neutralisait la valeur du
+    // champ `adresse` des `data/depot/*.json`, qui portaient l'adresse civique ANNONCÉE d'un
+    // employeur, recopiée d'une offre publique — donc exactement la forme surveillée ici. Le
+    // canal de dépôt a été supprimé : plus aucun fichier versionné ne porte le texte d'une
+    // annonce, et l'exemption n'avait plus d'objet. Une exception qui survit à sa raison est
+    // un trou qui attend. Tout est scanné tel quel.
+    const contenu = readFileSync(resolve(process.cwd(), f), "utf8");
     contenu.split("\n").forEach((ligne, i) => {
       if (motif.test(ligne) && !estExemple(ligne)) {
         trouvailles.push({ fichier: f, ligne: i + 1, extrait: ligne.trim().slice(0, 100) });
@@ -169,76 +172,72 @@ describe("garde-fou n°1 — aucune donnée personnelle en clair", () => {
     expect(chercher(motif, FICHIERS)).toEqual([]);
   });
 
-  it("l'exemption des dépôts ne couvre QUE le champ `adresse`, pas leur reste", () => {
-    // ⚠️ POURQUOI UNE EXEMPTION EXISTE, ET POURQUOI ELLE EST SI ÉTROITE.
-    //
-    // Depuis le 2026-08-06, les fichiers `data/depot/*.json` portent l'adresse civique
-    // ANNONCÉE d'un employeur — recopiée d'une offre d'emploi publique. C'est une adresse
-    // d'entreprise, versionnée exprès, et elle a exactement la forme que ce garde
-    // surveille. Sans exemption, la fonctionnalité serait impossible ; avec une exemption
-    // par FICHIER, on ouvrirait un dossier entier où n'importe quelle adresse pourrait se
-    // glisser. On exempte donc la VALEUR d'une seule clé, et rien d'autre.
-    //
-    // Ce que ça ne met PAS en danger : le domicile de Marc ne vit que dans
-    // `DOMICILE_ADRESSE`, une variable d'environnement, et aucun chemin d'ingestion ne le
-    // touche. Un dépôt est écrit à partir d'annonces publiques, jamais de son profil.
-    //
-    // Ce test PROUVE l'étroitesse : une adresse posée AILLEURS que dans `adresse` est
-    // toujours vue. Sans lui, élargir l'exemption à tout le fichier passerait inaperçu.
-    const motif = /\b\d{3,5},?\s+(av\.|avenue|rue|boul\.|boulevard|ch\.|chemin)\s+\S/i;
-    const numero = "1548";
-    const voie = "avenue de la Test";
-    expect(retirerAdressesDeDepot(`  "ville": "${numero} ${voie}"`)).toMatch(motif);
-    expect(retirerAdressesDeDepot(`  "adresse": "${numero} ${voie}, Québec, QC"`)).not.toMatch(
-      motif,
-    );
-    // Et la clé doit être celle du dépôt, pas n'importe quelle clé qui lui ressemble.
-    expect(retirerAdressesDeDepot(`  "adresseSource": "${numero} ${voie}"`)).toMatch(motif);
-  });
-
-  it("aucune PII de tiers dans les descriptions d'un dépôt", () => {
+  it("aucune PII de tiers — courriel nominatif ou profil personnel", () => {
     // ⚠️ LE VECTEUR QUE CE TEST FERME, ET POURQUOI IL EST NÉ APRÈS LES AUTRES.
     //
     // Le 2026-08-12, la veille a lu les annonces en entier pour la première fois. L'une
     // d'elles (Randstad) portait le NOM, le COURRIEL et le PROFIL LINKEDIN PERSONNELS d'un
-    // recruteur. Aucun motif ci-dessus ne l'attrapait : il a fallu que je le voie. Une
-    // exécution automatique de la veille l'aurait committé sans broncher.
+    // recruteur. Aucun autre motif de ce fichier ne l'attrapait : il a fallu que je le voie.
+    // Une exécution automatique de la veille l'aurait committé sans broncher.
     //
     // `lib/ingest/expurger.ts` est l'OUTIL qui nettoie ; ce test est la GARDE qui refuse.
     // Les deux sont nécessaires : un outil qu'on peut oublier d'appeler ne protège rien.
     //
-    // PORTÉE ASSUMÉE : le scan est limité aux `data/depot/*.json`, seule surface où du texte
-    // écrit par un tiers entre dans le dépôt. Un motif de courriel appliqué à TOUT le repo
-    // signalerait `AUTHORIZED_EMAIL` dans `docs/DEPLOIEMENT.md` — l'adresse de Marc, documentée
-    // volontairement, qui n'est pas la PII d'un tiers. Un garde qui crie au loup sur une
-    // valeur légitime finit contourné ; celui-ci vise là où le risque a été MESURÉ.
-    const depots = FICHIERS.filter((f) => f.startsWith("data/depot/"));
+    // ⚠️ LA PORTÉE A ÉTÉ ÉLARGIE À TOUT LE DÉPÔT LE 2026-09-18, ET C'EST UNE CORRECTION,
+    // PAS UNE EXTENSION DE CONFORT. Ces deux motifs ne tournaient que sur `data/depot/*.json`
+    // — « la seule surface où du texte écrit par un tiers entre dans le dépôt ». Ce canal a
+    // été supprimé ce jour-là : laissés là, les deux motifs auraient scanné une liste VIDE,
+    // donc protégé RIEN, en restant verts. Une garde dont la population disparaît ne se
+    // supprime pas avec elle : elle se re-pointe sur la population qui reste.
+    //
+    // Mesuré au moment de l'élargissement, sur 369 fichiers versionnés : DEUX trouvailles,
+    // toutes deux dans `tests/expurger.test.ts`, qui portait depuis le 12/08 le vrai nom, le
+    // vrai courriel et le vrai identifiant LinkedIn du recruteur Randstad — recopiés de
+    // l'annonce dans les fixtures, dans un dépôt PUBLIC, sans qu'aucune garde ne les voie.
+    // « Le garde PII se déclenchera sur tes FIXTURES, et il aura raison. » Ils ont été
+    // remplacés par des valeurs de même FORME et sans personne derrière.
     const motifs: readonly { nom: string; motif: RegExp }[] = [
       { nom: "courriel nominatif", motif: /[\p{L}][\p{L}'-]*\.[\p{L}][\p{L}'-]*@[\p{L}\d.-]+\.[a-z]{2,}/u },
       { nom: "profil LinkedIn personnel", motif: /linkedin\.com\/in\// },
-      { nom: "téléphone", motif: /(?:\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/ },
-      // ⚠️ AJOUTÉ LE 2026-08-19, APRÈS UNE FUITE RÉELLE. Une annonce ELEM rédigée en ANGLAIS
-      // disait « to the attention of Ms. … ». Le scan ci-dessus ne portait aucun motif de
-      // civilité, et celui de la section « garde-fou n°1 » n'en connaissait que les formes
-      // FRANÇAISES : le nom a traversé l'outil ET la garde, et il était déjà dans
-      // `data/depot/2026-08-18.json` — donc dans un dépôt PUBLIC — depuis la veille.
-      { nom: "personne nommée", motif: /\b(?:M\.|Mme|Mlle|Monsieur|Madame|Mademoiselle|Ms\.|Mrs\.|Mr\.|Dr\.)\s+\p{Lu}[\p{L}'’-]{2,}/u },
     ];
     for (const { nom, motif } of motifs) {
-      expect(chercher(motif, depots), `PII de tiers (${nom}) dans un dépôt`).toEqual([]);
+      const trouvailles = chercher(motif, FICHIERS).filter((t) => !estAdresseDuProprietaire(t.extrait));
+      expect(trouvailles, `PII de tiers (${nom})`).toEqual([]);
     }
   });
 
-  it("le scan des dépôts discrimine, et il a de quoi scanner", () => {
+  it("l'exemption du propriétaire discrimine : elle ne couvre QUE sa ligne", () => {
+    // ⚠️ SANS CE CAS, L'EXEMPTION SERAIT UN TROU. Elle existe pour une raison nommée :
+    // `AUTHORIZED_EMAIL` est l'adresse de MARC, documentée volontairement dans
+    // `docs/DEPLOIEMENT.md` — ce n'est pas la PII d'un tiers, et un garde qui crie au loup
+    // sur une valeur légitime finit contourné.
+    //
+    // ⚠️ ET ELLE NE REPOSE PAS SUR UN ACCIDENT. Mesuré : l'adresse de Marc échappe DÉJÀ au
+    // motif de courriel nominatif, mais seulement parce que sa partie locale finit par un
+    // CHIFFRE (`…richard4@`), que le motif n'accepte pas avant l'arobase. Une adresse de la
+    // même famille sans chiffre serait signalée. On ne garde pas une garde debout sur un
+    // hasard de graphie : l'exception est écrite, bornée à la ligne qui NOMME la variable.
+    expect(estAdresseDuProprietaire("AUTHORIZED_EMAIL=prenom.nom@fournisseur.com")).toBe(true);
+    // Le tiers sur une ligne ordinaire n'est pas couvert — et c'est tout l'enjeu.
+    expect(estAdresseDuProprietaire("Écrire à prenom.nom@fournisseur.com")).toBe(false);
+    // Ni une ligne qui parle d'autre chose en mentionnant une adresse nominative.
+    expect(estAdresseDuProprietaire("Contact RH : prenom.nom@employeur.ca")).toBe(false);
+  });
+
+  it("le scan de PII de tiers discrimine, et il a de quoi scanner", () => {
     // Un scan qui ne voit AUCUN fichier passe à vide : protection nulle, silencieuse. Et un
     // motif cassé passe à vide de la même façon. On prouve donc le VOLUME et la DÉTECTION.
-    const depots = FICHIERS.filter((f) => f.startsWith("data/depot/"));
-    expect(depots.length).toBeGreaterThan(0);
+    expect(FICHIERS.length).toBeGreaterThan(50);
 
     const courriel = /[\p{L}][\p{L}'-]*\.[\p{L}][\p{L}'-]*@[\p{L}\d.-]+\.[a-z]{2,}/u;
-    expect("Écrire à jean.dupont@exemple.ca").toMatch(courriel);
+    expect("Écrire à jean.dupont@fournisseur.ca").toMatch(courriel);
     // La boîte de rôle — celle à laquelle Marc postule — ne doit PAS être vue comme de la PII.
-    expect("Écrire à carriere@exemple.ca").not.toMatch(courriel);
+    expect("Écrire à carriere@fournisseur.ca").not.toMatch(courriel);
+
+    const linkedin = /linkedin\.com\/in\//;
+    expect("https://www.linkedin.com/in/quelquun-123/").toMatch(linkedin);
+    // Une page d'ENTREPRISE est publique et renseigne sur l'employeur : elle reste.
+    expect("https://www.linkedin.com/company/quelque-employeur/").not.toMatch(linkedin);
 
     const tel = /(?:\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/;
     expect("418 555-0142").toMatch(tel);

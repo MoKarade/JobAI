@@ -36,7 +36,12 @@ jobs:
 
       - run: npm ci --ignore-scripts
 
-      - name: Sonder les sources actuelles
+      # ⚠️ L'ÉTAPE « Sonder les sources actuelles » A ÉTÉ RETIRÉE LE 2026-09-18 avec
+      # `scripts/sonder-sources.ts`. Elle mesurait les recherches RSS du Guichet et les cinq
+      # familles d'ATS, supprimées le même jour : sans ce retrait, le workflow aurait échoué
+      # sur un fichier absent à chaque lancement. Les quatre sondes restantes n'y touchaient
+      # pas et continuent de tourner.
+      - name: Sonder les sources québécoises
         # [CI-NPX-NO-INSTALL] `--no-install` : sans lui, `npx` TÉLÉCHARGE le paquet depuis le
         # registre quand il ne le trouve pas localement, puis exécute ses scripts de cycle de vie
         # — la surface que `--ignore-scripts` ferme à l'étape d'installation, rouverte ici, et sur
@@ -45,9 +50,6 @@ jobs:
         # franchement s'il manque au lieu d'aller le chercher. Mesuré le 18/09 : `npx --no-install tsx --version` rend « tsx v4.23.1 », le binaire local (`tsx` est une devDependency).
         # ⚠️ Vérifié aussi que l'étape d'installation vit dans le MÊME job — sans elle, le drapeau
         # transformerait un téléchargement silencieux en échec.
-        run: npx --no-install tsx scripts/sonder-sources.ts
-
-      - name: Sonder les sources québécoises
         run: npx --no-install tsx scripts/sonder-quebec.ts
 
       # Ajoutée le 2026-08-05 : « ça fait plusieurs jours y'a pas assez d'offres ». Les

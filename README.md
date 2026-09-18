@@ -40,15 +40,16 @@ les décisions dans [`docs/adr/`](./docs/adr/).
 - **Suivi des offres** — notation pondérée par le profil, statuts de candidature, filtres,
   export. Interface : accueil (`/`), fiche d'offre (`/offre/[id]`), carte (`/carte`),
   références (`/references`).
-- **Veille** — `POST /api/ingest/depot` reçoit des lots d'offres (une Routine claude.ai
-  envoie, l'app trie : filtre régional, plancher de score, dédoublonnage). Le cron
-  `/api/cron/veille` applique les mêmes règles. ⏱️ **L'ordre des deux compte** : la Routine
-  part à 11:00 UTC et met jusqu'à trois heures (mesuré le 2026-08-12 : 11:06 → 13:55, la
-  lecture des annonces domine), puis le déploiement suit. Le cron est donc à **15:00 UTC**
-  pour lire le dépôt du JOUR. Aux deux à 11:00, il lisait celui de la veille. Rien n'était
-  perdu — `fichiersDansLaFenetre` couvre 7 jours — mais les offres arrivaient un jour tard. ⚠️ Les sources automatiques sont mortes
-  (Guichet-Emplois 404, ATS américains sans employeur local, pas de flux chez Jobillico /
-  Québec emploi / Isarta) — le dépôt est aujourd'hui le vrai chemin d'entrée.
+- **Veille** — le cron `/api/cron/veille` (11:00 UTC, `vercel.json`) lit le **flux complet
+  du Guichet-Emplois** et applique le tri : filtre régional, plancher de score,
+  dédoublonnage, péremption. C'est la **seule** source, et c'est neuf.
+  ⚠️ **Trois autres canaux ont été supprimés le 2026-09-18** — les recherches RSS du Guichet
+  par mot-clé, les pages carrières d'ATS (Greenhouse, Lever, Recruitee, Workable,
+  SmartRecruiters) et le dépôt de fichiers `POST /api/ingest/depot` alimenté par une Routine
+  claude.ai. Ils ne rendaient plus **aucune** offre : la liste RSS était vide (les adresses
+  ne répondent pas), aucune entreprise d'ATS n'a jamais été déclarée, et le dernier lot
+  déposé datait du 21/08 — hors de la fenêtre de sept jours depuis trois semaines. Ils
+  tournaient quand même à chaque passe, et leur zéro se confondait avec un marché calme.
 - **Distance et carte** — domicile géocodé une fois et conservé en base, mesure automatique
   après réponse, bornée à une passe / 5 min. Deux crons de géocodage (`vercel.json`) :
   `/api/cron/veille` (15:00 UTC, ingestion + géocodage) et `/api/cron/geocodage` (03:00 UTC,

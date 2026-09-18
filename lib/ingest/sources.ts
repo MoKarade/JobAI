@@ -4,22 +4,14 @@
 // il récupère, confie au bon analyseur, et rend un compte par source.
 //
 // POURQUOI UN COMPTE PAR SOURCE, ET PAS UN TOTAL
-// Avec six sources, un total de zéro ne veut rien dire : marché calme, jeton d'entreprise
-// périmé, API déplacée, réseau coupé ? Sans le détail, on ne débogue rien et on finit par
-// croire que « la veille tourne » alors qu'elle est muette depuis trois semaines. Chaque
-// source rend donc son propre résultat, succès ou échec nommé.
+// Un total de zéro ne veut rien dire : marché calme, API déplacée, réseau coupé ? Sans le
+// détail, on ne débogue rien et on finit par croire que « la veille tourne » alors qu'elle
+// est muette depuis trois semaines. Chaque source rend donc son propre résultat, succès ou
+// échec nommé. ⚠️ IL N'EN RESTE QU'UNE depuis le 2026-09-18 (le flux du Guichet) — la règle
+// vaut quand même : elle a été écrite parce que six sources muettes s'additionnaient en un
+// seul zéro, et c'est elle qui a fini par montrer que cinq d'entre elles ne servaient à rien.
 
-import {
-  analyserGreenhouse,
-  analyserLever,
-  analyserRecruitee,
-  analyserRss,
-  analyserSmartRecruiters,
-  analyserWorkable,
-} from "./analyseurs";
-import { estDansLaRegion } from "./region";
-import type { AtsEntreprise, FamilleAts, OffreBrute, Recuperateur, ResultatSource } from "./types";
-import { PROFIL_DEFAUT } from "../profil";
+import type { Recuperateur } from "./types";
 
 /** Délai maximal accordé à une source. Une source lente ne doit pas geler la passe. */
 export const DELAI_MAX_MS = 8_000;
@@ -27,7 +19,7 @@ export const DELAI_MAX_MS = 8_000;
 /**
  * Identification de l'appelant.
  *
- * Les API d'ATS et le Guichet-Emplois acceptent le trafic identifié et bloquent l'anonyme.
+ * Le Guichet-Emplois accepte le trafic identifié et bloque l'anonyme.
  * Se nommer est aussi la contrepartie honnête de l'automatisation : on ne se fait pas
  * passer pour un navigateur.
  */
@@ -57,213 +49,10 @@ export const recuperer: Recuperateur = async (url, entetesSup = {}) => {
   }
 };
 
-function messageErreur(err: unknown): string {
-  if (err instanceof Error) {
-    if (err.name === "AbortError") return `pas de réponse en ${DELAI_MAX_MS / 1000} s`;
-    return err.message;
-  }
-  return String(err);
-}
-
-/**
- * Les recherches du Guichet-Emplois — DÉSACTIVÉES le 2026-07-31.
- *
- * ⚠️ MESURÉ, PAS SUPPOSÉ : aucune URL de flux ne répond. Cinq formes testées sur un runner
- * au réseau ouvert (`scripts/sonder-sources.ts`, banc d'essai) :
- *   · `jobsearch/rss?…`                    → 404
- *   · `rss?…`                              → 404
- *   · `jobsearch/jobsearch?fsrc=32&…`      → 200, mais une page HTML « Temporary Foreign
- *                                             Workers Search » : pas un flux
- *   · `guichetemplois.gc.ca/rechercheemploi/rss` → délai dépassé
- *   · `jobsearch/jobsearch?…` (page)       → délai dépassé
- *
- * Le Guichet-Emplois n'expose donc pas de flux public à ces adresses, et les délais
- * dépassés suggèrent qu'il ralentit les appels automatisés. Les laisser dans la liste
- * active ferait huit requêtes vouées à l'échec chaque matin — du bruit dans le rapport,
- * et l'habitude de voir des sources en erreur.
- *
- * Le code d'analyse RSS reste en place et testé : il servira le jour où une adresse
- * valide sera trouvée (leur API partenaire, sur clé, est la piste suivante).
- */
-export const RECHERCHES_GUICHET: readonly string[] = [];
-
-/**
- * Ce qu'on interrogerait si le flux répondait. Gardé pour le banc d'essai de la sonde
- * (`scripts/sonder-sources.ts`, son unique consommateur — et il n'en lit que le premier).
- *
- * ⚠️ CE COMMENTAIRE A PROMIS PENDANT UN MOIS CE QUE LA LIGNE NE PEUT PAS TENIR, corrigé le
- * 2026-09-17. Il disait « VIENT DU PROFIL (ADR-0009), pas d'une liste écrite ici — la veille
- * doit chercher ce que Marc EST ». La ligne lit `PROFIL_DEFAUT`, c'est-à-dire le profil DU
- * CODE : un CV validé change le profil ACTIF (en base) et ne touche jamais cette valeur.
- *
- * Et ce n'est pas un oubli réparable ici : une constante de module est évaluée à
- * l'import, alors que le profil actif est une LECTURE DE BASE, asynchrone
- * (`profilActif`, lib/cv/depot.ts). La promesse n'est pas tenable à cet endroit — elle
- * se tient au point d'APPEL, quand une passe construit ses sources.
- *
- * ⚠️ AUCUN CHEMIN VIVANT N'EN DÉPEND AUJOURD'HUI, et c'est ce qui a rendu l'écart
- * invisible : `RECHERCHES_GUICHET` est vide (le flux RSS ne répond pas, voir ci-dessus),
- * donc la veille n'interroge AUCUN terme par ce canal. La divergence est réelle mais
- * dormante — elle se réveillerait le jour où ce canal revivrait, et c'est `[CV-08]` qui
- * porte le raccordement.
- */
-export const RECHERCHES_GUICHET_CANDIDATES: readonly string[] = PROFIL_DEFAUT.recherches;
-
-/** L'URL du flux RSS officiel du Guichet-Emplois pour une recherche donnée. */
-export function urlGuichet(recherche: string, lieu = "Quebec, QC"): string {
-  const p = new URLSearchParams({ searchstring: recherche, locationstring: lieu, sort: "M" });
-  return `https://www.jobbank.gc.ca/jobsearch/rss?${p.toString()}`;
-}
-
-/** L'URL de l'API publique d'un ATS pour une entreprise donnée. */
-export function urlAts(famille: FamilleAts, jeton: string): string {
-  switch (famille) {
-    case "greenhouse":
-      return `https://boards-api.greenhouse.io/v1/boards/${jeton}/jobs?content=true`;
-    case "lever":
-      return `https://api.lever.co/v0/postings/${jeton}?mode=json`;
-    case "recruitee":
-      return `https://${jeton}.recruitee.com/api/offers/`;
-    case "workable":
-      return `https://apply.workable.com/api/v1/widget/accounts/${jeton}?details=true`;
-    case "smartrecruiters":
-      return `https://api.smartrecruiters.com/v1/companies/${jeton}/postings?limit=100`;
-  }
-}
-
-/** L'analyseur qui correspond à une famille d'ATS. */
-export function analyseurAts(
-  famille: FamilleAts,
-): (corps: string, entreprise: string) => OffreBrute[] {
-  switch (famille) {
-    case "greenhouse":
-      return analyserGreenhouse;
-    case "lever":
-      return analyserLever;
-    case "recruitee":
-      return analyserRecruitee;
-    case "workable":
-      return analyserWorkable;
-    case "smartrecruiters":
-      return analyserSmartRecruiters;
-  }
-}
-
-/** Une recherche du Guichet-Emplois, en source. */
-export function sourceGuichet(recherche: string) {
-  return {
-    id: `guichet:${recherche}`,
-    nom: `Guichet-Emplois — ${recherche}`,
-    interroger: async (rec: Recuperateur): Promise<ResultatSource> => {
-      try {
-        const corps = await rec(urlGuichet(recherche));
-        return { ok: true, source: `guichet:${recherche}`, offres: analyserRss(corps) };
-      } catch (err) {
-        return { ok: false, source: `guichet:${recherche}`, erreur: messageErreur(err) };
-      }
-    },
-  };
-}
-
-/** La page carrières d'une entreprise, via son ATS. */
-export function sourceAts(ats: AtsEntreprise) {
-  const id = `${ats.famille}:${ats.jeton}`;
-  return {
-    id,
-    nom: `${ats.entreprise} (${ats.famille})`,
-    interroger: async (rec: Recuperateur): Promise<ResultatSource> => {
-      try {
-        const corps = await rec(urlAts(ats.famille, ats.jeton));
-        const offres = analyseurAts(ats.famille)(corps, ats.entreprise);
-        return { ok: true, source: id, offres };
-      } catch (err) {
-        return { ok: false, source: id, erreur: messageErreur(err) };
-      }
-    },
-  };
-}
-
-/**
- * Le verdict d'une tentative de résolution d'entreprise chez un ATS.
- *
- * ⚠️ QUATRE ÉTATS, ET PAS UN BOOLÉEN — c'est tout l'objet de ce type. Un « oui/non » ne peut
- * pas dire la différence entre « c'est bien cette entreprise » et « le jeton répond, mais
- * c'est quelqu'un d'autre ». Or c'est exactement le piège déjà mesuré le 2026-08-05 :
- * `recruitee/ace` et `recruitee/robert` répondent parfaitement — avec des postes à
- * AMSTERDAM. Un identifiant deviné trouve des homonymes, et ils sont crédibles.
- */
-export type VerdictAts =
-  /** Des offres, et au moins une dans la région : c'est bien elle. À inscrire. */
-  | { verdict: "confirme"; offres: OffreBrute[] }
-  /** Des offres, mais AUCUNE dans la région : un homonyme. Ne jamais inscrire. */
-  | { verdict: "refute"; raison: string }
-  /** Le jeton répond, sans aucune offre : indiscernable d'un homonyme au repos. */
-  | { verdict: "indecis"; raison: string }
-  /** Rien sous ce jeton : pas de page carrières chez cet ATS. */
-  | { verdict: "absent" };
-
-/**
- * Cette entreprise a-t-elle une page carrières chez cette famille d'ATS — et est-ce BIEN elle ?
- *
- * Sert la découverte : le jeton d'une entreprise chez un ATS ne se devine pas de façon
- * fiable, il se VÉRIFIE. Et le vérifier, ce n'est pas constater que l'API répond : c'est
- * confronter ce qu'elle rend à ce qu'on attend. Deux vérifications indépendantes, jamais une
- * seule — le jeton répond ET le contenu est de la région.
- *
- * ⚠️ UN TABLEAU VIDE N'EST PAS UN SUCCÈS, contrairement à ce que cette fonction affirmait
- * avant le 2026-08-17. Une entreprise peut réellement n'avoir aucun poste ouvert
- * aujourd'hui — mais un homonyme d'Amsterdam au repos rend exactement la même chose, et
- * rien ne les distingue. Inscrire sur cette base, c'est parier ; le verdict `indecis` dit
- * qu'on ne sait pas, et l'appelant décide de retenter plus tard plutôt que d'inscrire faux.
- */
-export async function verifierAts(
-  famille: FamilleAts,
-  jeton: string,
-  entreprise: string,
-  rec: Recuperateur,
-): Promise<VerdictAts> {
-  let offres: OffreBrute[];
-  try {
-    const corps = await rec(urlAts(famille, jeton));
-    offres = analyseurAts(famille)(corps, entreprise);
-  } catch {
-    return { verdict: "absent" };
-  }
-
-  if (offres.length === 0) {
-    return { verdict: "indecis", raison: "le jeton répond, mais aucune offre à confronter" };
-  }
-
-  const dansLaRegion = offres.filter((o) => estDansLaRegion(o.ville, o.description));
-  if (dansLaRegion.length === 0) {
-    // On NOMME ce qu'on a vu : « refusé » sans motif ne se vérifie pas, et c'est la seule
-    // trace qui permettra de distinguer un homonyme d'un déménagement.
-    const lieux = [...new Set(offres.map((o) => o.ville.trim()).filter((v) => v !== ""))];
-    const apercu = lieux.slice(0, 3).join(", ") || "aucun lieu annoncé";
-    return {
-      verdict: "refute",
-      raison: `${offres.length} offre(s), aucune dans la région (${apercu})`,
-    };
-  }
-
-  // On rend TOUTES les offres, pas seulement celles de la région : le tri régional est le
-  // travail de `trier()`, et le refaire ici en ferait une seconde copie qui divergera.
-  return { verdict: "confirme", offres };
-}
-
-/**
- * Le jeton probable d'une entreprise chez un ATS, à partir de son nom.
- *
- * Une SUPPOSITION, jamais une vérité : elle n'a de valeur qu'une fois passée par
- * `verifierAts`. C'est ce qui permet de chercher au-delà des entreprises déjà connues sans
- * inscrire nulle part une entreprise dont on n'a pas vu la page carrières.
- */
-export function jetonProbable(nom: string): string {
-  return nom
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/\b(inc|ltee|ltd|ltda|corp|corporation|groupe|group|company|cie)\b/g, "")
-    .replace(/[^a-z0-9]+/g, "")
-    .trim();
-}
+// ⚠️ TOUTE LA SURFACE ATS A ÉTÉ SUPPRIMÉE LE 2026-09-18 : `urlAts`, `analyseurAts`,
+// `verifierAts` (les quatre verdicts confirme/refute/indecis/absent) et `jetonProbable`.
+// Elles servaient la DÉCOUVERTE d'une page carrières chez un ATS à partir du nom d'une
+// entreprise — un mécanisme prudent, dont la leçon (« un identifiant deviné trouve des
+// homonymes, et ils sont crédibles ») reste écrite dans `docs/LESSONS.md`. Ce qui l'a
+// condamné n'est pas sa justesse : aucune entreprise d'ATS n'a jamais été déclarée, donc
+// la source interrogeait une liste vide à chaque passe depuis un mois.

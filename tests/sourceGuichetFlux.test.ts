@@ -24,7 +24,7 @@ import {
 import { selectionnerSources } from "../lib/ingest/passe";
 import { trier } from "../lib/ingest/pipeline";
 import { normaliserLieu } from "../lib/ingest/region";
-import { ID_SOURCE_DEPOT, type Recuperateur } from "../lib/ingest/types";
+import { type Recuperateur } from "../lib/ingest/types";
 
 const enc = new TextEncoder();
 
@@ -297,28 +297,24 @@ describe("resumerBilanFlux — la ligne qui distingue « rien à prendre » de �
   });
 });
 
-describe("selectionnerSources — le flux est construit seulement si Marc a choisi", () => {
-  it("le construit dès qu'on le demande — la liste de métiers n'allume plus rien", async () => {
+describe("selectionnerSources — le flux est la SEULE source", () => {
+  it("le construit dès qu'on le demande — la liste de métiers n'allume plus rien", () => {
     // ⚠️ CONTRAT CHANGÉ (Marc, 2026-08-20). La liste ne filtre plus l'ingestion, donc une
     // liste vide n'éteint plus la source : c'est l'appelant qui décide de lire le flux.
-    const avec = selectionnerSources(0, "2026-08-20", { metiers: [] });
-    expect(avec.some((s) => s.id === ID_SOURCE_FLUX_GUICHET)).toBe(true);
+    const avec = selectionnerSources({ metiers: [] });
+    expect(avec.map((s) => s.id)).toEqual([ID_SOURCE_FLUX_GUICHET]);
   });
 
   it("ne le construit pas si l'appelant ne le demande pas", () => {
-    const sans = selectionnerSources(0, "2026-08-20");
-    expect(sans.some((s) => s.id === ID_SOURCE_FLUX_GUICHET)).toBe(false);
+    expect(selectionnerSources()).toEqual([]);
   });
 
-  it("le construit HORS ROTATION, comme le dépôt", () => {
-    // Hors rotation parce qu'une source sautée un jour laisse ses offres prendre une
-    // absence : trois absences périment. Le mettre en rotation périmerait par intermittence
-    // ce qu'on vient d'ingérer, pour une raison d'horaire.
-    for (const depart of [0, 3, 7, 13]) {
-      const ids = selectionnerSources(depart, "2026-08-19", { metiers: ["22"] }).map((s) => s.id);
-      expect(ids).toContain(ID_SOURCE_FLUX_GUICHET);
-      expect(ids).toContain(ID_SOURCE_DEPOT);
-    }
+  it("⚠️ et il n'y a PLUS de rotation ni de seconde source", () => {
+    // Ce cas remplace « le construit HORS ROTATION, comme le dépôt » (2026-09-18). Les trois
+    // autres canaux — recherches RSS, pages carrières d'ATS, dépôt de fichiers — rendaient
+    // ZÉRO offre à chaque passe depuis un mois et ont été supprimés. Ce qui est verrouillé
+    // ici est le FAIT : une seule source, donc plus rien à faire tourner.
+    expect(selectionnerSources({ metiers: ["22"] })).toHaveLength(1);
   });
 });
 

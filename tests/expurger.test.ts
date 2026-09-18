@@ -23,8 +23,8 @@ const VOIE_PROSE = "Avenue des Affaires"; // exemple factice, fragment de l'adre
 
 describe("courriel nominatif", () => {
   it("retire une adresse « prenom.nom@ »", () => {
-    const r = expurgerPII("Envoyez votre CV à anthony.lefebvre@randstad.ca dès aujourd'hui.");
-    expect(r.texte).not.toContain("anthony.lefebvre");
+    const r = expurgerPII("Envoyez votre CV à prenom.nom@exemple-employeur.ca dès aujourd'hui.");
+    expect(r.texte).not.toContain("prenom.nom");
     expect(r.texte).toContain("[courriel nominatif retiré]");
     expect(r.retires).toContain("courriel nominatif");
   });
@@ -51,8 +51,8 @@ describe("courriel nominatif", () => {
 
 describe("profil personnel", () => {
   it("retire un profil LinkedIn personnel", () => {
-    const r = expurgerPII("Rejoignez-moi : https://www.linkedin.com/in/anthony-lefebvre-83814632/");
-    expect(r.texte).not.toContain("anthony-lefebvre");
+    const r = expurgerPII("Rejoignez-moi : https://www.linkedin.com/in/prenom-nom-exemple-83814632/");
+    expect(r.texte).not.toContain("prenom-nom-exemple");
     expect(r.retires).toContain("profil personnel");
   });
 
@@ -216,7 +216,7 @@ describe("personne nommée par une civilité — le trou du 2026-08-19", () => {
 
 describe("le rapport dit ce qui a été retiré, jamais la valeur", () => {
   it("nomme les catégories, dédoublonnées et triées", () => {
-    const r = expurgerPII(`a.b@x.ca, ${TEL}, et c.d@y.ca`);
+    const r = expurgerPII(`a.b@x.ca, ${TEL}, et c.d@y.ca`); // exemple factice, aucune personne derriere
     expect(r.retires).toEqual(["courriel nominatif", "téléphone"]);
   });
 

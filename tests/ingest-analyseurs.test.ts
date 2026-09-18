@@ -11,16 +11,13 @@
 // dire LAQUELLE, sinon on ne débogue rien.
 
 import { describe, it, expect } from "vitest";
-import {
-  analyserGreenhouse,
-  analyserLever,
-  analyserRecruitee,
-  analyserRss,
-  analyserSmartRecruiters,
-  analyserWorkable,
-  jourDe,
-  texteSimple,
-} from "../lib/ingest/analyseurs";
+import { analyserRss, jourDe, texteSimple } from "../lib/ingest/analyseurs";
+
+// ⚠️ LES CINQ BLOCS D'ATS ONT ÉTÉ RETIRÉS LE 2026-09-18 avec leurs analyseurs (Greenhouse,
+// Lever, Recruitee, Workable, SmartRecruiters). Ils ne testaient rien de faux — ils
+// testaient du code qu'aucune passe n'appelait plus. Le bloc « ce qu'aucun analyseur ne
+// fait » a SURVÉCU : la règle no-fake-data au point d'entrée ne dépend d'aucune famille, et
+// elle est re-posée ci-dessous sur l'analyseur qui reste.
 
 describe("nettoyage du texte", () => {
   it("retire les balises et les entités des descriptions d'ATS", () => {
@@ -127,157 +124,24 @@ describe("RSS (Guichet-Emplois)", () => {
   });
 });
 
-describe("Greenhouse", () => {
-  const corps = JSON.stringify({
-    jobs: [
-      {
-        id: 4567,
-        title: "Coordonnateur de projets",
-        absolute_url: "https://boards.greenhouse.io/exemple/jobs/4567",
-        location: { name: "Québec, QC" },
-        updated_at: "2026-07-29T12:00:00Z",
-        content: "&lt;p&gt;Gestion de projets industriels&lt;/p&gt;",
-      },
-      { id: 9, title: "Sans lien", location: { name: "Lévis" } },
-    ],
-  });
-
-  it("lit les offres et écarte celle qui n'a pas d'URL", () => {
-    const r = analyserGreenhouse(corps, "Exemple inc.");
-    expect(r).toHaveLength(1);
-    expect(r[0]).toMatchObject({
-      refSource: "4567",
-      titre: "Coordonnateur de projets",
-      entreprise: "Exemple inc.",
-      ville: "Québec, QC",
-      publieeLe: "2026-07-29",
-    });
-  });
-
-  it("rend une liste vide quand le tableau attendu est absent", () => {
-    expect(analyserGreenhouse(JSON.stringify({ jobs: null }), "X")).toEqual([]);
-    expect(analyserGreenhouse(JSON.stringify({}), "X")).toEqual([]);
-  });
-
-  it("LÈVE sur une page HTML servie en 200 — sinon on dirait « aucun poste »", () => {
-    // Le cas réel : un jeton d'entreprise erroné rend une page de connexion, pas une 404.
-    // Rendre [] ici ferait passer une source cassée pour une entreprise qui n'embauche pas.
-    expect(() => analyserGreenhouse("<!doctype html><html>…", "X")).toThrow(/pas du JSON/);
-  });
-});
-
-describe("Lever", () => {
-  const corps = JSON.stringify([
-    {
-      id: "abc-123",
-      text: "Superviseur technique",
-      hostedUrl: "https://jobs.lever.co/exemple/abc-123",
-      categories: { location: "Lévis, QC", team: "Opérations" },
-      descriptionPlain: "Encadrement d'une équipe technique.",
-      createdAt: 1785000000000,
-    },
-  ]);
-
-  it("lit un tableau racine et une date en millisecondes", () => {
-    const r = analyserLever(corps, "Exemple");
-    expect(r).toHaveLength(1);
-    expect(r[0]).toMatchObject({
-      refSource: "abc-123",
-      titre: "Superviseur technique",
-      ville: "Lévis, QC",
-      lien: "https://jobs.lever.co/exemple/abc-123",
-    });
-    expect(r[0]!.publieeLe).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-  });
-
-  it("rend une liste vide si la racine n'est pas un tableau", () => {
-    expect(analyserLever(JSON.stringify({ postings: [] }), "X")).toEqual([]);
-  });
-});
-
-describe("Recruitee", () => {
-  it("compose la ville depuis city et country", () => {
-    const corps = JSON.stringify({
-      offers: [
-        {
-          id: 77,
-          title: "Chargé de projets",
-          careers_url: "https://exemple.recruitee.com/o/charge-de-projets",
-          city: "Québec",
-          country: "Canada",
-          description: "<p>Coordination</p>",
-          published_at: "2026-07-20T10:00:00Z",
-        },
-      ],
-    });
-    const r = analyserRecruitee(corps, "Exemple");
-    expect(r[0]).toMatchObject({ ville: "Québec, Canada", publieeLe: "2026-07-20" });
-  });
-});
-
-describe("Workable", () => {
-  it("compose la ville depuis city et region", () => {
-    const corps = JSON.stringify({
-      jobs: [
-        {
-          shortcode: "AB12CD",
-          title: "Technicien en automatisation",
-          url: "https://apply.workable.com/exemple/j/AB12CD",
-          location: { city: "Lévis", region: "Quebec" },
-          description: "<p>Automates</p>",
-          published_on: "2026-07-15",
-        },
-      ],
-    });
-    const r = analyserWorkable(corps, "Exemple");
-    expect(r[0]).toMatchObject({
-      refSource: "AB12CD",
-      ville: "Lévis, Quebec",
-      publieeLe: "2026-07-15",
-    });
-  });
-});
-
-describe("SmartRecruiters", () => {
-  it("lit le tableau content", () => {
-    const corps = JSON.stringify({
-      content: [
-        {
-          id: "743999",
-          name: "Superviseur de maintenance",
-          ref: "https://jobs.smartrecruiters.com/Exemple/743999",
-          location: { city: "Québec", region: "QC" },
-          releasedDate: "2026-07-10T08:00:00.000Z",
-        },
-      ],
-    });
-    const r = analyserSmartRecruiters(corps, "Exemple");
-    expect(r[0]).toMatchObject({
-      refSource: "743999",
-      titre: "Superviseur de maintenance",
-      ville: "Québec, QC",
-      publieeLe: "2026-07-10",
-    });
-  });
-
-  it("écarte un poste sans URL exploitable plutôt que d'en fabriquer une fausse", () => {
-    const corps = JSON.stringify({ content: [{ id: "", name: "Sans référence" }] });
-    expect(analyserSmartRecruiters(corps, "X")).toEqual([]);
-  });
-});
-
 describe("ce qu'aucun analyseur ne fait", () => {
-  it("aucun n'invente de ville, de date ni de description", () => {
+  it("aucun n'invente d'entreprise, de ville, de date ni de description", () => {
     // Sur une offre minimale mais valide, les champs absents restent vides — jamais
     // remplis par déduction. C'est la règle no-fake-data au point d'entrée des données.
-    const corps = JSON.stringify({
-      jobs: [{ id: 1, title: "Poste", absolute_url: "https://exemple.test/1" }],
-    });
-    const r = analyserGreenhouse(corps, "Exemple");
+    //
+    // ⚠️ CE CAS TOURNAIT SUR `analyserGreenhouse` JUSQU'AU 2026-09-18. Re-posé ici sur
+    // l'analyseur qui reste plutôt que supprimé avec les autres : la règle ne parlait pas de
+    // Greenhouse, elle parlait du POINT D'ENTRÉE. La supprimer avec son témoin aurait laissé
+    // croire qu'elle n'avait jamais existé.
+    const corps =
+      "<rss><channel><item><title>Poste</title>" +
+      "<link>https://exemple.test/1</link></item></channel></rss>";
+    const r = analyserRss(corps);
+    expect(r).toHaveLength(1);
     expect(r[0]).toEqual({
-      refSource: "1",
+      refSource: "https://exemple.test/1",
       titre: "Poste",
-      entreprise: "Exemple",
+      entreprise: "",
       ville: "",
       lien: "https://exemple.test/1",
       description: "",

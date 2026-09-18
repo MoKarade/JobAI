@@ -154,11 +154,21 @@ export function expurgerPII(texte: string): RapportExpurgement {
 }
 
 /**
- * Expurge toutes les descriptions d'un lot de dépôt, et rend le compte de ce qui a été retiré.
+ * Expurge toutes les descriptions d'un lot, et rend le compte de ce qui a été retiré.
  *
- * ⚠️ Le champ `adresse` n'est PAS touché : c'est le seul endroit où une adresse civique a le
- * droit d'exister dans un fichier versionné (exemption de `piiGuard`, ancrée sur cette clé).
- * Expurger ici détruirait la donnée même que la veille cherche.
+ * ⚠️ SANS CONSOMMATEUR DEPUIS LE 2026-09-18, ET GARDÉE DÉLIBÉRÉMENT. Son unique appelant
+ * était `scripts/deposer-veille.ts`, supprimé avec le canal de dépôt de fichiers. Elle n'est
+ * pas du code mort par oubli : `expurgerPII`, qu'elle enveloppe, reste appelée une par une
+ * dans le flux, et le jour où un lot entier de descriptions repassera par ici — l'import
+ * complet du flux, `[VEILLE-06]` — c'est cette fonction-là qu'il faudra appeler, pas une
+ * boucle réécrite à côté. Ses trois tests restent verts et la tiennent en état.
+ *
+ * ⚠️ Son commentaire disait jusqu'à ce jour que le champ `adresse` n'était pas touché « parce
+ * que c'est le seul endroit où une adresse civique a le droit d'exister dans un fichier
+ * versionné (exemption de `piiGuard`) ». Cette exemption N'EXISTE PLUS : elle est morte avec
+ * les `data/depot/*.json` qu'elle couvrait, et `piiGuard` ne neutralise plus rien nulle part.
+ * Ce qui reste vrai est plus simple — cette fonction n'expurge QUE `description`, et
+ * n'importe quel autre champ passe intact. Le prochain appelant doit le savoir.
  */
 export function expurgerLot<T extends { description: string }>(
   offres: readonly T[],

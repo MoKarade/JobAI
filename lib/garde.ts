@@ -34,10 +34,12 @@ export function estCheminPublic(chemin: string): boolean {
   // Même famille, même CRON_SECRET (factorisé dans `lib/cronAuth.ts`) : une seconde passe
   // de géocodage quotidienne, à une autre heure que la veille (chantier #07, [CARTE-03]).
   if (chemin === "/api/cron/geocodage") return true;
-  // Même famille : gardée par `INGEST_TOKEN`, en temps constant, échec fermé. C'est le
-  // point d'entrée par lequel une Routine dépose ce qu'elle a trouvé — elle a le
-  // connecteur Indeed mais aucun accès au dépôt, et aucune session Google.
-  if (chemin === "/api/ingest/depot") return true;
+  // ⚠️ `/api/ingest/depot` A ÉTÉ RETIRÉ LE 2026-09-18 AVEC SA ROUTE ET SON SECRET. C'était
+  // le point d'entrée par lequel une Routine claude.ai déposait ce qu'elle avait trouvé.
+  // Aucune Routine ne l'a jamais alimenté (vérifié sur les 60 Routines du compte), et le
+  // dernier lot déposé datait du 21/08. Retirer la route SANS retirer cette ligne aurait
+  // laissé un chemin PUBLIC déclaré pour une route absente : inoffensif tant que rien n'y
+  // répond, et un trou béant le jour où quelqu'un recrée un fichier à ce chemin.
   // Même famille : le connecteur MCP porte sa propre authentification (jeton en temps
   // constant aujourd'hui, OAuth 2.1 au lot 3 de l'ADR-0011). Un client MCP n'a pas de
   // session Google ; derrière la garde de session il recevrait une redirection HTML au lieu

@@ -1,5 +1,14 @@
 # La Routine quotidienne — le seul canal qui produit des offres
 
+> ⚠️ **RÉCIT DATÉ — CE CANAL N'EXISTE PLUS (2026-09-18).** Ce document décrit la Routine
+> claude.ai qui déposait des offres par `POST /api/ingest/depot`. La route, son secret
+> (`INGEST_TOKEN`), la source « fichiers » et les onze lots de `data/depot/` ont été
+> supprimés : aucune Routine du compte ne l'a jamais alimentée (les 60 ont été relues le
+> 2026-09-18), et le dernier lot datait du 21/08 — hors de la fenêtre de sept jours depuis
+> trois semaines. **Ne suis pas ce mode d'emploi.** Il est gardé pour ce qu'il MESURE : les
+> sept sources éprouvées et leurs verdicts, qui restent la raison pour laquelle le flux
+> complet du Guichet est aujourd'hui la seule source.
+
 > À copier dans une Routine claude.ai. Ce fichier est la **source de vérité** du prompt :
 > tant qu'il ne vivait que dans la Routine, personne ne pouvait le lire, le corriger, ni
 > même savoir ce qu'il cherchait — et c'est resté invisible pendant que Marc constatait

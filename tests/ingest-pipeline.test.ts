@@ -5,7 +5,7 @@
 // vérifiées alors que personne ne les a lues. Les trois se testent ici.
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { brutesParIdStocke, cleCanonique, idsStockesVus, liensARafraichir,
   FIT_ROLE_PLANCHER,
@@ -616,6 +616,32 @@ describe("liensARafraichir — le lien suit l'annonce, le reste ne bouge pas", (
   });
 });
 
+/**
+ * Les fichiers du dépôt qui ÉCRIVENT le lien d'une offre en base.
+ *
+ * Découvert, jamais listé : c'est la seule forme qui reste juste quand un chemin disparaît
+ * (la route de dépôt, 2026-09-18) comme quand un nouveau apparaît. Le motif vise l'ÉCRITURE
+ * Drizzle (`.set({ lien`), pas la mention du mot — et il lit la source décommentée, sinon
+ * le paragraphe qui explique la règle se compterait comme un chemin.
+ */
+function cheminsQuiEcriventLeLien(): string[] {
+  const trouves: string[] = [];
+  const parcourir = (dossier: string): void => {
+    for (const e of readdirSync(resolve(process.cwd(), dossier), { withFileTypes: true })) {
+      const chemin = `${dossier}/${e.name}`;
+      if (e.isDirectory()) {
+        if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+        parcourir(chemin);
+      } else if (e.name.endsWith(".ts") || e.name.endsWith(".tsx")) {
+        const src = sansCommentaires(readFileSync(resolve(process.cwd(), chemin), "utf8"));
+        if (/\.set\(\{\s*lien/.test(src)) trouves.push(chemin);
+      }
+    }
+  };
+  for (const racine of ["lib", "app", "scripts"]) parcourir(racine);
+  return trouves.sort();
+}
+
 /** Même découpage que `tests/liensOffreCables.test.ts` : par ligne, suffisant ici. */
 function sansCommentaires(source: string): string {
   return source
@@ -624,12 +650,26 @@ function sansCommentaires(source: string): string {
     .join("\n");
 }
 
-describe("⚠️ le branchement — les DEUX chemins d'écriture appliquent la règle", () => {
+describe("⚠️ le branchement — TOUT chemin d'écriture applique la règle", () => {
   // La leçon de `[FERMETURE-03]`, payée le 2026-09-15 : un mécanisme peut calculer juste,
   // rendre juste, passer un test d'intégration qui traverse la passe, et n'atteindre JAMAIS
   // la base. Ce qui compte n'est pas ce que la fonction REND, c'est ce que la persistance
-  // parcourt. Deux chemins écrivent des offres confirmées ; les deux doivent rafraîchir.
-  const CHEMINS = ["lib/veilleComplete.ts", "app/api/ingest/depot/route.ts"] as const;
+  // parcourt. Tout chemin qui écrit des offres confirmées doit rafraîchir.
+  //
+  // ⚠️ LA LISTE SE DÉCOUVRE, ELLE NE S'ÉCRIT PLUS À LA MAIN (2026-09-18). Elle en portait
+  // DEUX ; la route de dépôt a été supprimée avec le reste du canal, et une liste figée
+  // aurait alors désigné un fichier absent — rouge — ou, dans l'autre sens, aurait laissé un
+  // troisième chemin d'écriture naître sans jamais être gardé. C'est exactement « une liste
+  // écrite à la main devient fausse au chantier suivant ». On BALAIE donc le dépôt, et
+  // l'anti-vacuité est double : au moins un chemin trouvé, et aucun hors de ce qu'on connaît.
+  const CHEMINS = cheminsQuiEcriventLeLien();
+
+  it("le balayage trouve au moins un chemin d'écriture — sinon les cas ci-dessous sont vides", () => {
+    expect(CHEMINS.length).toBeGreaterThan(0);
+    // Le seul chemin connu au 2026-09-18. Un nouveau fera tomber ce cas : c'est le but —
+    // on le regarde, puis on l'ajoute ici en connaissance de cause.
+    expect(CHEMINS).toEqual(["lib/veilleComplete.ts"]);
+  });
 
   for (const f of CHEMINS) {
     it(`${f} écrit le lien rafraîchi`, () => {

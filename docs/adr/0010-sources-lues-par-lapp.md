@@ -1,8 +1,16 @@
 # ADR-0010 — Lire les offres DEPUIS L'APP : sources candidates, mesure d'accès, extraction
 
 - **Statut** : **Accepté** (décision Marc, 2026-08-19 : « TOUT et rajoute aussi Indeed,
-  LinkedIn, Jobillico, ZipRecruiter »). Q1, Q2 et Q3 sont ouvertes ; quatre agrégateurs
-  s'ajoutent au périmètre de MESURE. **Aucune source n'ingère encore quoi que ce soit.**
+  LinkedIn, Jobillico, ZipRecruiter »), puis **partiellement RÉVISÉ le 2026-09-18** —
+  décision Marc : « enlève tout ce qui ne rend rien à la recherche ». Trois des canaux
+  explorés ici ont été SUPPRIMÉS du code : les recherches RSS du Guichet par mot-clé, les
+  cinq familles d'ATS et le dépôt de fichiers. Ce qui les condamne n'est pas ce document,
+  qui a bien fait son travail de mesure : c'est le chiffre d'après. Mesuré le 2026-09-18,
+  aucun des trois n'avait rendu une seule offre depuis un mois, pendant que le **flux complet
+  du Guichet** — la piste ouverte ici, Q1 — en ramenait 42 894 par passe.
+  **Ce document reste un récit daté, et il ne se réécrit pas** : ses mesures d'accès, ses
+  verdicts source par source et sa méthode (témoin négatif, double vérification) sont
+  exactement ce qui a permis de trancher. Seul son statut change.
 - **Date** : 2026-08-19
 - **Exigé par** : garde-fou n°4 (« *Verrou : ADR-0002 avant toute nouvelle source* »)
 - **Se lit après** : ADR-0005 (précision de la veille), et le retrait `[VEILLE-35]`

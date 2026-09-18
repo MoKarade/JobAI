@@ -23,7 +23,7 @@ import { villesRefusees } from "./ingest/pipeline";
 // L'id de la source, importé et jamais recopié : le rapport doit RECONNAÎTRE le dépôt parmi
 // les autres pour en dire la fraîcheur, et deux exemplaires d'une chaîne finissent par
 // diverger — la fraîcheur deviendrait muette sans qu'aucune erreur ne le signale.
-import { ID_SOURCE_DEPOT } from "./ingest/types";
+import { ID_SOURCE_FLUX_GUICHET } from "./ingest/sourceGuichetFlux";
 import type { Offre } from "./types";
 
 /** Clé sous laquelle le dernier rapport est conservé, pour l'écran. */
@@ -94,22 +94,21 @@ export interface RapportVeille {
     note?: string;
   }[];
   /**
-   * Fraîcheur du dépôt — le SEUL canal vivant depuis le retrait des pages carrières.
+   * La FRAÎCHEUR de la source, et elle existe pour qualifier le « 0 nouvelle ».
    *
-   * ⚠️ C'EST LE SEUL CHIFFRE QUI DISTINGUE « RIEN DE NEUF » DE « PLUS RIEN N'ARRIVE ».
-   * Le dépôt lit une fenêtre de sept jours : le jour où aucun lot n'est déposé, il rend
-   * quand même ceux de la veille, tout est compté « déjà connue », et le rapport affiche
-   * « 0 nouvelle » — mot pour mot ce qu'il afficherait un jour sans embauche. Les deux
-   * situations appellent des gestes opposés : attendre, ou aller réparer la chaîne qui
-   * dépose. Ce projet a déjà payé ce silence — le cron de la veille a cessé d'être appelé
-   * pendant trois jours sans qu'un voyant ne change, pendant que la péremption éteignait
-   * les offres une à une.
+   * ⚠️ ELLE PORTAIT SUR LE DÉPÔT DE FICHIERS JUSQU'AU 2026-09-18 ; le dépôt a été supprimé
+   * (zéro offre rendue depuis un mois) et elle suit désormais le FLUX DU GUICHET, seule
+   * source restante. Le besoin, lui, n'a pas bougé d'un pouce : le jour où la source ne rend
+   * rien, tout est compté « déjà connue » et le rapport affiche « 0 nouvelle » — mot pour mot
+   * ce qu'il afficherait un jour sans embauche. Les deux appellent des gestes opposés :
+   * attendre, ou aller réparer. Ce projet a déjà payé ce silence — le cron a cessé d'être
+   * appelé pendant trois jours sans qu'un voyant ne change, pendant que la péremption
+   * éteignait les offres une à une.
    *
-   * `retardJours` vaut 0 quand un lot du jour a bien été déposé, `null` quand le dépôt n'a
-   * rien rendu du tout (fenêtre vide, ou source en échec) — deux aveux différents, jamais
-   * un zéro qui aurait l'air d'une mesure.
+   * `retardJours` vaut 0 quand la source a rendu un lot du jour, `null` quand elle n'a rien
+   * rendu du tout (échec) — deux aveux différents, jamais un zéro qui aurait l'air d'une mesure.
    */
-  depot: { dernierJour: string | null; retardJours: number | null };
+  fraicheur: { dernierJour: string | null; retardJours: number | null };
   /** Lieux inconnus soumis au géocodeur pendant cette passe. */
   lieux: { demandes: number; juges: number; introuvables: number };
   /** Ce que la passe de localisation a fait, en clair. */
@@ -220,8 +219,8 @@ export function construireRapport(entree: {
     sources: entree.sources,
     // Dérivé de ce que la source a RÉELLEMENT lu, jamais d'un paramètre séparé : un second
     // canal pour la même information finirait par dire autre chose que la passe elle-même.
-    depot: (() => {
-      const d = entree.sources.find((s) => s.id === ID_SOURCE_DEPOT);
+    fraicheur: (() => {
+      const d = entree.sources.find((s) => s.id === ID_SOURCE_FLUX_GUICHET);
       const dernierJour = d?.ok === true ? (d.dernierJour ?? null) : null;
       return {
         dernierJour,
@@ -243,43 +242,43 @@ export function construireRapport(entree: {
  * que la CI de ce dépôt a été ignorée quatre commits d'affilée. Deux jours consécutifs sans
  * lot, en revanche, n'arrive pas par hasard.
  */
-export const RETARD_DEPOT_ALERTE_JOURS = 2;
+export const RETARD_SOURCE_ALERTE_JOURS = 2;
 
-export interface FraicheurDepot {
+export interface FraicheurSource {
   etat: "frais" | "vieillissant" | "rompu";
   texte: string;
 }
 
 /**
- * Ce que la fraîcheur du dépôt autorise à DIRE. PURE.
+ * Ce que la fraîcheur de la SOURCE autorise à DIRE. PURE.
  *
- * ⚠️ ELLE EXISTE POUR QUALIFIER LE « 0 NOUVELLE », PAS POUR DÉCORER. Tant que le dépôt est
+ * ⚠️ ELLE EXISTE POUR QUALIFIER LE « 0 NOUVELLE », PAS POUR DÉCORER. Tant que la source est
  * frais, « 0 nouvelle » est une information sur le marché : il n'y a rien eu aujourd'hui.
  * Dès qu'il rouille, le même « 0 » ne dit plus rien du tout — il dit que personne n'a
  * regardé. Les deux se ressemblent à l'écran et appellent des gestes opposés : attendre, ou
  * aller réparer la chaîne qui dépose. C'est précisément le silence que ce projet a déjà payé
  * — un cron muet trois jours durant, pendant que la péremption éteignait les offres une à une.
  */
-export function fraicheurDepot(depot: RapportVeille["depot"]): FraicheurDepot {
-  if (depot.retardJours === null) {
+export function fraicheurSource(f: RapportVeille["fraicheur"]): FraicheurSource {
+  if (f.retardJours === null) {
     return {
       etat: "rompu",
       texte:
-        "Aucun lot de dépôt n’a été lu à cette passe. Le seul canal qui apporte des offres n’a rien rendu : tant que ça dure, « 0 nouvelle » ne dit rien du marché.",
+        "Le flux du Guichet n’a rien rendu à cette passe. La seule source d’offres est muette : tant que ça dure, « 0 nouvelle » ne dit rien du marché.",
     };
   }
-  if (depot.retardJours === 0) {
-    return { etat: "frais", texte: "Le lot du jour a bien été déposé." };
+  if (f.retardJours === 0) {
+    return { etat: "frais", texte: "Le flux du jour a bien été lu." };
   }
-  if (depot.retardJours < RETARD_DEPOT_ALERTE_JOURS) {
+  if (f.retardJours < RETARD_SOURCE_ALERTE_JOURS) {
     return {
       etat: "vieillissant",
-      texte: `Aucun lot déposé aujourd’hui — le dernier date d’hier (${depot.dernierJour}).`,
+      texte: `Le flux lu date d’hier (${f.dernierJour}) — le Guichet ne l’a pas republié aujourd’hui.`,
     };
   }
   return {
     etat: "rompu",
-    texte: `Aucun lot déposé depuis ${depot.retardJours} jours — le dernier date du ${depot.dernierJour}. Tant que ça dure, « 0 nouvelle » ne dit rien du marché : la chaîne qui dépose est à vérifier.`,
+    texte: `Le flux lu date du ${f.dernierJour}, soit ${f.retardJours} jours. Tant que ça dure, « 0 nouvelle » ne dit rien du marché : c'est le Guichet ou la passe qu'il faut vérifier.`,
   };
 }
 

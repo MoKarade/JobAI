@@ -62,10 +62,16 @@ Format : {l'interdit · l'exception nommée et bornée · le seul fichier autori
    *Second verrou, né du texte ingéré* : les annonces lues par la veille portent la **PII de
    TIERS** (courriel nominatif, profil LinkedIn personnel, téléphone d'un recruteur — vécu le
    2026-08-12 sur une annonce Randstad). `lib/ingest/expurger.ts` (`expurgerPII`, PURE) est
-   l'outil qui nettoie ; le test « aucune PII de tiers dans les descriptions d'un dépôt »
-   (scan des `data/depot/*.json`) est la garde qui **refuse**. Les deux sont nécessaires : un
-   outil qu'on peut oublier d'appeler ne protège rien. La boîte de rôle (`carriere@…`) SURVIT
-   — c'est l'adresse à laquelle Marc postule.
+   l'outil qui nettoie ; le test « aucune PII de tiers » est la garde qui **refuse**. Les deux
+   sont nécessaires : un outil qu'on peut oublier d'appeler ne protège rien. La boîte de rôle
+   (`carriere@…`) SURVIT — c'est l'adresse à laquelle Marc postule.
+   ⚠️ **Sa portée est passée des `data/depot/*.json` à TOUT le dépôt le 2026-09-18**, et ce
+   n'est pas du confort : le canal de dépôt a été supprimé, donc les deux motifs qui ne
+   tournaient que sur lui auraient scanné une liste VIDE en restant verts. Élargis, ils ont
+   trouvé du premier coup le vrai nom, le vrai courriel et le vrai identifiant LinkedIn du
+   recruteur Randstad — recopiés de l'annonce dans les fixtures de `tests/expurger.test.ts`
+   le 12/08, dans un dépôt PUBLIC, et invisibles depuis. L'exemption du champ `adresse` des
+   dépôts a disparu avec eux : **`piiGuard` ne neutralise plus rien nulle part**.
 
 2. **Le suivi appartient à Marc.** `statut`, `prio`, `dateEnvoi`, `userNote`
    (`USER_OWNED_FIELDS`) ne sont **jamais** écrasés par un rafraîchissement de seed, une
@@ -272,8 +278,7 @@ Un test vert sur un champ retiré est exactement le genre de vert dont on prend 
 | `docs/adr/` | Les décisions architecturales, `NNNN-slug.md`. Obligatoire avant toute modif de la notation ou du matching (§11). |
 | `docs/LESSONS.md` | Le journal des leçons **et leurs HISTOIRES** (incident, mesure, date) — depuis le 2026-09-17, il porte aussi les 153 récits déménagés de la §9. Leur RÈGLE reste en §9 : une leçon s'écrit des DEUX côtés, dans le même commit. |
 | `docs/DEPLOIEMENT.md` | Déployer, et les variables d'environnement attendues. |
-| `docs/ROUTINE-DEPOT.md` | La routine de dépôt des offres de la veille. |
-| `docs/veille-prompt.md` | Le prompt de la veille et ses garde-fous. |
+| `docs/ROUTINE-DEPOT.md` · `docs/veille-prompt.md` | **RÉCITS depuis le 2026-09-18** : la routine de dépôt et son prompt décrivent un canal supprimé. Gardés comme récits datés (leur en-tête le dit), jamais comme mode d'emploi. |
 
 La structure est commune aux huit dépôts du hub — elle est fixée dans
 [`conventions/STRUCTURE-DEPOT.md`](https://github.com/MoKarade/claude-config/blob/main/conventions/STRUCTURE-DEPOT.md)

@@ -2847,3 +2847,54 @@ refaire du déjà-fait, ou pire, renoncer à brancher ce qui est déjà branché
 et `[V3-*]` (fonctionnalités non commencées), `[CV-07]` (variable d'environnement, côté Marc),
 `[ROUTINE-01]` (arbitrage de Marc, pas une tâche). Les laisser ouverts est le verdict honnête :
 je n'ai pas mesuré, donc je ne coche pas.
+
+---
+
+## Chantier — la veille n'a plus qu'une source (2026-09-18) 🟦
+
+Demande de Marc, 2026-09-18 : « enlève tout ce qui ne rend rien à la recherche ». Quatre
+canaux nommés, tous mesurés morts le jour même.
+
+### `[VEILLE-51]` — supprimer les canaux qui ne rendent rien ✅
+
+| Canal supprimé | Ce que la mesure a dit |
+|---|---|
+| Recherches RSS du Guichet par mot-clé | Liste de recherches **vide** : les adresses ne répondent pas (404 sur six formes, 31/07 puis 05/08). |
+| Pages carrières d'ATS (5 familles) | **Aucune entreprise déclarée**, jamais. La source interrogeait une liste vide à chaque passe. |
+| Dépôt de fichiers `data/depot/` + `POST /api/ingest/depot` | Dernier lot le **21/08** — hors de la fenêtre de 7 jours depuis trois semaines. |
+| Routine claude.ai qui alimentait le dépôt | **Aucune** des 60 Routines du compte ne pointait sur JobAI (relues le 18/09). |
+
+Reste : le **flux complet du Guichet-Emplois**, 42 894 offres vues par passe.
+`selectionnerSources` n'a plus de rotation ni de curseur — il rend une source ou aucune.
+
+⚠️ **Ce qui a été GARDÉ délibérément, et pourquoi** :
+- `lib/ingest/expurger.ts` `expurgerLot` — orpheline depuis la suppression de
+  `scripts/deposer-veille.ts`, annotée comme telle. `[VEILLE-06]` (import complet du flux)
+  en aura besoin, et une boucle réécrite à côté divergerait de `expurgerPII`.
+- `lib/ingest/sondeSources.ts` et `/api/diagnostic/sources` — la sonde MESURE, elle
+  n'ingère pas. Ses six candidats d'ATS sont partis ; les treize autres (Guichet, données
+  ouvertes, portails publics, agrégateurs par `robots.txt`) restent utiles.
+- `docs/ROUTINE-DEPOT.md` et `docs/veille-prompt.md` — **récits datés**, bandeau en tête.
+  Ils portent la mesure des sept sources, qui est la raison du choix actuel.
+
+### `[PII-02]` — le garde de PII de tiers ne scannait qu'un dossier qui a disparu ✅
+
+Les motifs « courriel nominatif » et « profil LinkedIn personnel » ne tournaient que sur
+`data/depot/*.json`. Ce dossier supprimé, ils auraient scanné une liste **vide** en restant
+verts. Re-pointés sur **tous** les fichiers versionnés — et ils ont trouvé du premier coup,
+sur 369 fichiers, le vrai nom, le vrai courriel et le vrai identifiant LinkedIn du recruteur
+Randstad, recopiés de l'annonce du 12/08 dans les fixtures de `tests/expurger.test.ts`, dans
+un dépôt **public**, invisibles depuis cinq semaines. Remplacés par des valeurs de même forme
+sans personne derrière. L'exemption du champ `adresse` des dépôts a été retirée avec eux :
+`piiGuard` ne neutralise plus rien nulle part.
+
+### `[PERSIST-02]` — la liste des chemins d'écriture d'offres est incomplète ⬜
+
+Découvert en chemin, **non corrigé** (hors périmètre). `tests/persistance.test.ts` garde une
+liste ÉCRITE À LA MAIN des fichiers qui écrivent des offres. Mesuré : cinq fichiers font
+`insert(offers)` ou `update(offers)` — `lib/veilleComplete.ts`, `lib/actions.ts`,
+`lib/synchro.ts`, plus **`app/api/mcp/route.ts` et `lib/cv/actions.ts`**, qui ne sont pas dans
+la liste. Les deux manquants font des écritures CIBLÉES (deux champs), pas une réénumération
+de colonnes : ce n'est probablement pas un défaut, mais personne ne l'a tranché et la liste
+prétend être complète. Le remède est le même que celui posé le 18/09 dans
+`tests/ingest-pipeline.test.ts` : **découvrir** la liste par balayage au lieu de l'écrire.

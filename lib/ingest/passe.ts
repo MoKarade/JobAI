@@ -33,14 +33,9 @@ import {
   type VilleACompleter,
 } from "./pipeline";
 import { verdictsFermes, type RegistreLieux } from "./lieux";
-import { RECHERCHES_GUICHET, sourceGuichet } from "./sources";
-import { sourceDepotFichier } from "./depotFichier";
 import { sourceGuichetFlux, type OptionsSourceFlux } from "./sourceGuichetFlux";
-import { villeCoherente } from "./depotSchema";
+import { villeCoherente } from "./adresseAnnoncee";
 import type { OffreBrute, Recuperateur, ResultatSource, Source } from "./types";
-
-/** Sources interrogées par exécution. Au-delà, on dépasse la durée d'une fonction. */
-export const MAX_SOURCES_PAR_PASSE = 14;
 
 /**
  * Noms de lieu MESURÉS par passe, au maximum.
@@ -164,52 +159,23 @@ export interface RapportPasse {
 /**
  * Les sources d'une exécution.
  *
- * `depart` fait tourner la sélection d'un jour à l'autre : sans lui, les mêmes sources
- * seraient interrogées chaque jour et les dernières de la liste ne le seraient JAMAIS.
+ * ⚠️ IL N'Y EN A PLUS QU'UNE, ET LA ROTATION A DISPARU AVEC LES AUTRES (2026-09-18).
+ * Cette fonction choisissait parmi une liste tournante de sources réseau — recherches RSS du
+ * Guichet, pages carrières d'ATS — plus le dépôt de fichiers hors rotation. Mesuré le
+ * 2026-09-18 : la liste RSS était VIDE (les adresses ne répondent pas), aucune entreprise
+ * d'ATS n'était déclarée nulle part, et le dernier lot de `data/depot/` datait du 21/08 —
+ * donc hors de la fenêtre de sept jours depuis trois semaines. Les trois rendaient ZÉRO
+ * offre, à chaque passe, depuis un mois.
+ *
+ * Ce qui reste est ce qui alimentait déjà tout : le flux complet du Guichet-Emplois. Il est
+ * lu dès que l'appelant le demande, et c'est l'appelant qui décide de le demander.
+ *
+ * La rotation n'est pas « à remettre si on ajoute une source » : elle existait pour ne pas
+ * dépasser la durée d'une fonction en interrogeant douze services. Une source qui reviendrait
+ * un jour se poserait la question à ce moment-là, avec ses propres chiffres.
  */
-export function selectionnerSources(
-  depart: number,
-  aujourdhui: string,
-  /**
-   * De quoi construire la source du flux complet, ou `undefined` pour ne pas la construire.
-   *
-   * ⚠️ UNE LISTE DE MÉTIERS VIDE ÉTEINT LA SOURCE, elle ne la rend pas permissive. Sans ce
-   * garde, le jour où le module est branché, la première passe lirait ~130 Mo et ferait
-   * entrer des milliers d'offres que personne n'a demandées. Le défaut sûr d'un filtre qui
-   * n'a pas encore été réglé est de tout refuser, pas de tout laisser passer.
-   */
-  flux?: OptionsSourceFlux,
-): Source[] {
-  // ⚠️ LE DÉPÔT DE FICHIERS EST HORS ROTATION, ET C'EST TOUT L'INTÉRÊT. La rotation existe
-  // pour ne pas dépasser la durée d'une fonction en interrogeant douze sources RÉSEAU. Le
-  // dépôt ne fait aucune requête : il lit un fichier du projet. Le mettre dans la rotation
-  // le ferait sauter certains jours — donc les offres qu'il porte ne seraient pas « revues »
-  // ce jour-là, et la péremption les ferait disparaître alors qu'elles sont bien là.
-  const depot = sourceDepotFichier(aujourdhui);
-
-  // ⚠️ LE FLUX COMPLET EST HORS ROTATION POUR LA MÊME RAISON QUE LE DÉPÔT, et elle est
-  // encore plus impérieuse ici : il est en passe de devenir la source PRINCIPALE. Une source
-  // sautée un jour sur deux voit ses offres prendre une absence ce jour-là, et trois
-  // absences périment. Le mettre dans la rotation reviendrait à périmer par intermittence
-  // ce qu'on vient d'ingérer — un faux positif de péremption dont la cause serait l'horaire.
-  const hors: Source[] = [depot];
-  // ⚠️ LA LISTE DE MÉTIERS N'ALLUME PLUS RIEN (décision Marc 2026-08-20). Elle ne filtre
-  // plus l'ingestion, elle pondère la NOTE — donc une liste vide n'éteint plus la source,
-  // elle rend seulement toutes les offres équivalentes au regard du domaine. Le flux est lu
-  // dès qu'on le demande, et c'est l'appelant qui décide de le demander.
-  if (flux !== undefined) {
-    hors.push(sourceGuichetFlux(flux).source);
-  }
-
-  const reseau = RECHERCHES_GUICHET.map((r) => sourceGuichet(r));
-  if (reseau.length <= MAX_SOURCES_PAR_PASSE) return [...hors, ...reseau];
-
-  const debut = ((depart % reseau.length) + reseau.length) % reseau.length;
-  const choisies: typeof reseau = [];
-  for (let i = 0; i < MAX_SOURCES_PAR_PASSE; i++) {
-    choisies.push(reseau[(debut + i) % reseau.length]!);
-  }
-  return [...hors, ...choisies];
+export function selectionnerSources(flux?: OptionsSourceFlux): Source[] {
+  return flux === undefined ? [] : [sourceGuichetFlux(flux).source];
 }
 
 /**
@@ -264,8 +230,6 @@ export async function executerPasse(
   // ville tout juste mesurée entre à la passe SUIVANTE, pas à celle-ci. Vouloir corriger ça
   // en mesurant d'abord n'est pas possible : on ne saurait pas quoi mesurer.
   const sources = selectionnerSources(
-    depart,
-    aujourdhui,
     flux === undefined
       ? undefined
       : { ...flux, verdicts: verdictsFermes(lieux?.registre ?? {}) },

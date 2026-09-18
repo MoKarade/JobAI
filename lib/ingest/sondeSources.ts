@@ -16,8 +16,6 @@
 // l'information qu'une sonde cherche. Un `fetch` nu qui rend le CODE est la seule façon de
 // distinguer « refusé », « inexistant » et « quota » — la leçon des 180 essais ATS.
 
-import { analyseurAts } from "./sources";
-import { FAMILLES_ATS, type FamilleAts } from "./types";
 
 /** Combien de caractères de contenu on remonte. Assez pour VOIR, trop peu pour collecter. */
 export const TAILLE_ECHANTILLON = 400;
@@ -68,8 +66,6 @@ export interface Candidat {
   nom: string;
   url: string;
   voie: VoieLegale;
-  /** La famille d'ATS, quand le corps peut être compté par un analyseur existant. */
-  famille?: FamilleAts;
   /** Ce qu'on attend d'une réponse EXPLOITABLE, en une phrase lisible. */
   attendu: string;
   /** Note honnête : ce que la mesure ne dira PAS. */
@@ -95,10 +91,13 @@ export interface Mesure {
    */
   tronque?: boolean;
   /**
-   * Offres réellement extraites par l'analyseur de la famille, quand il y en a un.
+   * Offres réellement extraites par un analyseur, quand il y en a un.
    *
    * `null` = pas d'analyseur applicable, `0` = la réponse est valide mais ne porte AUCUNE
-   * offre. Les deux se ressemblent dans un rapport et disent le contraire.
+   * offre. Les deux se ressemblent dans un rapport et disent le contraire — et c'est
+   * précisément pourquoi le champ reste, alors qu'il vaut `null` partout depuis le
+   * 2026-09-18 : le distinguer d'un `0` est ce qui empêchera un candidat futur d'être
+   * déclaré vide faute d'avoir été compté.
    */
   offres: number | null;
   ms: number;
@@ -145,22 +144,13 @@ export function echantillonner(corps: string, taille = TAILLE_ECHANTILLON): stri
   return corps.replace(/\s+/g, " ").trim().slice(0, taille);
 }
 
-/**
- * Combien d'offres ce corps porte-t-il vraiment ?
- *
- * On réutilise l'analyseur de production, jamais un compteur écrit à côté : deux façons de
- * lire la même réponse divergent, et c'est la plus optimiste qui ferait croire à une source
- * vivante. `null` quand aucune famille ne s'applique.
- */
-export function compterOffres(corps: string, famille: FamilleAts | undefined): number | null {
-  if (famille === undefined) return null;
-  if (!FAMILLES_ATS.includes(famille)) return null;
-  try {
-    return analyseurAts(famille)(corps, "sonde").length;
-  } catch {
-    return null;
-  }
-}
+// ⚠️ `compterOffres` A DISPARU LE 2026-09-18 AVEC LES ANALYSEURS D'ATS. Elle réutilisait
+// l'analyseur de PRODUCTION de la famille sondée, exprès — « deux façons de lire la même
+// réponse divergent, et c'est la plus optimiste qui ferait croire à une source vivante ».
+// Ce principe reste vrai : le jour où un candidat redeviendra comptable, son compteur devra
+// être celui de l'ingestion, jamais un second écrit à côté. En attendant, aucun candidat
+// restant n'a d'analyseur applicable, et `offres` vaut `null` partout — ce que `verdictDe`
+// lit déjà comme « joignable, rien de comptable », pas comme « vide ».
 
 /**
  * Les directives d'un `robots.txt` qui s'appliquent à UN agent donné.
@@ -208,18 +198,16 @@ export function extraireBlocRobots(texte: string, agent = "*"): string[] {
   return groupes.find((g) => g.agents.includes("*"))?.regles ?? [];
 }
 
-/** Un identifiant qu'aucune entreprise ne porte. Le TÉMOIN NÉGATIF. */
-const BIDON = "nexistepasdutout999";
-
 /**
  * Les candidats soumis à la mesure.
  *
- * ⚠️ LES CINQ ATS SONT SONDÉS AVEC LE TÉMOIN NÉGATIF, PAS AVEC DE VRAIS JETONS — et ce
- * n'est pas une timidité, c'est la question posée. On demande « l'app joint-elle cette
- * API ? », à quoi un 404 répond parfaitement (le service a reçu, compris et répondu).
- * Sonder 36 employeurs × 5 familles serait la DÉCOUVERTE que `[VEILLE-35]` a retirée :
- * 180 requêtes pour inscrire ce qui répond, avec les homonymes d'Amsterdam au bout.
- * Les vrais jetons se CONSTATENT ensuite, un par un, sur la page carrières de l'employeur.
+ * ⚠️ LES SIX CANDIDATS D'ATS ONT ÉTÉ RETIRÉS LE 2026-09-18, avec la source qu'ils
+ * préparaient. Ils étaient sondés au TÉMOIN NÉGATIF — un identifiant qu'aucune entreprise
+ * ne porte — pour répondre à « l'app joint-elle cette API ? » sans jamais faire la
+ * DÉCOUVERTE que `[VEILLE-35]` avait retirée. La mesure a fini par être tranchée autrement :
+ * joignables ou non, aucune entreprise d'ATS n'a jamais été inscrite, donc la source
+ * interrogeait une liste vide. Ce qui reste sondé est ce qui peut encore alimenter la
+ * recherche — le Guichet, les données ouvertes, les portails publics.
  *
  * ⚠️ POUR LES QUATRE AGRÉGATEURS, ON LIT `robots.txt` — ET C'EST LA BONNE PREMIÈRE
  * QUESTION. Leur joignabilité n'apprend rien : ils répondent tous. Ce qu'on ignore, c'est
@@ -228,52 +216,6 @@ const BIDON = "nexistepasdutout999";
  * tout le reste. Un `Disallow: /jobs` y répond mieux que n'importe quelle supposition.
  */
 export const CANDIDATS: readonly Candidat[] = [
-  // ── API d'ATS : publiques, documentées, faites pour être consommées ────────────────
-  {
-    id: "ats:greenhouse",
-    famille: "greenhouse",
-    nom: "Greenhouse — API publique de tableau d'offres",
-    url: `https://boards-api.greenhouse.io/v1/boards/${BIDON}/jobs?content=true`,
-    voie: "api-publique",
-    attendu: "404 sur le témoin négatif = l'API a reçu et répondu, donc elle est joignable",
-  },
-  {
-    id: "ats:lever",
-    famille: "lever",
-    nom: "Lever — API publique d'offres",
-    url: `https://api.lever.co/v0/postings/${BIDON}?mode=json`,
-    voie: "api-publique",
-    attendu: "404 sur le témoin négatif",
-  },
-  {
-    id: "ats:recruitee",
-    famille: "recruitee",
-    nom: "Recruitee — API publique d'offres",
-    url: `https://${BIDON}.recruitee.com/api/offers/`,
-    voie: "api-publique",
-    attendu: "404 ou erreur DNS sur le témoin négatif (le jeton est un sous-domaine)",
-    reserve: "Le jeton étant dans le NOM D'HÔTE, un échec ici peut être un échec DNS et non un refus.",
-  },
-  {
-    id: "ats:workable",
-    famille: "workable",
-    nom: "Workable — API publique de widget",
-    url: `https://apply.workable.com/api/v1/widget/accounts/${BIDON}?details=true`,
-    voie: "api-publique",
-    attendu: "404 sur le témoin négatif",
-  },
-  {
-    id: "ats:smartrecruiters",
-    famille: "smartrecruiters",
-    nom: "SmartRecruiters — API publique d'offres",
-    url: `https://api.smartrecruiters.com/v1/companies/${BIDON}/postings?limit=100`,
-    voie: "api-publique",
-    attendu: "joignable — MAIS son 200 ne prouve rien",
-    reserve:
-      "MESURÉ EN JUILLET : cette API répond 200 à un identifiant qui n'existe pas. Son code " +
-      "de succès est donc inutilisable comme signal de présence ; seul le COMPTE d'offres l'est.",
-  },
-
   // ── Sources publiques officielles : l'exception NOMMÉE du garde-fou n°4 ────────────
   {
     id: "officielle:guichet-accueil",
@@ -354,20 +296,6 @@ export const CANDIDATS: readonly Candidat[] = [
     voie: "officielle",
     attendu: "les offres d'un employeur nommé — la voie la plus ciblée pour les 36 cibles",
     reserve: "Forme d'URL lue dans un résultat de recherche. À confirmer par l'échantillon.",
-  },
-
-  // ── Vérification d'un jeton ATS CONSTATÉ (et non deviné) ───────────────────────────
-  {
-    id: "jeton:robotiq-smartrecruiters",
-    nom: "Robotiq — jeton SmartRecruiters constaté",
-    url: "https://api.smartrecruiters.com/v1/companies/ROBOTIQInc/postings?limit=100",
-    voie: "api-publique",
-    famille: "smartrecruiters",
-    attendu: "des offres RÉELLES — c'est la deuxième vérification, indépendante de la première",
-    reserve:
-      "Le jeton `ROBOTIQInc` a été CONSTATÉ dans l'URL `careers.smartrecruiters.com/ROBOTIQInc`, " +
-      "pas déduit du nom. Reste la seconde vérification exigée : le contenu est-il dans la région ? " +
-      "`recruitee/robert` répondait très bien — avec des postes à Amsterdam.",
   },
 
   // ── Oracle Cloud HCM : MESURÉ, pas branché — la voie publique n'existe pas ─────────
@@ -534,7 +462,7 @@ export async function sonder(
           taille: corps.length,
           ...(tronque ? { tronque: true } : {}),
           echantillon: echantillonner(corps),
-          offres: compterOffres(corps, c.famille),
+          offres: null,
           ms: Date.now() - debut,
         });
       } finally {

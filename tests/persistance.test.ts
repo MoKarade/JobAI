@@ -61,8 +61,13 @@ describe("une seule copie de la liste de colonnes", () => {
     // a bien fait son travail au moment du déplacement : il a refusé de laisser un chemin
     // d'écriture sortir de sa surveillance. C'est la LISTE qu'on met à jour, jamais
     // l'assertion — un chemin retiré d'ici est un chemin qui n'est plus gardé.
+    //
+    // ⚠️ `app/api/ingest/depot/route.ts` EN EST SORTI le 2026-09-18 — parce que le fichier
+    // n'existe plus. Le canal de dépôt de fichiers a été supprimé en entier (il ne rendait
+    // plus rien depuis le 21/08). Ce n'est donc PAS un chemin qu'on cesse de garder : c'est
+    // un chemin qui a cessé d'exister. La distinction compte, et c'est la seule raison
+    // admissible de raccourcir cette liste.
     "lib/veilleComplete.ts",
-    "app/api/ingest/depot/route.ts",
     "lib/actions.ts",
     "lib/synchro.ts",
   ];
