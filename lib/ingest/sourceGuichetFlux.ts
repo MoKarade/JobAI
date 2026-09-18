@@ -44,7 +44,7 @@ export const ID_SOURCE_FLUX_GUICHET = "guichet-flux";
  * (`plafond-retenues` part dans la note) : une passe partielle qui se présenterait comme
  * complète ferait croire que le flux ne porte que ça.
  */
-export const MAX_RETENUES_FLUX = 1_600;
+export const MAX_RETENUES_FLUX = 12_000;
 
 
 /**
@@ -57,10 +57,16 @@ export const MAX_RETENUES_FLUX = 1_600;
  * mesurées, donc jamais connues, donc jetées à vie — un filtre qui affame la boucle censée
  * l'élargir, et dont l'échec est parfaitement silencieux (il rend simplement moins).
  *
- * Elles sont donc rapportées, en nombre borné : le pipeline les refusera (`lieuInconnu`) et
- * les comptera, mais leur NOM aura servi. Quarante par passe suffisent largement — la
- * mesure n'en consomme que six, triés par fréquence — et ça s'éteint tout seul : un nom
- * mesuré ne se redemande jamais.
+ * ⚠️ LE QUOTA A ÉTÉ SUPPRIMÉ LE 2026-09-18 (ADR-0019) ET LA CONSTANTE RESTE À ZÉRO EFFET.
+ * Il valait 40 par passe et bornait le travail que la mesure des lieux devait fournir — les
+ * offres au-delà étaient IGNORÉES (`lieuInconnuIgnore`), donc perdues pour la passe. Depuis
+ * que tout ce qui est québécois entre, il n'y a plus de raison d'en laisser dehors : une
+ * offre au lieu inconnu est une offre qu'on garde et dont on mesurera la distance plus tard.
+ *
+ * La constante est CONSERVÉE, à zéro usage, uniquement pour que le prochain qui se demandera
+ * « combien de lieux inconnus par passe ? » trouve le chiffre ET son histoire plutôt que
+ * d'en réinventer un. Le jour où elle redevient utile, elle est là ; d'ici là, un test
+ * vérifie qu'elle ne borne plus rien.
  */
 export const MAX_LIEUX_INCONNUS_FLUX = 40;
 
@@ -93,7 +99,14 @@ export interface BilanFlux {
   horsRegion: number;
   /** Lieux inconnus rapportés pour que la mesure apprenne leur nom. */
   lieuInconnuRapporte: number;
-  /** Lieux inconnus laissés de côté, le quota de la passe étant atteint. */
+  /**
+   * Lieux inconnus laissés de côté, le quota de la passe étant atteint.
+   *
+   * ⚠️ TOUJOURS ZÉRO DEPUIS LE 2026-09-18 (ADR-0019) : plus rien n'est laissé de côté. Le
+   * champ SURVIT parce que la phrase qu'il produit est la seule qui distinguait « on a vu
+   * tous les lieux inconnus » de « on en a vu 40 sur 812 » — et cette distinction reste
+   * exactement celle qu'il faudra dire le jour où une borne reviendra.
+   */
   lieuInconnuIgnore: number;
   /** Écartées par leur code de profession, par code. Borné par `MAX_CLASSES` en amont. */
   ecarteesParCode: Record<string, number>;
@@ -152,16 +165,20 @@ export function resumerBilanFlux(b: BilanFlux): string {
  *
  * L'ORDRE DES TROIS DÉCISIONS COMPTE, et chacune pour une raison différente :
  *
- * 1. **Hors région ⇒ dehors, tout de suite.** Le flux est pancanadien : ce test élimine
- *    l'immense majorité pour le prix d'une comparaison de chaînes. Le faire en second
- *    ferait lire un code de profession sur des dizaines de milliers d'offres déjà perdues.
- * 2. **Le métier ensuite.** Ce qu'il refuse est compté PAR CODE — donc sur la population
- *    régionale, jamais canadienne. Compter les refus de métier avant d'avoir écarté le
+ * ⚠️ PLUS AUCUNE DE CES TROIS DÉCISIONS NE REFUSE (ADR-0019, 2026-09-18). Elles COMPTENT,
+ * et l'ordre compte encore pour ce que les compteurs SIGNIFIENT :
+ *
+ * 1. **Le lieu d'abord.** Le flux est pancanadien, mais le pré-filtre `estPeutEtreQuebec` a
+ *    déjà retiré 35 832 offres sur 43 071 : ce qui arrive ici est québécois. Le verdict de
+ *    `situer` est donc une mesure sur la population QUÉBÉCOISE, et c'est elle qu'on garde
+ *    sur l'offre (`situation`) pour que l'écran puisse en parler honnêtement.
+ * 2. **Le métier ensuite.** Ce qu'il « écarte » est compté PAR CODE — donc sur la population
+ *    québécoise, jamais canadienne. Compter les refus de métier avant d'avoir écarté le
  *    reste du Canada décrirait le Canada : c'est mot pour mot l'erreur de population du
  *    premier diagnostic, qui lisait l'inventaire des vues pour celui des retenues.
- * 3. **Le lieu inconnu en dernier, et il PASSE (en nombre borné).** Voir
- *    `MAX_LIEUX_INCONNUS_FLUX` : le jeter ici affamerait la mesure des lieux, qui apprend
- *    les noms de ville à partir de ce que les sources rapportent.
+ * 3. **Et tout passe.** Le seul refus qui subsiste dans ce fichier est celui du plafond
+ *    `MAX_RETENUES_FLUX`, qui protège la mémoire et le mur de la fonction — pas un jugement
+ *    sur l'offre. S'il mord, la lecture le DIT (`lecture partielle (plafond-retenues)`).
  */
 export function sourceGuichetFlux(options: OptionsSourceFlux): {
   source: Source;
@@ -185,9 +202,6 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
       let horsRegion = 0;
       let regionales = 0;
       let lieuInconnuRapporte = 0;
-      /** Places du quota consommées par le HORS-domaine. Voir le garde ci-dessous. */
-      let quotaLieuInconnu = 0;
-      let lieuInconnuIgnore = 0;
       /** Le code lu pour chaque offre retenue, à rattacher après la lecture (ADR-0013). */
       const codesParRef = new Map<string, string | null>();
       /** Les conditions publiées, rattachées après la lecture comme le code (ADR-0014 D2). */
@@ -200,11 +214,13 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
           budgetMs,
           maxRetenues,
           garder: (offre: OffreBrute, brut: string) => {
+            // ⚠️ LE LIEU NE REFUSE PLUS RIEN ICI (ADR-0019, décision Marc 2026-09-18). Les
+            // trois verdicts entrent : c'est la DISTANCE qui triera à l'écran, pas le nom de
+            // la ville. Le compteur, lui, reste — c'est la DISTRIBUTION qui a permis de
+            // trancher (2 034 hors région, 3 748 lieu inconnu, 1 457 dans la région sur les
+            // 7 239 québécoises du flux), et la perdre rendrait le prochain arbitrage aveugle.
             const lieu = situer(offre.ville, offre.description, verdicts, offre.codePostal);
-            if (lieu === "hors-region") {
-              horsRegion++;
-              return false;
-            }
+            if (lieu === "hors-region") horsRegion++;
 
             const code = lireChamp(brut, "noc2021");
             // ⚠️ ENREGISTRÉ ICI PARCE QUE C'EST LE SEUL ENDROIT QUI VOIT LE BLOC BRUT.
@@ -254,24 +270,13 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
             // D'où deux régimes : une offre DU domaine passe toujours (elles sont rares —
             // 3,5 % du flux mesuré — et bornées de toute façon par `maxRetenues`) ; les
             // autres se partagent le quota.
-            if (lieu === "lieu-inconnu") {
-              // ⚠️ DEUX COMPTEURS, ET C'EST VOULU. `lieuInconnuRapporte` part à l'écran : il
-              // doit continuer de dire COMBIEN d'offres au lieu inconnu sont rapportées,
-              // toutes confondues. Le quota, lui, ne borne que les hors-domaine. Réutiliser
-              // le compteur affiché comme compteur de quota aurait changé en silence le sens
-              // d'un nombre que Marc lit.
-              if (verdict !== "retenue") {
-                if (quotaLieuInconnu >= MAX_LIEUX_INCONNUS_FLUX) {
-                  lieuInconnuIgnore++;
-                  return false;
-                }
-                quotaLieuInconnu++;
-              }
-              lieuInconnuRapporte++;
-              return true;
-            }
+            if (lieu === "lieu-inconnu") lieuInconnuRapporte++;
+            if (lieu === "dans-la-region") regionales++;
 
-            regionales++;
+            // ⚠️ ON GARDE TOUT CE QUI EST ARRIVÉ JUSQU'ICI, et « jusqu'ici » veut dire : le
+            // pré-filtre du flux a reconnu une offre QUÉBÉCOISE (`estPeutEtreQuebec`), et
+            // l'analyseur a su la lire. 7 239 sur 43 071, mesuré le 2026-09-18. Ce n'est donc
+            // pas « tout le Canada entre » — c'est « le Québec entre, et la distance triera ».
             return true;
           },
         });
@@ -283,7 +288,9 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
           regionales,
           horsRegion,
           lieuInconnuRapporte,
-          lieuInconnuIgnore,
+          // Plus rien n'est laissé de côté depuis l'ADR-0019 : la valeur est un CONSTAT,
+          // pas un compteur mort. Voir le champ, qui dit pourquoi il survit.
+          lieuInconnuIgnore: 0,
           ecarteesParCode,
           codeIllisible,
         };

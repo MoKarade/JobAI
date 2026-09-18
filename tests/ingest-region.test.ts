@@ -25,9 +25,18 @@ describe("le cas qui a révélé le trou", () => {
     expect(estDansLaRegion("Manitoba, Canada")).toBe(false);
   });
 
-  it("le refuse aussi à travers tout le pipeline, malgré une note élevée", () => {
-    // La note n'est pas en cause : le poste notait 68 sur 100. Seul le lieu le disqualifie,
-    // et il doit le faire AVANT que la note n'ait son mot à dire.
+  it("⚠️ il ENTRE désormais, et il entre MARQUÉ « hors région » — c'est le contraire, et c'est voulu", () => {
+    // ⚠️ CE CAS S'EST INVERSÉ LE 2026-09-18 (ADR-0019), IL N'A PAS ÉTÉ SUPPRIMÉ.
+    //
+    // Il affirmait « le pipeline le refuse malgré une note de 68 » — et il avait raison de
+    // l'affirmer : c'est ce campement minier du Nord du Manitoba qui avait révélé que le
+    // barème ne sait pas trancher un lieu (il accorde 10 points sur 20 à une distance
+    // INCONNUE, donc « inconnue » et « à 2 000 km » y valent pareil).
+    //
+    // Ce qui a changé n'est pas ce constat, c'est la RÉPONSE qu'on y apporte : plus de refus
+    // à l'ingestion, mais un verdict ÉCRIT sur l'offre, et un filtre par distance à l'écran.
+    // Supprimer ce cas laisserait croire que le danger n'a jamais existé — or c'est
+    // exactement lui que `situation` doit continuer de rendre visible.
     const brute: OffreBrute = {
       refSource: "1",
       titre: "Superviseur de l'entretien ménager - Campement minier (Fly-in/fly-out)",
@@ -38,9 +47,13 @@ describe("le cas qui a révélé le trou", () => {
       publieeLe: "2026-07-30",
     };
     const r = trier([brute], new Set(), "2026-07-31");
-    expect(r.retenues).toEqual([]);
+    expect(r.retenues).toHaveLength(1);
+    // LE POINT DU CAS : elle entre, et elle entre en portant le verdict. Sans ce champ, elle
+    // serait indiscernable d'une offre de Québec, et c'est ça qui serait un mensonge.
+    expect(r.retenues[0]?.situation).toBe("hors-region");
+    // Le compteur, lui, n'a pas bougé de sens : il dit toujours combien ont ce verdict.
     expect(r.horsRegion).toBe(1);
-    expect(r.souslePlancher).toBe(0); // écartée par le LIEU, pas par la note
+    expect(r.souslePlancher).toBe(0); // toujours pas la note qui décide
   });
 });
 
@@ -117,7 +130,11 @@ describe("ce qui n'est pas tranchable", () => {
     );
     expect(r.horsRegion).toBe(1);
     expect(r.lieuInconnu).toBe(1);
-    expect(r.retenues).toEqual([]);
+    // ⚠️ `toEqual([])` JUSQU'AU 2026-09-18 (ADR-0019). Les deux entrent maintenant — ce que
+    // le cas défend n'a jamais été le refus, c'est que les deux verdicts ne se CONFONDENT
+    // pas : « à Toronto » et « on ne sait pas où » appellent des suites différentes, et les
+    // mélanger empêcherait de voir qu'une source a cessé d'indiquer ses villes.
+    expect(r.retenues.map((o) => o.situation)).toEqual(["hors-region", "lieu-inconnu"]);
   });
 
   it("la description sert de recours quand le champ ville est vague", () => {

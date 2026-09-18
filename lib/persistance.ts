@@ -55,6 +55,7 @@ export function colonnesSeed(o: Offre) {
     km: o.km,
     noc: o.noc ?? null,
     ville: o.ville,
+    situation: o.situation ?? null,
     salaireAffiche: o.salaireAffiche,
     priorite: o.priorite,
     statut: o.statut,

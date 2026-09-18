@@ -280,13 +280,20 @@ export async function executerVeilleComplete(
     // appellent des remèdes opposés, et le compte seul ne permet pas de choisir.
     //
     // Les villes sont donc NOMMÉES, groupées et triées : une ligne suffit à trancher.
-    const inconnues = villesRefusees(rapport.tri.refusees, "lieu-inconnu");
-    const horsRegion = villesRefusees(rapport.tri.refusees, "hors-region");
+    // ⚠️ `rapport.tri.lieux`, PLUS `refusees` (ADR-0019) : ces offres sont ENTRÉES. La ligne
+    // garde exactement le même objet — quelles villes le géocodeur doit apprendre — mais elle
+    // ne décrit plus un refus, et le journal le dit.
+    const inconnues = villesRefusees(rapport.tri.lieux, "lieu-inconnu");
+    const horsRegion = villesRefusees(rapport.tri.lieux, "hors-region");
     if (inconnues.length > 0 || horsRegion.length > 0) {
       const rendre = (l: { ville: string; n: number }[]) =>
         l.map((v) => `${v.ville}×${v.n}`).join(" · ");
       console.log(
-        `[veille] lieux refusés — inconnus : ${rendre(inconnues) || "aucun"}` +
+        // ⚠️ « REFUSÉS » JUSQU'AU 2026-09-18 : ces offres sont ENTRÉES. Le libellé disait vrai
+        // tant que le lieu refusait ; le laisser aurait fait chercher des offres perdues qui
+        // sont en base. Ce que la ligne sert reste identique — la liste de travail du
+        // géocodeur, triée par fréquence.
+        `[veille] lieux à trancher — inconnus : ${rendre(inconnues) || "aucun"}` +
           ` — hors région : ${rendre(horsRegion) || "aucun"}`,
       );
     }

@@ -58,6 +58,21 @@ export interface RapportVeille {
 
   /** Ce qui a été écarté, par motif, du plus fréquent au moins fréquent. */
   refusees: RefusGroupe[];
+
+  /**
+   * Le verdict de LIEU des offres entrées, groupé par motif puis par ville (ADR-0019).
+   *
+   * ⚠️ CE N'EST PAS UNE LISTE DE REFUS, et le champ est séparé pour cette seule raison. Ces
+   * offres sont EN BASE. Ce que la ligne dit, c'est ce qu'on sait de leur lieu tant que leur
+   * distance n'est pas mesurée — et par ricochet, la liste de travail du géocodeur.
+   *
+   * ⚠️ IL NE S'APPELLE PAS `lieux`, PARCE QUE `lieux` EXISTE DÉJÀ À DEUX LIGNES D'ICI et
+   * porte tout autre chose : le COMPTE de la mesure du géocodeur (demandés / jugés /
+   * introuvables). Premier jet nommé `lieux` — c'est le compilateur qui l'a arrêté, pas une
+   * relecture. « Savoir qu'un champ EXISTE ne dit rien de ce qu'il PORTE » : avant de nommer
+   * un champ dans un type déjà large, grep le nom.
+   */
+  verdictsLieu: RefusGroupe[];
   /**
    * Trouvées moins tout ce qu'on sait expliquer.
    *
@@ -176,18 +191,25 @@ export function construireRapport(entree: {
   // moyenne qui inclurait les périmées décrirait un stock que Marc ne regarde plus.
   const actives = entree.offres.filter((o) => !o.histo && o.perimeeLe === null);
 
-  const motifs: MotifRefus[] = ["hors-region", "lieu-inconnu", "sous-le-plancher", "doublon"];
-  const refusees: RefusGroupe[] = motifs
+  // ⚠️ DEUX LISTES DEPUIS L'ADR-0019, ET LA SÉPARATION EST LE POINT. `refusees` ne porte plus
+  // que ce qui n'est PAS entré ; `lieux` porte le verdict de lieu des offres qui SONT entrées.
+  // Les garder ensemble ferait annoncer « écartées » des offres que la passe vient d'inscrire.
+  const refusees: RefusGroupe[] = (["sous-le-plancher", "doublon"] as MotifRefus[])
     .map((motif) => ({
       motif,
       n: entree.tri.refusees.filter((r) => r.motif === motif).length,
-      // Les villes ne sont nommées que pour les motifs qui se DÉCIDENT sur le lieu : les
-      // afficher sous « sous le plancher » laisserait croire que la ville y est pour
-      // quelque chose, alors que c'est le titre qui a tranché.
-      villes:
-        motif === "hors-region" || motif === "lieu-inconnu"
-          ? villesRefusees(entree.tri.refusees, motif)
-          : [],
+      // Aucune ville ici : ces deux motifs se décident sur le TITRE ou sur l'identité, jamais
+      // sur le lieu. Les nommer laisserait croire que la ville y est pour quelque chose.
+      villes: [],
+    }))
+    .filter((r) => r.n > 0)
+    .sort((a, b) => b.n - a.n);
+
+  const verdictsLieu: RefusGroupe[] = (["hors-region", "lieu-inconnu"] as MotifRefus[])
+    .map((motif) => ({
+      motif,
+      n: entree.tri.lieux.filter((r) => r.motif === motif).length,
+      villes: villesRefusees(entree.tri.lieux, motif),
     }))
     .filter((r) => r.n > 0)
     .sort((a, b) => b.n - a.n);
@@ -211,6 +233,7 @@ export function construireRapport(entree: {
     noteMoyenneSuivi: moyenne(actives.map((o) => o.score)),
     meilleure,
     refusees,
+    verdictsLieu,
     sansMotif: entree.trouvees - explique,
     perimees: entree.perimees.length,
     revenues: entree.revenues.length,

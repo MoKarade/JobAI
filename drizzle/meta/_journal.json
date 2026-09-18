@@ -162,6 +162,13 @@
       "when": 1787316577481,
       "tag": "0022_polyline_facultative",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789763587769,
+      "tag": "0023_situation_du_lieu",
+      "breakpoints": true
     }
   ]
 }

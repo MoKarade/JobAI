@@ -122,7 +122,7 @@ describe("migration", () => {
     expect(r.rows.map((x) => x.table_name)).toEqual([...declarees].sort());
   });
 
-  it("pose bien les 14 contraintes CHECK du schéma", async () => {
+  it("pose bien les 15 contraintes CHECK du schéma", async () => {
     const r = await pg.query<{ constraint_name: string }>(
       `SELECT con.conname AS constraint_name
        FROM pg_constraint con
@@ -144,6 +144,9 @@ describe("migration", () => {
       "offers_priorite_ck",
       "offers_score_bornes_ck",
       "offers_score_source_ck",
+      // Ajoutée le 2026-09-18 (ADR-0019). Un `enum` Drizzle n'est QUE du typage TypeScript :
+      // sans ce CHECK, la base accepterait n'importe quelle chaîne dans `situation`.
+      "offers_situation_ck",
       "offers_source_ck",
       "offers_statut_ck",
       "villes_lat_ck",

@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   MAX_LIEUX_INCONNUS_FLUX,
+  MAX_RETENUES_FLUX,
   ID_SOURCE_FLUX_GUICHET,
   resumerBilanFlux,
   sourceGuichetFlux,
@@ -86,15 +87,23 @@ describe("sourceGuichetFlux — les trois décisions, dans l'ordre", () => {
     expect(bilan?.regionales).toBe(1);
   });
 
-  it("écarte une offre HORS RÉGION sans jamais lire son code", async () => {
-    // L'ordre compte : compter les refus de métier sur des offres canadiennes ferait
-    // décrire le Canada par une table censée décrire la région.
+  it("⚠️ COMPTE une offre HORS RÉGION sans la refuser — et sans jamais lire son code", async () => {
+    // ⚠️ CE CAS S'EST INVERSÉ LE 2026-09-18 (ADR-0019). Il affirmait `offres` vide : le lieu
+    // refusait. Il ne refuse plus — l'offre entre, marquée, et c'est la distance qui triera.
+    //
+    // ⚠️ CE QU'IL DÉFEND N'A PAS BOUGÉ, et c'est la seconde assertion : le code de profession
+    // n'est PAS lu pour une offre hors région. Compter les refus de métier sur des offres
+    // canadiennes ferait décrire le Canada par une table censée décrire la région — l'erreur
+    // de population du premier diagnostic. C'est l'ORDRE des décisions qui tient ça, et
+    // l'ordre survit à la disparition du refus.
     const flux = `<source>${offre({ ref: "1", ville: "Toronto", noc: "22301" })}</source>`;
     const { r, bilan } = await interroger(flux, ["22"]);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.offres).toHaveLength(0);
+    expect(r.offres).toHaveLength(1);
     expect(bilan?.horsRegion).toBe(1);
+    // La régionale, elle, reste à zéro : les deux compteurs ne se confondent pas.
+    expect(bilan?.regionales).toBe(0);
     expect(bilan?.ecarteesParCode).toEqual({});
   });
 
@@ -178,35 +187,27 @@ describe("sourceGuichetFlux — le lieu inconnu PASSE, sinon la mesure ne l'appr
     const apres = await interroger(avecCode, ["22"]);
     expect(apres.r.ok).toBe(true);
     if (!apres.r.ok) return;
-    expect(apres.r.offres).toHaveLength(0);
+    // ⚠️ `toHaveLength(0)` JUSQU'AU 2026-09-18 (ADR-0019) : l'offre entre désormais. Ce que
+    // l'ADR-0018 a apporté et que ce cas défend reste INTACT — la bande postale fait passer
+    // ce lieu de « on ne sait pas » à « on sait, et c'est loin ». Le verdict change, pas le
+    // fait d'entrer. Les deux compteurs le disent, et c'est là que ça se vérifie.
+    expect(apres.r.offres).toHaveLength(1);
     expect(apres.bilan?.horsRegion).toBe(1);
-    // Et la place de mesure est rendue — c'est le gain que l'ADR chiffre, pas le refus.
     expect(apres.bilan?.lieuInconnuRapporte).toBe(0);
   });
 
-  it("une offre DU domaine à lieu inconnu ne consomme PAS le quota", async () => {
-    // Le métier ne refuse plus, mais il PRIORISE : les rares offres du domaine passent
-    // toujours, et les autres se partagent les 40 places. Sans ça, la moitié du flux étant
-    // en lieu inconnu et 96 % hors domaine, le quota partirait aux laveurs de voitures.
-    const inconnues = Array.from({ length: MAX_LIEUX_INCONNUS_FLUX }, (_, i) =>
-      offre({ ref: `h${i}`, ville: "Villeneuve-du-Néant", noc: "65311" }),
-    ).join("");
-    const domaine = offre({ ref: "d1", ville: "Villeneuve-du-Néant", noc: "22301" });
-    const { r, bilan } = await interroger(`<source>${inconnues}${domaine}</source>`, ["22"]);
-    if (!r.ok) return;
-    // Les 40 hors domaine remplissent le quota ; la 41e — du domaine — passe quand même,
-    // et le compteur AFFICHÉ les compte toutes (c'est un compte, pas un quota).
-    expect(bilan?.lieuInconnuRapporte).toBe(MAX_LIEUX_INCONNUS_FLUX + 1);
-    expect(bilan?.lieuInconnuIgnore).toBe(0);
-    expect(r.offres.some((o) => o.refSource.includes("d1"))).toBe(true);
-  });
-
-  it("borne le passage, compte ce qu'il laisse en attente, et NE borne PAS les régionales", async () => {
-    // Le cas se dérive de la constante, jamais de sa valeur du jour.
-    // ⚠️ DU HORS-DOMAINE (65…), parce que c'est LUI que le quota borne. Une offre du domaine
-    // passe sans le consommer — voir le test suivant. Poser ce cas avec des codes retenus
-    // testerait un bornage qui n'existe plus.
-    const inconnus = Array.from({ length: MAX_LIEUX_INCONNUS_FLUX + 5 }, (_, i) =>
+  it("⚠️ NE BORNE PLUS RIEN : le quota de lieux inconnus est levé, et le cas le PROUVE", async () => {
+    // ⚠️ CE CAS REMPLACE LES DEUX QUI LE PRÉCÉDAIENT (ADR-0019, 2026-09-18) : « une offre DU
+    // domaine ne consomme pas le quota » et « borne le passage, compte ce qu'il laisse en
+    // attente ». Ils défendaient une PRIORISATION devenue sans objet — on ne choisit plus
+    // qui passe, tout le monde passe.
+    //
+    // Il ne les supprime pas en silence : il vérifie que la levée est RÉELLE, en dépassant
+    // DÉLIBÉRÉMENT l'ancien plafond. Dérivé de la constante et non de sa valeur du jour —
+    // si quelqu'un remet une borne, ce cas tombe, et c'est exactement son travail.
+    const surplus = 5;
+    const inconnus = Array.from({ length: MAX_LIEUX_INCONNUS_FLUX + surplus }, (_, i) =>
+      // Du HORS-DOMAINE (65…), la population que le quota bornait en premier.
       offre({ ref: `i${i}`, ville: `Sainte-Bidule-${i}`, noc: "65311" }),
     ).join("");
     const regionales = Array.from({ length: 3 }, (_, i) =>
@@ -215,10 +216,22 @@ describe("sourceGuichetFlux — le lieu inconnu PASSE, sinon la mesure ne l'appr
     const { r, bilan } = await interroger(`<source>${inconnus}${regionales}</source>`, ["22"]);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(bilan?.lieuInconnuRapporte).toBe(MAX_LIEUX_INCONNUS_FLUX);
-    expect(bilan?.lieuInconnuIgnore).toBe(5);
+    // TOUS les lieux inconnus sont rapportés, y compris ceux qui dépassaient l'ancien quota.
+    expect(bilan?.lieuInconnuRapporte).toBe(MAX_LIEUX_INCONNUS_FLUX + surplus);
+    // Et plus RIEN n'est laissé en attente — c'est le champ qui portait la borne.
+    expect(bilan?.lieuInconnuIgnore).toBe(0);
     expect(bilan?.regionales).toBe(3);
-    expect(r.offres).toHaveLength(MAX_LIEUX_INCONNUS_FLUX + 3);
+    expect(r.offres).toHaveLength(MAX_LIEUX_INCONNUS_FLUX + surplus + 3);
+  });
+
+  it("le plafond de rétention couvre les 7 239 québécoises mesurées le 2026-09-18", () => {
+    // ⚠️ LE SEUL REFUS QUI SUBSISTE DANS CE FICHIER, et il ne juge pas l'offre : il protège
+    // la mémoire et le mur de la fonction. Il valait 1 600 et MORDAIT — une passe réelle a
+    // rapporté exactement 1 600 offres, donc la lecture s'arrêtait sur un PRÉFIXE du flux.
+    // Le cas ancre la MARGE, pas la valeur : le plafond doit rester au-dessus de la
+    // population qu'il est censé laisser passer, mesurée le jour de l'ADR-0019.
+    const QUEBECOISES_MESUREES_2026_09_18 = 7_239;
+    expect(MAX_RETENUES_FLUX).toBeGreaterThan(QUEBECOISES_MESUREES_2026_09_18);
   });
 
   it("le registre MESURÉ élargit le pré-filtre : une ville jugée régionale entre", async () => {

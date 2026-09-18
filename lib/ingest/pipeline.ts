@@ -67,7 +67,25 @@ export interface Tri {
    * NOMMER » n'était donc tenue qu'à moitié pour le seul motif qui porte sur un champ.
    */
   refusees: { entreprise: string; titre: string; ville: string; motif: MotifRefus }[];
+
+  /**
+   * Ce que le LIEU a dit de chaque offre — et elles sont TOUTES entrées (ADR-0019).
+   *
+   * ⚠️ LISTE SÉPARÉE DE `refusees`, ET C'EST TOUT LE POINT. Jusqu'au 2026-09-18, ces deux
+   * motifs vivaient dans `refusees` parce qu'ils REFUSAIENT. Ils ne refusent plus : les
+   * laisser là ferait mentir un champ qui s'appelle « refusées », et l'écran annoncerait
+   * « écartées » des offres qu'il vient d'inscrire.
+   *
+   * ⚠️ ET ELLE NE DISPARAÎT PAS AVEC LE REFUS, parce que son OBJET n'a jamais été le refus.
+   * C'est elle qui produit « inconnus : sherrington×7 · gaspe×5 · … » dans le journal — la
+   * liste de travail du géocodeur, et la seule façon de savoir si `situer` progresse. La
+   * supprimer avec le filtre aurait coûté l'observabilité en même temps que la restriction.
+   */
+  lieux: { entreprise: string; titre: string; ville: string; motif: MotifLieu }[];
 }
+
+/** Les deux verdicts de lieu qui ne refusent plus, mais se disent toujours. */
+export type MotifLieu = Extract<MotifRefus, "hors-region" | "lieu-inconnu">;
 
 /**
  * Les noms de lieu de ce lot sur lesquels ni la liste blanche, ni le registre mesuré n'ont
@@ -116,7 +134,10 @@ export function lieuxAMesurer(
  * croire à deux cas rares là où il y en a un gros.
  */
 export function villesRefusees(
-  refusees: Tri["refusees"],
+  // ⚠️ ÉLARGI AU 2026-09-18 : la fonction ne lit que `ville` et `motif`, et elle sert
+  // désormais AUSSI la liste `lieux`, qui n'est plus une liste de refus. Le type dit
+  // exactement ce qu'elle consomme plutôt que de nommer un champ qui a changé de sens.
+  refusees: readonly { ville: string; motif: MotifRefus }[],
   motif: MotifRefus,
 ): { ville: string; n: number }[] {
   const par = new Map<string, number>();
@@ -315,6 +336,7 @@ export function trier(
   let horsRegion = 0;
   let lieuInconnu = 0;
   const refusees: Tri["refusees"] = [];
+  const lieux: Tri["lieux"] = [];
 
   for (const brute of recoltes) {
     const entreprise = brute.entreprise.trim() || "Employeur non nommé";
@@ -334,21 +356,25 @@ export function trier(
     vues.add(cle);
     vues.add(canon);
 
-    // LE LIEU D'ABORD, avant même de noter. Le barème ne peut pas trancher ça : il
-    // pénalise une distance INCONNUE de 10 points sur 20, ce qui laisse de quoi passer
-    // un seuil — « inconnue » et « à 2 000 km » y sont traitées pareil. C'est ainsi
-    // qu'un poste de campement minier au Manitoba est entré à 68/100 lors de la
-    // première sonde sur les vraies sources.
+    // ⚠️ LE LIEU NE REFUSE PLUS, IL S'ENREGISTRE (ADR-0019, décision Marc 2026-09-18).
+    //
+    // Ces deux `continue` jetaient 5 782 offres québécoises par passe — 2 034 « hors région »
+    // d'après le nom de la ville, 3 748 « lieu inconnu » — sur les 7 239 que le flux publie.
+    // C'est ce qui faisait qu'une passe rendait « 20 de plus » : ce que la source ramenait
+    // était déjà en base, et ce qui n'y était pas se faisait refuser ici.
+    //
+    // ⚠️ CE QU'ILS PROTÉGEAIENT RESTE VRAI, ET C'EST POURQUOI LE VERDICT SE GARDE. Le barème
+    // accorde 10 points sur 20 à une distance INCONNUE : « inconnue » et « à 2 000 km » y
+    // valent pareil, et c'est ainsi qu'un poste de campement minier au Manitoba est entré à
+    // 68/100 lors de la première sonde. Refuser n'était pas la seule réponse possible ; dire
+    // la vérité sur le lieu en est une autre, et c'est celle-ci. `situation` porte le verdict
+    // jusqu'à l'écran, qui filtrera par la DISTANCE — la seule chose qui répond vraiment à la
+    // question que le lieu posait.
     const lieu = situer(brute.ville, brute.description, lieuxResolus, brute.codePostal);
-    if (lieu === "hors-region") {
-      horsRegion++;
-      refusees.push({ entreprise, titre: brute.titre, ville: brute.ville, motif: "hors-region" });
-      continue;
-    }
-    if (lieu === "lieu-inconnu") {
-      lieuInconnu++;
-      refusees.push({ entreprise, titre: brute.titre, ville: brute.ville, motif: "lieu-inconnu" });
-      continue;
+    if (lieu !== "dans-la-region") {
+      if (lieu === "hors-region") horsRegion++;
+      else lieuInconnu++;
+      lieux.push({ entreprise, titre: brute.titre, ville: brute.ville, motif: lieu });
     }
 
     // La note vient du barème, avec `km: null` : la distance ne se déduit pas d'un nom de
@@ -402,6 +428,9 @@ export function trier(
       // La ville est CONSERVÉE : sans elle, un employeur hors des cibles ne peut pas être
       // géocodé plus tard, et sa distance — le critère n°1 — resterait inconnue à vie.
       ville: brute.ville.trim() || null,
+      // Le verdict de `situer`, gardé plutôt que jeté. Il ne décide plus rien ici ; il dit à
+      // l'écran ce qu'on SAIT du lieu tant que la distance n'est pas mesurée.
+      situation: lieu,
       salaireAffiche: null,
       priorite: "Moyenne",
       statut: "Identifiee",
@@ -419,7 +448,7 @@ export function trier(
     });
   }
 
-  return { retenues, souslePlancher, doublons, horsRegion, lieuInconnu, refusees };
+  return { retenues, souslePlancher, doublons, horsRegion, lieuInconnu, refusees, lieux };
 }
 
 

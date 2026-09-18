@@ -463,6 +463,9 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
 152. Libérer de la place au-dessus d'un élément qui est à son PLANCHER ne lui donne RIEN.
 153. Un frein qui compte ce que PERSONNE n'a dépensé ne protège rien : il enferme.
 154. Un recensement de commandes d'installation s'énumère par ce qu'elles FONT, jamais par le nom de l'une d'elles — `npm ci` recensé, `npx` oublié, et `npx` installe ET exécute des scripts.
+155. Un champ additif s'écrit `.nullable().optional()`, jamais `.nullable().default(null)` : un `default` Zod rend le champ REQUIS en SORTIE, donc obligatoire sur tout objet construit à la main.
+156. Avant de nommer un champ dans un type déjà large, grep le nom DANS ce type — savoir ce qu'on veut exprimer ne dit rien de ce que le nom porte déjà.
+157. Avant de retirer un filtre, lister ce que son chemin PRODUIT en plus du refus : ce qui sert à DÉCIDER meurt avec la décision, ce qui sert à OBSERVER doit survivre sous un nom qui ne ment plus.
 
 ## 10. Style et compte-rendu
 

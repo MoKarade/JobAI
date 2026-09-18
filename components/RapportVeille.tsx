@@ -133,6 +133,35 @@ export function RapportVeilleVue({
         </div>
       ) : null}
 
+      {rapport.verdictsLieu.length > 0 ? (
+        <div className="rapport__refus">
+          {/* ⚠️ « ÉCARTÉES » SERAIT FAUX ICI, ET C'EST POURQUOI LE BLOC EST SÉPARÉ. Depuis
+              l'ADR-0019, ces offres SONT en base : ce qu'on affiche est ce qu'on sait de leur
+              lieu tant que leur distance n'est pas mesurée. Les remettre dans le bloc du
+              dessus annoncerait « écartées » des offres que la passe vient d'inscrire. */}
+          <h4 className="rapport__soustitre">Entrées, mais le lieu reste à trancher</h4>
+          <ul className="rapport__motifs">
+            {rapport.verdictsLieu.map((r) => (
+              <li key={r.motif} className="rapport__motif">
+                <span className="rapport__motif-n">{r.n}</span>
+                <span className="rapport__motif-nom">{LIBELLE_MOTIF[r.motif]}</span>
+                {r.villes.length > 0 ? (
+                  <span className="rapport__villes">
+                    {r.villes
+                      .slice(0, MAX_VILLES)
+                      .map((v) => `${v.ville} (${v.n})`)
+                      .join(" · ")}
+                    {r.villes.length > MAX_VILLES
+                      ? ` · et ${r.villes.length - MAX_VILLES} autre(s)`
+                      : ""}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {/* ⚠️ NE S'AFFICHE QUE S'IL N'EST PAS NUL, et c'est tout son intérêt : un reliquat
           non nul veut dire qu'un motif de rejet nous échappe encore. Le 17 août, ce sont
           74 offres qui s'évaporaient ainsi. */}

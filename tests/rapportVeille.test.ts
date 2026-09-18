@@ -39,12 +39,21 @@ const offre = (champs: Partial<Offre> = {}): Offre =>
     ...champs,
   });
 
+// ⚠️ LES QUATRE MOTIFS SE POSENT ENCORE DANS UNE SEULE LISTE D'ENTRÉE, ET LE HELPER LES
+// RÉPARTIT. Depuis l'ADR-0019, `refusees` ne porte plus que les deux vrais refus et les deux
+// verdicts de lieu vivent dans `lieux` — mais les cas de ce fichier décrivent des SITUATIONS
+// (« 3 hors région, 2 doublons »), pas la structure interne du tri. Les faire réécrire leurs
+// fixtures aurait mesuré le refactor au lieu de mesurer le rapport.
+const estLieu = (m: Tri["refusees"][number]["motif"]) =>
+  m === "hors-region" || m === "lieu-inconnu";
+
 const tri = (refusees: Tri["refusees"] = []): Omit<Tri, "retenues"> => ({
   souslePlancher: refusees.filter((r) => r.motif === "sous-le-plancher").length,
   doublons: refusees.filter((r) => r.motif === "doublon").length,
   horsRegion: refusees.filter((r) => r.motif === "hors-region").length,
   lieuInconnu: refusees.filter((r) => r.motif === "lieu-inconnu").length,
-  refusees,
+  lieux: refusees.filter((r) => estLieu(r.motif)) as Tri["lieux"],
+  refusees: refusees.filter((r) => !estLieu(r.motif)),
 });
 
 const base = {
@@ -67,15 +76,21 @@ const base = {
 
 describe("le compte tombe juste, ou il le DIT", () => {
   it("sansMotif vaut zéro quand chaque offre trouvée est expliquée", () => {
+    // ⚠️ LA FIXTURE A CHANGÉ DE MONDE LE 2026-09-18 (ADR-0019), PAS L'INVARIANT. Elle posait
+    // « 3 trouvées = 1 nouvelle + 1 hors-région + 1 sous-le-plancher ». Une offre hors région
+    // n'est plus refusée : elle est ENTRÉE, donc elle compte parmi les nouvelles. Laisser la
+    // fixture en l'état aurait décrit une passe impossible — et fait rougir un invariant qui
+    // n'a rien à se reprocher. Ce qu'il dit reste mot pour mot le même : ce qui est TROUVÉ
+    // est soit entré, soit refusé pour un motif NOMMÉ.
     const r = construireRapport({
       ...base,
       trouvees: 3,
-      nouvelles: ["a"],
+      nouvelles: ["a", "b"],
       tri: tri([
         { entreprise: "X", titre: "T", ville: "Toronto", motif: "hors-region" },
         { entreprise: "Y", titre: "U", ville: "", motif: "sous-le-plancher" },
       ]),
-      offres: [offre({ id: "a" })],
+      offres: [offre({ id: "a" }), offre({ id: "b" })],
     });
     expect(r.sansMotif).toBe(0);
   });
@@ -158,12 +173,13 @@ describe("les refus sont groupés, triés, et nommés par leur objet", () => {
         { entreprise: "D", titre: "T", ville: "", motif: "sous-le-plancher" },
       ]),
     });
-    expect(r.refusees.map((x) => [x.motif, x.n])).toEqual([
-      ["hors-region", 3],
-      ["sous-le-plancher", 1],
-    ]);
+    // ⚠️ DEUX LISTES DEPUIS L'ADR-0019, ET LE CAS S'EST SÉPARÉ AU LIEU DE DISPARAÎTRE. Le tri
+    // par fréquence et le refus d'inventer un motif vide valent pour les deux — c'est la
+    // même fonction de groupement. Ce qui a changé est la LISTE où le lieu atterrit.
+    expect(r.refusees.map((x) => [x.motif, x.n])).toEqual([["sous-le-plancher", 1]]);
+    expect(r.verdictsLieu.map((x) => [x.motif, x.n])).toEqual([["hors-region", 3]]);
     // Les villes sont nommées, et groupées : « toronto (2) » se lit, trois lignes non.
-    expect(r.refusees[0]?.villes).toEqual([
+    expect(r.verdictsLieu[0]?.villes).toEqual([
       { ville: "toronto", n: 2 },
       { ville: "montreal", n: 1 },
     ]);

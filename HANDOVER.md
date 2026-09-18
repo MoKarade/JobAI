@@ -6,6 +6,74 @@
 
 ---
 
+## Session 2026-09-18 (suite 6) — le lieu ne refuse plus rien, et le plafond ne mord plus
+
+Marc : « je viens de faire une passe je pensais avoir plein d'offres mais juste 20 de plus ».
+Mesuré, puis « go lot 2 ».
+
+### Pourquoi 21 nouvelles — les trois causes, mesurées
+
+Passe de 20:23 : `ingérées=21/1600 · doublons=1535 · lieu-inconnu=38 · hors-région=6`.
+1535+38+6+21 = **1600**, au chiffre près.
+
+1. **`trouvees` valait EXACTEMENT `MAX_RETENUES_FLUX`** — le plafond mordait, donc la source
+   lisait un PRÉFIXE du flux et s'arrêtait. Sur 43 071 offres.
+2. **1 535 des 1 600 étaient déjà en base** : le Guichet republie chaque jour, le bassin
+   atteignable est saturé par les offres suivies.
+3. **Le filtre de région refusait 5 782 offres québécoises par passe** — sur les 7 239 que le
+   flux publie (mesure du même soir, `fin: flux-termine`).
+
+### Ce que le lot change
+
+Plafond **1 600 → 12 000** (dérivé des 7 239 mesurées, ×1,65 de marge). Plus aucun refus de
+lieu, ni dans le flux ni dans `trier`. Le verdict de `situer` est ENREGISTRÉ sur l'offre
+(colonne `situation`, additive, `null` = jamais mesurée) au lieu d'être jeté.
+
+Coût mesuré AVANT de coder : `trier` sur 7 239 offres = **368 ms**, lecture du flux complet
+= **5 s**, ~37 allers-retours d'écriture par lots de 200, mur de la fonction à 300 s. Premier
+passage : ~5 500 offres écrites d'un coup.
+
+### ⚠️ Le risque, et il est réel
+
+**Entre ce lot et le filtre de distance, l'app est MOINS utilisable qu'avant.** Le barème donne
+10 points sur 20 à une distance INCONNUE : une offre de Montréal peut noter comme une offre de
+Québec, et la liste triée par note se mélange. J'ai proposé l'ordre inverse (distance → écran →
+import) ; **Marc a tranché « go lot 2 »**, en connaissance de ce paragraphe. C'est réversible :
+l'ingestion est additive, et le filtre à venir travaillera sur des offres déjà en base.
+
+### L'observabilité a failli partir avec le filtre
+
+`Tri.refusees` portait les verdicts de lieu. Retirer le refus sans plus y penser aurait
+supprimé la ligne `[veille] lieux … — inconnus : sherrington×7 · gaspe×5 · …` — la liste de
+travail du géocodeur, et la seule façon de voir si `situer` progresse. Une SECONDE liste
+(`Tri.lieux`) la porte désormais, et les libellés ont suivi : « refusés » serait devenu faux
+pour des offres qui entrent. L'écran a un bloc séparé, « Entrées, mais le lieu reste à
+trancher ».
+
+### Les tests se sont INVERSÉS, aucun n'a été supprimé
+
+Onze cas affirmaient le refus. Le campement minier du Manitoba (le cas qui avait révélé le
+trou en juillet) affirme maintenant qu'il ENTRE, et qu'il entre MARQUÉ — parce que ce qu'il
+défendait n'a jamais été le refus, c'était que le barème ne sait pas trancher un lieu. Les deux
+cas de quota sont remplacés par un cas qui PROUVE la levée, en dépassant délibérément l'ancien
+plafond et en le dérivant de la constante.
+
+**Vérifications** : gate complet vert. Deux mutations — remettre le `continue` sur le lieu ⇒
+5 rouges ; retirer `situation` de la liste de colonnes ⇒ 1 rouge (la garde dérivée de la
+persistance l'a vu sans qu'on lui demande).
+
+### Points d'attention
+
+- **`[UI-FILTRE-KM]` et `[GEO-BOOTSTRAP]` sont au BACKLOG et non faits.** Ce sont eux qui
+  rendent ce lot utilisable ; sans eux, ~7 000 offres arrivent sans rien pour les trier.
+- `MAX_LIEUX_INCONNUS_FLUX` (40) est **conservée à zéro usage**, avec son histoire, pour que
+  le prochain qui se demande « combien de lieux inconnus par passe ? » trouve le chiffre. Un
+  test vérifie qu'elle ne borne plus rien.
+- Migration `0023_situation_du_lieu.sql` : additive, appliquée automatiquement au premier
+  accès aux données. Rien à lancer à la main.
+
+---
+
 ## Session 2026-09-18 (suite 5) — la veille n'a plus qu'une source, et un garde a trouvé une vraie fuite
 
 Marc : « enlève tout ce qui ne rend rien à la recherche ». Quatre canaux nommés, puis « go ».

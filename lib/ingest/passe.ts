@@ -414,6 +414,7 @@ export async function executerPasse(
       horsRegion: tri.horsRegion,
       lieuInconnu: tri.lieuInconnu,
       refusees: tri.refusees,
+      lieux: tri.lieux,
     },
     nouvelles: tri.retenues.map((o) => o.id),
     villesACompleter: villesACompleter(brutes, connues),

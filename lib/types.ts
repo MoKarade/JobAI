@@ -96,6 +96,17 @@ export const OffreSchema = z.object({
    * Sert au géocodage : « ISS » seul est une recherche mondiale, « ISS, Québec » non.
    */
   ville: z.string().max(120).nullable().default(null),
+  /**
+   * Ce que `situer` a répondu sur le LIEU, à l'ingestion (ADR-0019). `null` = jamais mesurée.
+   *
+   * ⚠️ ADDITIF ET FACULTATIF, ET C'EST `noc` QUI DONNE LA FORME EXACTE — `.nullable()
+   * .optional()`, jamais `.nullable().default(null)`. Les deux se lisent pareil et ne le sont
+   * pas : un `default` rend le champ REQUIS en SORTIE, donc tout objet `Offre` construit à la
+   * main doit le poser. Mesuré en l'écrivant : 7 fichiers de test et 2 modules cassaient au
+   * typecheck pour un champ qu'aucun d'eux n'a à connaître. Facultatif, rien ne bouge, et
+   * rien en base n'a à être migré.
+   */
+  situation: z.enum(["dans-la-region", "hors-region", "lieu-inconnu"]).nullable().optional(),
   /** Salaire TEL QU'AFFICHÉ, en texte. null si l'offre n'en donne aucun. */
   salaireAffiche: z.string().max(80).nullable(),
   priorite: PrioriteSchema,

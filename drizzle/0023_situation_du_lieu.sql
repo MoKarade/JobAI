@@ -1,0 +1,2 @@
+ALTER TABLE "offers" ADD COLUMN "situation" text;--> statement-breakpoint
+ALTER TABLE "offers" ADD CONSTRAINT "offers_situation_ck" CHECK ("offers"."situation" IS NULL OR "offers"."situation" IN ('dans-la-region', 'hors-region', 'lieu-inconnu'));

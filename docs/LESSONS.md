@@ -2244,3 +2244,70 @@ workflows font `npm ci --ignore-scripts` dans le même job que leurs `npx`.
 d'elles. C'est la leçon n° 127 (« une liste écrite à la main devient fausse au chantier
 suivant ») appliquée à une REQUÊTE de recensement, et la variante n° 5 du même piège en une
 session : un scan ne couvre que la forme qu'on lui a apprise.
+
+---
+
+## 2026-09-18 — `.default(null)` et `.nullable().optional()` ne sont pas la même chose, et l'un des deux est additif
+
+`[VEILLE-52]`, ADR-0019. J'ajoutais une colonne `situation` à `Offre` — un champ ADDITIF, le
+patron que ce dépôt applique déjà à `noc`. Écrit `.nullable().default(null)`, parce que ça se
+lit « nullable, et par défaut null », ce qui décrit exactement l'intention.
+
+**Le typecheck a sorti 9 erreurs, dans 7 fichiers de test et 2 modules** — tous des endroits
+qui construisent un objet `Offre` à la main et qui n'ont rien à savoir de cette colonne. Zod
+distingue le type d'ENTRÉE du type de SORTIE : `.default()` rend le champ facultatif à
+l'entrée et **REQUIS à la sortie**, donc `z.infer` — le type `Offre` que tout le dépôt
+manipule — l'exige partout. `.nullable().optional()` laisse les deux facultatifs, et c'est
+la forme que `noc` portait déjà trois lignes plus haut.
+
+**La règle** : un champ additif s'écrit `.nullable().optional()`, jamais
+`.nullable().default(null)` — et quand un patron existe déjà dans le même fichier, le copier
+mot pour mot plutôt que d'écrire la version qui « se lit mieux ». Coût réel : un aller-retour
+de typecheck. Coût si je l'avais laissé passer en corrigeant les 9 sites : neuf fixtures qui
+posent une valeur qu'aucune ne veut exprimer, et la règle « champ additif = zéro migration »
+silencieusement perdue.
+
+---
+
+## 2026-09-18 — Le champ que je voulais nommer existait déjà dans le même type, et portait autre chose
+
+Même lot. `RapportVeille` gagne la liste des verdicts de lieu ; je l'appelle `lieux`, parce
+que c'est ce que c'est. Le compilateur refuse : `RapportVeille.lieux` existe déjà, et porte
+le COMPTE de la mesure du géocodeur (`{ demandes, juges, introuvables }`). Deux choses sans
+rapport, le même mot, dans le même type.
+
+Ce n'est pas une relecture qui l'a trouvé, c'est `tsc`. **Et il n'aurait rien dit si le type
+d'en face avait été compatible** — par exemple si j'avais ajouté `lieux: string[]` à un type
+qui portait déjà un `lieux?: string[]` optionnel. Renommé en `verdictsLieu`.
+
+**La règle** : avant de nommer un champ dans un type déjà large, grep le nom dans ce type.
+C'est la leçon n° 117 (« savoir qu'un champ EXISTE ne dit rien de ce qu'il PORTE ») prise
+par l'autre bout : savoir ce que je veux EXPRIMER ne dit rien de ce que le nom porte DÉJÀ.
+
+---
+
+## 2026-09-18 — Retirer un filtre laisse orpheline l'observabilité qu'il produisait
+
+Même lot, et c'est le piège qui m'a coûté le plus de réflexion. Les deux verdicts de lieu
+(`hors-region`, `lieu-inconnu`) vivaient dans `Tri.refusees`, la liste des refus nommés. En
+retirant le refus, le réflexe est de retirer les entrées : elles n'ont plus rien à faire dans
+une liste qui s'appelle « refusées », et l'écran annoncerait « écartées » des offres qu'il
+vient d'inscrire.
+
+**Mais cette liste ne servait pas qu'à justifier le refus.** C'est elle qui produit
+`[veille] lieux … — inconnus : sherrington×7 · gaspe×5 · parc-bon-air×3 …` dans le journal —
+autrement dit la liste de travail du géocodeur, triée par fréquence, et la seule façon de
+savoir si `situer` progresse. La retirer avec le filtre aurait supprimé l'observabilité en
+même temps que la restriction, et personne ne l'aurait vu : le journal aurait simplement
+cessé d'écrire une ligne.
+
+Correctif : une SECONDE liste, `Tri.lieux`, avec la même forme et un nom qui dit la vérité
+(« ce que le lieu a dit », pas « ce qui a été refusé »). `villesRefusees` la consomme sans
+changer d'une ligne — elle ne lisait que `ville` et `motif`. Le journal et l'écran ont suivi,
+et leur libellé aussi : « lieux refusés » serait devenu faux.
+
+**La règle** : avant de retirer un filtre, lister ce que son chemin PRODUIT en plus du refus
+— compteurs, listes nommées, lignes de journal, priorités de file. Ce qui sert à DÉCIDER
+disparaît avec la décision ; ce qui sert à OBSERVER doit survivre, et sous un nom qui ne ment
+plus. Même famille que la leçon n° 140 (« une garde qui EXCLUT une population la prive aussi
+de ce que ce mécanisme DISAIT »), vue depuis le moment où l'on retire la garde.

@@ -271,11 +271,16 @@ describe("bout en bout : le tri suit la mesure", () => {
   it("une offre d'une ville mesurée proche entre, et n'est plus comptée « lieu inconnu »", () => {
     const lot = [brute({ ville: "Sainte-Hénédine" })];
 
+    // ⚠️ SANS LA MESURE, ELLE ENTRE QUAND MÊME DEPUIS L'ADR-0019 — mais MARQUÉE « lieu
+    // inconnu », et c'est la marque qui fait toute la différence de ce cas. Il affirmait
+    // « elle n'entre pas » ; ce qu'il DÉFEND, c'est que la mesure change le verdict, et ça
+    // n'a pas bougé : `situation` passe de `lieu-inconnu` à `dans-la-region`.
     const sans = trier(lot, new Set(), "2026-08-17");
-    expect(sans.retenues).toHaveLength(0);
+    expect(sans.retenues.map((o) => o.situation)).toEqual(["lieu-inconnu"]);
     expect(sans.lieuInconnu).toBe(1);
-    // Et le refus est NOMMÉ — c'est ce qui permet de constater le changement.
-    expect(villesRefusees(sans.refusees, "lieu-inconnu")).toEqual([
+    // Et le verdict est NOMMÉ par sa ville — c'est ce qui permet de constater le changement,
+    // et c'est la liste de travail du géocodeur.
+    expect(villesRefusees(sans.lieux, "lieu-inconnu")).toEqual([
       { ville: "sainte-henedine", n: 1 },
     ]);
 
@@ -285,7 +290,7 @@ describe("bout en bout : le tri suit la mesure", () => {
       "2026-08-17",
       new Map([["sainte-henedine", "dans-la-region"]]),
     );
-    expect(avec.retenues).toHaveLength(1);
+    expect(avec.retenues.map((o) => o.situation)).toEqual(["dans-la-region"]);
     expect(avec.lieuInconnu).toBe(0);
     // La ville est CONSERVÉE : sans elle l'employeur n'est pas géocodable, donc l'offre
     // resterait sans distance et hors de la carte — le manque même qu'on corrige.

@@ -77,6 +77,25 @@ export const offers = pgTable(
     ville: text("ville"),
 
     /**
+     * Ce que `situer` a répondu sur le LIEU de cette offre, à l'ingestion (ADR-0019).
+     *
+     * ⚠️ ELLE N'EST PAS UN FILTRE, ET C'EST TOUT SON INTÉRÊT. Depuis le 2026-09-18, les trois
+     * verdicts entrent tous en base : c'est la DISTANCE qui trie à l'écran, pas le nom de la
+     * ville. Cette colonne garde la mesure qui servait autrefois à refuser — sans elle, les
+     * 2 034 offres jugées « hors région » d'après leur nom seraient présentées exactement
+     * comme les 1 457 jugées « dans la région », et on aurait jeté un calcul qu'on venait de
+     * payer.
+     *
+     * `null` = jamais mesurée. C'est le cas de TOUT ce qui précède le 2026-09-18 : le jeu de
+     * départ, les saisies manuelles, et les offres ingérées avant cette colonne. On ne
+     * rétro-remplit pas — « ces offres-là avaient forcément passé le filtre » est un
+     * raisonnement, pas une mesure, et il serait faux pour les offres saisies à la main.
+     */
+    situation: text("situation", {
+      enum: ["dans-la-region", "hors-region", "lieu-inconnu"],
+    }),
+
+    /**
      * Salaire TEL QU'AFFICHÉ dans l'offre, en texte libre (« 40 $/h+ », « 52 260 – 120 727 $ »,
      * « non affiché »). Volontairement pas un nombre : convertir ici, c'est inventer une
      * précision que l'offre ne donne pas. La notation fait sa propre lecture.
@@ -176,6 +195,10 @@ export const offers = pgTable(
     ),
     // Une distance négative n'existe pas.
     check("offers_km_ck", sql`${table.km} IS NULL OR ${table.km} >= 0`),
+    check(
+      "offers_situation_ck",
+      sql`${table.situation} IS NULL OR ${table.situation} IN ('dans-la-region', 'hors-region', 'lieu-inconnu')`,
+    ),
   ],
 );
 

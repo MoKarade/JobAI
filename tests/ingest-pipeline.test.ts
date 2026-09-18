@@ -181,7 +181,12 @@ describe("honnêteté de ce qui entre", () => {
 });
 
 describe("ce qui est écarté est NOMMÉ, pas seulement compté", () => {
-  it("chaque refus porte son motif", () => {
+  // ⚠️ DEUX LISTES DEPUIS L'ADR-0019 (2026-09-18), ET LES CAS ONT SUIVI LA SÉPARATION plutôt
+  // que d'être supprimés. `refusees` ne porte plus que ce qui N'EST PAS entré (doublon,
+  // sous-le-plancher) ; `lieux` porte le verdict de lieu des offres qui SONT entrées. Ce que
+  // ces cas défendent n'a jamais été le refus : c'est que chaque décision soit NOMMÉE et
+  // porte son OBJET — « 47 lieu inconnu » sans dire lesquelles ne se vérifie pas.
+  it("chaque décision porte son motif, dans la liste qui dit la vérité sur elle", () => {
     // Signalé par le premier vrai dépôt : « le serveur donne les compteurs mais ne
     // ventile pas offre par offre ». Un compte seul ne se vérifie pas — « 5 écartées »
     // ne dit pas si le filtre a bien travaillé ou s'il vient de jeter la meilleure
@@ -196,11 +201,17 @@ describe("ce qui est écarté est NOMMÉ, pas seulement compté", () => {
       "2026-07-31",
     );
 
-    expect(r.refusees).toHaveLength(3);
-    const parMotif = Object.fromEntries(r.refusees.map((x) => [x.motif, x.entreprise]));
-    expect(parMotif["sous-le-plancher"]).toBe("Exemple inc.");
+    // Un seul VRAI refus : le titre « Caissier » ne passe pas le plancher.
+    expect(r.refusees.map((x) => [x.motif, x.entreprise])).toEqual([
+      ["sous-le-plancher", "Exemple inc."],
+    ]);
+    // Les deux autres sont ENTRÉES, et leur verdict de lieu les suit — dans la liste, et
+    // sur l'offre elle-même. Les deux points comptent : la liste sert le journal et
+    // l'écran, `situation` suivra l'offre jusqu'au filtre de distance.
+    const parMotif = Object.fromEntries(r.lieux.map((x) => [x.motif, x.entreprise]));
     expect(parMotif["hors-region"]).toBe("Ailleurs inc.");
     expect(parMotif["lieu-inconnu"]).toBe("Nulle part");
+    expect(r.retenues.map((o) => o.situation).sort()).toEqual(["hors-region", "lieu-inconnu"]);
   });
 
   it("les comptes et la liste nommée disent la MÊME chose", () => {
@@ -216,10 +227,17 @@ describe("ce qui est écarté est NOMMÉ, pas seulement compté", () => {
       "2026-07-31",
     );
     const compte = (m: string) => r.refusees.filter((x) => x.motif === m).length;
+    const compteLieu = (m: string) => r.lieux.filter((x) => x.motif === m).length;
     expect(compte("sous-le-plancher")).toBe(r.souslePlancher);
-    expect(compte("hors-region")).toBe(r.horsRegion);
-    expect(compte("lieu-inconnu")).toBe(r.lieuInconnu);
     expect(compte("doublon")).toBe(r.doublons);
+    // Les deux verdicts de lieu se comptent dans LEUR liste — s'ils étaient restés dans
+    // `refusees`, ce cas serait resté vert en décrivant une réalité qui n'existe plus.
+    expect(compteLieu("hors-region")).toBe(r.horsRegion);
+    expect(compteLieu("lieu-inconnu")).toBe(r.lieuInconnu);
+    // ⚠️ L'INVARIANT DE COMPTAGE A CHANGÉ DE FORME, PAS DE SENS : chaque offre trouvée est
+    // soit refusée, soit retenue. Le lieu n'en retire plus aucune, donc il n'entre plus
+    // dans cette somme — et c'est exactement ce qui fait qu'une offre « hors région » est
+    // maintenant comptée dans `retenues`.
     expect(r.refusees.length + r.retenues.length).toBe(4);
   });
 
@@ -236,13 +254,19 @@ describe("ce qui est écarté est NOMMÉ, pas seulement compté", () => {
       new Set(),
       "2026-07-31",
     );
-    const parEntreprise = Object.fromEntries(r.refusees.map((x) => [x.entreprise, x.ville]));
+    const parEntreprise = Object.fromEntries(r.lieux.map((x) => [x.entreprise, x.ville]));
     expect(parEntreprise["Ailleurs inc."]).toBe("Toronto, ON");
     expect(parEntreprise["Nulle part"]).toBe("Baie-Comeau");
   });
 });
 
 describe("villesRefusees — le motif nommé AVEC son objet", () => {
+  // ⚠️ ELLE LIT `r.lieux` DEPUIS L'ADR-0019, PAS `r.refusees` — et sa raison d'être n'a pas
+  // bougé d'un pouce. Elle a été écrite le 2026-08-17 parce que « 47 lieu inconnu » ne disait
+  // pas LESQUELLES, donc ne permettait pas de choisir le remède. Ces offres entrent
+  // maintenant au lieu d'être jetées ; la question « quelles villes le géocodeur doit-il
+  // apprendre ? » est exactement la même, et c'est toujours cette ligne qui y répond.
+
   it("groupe sur la forme normalisée et trie du plus fréquent au moins fréquent", () => {
     // « Baie-Comeau » et « BAIE-COMEAU » sont le même problème : la casse et les accents
     // ne doivent pas fabriquer deux cas rares là où il y en a un gros, sinon la ligne
@@ -261,7 +285,7 @@ describe("villesRefusees — le motif nommé AVEC son objet", () => {
       "2026-07-31",
     );
 
-    expect(villesRefusees(r.refusees, "lieu-inconnu")).toEqual([
+    expect(villesRefusees(r.lieux, "lieu-inconnu")).toEqual([
       { ville: "baie-comeau", n: 2 },
       { ville: "amos", n: 1 },
       { ville: "baie-comeau qc", n: 1 },
@@ -277,10 +301,10 @@ describe("villesRefusees — le motif nommé AVEC son objet", () => {
       new Set(),
       "2026-07-31",
     );
-    expect(villesRefusees(r.refusees, "hors-region")).toEqual([{ ville: "toronto", n: 1 }]);
+    expect(villesRefusees(r.lieux, "hors-region")).toEqual([{ ville: "toronto", n: 1 }]);
     // Une ville vide dit « la source n'a rien écrit » — le remède n'est pas le même
     // qu'une ville écrite mais inconnue, donc elle ne se fond pas dans les autres.
-    expect(villesRefusees(r.refusees, "lieu-inconnu")).toEqual([{ ville: "(vide)", n: 1 }]);
+    expect(villesRefusees(r.lieux, "lieu-inconnu")).toEqual([{ ville: "(vide)", n: 1 }]);
   });
 });
 

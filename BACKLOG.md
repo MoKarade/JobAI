@@ -2898,3 +2898,36 @@ la liste. Les deux manquants font des écritures CIBLÉES (deux champs), pas une
 de colonnes : ce n'est probablement pas un défaut, mais personne ne l'a tranché et la liste
 prétend être complète. Le remède est le même que celui posé le 18/09 dans
 `tests/ingest-pipeline.test.ts` : **découvrir** la liste par balayage au lieu de l'écrire.
+
+### `[VEILLE-52]` — toutes les québécoises entrent, le lieu ne refuse plus ✅
+
+ADR-0019. Demande de Marc : « toutes les 43k offres tu les importes, ensuite on filtre par km ».
+Puis « go lot 2 » après avoir entendu la réserve d'ordre (voir *Points d'attention*).
+
+Ce qui a été mesuré avant d'être codé, le 2026-09-18 :
+
+| Mesure | Valeur |
+|---|---|
+| Flux complet (`fin: flux-termine`) | 43 071 offres vues |
+| Passent `estPeutEtreQuebec` | **7 239** |
+| Verdicts de `situer` | 1 457 dans la région · 2 034 hors région · 3 748 lieu inconnu |
+| Ce que la passe de 20:23 a ramené | `ingérées=21/1600 · doublons=1535 · lieu-inconnu=38 · hors-région=6` |
+| `trier` sur 7 239 offres | **368 ms** (banc local) |
+
+`trouvees` valait EXACTEMENT `MAX_RETENUES_FLUX` : le plafond mordait, la lecture s'arrêtait
+sur un PRÉFIXE du flux. Trois changements : plafond 1 600 → 12 000, plus aucun refus de lieu
+dans le flux ni dans `trier`, et le verdict ENREGISTRÉ (colonne `situation`).
+
+### `[UI-FILTRE-KM]` — le filtre de distance à l'écran ⬜
+
+**C'est le lot qui rend `[VEILLE-52]` utilisable, et il n'est pas fait.** Filtre par km sur le
+rayon du profil, tri par note, et un groupe « distance inconnue » qui n'est PAS masqué (masquer
+une offre dont la distance est inconnue affirmerait qu'elle est loin). `situation` est en base
+et porte déjà de quoi le dire honnêtement.
+
+### `[GEO-BOOTSTRAP]` — une distance approchée tout de suite ⬜
+
+La table `villes` (centres de municipalités, géocodés une fois) existe et n'est pas exploitée
+pour donner un km approché aux offres. Manque le repli par bande postale pour les 3 748 offres
+dont personne ne nomme la ville. Sans ce lot, le filtre km n'a presque rien à filtrer : le
+géocodage plafonne à 8 villes par passe.
