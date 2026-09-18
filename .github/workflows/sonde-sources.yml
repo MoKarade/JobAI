@@ -22,13 +22,19 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # [CI-PERSIST-CREDS] `actions/checkout` v2+ écrit le GITHUB_TOKEN dans la config git du
+          # runner POUR TOUT LE RESTE DU RUN : n'importe quelle étape suivante, y compris une
+          # action tierce, peut le lire. Vérifié un par un : aucun workflow de ce dépôt ne fait
+          # de `git push` ni d'appel `gh`, donc aucun n'a besoin du jeton persisté.
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Sonder les sources actuelles
         run: npx tsx scripts/sonder-sources.ts
