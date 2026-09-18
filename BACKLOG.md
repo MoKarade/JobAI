@@ -1735,6 +1735,34 @@ RESTE — à observer sur les prochains dépôts (rien à coder) :
       Quatre mutations jouées, quatre rouges : ordre d'origine restauré (3 cas), tri retiré,
       `sansVille` fondu dans `sansTentative`, `villeDe` consultée hors éligibles.
 
+- [ ] 🟠 **`[QUOTA-VILLE-02]`** **Le MÊME défaut d'ordre vit dans `rattraperAdresses`, et il n'a
+      PAS été corrigé** — trouvé en chemin le 2026-09-18 en cherchant si le patron existait
+      ailleurs, signalé plutôt que réparé (un bug préexistant ne se corrige pas sans feu vert).
+      `lib/actions.ts`, `rattraperAdresses` : `.sort(geocodeLe)` puis **`.slice(0, max)`**, et
+      c'est seulement APRÈS que `villeDe` écarte celles dont la ville est inconnue. Une éligible
+      sans ville consomme donc une place, n'est jamais interrogée, ne voit jamais son
+      `geocodeLe` marqué, et revient en tête à la passe suivante — exactement le mécanisme que
+      `[V-ROUTINE-QUOTA]` vient de fermer sur le raffinage.
+      ⚠️ **Et son propre commentaire décrit le piège qu'il ne couvre pas** : « une entreprise
+      qu'OpenStreetMap ne connaîtra JAMAIS resterait éternellement en tête et consommerait le
+      quota à la place des autres ». C'est vrai, c'est bien géré pour un ÉCHEC de géocodage
+      (`geocodeLe` marqué à chaque tentative), et c'est faux pour une absence de VILLE — le cas
+      où aucune tentative n'a lieu.
+      **Remède prêt** : `choisirARaffiner` ne convient pas telle quelle (elle filtre sur
+      `positionARaffiner`, pas sur `adresseARattraper`). Il faut soit la paramétrer par son
+      prédicat d'éligibilité, soit écrire sa jumelle — dans les deux cas le corps est le même,
+      et `trancherParQuota` reste le seul endroit qui tranche.
+      ⚠️ **Portée inconnue, comme pour son jumeau** : rien ne prouve que le défaut morde
+      aujourd'hui. `adresseARattraper` exige `precision === "exacte"`, donc un lieu déjà géocodé
+      avec succès depuis une ville — et les offres ne sont jamais supprimées, donc `villeDe`
+      devrait encore la retrouver. Le chemin réellement atteignable est une entrée de
+      `ENTREPRISES_CIBLES` **retirée du code** alors que son lieu persiste en base.
+      **Avant de coder** : publier d'abord le compte (comme `(K sans ville connue)` côté
+      raffinage) et lire un relevé. Corriger à l'aveugle un défaut dont la portée est inconnue,
+      c'est se priver de la mesure qui dit s'il fallait le corriger.
+      ➜ Le troisième consommateur de `villeDe`, `adressesDepuisRegistre`, est SAIN : il n'a
+      aucun quota (c'est l'étape non bornée de `[DISTANCES-01]`), donc rien à trancher.
+
 **[CARTE-03-GOOGLE] — Google Maps Geocoding, troisième repli.** ADR-0007. Marc a choisi
 Google Maps Geocoding (sur 4 options présentées) pour les entreprises que Nominatim ET le
 registre ratent encore. Fait le 2026-08-12, gate vert :
