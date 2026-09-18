@@ -7,10 +7,16 @@
 // CONFIGURÉE, et l'en-tête ne sert que de repli — utile en développement, où aucune variable
 // n'est posée.
 
+import { texteEnv } from "../env";
+
 /** L'origine canonique, configurée si elle l'est, déduite de la requête sinon. */
 export function origineDe(requete: Request): string {
-  const configuree = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "";
-  if (configuree !== "") {
+  // ⚠️ `texteEnv` PLUTÔT QU'UN COALESCEMENT NULLISH (`[ENV-VIDE-01]`). `""` n'étant pas
+  // nullish, `AUTH_URL` laissée BLANCHE n'était pas remplacée par `NEXTAUTH_URL` : elle
+  // coupait la chaîne de repli et faisait retomber l'origine sur l'en-tête de la requête —
+  // exactement ce que ce module existe pour refuser.
+  const configuree = texteEnv("AUTH_URL", "NEXTAUTH_URL");
+  if (configuree !== null) {
     try {
       return new URL(configuree).origin;
     } catch {

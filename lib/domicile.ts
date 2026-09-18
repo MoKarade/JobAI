@@ -23,6 +23,7 @@ import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { syncState } from "./db/schema";
 import { geocoderPlusieurs } from "./geocodage";
+import { nombreEnv, texteEnv } from "./env";
 
 /** Clé sous laquelle les coordonnées du domicile sont conservées, une fois géocodées. */
 const CLE_DOMICILE = "domicile-coord";
@@ -39,9 +40,12 @@ function outilsNominatim() {
  * `km` reste honnêtement inconnu plutôt que faux.
  */
 function domicileConfigure(): { lat: number; lon: number } | null {
-  const lat = Number(process.env.DOMICILE_LAT);
-  const lon = Number(process.env.DOMICILE_LON);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  // ⚠️ `nombreEnv` PLUTÔT QU'UNE CONVERSION DIRECTE, et c'est un correctif (`[ENV-VIDE-01]`).
+  // Une variable laissée BLANCHE se convertissait en `0` — un point au large de la Guinée —
+  // et le repli par adresse n'était jamais atteint : toutes les distances partaient de là.
+  const lat = nombreEnv("DOMICILE_LAT");
+  const lon = nombreEnv("DOMICILE_LON");
+  if (lat === null || lon === null) return null;
   return { lat, lon };
 }
 
@@ -60,8 +64,8 @@ export async function domicile(): Promise<{ lat: number; lon: number } | null> {
   const direct = domicileConfigure();
   if (direct) return direct;
 
-  const adresse = process.env.DOMICILE_ADRESSE?.trim();
-  if (!adresse) return null;
+  const adresse = texteEnv("DOMICILE_ADRESSE");
+  if (adresse === null) return null;
 
   // Déjà géocodée ? On ne redemande pas : la position d'un domicile ne change pas, et
   // chaque appel évité est un appel de moins vers un service bénévole.

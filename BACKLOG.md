@@ -2665,8 +2665,9 @@ vérifier l'état d'une annonce moi-même.
       témoins nommés dans CHAQUE forme avant de se servir de la sortie. Ne pas reprendre la
       liste ci-dessus sans la re-mesurer : elle décrit une population, pas un mécanisme.
 
-- [ ] 🔴 **`[REDIR-01]`** **La garde anti-tremplin de `cheminInterne` se contourne par un
-      ANTISLASH — et le second verrou qu'elle invoque N'EXISTE PAS.** Trouvé le 2026-09-18 en
+- [x] 🔴 **`[REDIR-01]`** ✅ **CORRIGÉ le 2026-09-18, sur feu vert de Marc (« go »).**
+      **La garde anti-tremplin de `cheminInterne` se contournait par un
+      ANTISLASH — et le second verrou qu'elle invoquait N'EXISTAIT PAS.** Trouvé le 2026-09-18 en
       écrivant les tests de `[ACTIONS-02]`, **NON corrigé** (bug préexistant : il se signale,
       il ne se répare pas sans feu vert).
       **MESURÉ**, à travers la vraie fonction, pas une réécriture :
@@ -2698,9 +2699,27 @@ vérifier l'état d'une annonce moi-même.
       suffit d'y ajouter les deux chaînes mesurées.
       ⚠️ **Aucun test ne fige le contournement**, délibérément : écrire `expect(cheminInterne(
       "/\evil.com")).toBe("/\evil.com")` verrouillerait le défaut. Ce qui le porte est cet item.
+      ✅ **CORRECTIF LIVRÉ — la CLASSE, pas une forme de plus.** `cheminInterne` ne compare
+      plus du TEXTE : elle demande à l'analyseur d'URL lui-même où mène le chemin, contre une
+      origine témoin jetable (`https://temoin.invalid`, domaine réservé RFC 2606, jamais
+      requêté). Origine différente ⇒ refus. Ajouter une forme de plus à une liste textuelle
+      aurait laissé la quatrième dehors ; juger sur ce que la plateforme FAIT ferme l'ensemble.
+      **Mesuré après correctif** : les quatre formes à antislash, `//evil.com` et
+      `https://evil.com` rendent toutes `/` ; `/carte` et `/offre/42?vue=liste#bas` passent
+      VERBATIM. La valeur n'est pas normalisée au retour — la garde répond « interne ou pas »,
+      elle ne réécrit pas la demande.
+      ✅ **Et le commentaire menteur est corrigé dans le même commit.** Il raconte désormais ce
+      qui a été vérifié : pas de `lib/retour.ts` dans le hub, un filet Auth.js par défaut qui
+      joue probablement mais qui appartient à une dépendance du hub et n'a jamais été exercé
+      ici. Une promesse de verrou rendait la vraie garde moins relue qu'elle n'aurait dû l'être.
+      Verrou : `tests/gardesEntree.test.ts` porte les **chaînes d'attaque exactes** (règle §9
+      n°128) et vérifie AUSSI le `callbackUrl` produit — la garde ne vaut que si l'appelant en
+      hérite, et c'est là que le défaut se voyait. Mutation jouée : retour à la garde textuelle
+      ⇒ 2 rouges.
 
-- [ ] 🟠 **`[ENV-VIDE-01]`** **Une variable d'environnement VIDE n'est pas une variable absente,
-      et trois endroits confondent les deux.** Trouvé le 2026-09-18 avec `[REDIR-01]`, **NON
+- [x] 🟠 **`[ENV-VIDE-01]`** ✅ **CORRIGÉ le 2026-09-18, sur feu vert de Marc (« go »).**
+      **Une variable d'environnement VIDE n'est pas une variable absente,
+      et deux endroits confondaient les deux.** Trouvé le 2026-09-18 avec `[REDIR-01]`, **NON
       corrigé** (même raison).
       `Number("")` vaut **0**, et `Number.isFinite(0)` vaut **true** (mesuré). Donc :
       · **`DOMICILE_LAT=""` + `DOMICILE_LON=""` ⇒ `domicileConfigure()` rend `{lat: 0, lon: 0}`**,
@@ -2715,7 +2734,24 @@ vérifier l'état d'une annonce moi-même.
       **Correctif proposé** : comparer la chaîne BRUTE à `""` après `trim()` avant de la
       convertir, aux trois endroits. Et comme c'est une CLASSE, pas trois cas, un test-scan qui
       cherche `Number(process.env.` sans garde de chaîne vide vaudrait mieux que trois
-      correctifs. [À vérifier — le scan n'a pas été écrit]
+      correctifs.
+      ✅ **CORRECTIF LIVRÉ — `lib/env.ts` (PURE, feuille)** : `texteEnv(...noms)` rend la
+      première variable NON BLANCHE (donc la chaîne de repli enjambe une variable vide, ce que
+      `??` ne faisait pas), `nombreEnv(nom)` ne convertit que sur une chaîne non vide.
+      **DEUX sites, pas trois** — le troisième soupçon était un faux positif, et le dire
+      compte : les trois `AUTHORIZED_EMAIL` sont SAINS, parce que `estProprietaire` refuse
+      explicitement une autorisation vide (échec fermé, déjà écrit et déjà testé).
+      ✅ **Et le scan promis a été écrit** (`tests/env.test.ts`) : aucun module de `lib/` ne
+      convertit une variable d'environnement en nombre par lui-même, `lib/env.ts` excepté.
+      C'est ce qui empêche un TROISIÈME site d'apparaître — une règle qui ne vit que dans un
+      document se reperd (règle §9 n°125). Avec son anti-vacuité : le scan doit lire plus de
+      cinquante fichiers ET prouver que son motif sait trouver.
+      ⚠️ **Le motif du scan est COMPOSÉ dans le test**, pas écrit en toutes lettres : sinon il
+      matcherait sa propre explication. Le piège a été payé deux fois aujourd'hui.
+      ⚠️ **Un ZÉRO ÉCRIT reste un zéro** : `nombreEnv` rend `0` pour `"0"`. Sans ce cas, on ne
+      saurait pas distinguer « blanc rejeté » de « zéro rejeté ».
+      Mutation jouée : retour à la conversion directe ⇒ le test de comportement ET le scan
+      rougissent, ce qui est exactement la paire voulue.
 
 ## Audit du backlog — 2026-09-17
 

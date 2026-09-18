@@ -6,6 +6,49 @@
 
 ---
 
+## Session 2026-09-18 (suite 4) — les deux défauts sont fermés, et l'un des deux l'est par CLASSE
+
+Marc : « go ». Feu vert sur `[REDIR-01]` et `[ENV-VIDE-01]`, signalés une heure plus tôt.
+
+### 🔴 `[REDIR-01]` — on ne compare plus du texte, on demande où ça mène
+
+`cheminInterne` refusait `//evil.com` par comparaison de chaîne, et l'analyseur d'URL
+normalisait l'antislash **après** elle. Le correctif ne rallonge pas la liste des formes
+interdites : il demande à l'analyseur lui-même où mène le chemin, contre une origine témoin
+jetable (`https://temoin.invalid`, domaine réservé, jamais requêté). Origine différente ⇒ refus.
+Ajouter `/\` à une liste textuelle aurait laissé la quatrième forme dehors ; **juger sur ce que
+la plateforme FAIT ferme l'ensemble.**
+
+Mesuré après correctif : les quatre formes à antislash, `//evil.com` et `https://evil.com`
+rendent toutes `/` ; `/carte` et `/offre/42?vue=liste#bas` passent **verbatim**. La garde répond
+« interne ou pas », elle ne réécrit pas la demande.
+
+⚠️ **Le commentaire menteur est corrigé dans le même commit.** Il promettait un `lib/retour.ts`
+côté hub qui n'existe pas. Il raconte maintenant ce qui a été vérifié — et dit que le filet
+Auth.js par défaut appartient à une dépendance du hub, n'a jamais été exercé ici, et ne peut
+donc pas porter la sécurité de JobAI. **Une promesse de verrou rendait la vraie garde moins
+relue qu'elle n'aurait dû l'être.**
+
+### 🟠 `[ENV-VIDE-01]` — deux sites, pas trois, et un scan pour qu'il n'y en ait jamais un troisième
+
+`lib/env.ts` (PURE, feuille) : `texteEnv(...noms)` rend la première variable **non blanche** —
+donc la chaîne de repli enjambe une variable vide, ce que `??` ne faisait pas — et `nombreEnv`
+ne convertit que sur une chaîne non vide.
+
+⚠️ **Le troisième soupçon était un faux positif, et le dire compte** : les trois
+`AUTHORIZED_EMAIL` sont sains, `estProprietaire` refusant explicitement une autorisation vide.
+Corriger ce qui n'est pas cassé aurait ajouté du bruit et fait croire à trois défauts.
+
+⚠️ **Le scan promis a été écrit**, pas seulement annoncé : aucun module de `lib/` ne convertit
+une variable d'environnement en nombre par lui-même. C'est ce qui empêche un troisième site
+d'apparaître — une règle qui ne vit que dans un document se reperd (§9 n°125). Son motif est
+**composé** dans le test plutôt qu'écrit en toutes lettres, sinon il matcherait sa propre
+explication : le piège a été payé deux fois aujourd'hui.
+
+**Vérifications** : trois mutations, trois rouges — retour à la garde textuelle (2 cas), retour
+au coalescement nullish (1 cas), retour à la conversion directe (le test de comportement **et**
+le scan, la paire voulue). Gate complet vert.
+
 ## Session 2026-09-18 (suite 3) — les gardes jamais exercées, et ce qu'elles cachaient
 
 Marc : « continue les tâches backlog ». Premier lot de `[ACTIONS-02]`. Trois des douze modules

@@ -63,6 +63,26 @@ describe("cheminInterne — la garde du tremplin", () => {
     expect(cheminInterne("//evil.com/suite")).toBe("/");
   });
 
+  it("⚠️ refuse les formes à ANTISLASH — le contournement de `[REDIR-01]`", () => {
+    // MESURÉ le 2026-09-18, AVANT correctif : ces deux chaînes traversaient la garde
+    // textuelle intactes, puis devenaient `//evil.com` quand l'appelant composait l'URL.
+    // Le `callbackUrl` produit avait alors pour origine `https://evil.com`.
+    // Règle §9 n°128 : un contrôle de sécurité se teste avec les chaînes d'attaque EXACTES.
+    expect(cheminInterne("/\\evil.com")).toBe("/");
+    expect(cheminInterne("/\\/evil.com")).toBe("/");
+    expect(cheminInterne("/\\\\evil.com")).toBe("/");
+  });
+
+  it("⚠️ et le `callbackUrl` de ces formes reste sur l'origine de JobAI", () => {
+    // La garde ne vaut que si l'appelant en hérite : c'est là que le défaut se voyait.
+    for (const attaque of ["/\\evil.com", "/\\/evil.com"]) {
+      const url = new URL(urlConnexionHub("https://emploi.hubperso.com", attaque));
+      expect(new URL(url.searchParams.get("callbackUrl") ?? "").origin).toBe(
+        "https://emploi.hubperso.com",
+      );
+    }
+  });
+
   it("rend `/` sur une entrée vide, absente ou blanche", () => {
     expect(cheminInterne(null)).toBe("/");
     expect(cheminInterne(undefined)).toBe("/");
@@ -97,6 +117,18 @@ describe("origineDe — l'en-tête `Host` ne décide pas de l'adresse publiée",
 
   it("garde l'ORIGINE seule, jamais le chemin de la variable", () => {
     vi.stubEnv("AUTH_URL", "https://emploi.hubperso.com/api/auth");
+    expect(origineDe(requete("https://forge.example/x"))).toBe("https://emploi.hubperso.com");
+  });
+
+  it("⚠️ une variable BLANCHE est traitée comme absente — `[ENV-VIDE-01]`", () => {
+    // AVANT correctif : `??` est le coalescement NULLISH, donc `""` n'était PAS remplacée par
+    // `NEXTAUTH_URL` — elle coupait la chaîne de repli et faisait retomber l'origine sur
+    // l'en-tête de la requête, exactement ce que ce module existe pour refuser.
+    vi.stubEnv("AUTH_URL", "");
+    vi.stubEnv("NEXTAUTH_URL", "https://emploi.hubperso.com");
+    expect(origineDe(requete("https://forge.example/x"))).toBe("https://emploi.hubperso.com");
+    // Et une valeur uniquement faite d'espaces compte pareil.
+    vi.stubEnv("AUTH_URL", "   ");
     expect(origineDe(requete("https://forge.example/x"))).toBe("https://emploi.hubperso.com");
   });
 
@@ -145,6 +177,24 @@ describe("domicile — « pas de position » plutôt qu'une position fausse", ()
     // un jour où elle cesserait de court-circuiter, on paierait un appel Nominatim par passe
     // sans qu'aucun résultat ne change.
     expect(touches).toEqual([]);
+  });
+
+  it("⚠️ des coordonnées BLANCHES ne deviennent pas `{0, 0}` — `[ENV-VIDE-01]`", async () => {
+    // AVANT correctif : `Number("")` vaut 0 et 0 est fini, donc une variable créée puis
+    // laissée blanche dans Vercel rendait un point au large de la Guinée — et le repli par
+    // adresse n'était JAMAIS atteint. Toutes les distances partaient de là.
+    vi.stubEnv("DOMICILE_LAT", "");
+    vi.stubEnv("DOMICILE_LON", "");
+    vi.stubEnv("DOMICILE_ADRESSE", undefined);
+    const { domicile } = await import("@/lib/domicile");
+    expect(await domicile()).toBeNull();
+
+    // Une valeur uniquement faite d'espaces compte pareil : `Number(" ")` vaut 0 aussi.
+    vi.stubEnv("DOMICILE_LAT", " ");
+    vi.stubEnv("DOMICILE_LON", " ");
+    vi.resetModules();
+    const { domicile: d2 } = await import("@/lib/domicile");
+    expect(await d2()).toBeNull();
   });
 
   it("des coordonnées ILLISIBLES ne deviennent pas une position : on passe à l'adresse", async () => {
