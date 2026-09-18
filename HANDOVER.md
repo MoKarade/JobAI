@@ -6,6 +6,59 @@
 
 ---
 
+## Session 2026-09-18 (suite 3) — les gardes jamais exercées, et ce qu'elles cachaient
+
+Marc : « continue les tâches backlog ». Premier lot de `[ACTIONS-02]`. Trois des douze modules
+sans test ne sont pas des modules ordinaires : ce sont des **gardes**, du code dont le seul
+travail est de refuser. Un module de calcul sans test rend un mauvais chiffre, qu'on finit par
+voir ; une garde sans test ne rend RIEN — elle laisse passer, et personne ne le sait.
+
+**Livré** : `tests/gardesEntree.test.ts`, 13 cas, 3 mutations. `cheminInterne` (le tremplin
+d'après-connexion), `origineDe` (l'en-tête `Host` ne décide pas de l'adresse publiée dans les
+métadonnées OAuth), `domicile` (pas de position plutôt qu'une position fausse).
+
+### 🔴 Les exercer a trouvé un contournement — `[REDIR-01]`, NON corrigé
+
+Mesuré à travers la vraie fonction :
+
+```
+"/\evil.com"   → cheminInterne rend "/\evil.com"   → callbackUrl origin = https://evil.com
+"/\/evil.com"  → cheminInterne rend "/\/evil.com"  → callbackUrl origin = https://evil.com
+"//evil.com"    → cheminInterne rend "/"             → callbackUrl origin = emploi.hubperso.com
+```
+
+La garde teste `startsWith("//")`, et l'analyseur d'URL normalise l'antislash en barre oblique
+**après** elle. Le commentaire du module nomme exactement cette classe : l'auteur la
+connaissait, il a couvert une forme sur trois. C'est la règle §9 n°128 du `CLAUDE.md` mot pour
+mot — « un contrôle de sécurité se teste avec les chaînes d'attaque EXACTES ».
+
+⚠️ **Et le second verrou que le commentaire invoque n'existe pas.** `lib/connexionHub.ts` écrit
+que « le hub valide cette destination de son côté (`lib/retour.ts`) ». **Il n'y a aucun
+`lib/retour.ts` dans Hubperso** (vérifié sur `b401f6a`) : `app/login/page.tsx` passe
+`callbackUrl` directement à `signIn`. Une promesse de verrou sans verrou.
+
+⚠️ **Ce que je n'ai PAS mesuré** : que la chaîne soit exploitable de bout en bout. Auth.js
+applique par défaut un `redirect` qui refuse une origine étrangère et Hubperso ne le surcharge
+pas — ce troisième filet joue probablement. Mais il n'a pas été exercé, et la sécurité de JobAI
+ne peut pas reposer sur le défaut d'une dépendance du hub. [Probable, non mesuré]
+
+⚠️ **Aucun test ne fige le contournement**, délibérément : l'asserter le verrouillerait.
+
+### 🟠 Et une classe, pas un cas — `[ENV-VIDE-01]`, NON corrigé
+
+`Number("")` vaut **0**, et `0` est fini. Donc `DOMICILE_LAT=""` rend `{lat: 0, lon: 0}` — au
+large de la Guinée — et **toutes** les distances partent de là sans qu'aucun écran ne puisse le
+démentir. Même mécanique pour `AUTH_URL=""`, qui court-circuite `NEXTAUTH_URL` (`??` est
+nullish) et fait retomber `origineDe` sur l'en-tête. Le scénario n'a rien de théorique : une
+variable créée puis laissée blanche dans Vercel donne une chaîne vide, pas une absence.
+
+**Les deux attendent un feu vert** — bug préexistant trouvé en chemin, il se signale, il ne se
+répare pas sans demande.
+
+**Vérifications** : trois mutations, trois rouges (garde `//` retirée, origine configurée
+ignorée, voie directe du domicile qui cesse de court-circuiter). Gate complet vert. Aucune
+ligne de `lib/` ne change : ce lot est entièrement des tests.
+
 ## Session 2026-09-18 (suite 2) — `[ACTIONS-01]` : trois Server Actions sans aucun verrou
 
 Marc : « continue les tâches backlog ». Ce qui restait d'actionnable sans décision de sa part

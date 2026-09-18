@@ -2639,6 +2639,16 @@ vérifier l'état d'une annonce moi-même.
       donc comptait une bascule PARTOUT, donc rendait le contrôle négatif vert par accident.
 
 - [ ] 🟡 **`[ACTIONS-02]`** **Treize modules `lib/` ne sont importés par aucun test.**
+      ✅ **PREMIER LOT LIVRÉ le 2026-09-18** — `tests/gardesEntree.test.ts`, 13 cas, 3 mutations.
+      Trois des douze restants ne sont pas des modules ordinaires : ce sont des **GARDES**, du
+      code dont le seul travail est de refuser. Un module de calcul sans test rend un mauvais
+      chiffre, qu'on finit par voir ; une garde sans test ne rend RIEN — elle laisse passer.
+      `cheminInterne` (tremplin d'après-connexion), `origineDe` (l'en-tête `Host` ne décide pas
+      de l'adresse publiée dans les métadonnées OAuth), `domicile` (pas de position plutôt
+      qu'une position fausse). **Et les exercer a trouvé deux défauts, ci-dessous.**
+      ⚠️ Nuance mesurée en écrivant : `AUTH_URL=""` n'est PAS remplacée par `NEXTAUTH_URL` —
+      `??` est le coalescement NULLISH. Mon premier test posait `""` et mesurait donc autre
+      chose que son titre. Reste après ce lot : neuf modules.
       Recensé le 2026-09-18, après `[ACTIONS-01]` (qui en a retiré trois). Par taille :
       `ingest/sources.ts` (269), `donnees.ts` (126, MOCKÉ seulement), `domicile.ts` (91),
       `coutLlmStore.ts` (77, mocké), `mesureLieux.ts` (75), `adresse.ts` (58), `etat.ts` (51),
@@ -2654,6 +2664,58 @@ vérifier l'état d'une annonce moi-même.
       **Un recenseur ne voit que les formes que son auteur avait sous les yeux** — d'où des
       témoins nommés dans CHAQUE forme avant de se servir de la sortie. Ne pas reprendre la
       liste ci-dessus sans la re-mesurer : elle décrit une population, pas un mécanisme.
+
+- [ ] 🔴 **`[REDIR-01]`** **La garde anti-tremplin de `cheminInterne` se contourne par un
+      ANTISLASH — et le second verrou qu'elle invoque N'EXISTE PAS.** Trouvé le 2026-09-18 en
+      écrivant les tests de `[ACTIONS-02]`, **NON corrigé** (bug préexistant : il se signale,
+      il ne se répare pas sans feu vert).
+      **MESURÉ**, à travers la vraie fonction, pas une réécriture :
+      ```
+      "/\evil.com"   → cheminInterne rend "/\evil.com"   → callbackUrl origin = https://evil.com
+      "/\/evil.com"  → cheminInterne rend "/\/evil.com"  → callbackUrl origin = https://evil.com
+      "//evil.com"    → cheminInterne rend "/"             → callbackUrl origin = emploi.hubperso.com
+      ```
+      **La cause** : la garde teste `startsWith("//")`, et l'analyseur d'URL du navigateur (norme
+      WHATWG) NORMALISE l'antislash en barre oblique pour les schémas spéciaux. `/\` et `/\/`
+      deviennent donc `//` APRÈS la garde. Le commentaire du module nomme exactement cette
+      classe (« `//evil.com` ressemble à un chemin sans en être un ») : l'auteur la connaissait,
+      il a couvert une forme sur trois. C'est la règle §9 n°128 du `CLAUDE.md`, mot pour mot —
+      « un contrôle de sécurité se teste avec les chaînes d'attaque EXACTES ».
+      ⚠️ **ET LE SECOND VERROU CITÉ PAR LE COMMENTAIRE N'EXISTE PAS.** `lib/connexionHub.ts`
+      écrit : « Le hub valide cette destination de son côté (`lib/retour.ts`) : il n'accepte que
+      les sous-domaines de `hubperso.com` ». **Il n'y a aucun `lib/retour.ts` dans Hubperso**
+      (vérifié sur `b401f6a`) ; `app/login/page.tsx` passe `callbackUrl` directement à
+      `signIn("google", { redirectTo: … })`. Une promesse de verrou sans verrou.
+      ⚠️ **CE QUE JE N'AI PAS MESURÉ, ET QUE JE NE PRÉTENDS DONC PAS** : que la chaîne soit
+      exploitable de bout en bout. Auth.js applique par défaut un `redirect` qui refuse une
+      origine étrangère, et Hubperso ne le surcharge pas — ce troisième filet joue
+      probablement. Mais il n'a pas été exercé, et la sécurité de JobAI ne peut pas reposer sur
+      le comportement par défaut d'une dépendance du hub. [Probable, non mesuré]
+      **Correctif proposé (une ligne)** : refuser aussi l'antislash en 2ᵉ position — ou mieux,
+      NORMALISER avant de juger (`new URL(valeur, "https://x.invalid")` et exiger que l'origine
+      obtenue soit `https://x.invalid`), ce qui ferme la classe entière au lieu d'une forme de
+      plus. Le test d'attaque est déjà écrit dans `tests/gardesEntree.test.ts` pour `//` : il
+      suffit d'y ajouter les deux chaînes mesurées.
+      ⚠️ **Aucun test ne fige le contournement**, délibérément : écrire `expect(cheminInterne(
+      "/\evil.com")).toBe("/\evil.com")` verrouillerait le défaut. Ce qui le porte est cet item.
+
+- [ ] 🟠 **`[ENV-VIDE-01]`** **Une variable d'environnement VIDE n'est pas une variable absente,
+      et trois endroits confondent les deux.** Trouvé le 2026-09-18 avec `[REDIR-01]`, **NON
+      corrigé** (même raison).
+      `Number("")` vaut **0**, et `Number.isFinite(0)` vaut **true** (mesuré). Donc :
+      · **`DOMICILE_LAT=""` + `DOMICILE_LON=""` ⇒ `domicileConfigure()` rend `{lat: 0, lon: 0}`**,
+        au large de la Guinée. Le repli par adresse n'est jamais atteint, et **toutes** les
+        distances sont calculées depuis ce point sans qu'aucun écran ne puisse le démentir.
+        C'est « no fake data » pris à revers : une coordonnée plausible et fausse.
+      · `DOMICILE_LAT=" "` fait pareil (`Number(" ")` vaut 0).
+      · **`AUTH_URL=""` court-circuite `NEXTAUTH_URL`** (`??` est nullish) et fait retomber
+        `origineDe` sur l'en-tête de la requête — exactement ce que ce module refuse.
+      ⚠️ **Le scénario n'est pas théorique** : une variable créée puis laissée blanche dans
+      l'interface Vercel donne une chaîne vide, pas une absence.
+      **Correctif proposé** : comparer la chaîne BRUTE à `""` après `trim()` avant de la
+      convertir, aux trois endroits. Et comme c'est une CLASSE, pas trois cas, un test-scan qui
+      cherche `Number(process.env.` sans garde de chaîne vide vaudrait mieux que trois
+      correctifs. [À vérifier — le scan n'a pas été écrit]
 
 ## Audit du backlog — 2026-09-17
 
