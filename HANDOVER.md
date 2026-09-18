@@ -6,6 +6,51 @@
 
 ---
 
+## Session 2026-09-18 (suite 2) — `[ACTIONS-01]` : trois Server Actions sans aucun verrou
+
+Marc : « continue les tâches backlog ». Ce qui restait d'actionnable sans décision de sa part
+n'était plus un item existant : c'était un TROU. Recensé — cinq modules `lib/actions*.ts`
+portent des Server Actions, **deux étaient testés, trois ne l'étaient pas**. La signature d'un
+patron appliqué à côté mais pas ici : le risque était connu, traité deux fois, les trois
+voisins oubliés.
+
+**Ce qui est verrouillé** (`tests/actionsReglages.test.ts`, 11 cas) :
+- **La session est revérifiée, et le refus arrive AVANT toute écriture.** `lib/session.ts` le
+  dit en toutes lettres — c'était une promesse en commentaire. Pour `lancerAnalyseMarche`, la
+  conséquence est chiffrable : **l'action fait un appel FACTURÉ**, donc la garde protège une
+  dépense, pas seulement une donnée.
+- **L'ordre des deux écritures de `reglerRayon`** : le rayon d'abord, le registre re-jugé
+  ensuite. Le module l'explique sur huit lignes et rien ne le tenait.
+- Un refus de validation n'écrit rien ; une saisie partiellement illisible garde sa part valide
+  et rend ses rejets ; une analyse **payée** n'est pas perdue si l'écriture d'état échoue.
+
+⚠️ **Avec son contrôle d'anti-vacuité** : « aucun appel facturé » ne prouve rien tant qu'un cas
+ne montre pas que le même espion sait en VOIR un.
+
+### Deux pièges payés en écrivant les tests, tous deux déjà nommés ailleurs
+
+1. **Les clés d'état recopiées de mémoire.** J'avais écrit `"rayon"` et `"metiers"` ; elles
+   valent `veille-rayon` et `veille-metiers`. Elles se dérivent désormais de leur CONSTANTE.
+2. **Une fixture aux mauvais noms de champs.** `{ km, dansLeRayon }` contre un `LieuJuge` qui
+   porte `{ verdict, km, le, essais }` : `verdict` valait `undefined`, ce qui comptait une
+   bascule PARTOUT et rendait le contrôle négatif **vert par accident**.
+
+### Et le recenseur s'est trompé deux fois avant d'être juste
+
+Le nombre de modules « sans test » a valu successivement **17, 39, 68 puis 13**. Cause : le
+dépôt importe sous DEUX formes (`@/lib/x` et `../lib/x`), et mes témoins de contrôle étaient
+tous de la première — ils ne discriminaient donc pas la seconde. **Un recenseur ne voit que les
+formes que son auteur avait sous les yeux.** La version finale exige des témoins nommés dans
+CHAQUE forme et refuse de rendre sa liste si l'un manque.
+
+⚠️ Le reliquat est consigné en `[ACTIONS-02]`, avec sa mise en garde : « MOCKÉ seulement »
+n'est pas « couvert » — et `lib/session.ts`, la garde de TOUTES les Server Actions, est
+justement dans ce cas.
+
+**Vérifications** : trois mutations, trois rouges (garde de session retirée de l'analyse, deux
+écritures du rayon inversées, écriture placée avant la garde dans les métiers). Gate complet
+vert. Aucune ligne de `lib/` ne change : ce lot est entièrement des tests.
+
 ## Session 2026-09-18 (suite) — `[QUOTA-VILLE-02]` : le défaut jumeau, et une règle au lieu de deux
 
 Marc : « fais QUOTA-VILLE-02 aussi ». Feu vert explicite sur le défaut signalé une heure plus

@@ -2606,6 +2606,55 @@ vérifier l'état d'une annonce moi-même.
 
 ---
 
+## Consolidation — 2026-09-18
+
+- [x] 🟠 **`[ACTIONS-01]`** ✅ **Livré le 2026-09-18** (« continue les tâches backlog »).
+      **Cinq modules `lib/actions*.ts` portent des Server Actions ; DEUX étaient testés,
+      TROIS ne l'étaient pas.** `actionsVeille` et `actionsTrajet` avaient leurs verrous,
+      `actionsRayon`, `actionsMetiers` et `actionsAnalyse` n'en avaient aucun — la signature
+      d'un patron appliqué à côté mais pas ici : le risque était connu, traité deux fois, et
+      les trois voisins oubliés. `tests/actionsReglages.test.ts`, 11 cas, 3 mutations.
+      **Ce qui est verrouillé, et la conséquence de chacun** :
+      · **La session est revérifiée, et le refus arrive AVANT toute écriture.**
+        `lib/session.ts` le dit en toutes lettres (« une Server Action n'est pas une route,
+        c'est un point d'entrée POST appelable directement ») — c'était une promesse en
+        commentaire. Pour `lancerAnalyseMarche`, la conséquence est chiffrable : **l'action
+        fait un appel FACTURÉ**, donc la garde protège une dépense.
+      · **L'ordre des deux écritures de `reglerRayon`** : le rayon d'abord, le registre
+        re-jugé ensuite. Le module l'explique sur huit lignes et rien ne le tenait. Inversé,
+        on laisse un registre jugé sous un rayon jamais écrit — incohérent avec l'écran, et
+        rien ne le rattrape.
+      · **Un refus de validation n'écrit rien** (saisie hors bornes, trop de codes).
+      · **Une saisie partiellement illisible garde sa part valide ET rend ses rejets** — les
+        deux moitiés sont délibérées, en perdre une trompe Marc dans un sens ou dans l'autre.
+      · **Une analyse PAYÉE n'est pas perdue** quand l'écriture d'état échoue.
+      ⚠️ **Avec son contrôle d'anti-vacuité** : « aucun appel facturé » ne prouve rien tant
+      qu'un cas ne montre pas que le même espion sait en VOIR un. Sans lui, un espion jamais
+      câblé rendait les deux cas verts.
+      ⚠️ **Deux pièges payés en écrivant les tests, tous deux déjà nommés dans les leçons du
+      hub** : (a) les clés d'état recopiées de mémoire (`"rayon"`, `"metiers"`) valent en
+      réalité `veille-rayon` et `veille-metiers` — elles se dérivent désormais de leur
+      CONSTANTE ; (b) une **fixture aux mauvais noms de champs** (`{ km, dansLeRayon }` contre
+      un `LieuJuge` qui porte `{ verdict, km, le, essais }`) rendait `verdict` `undefined`,
+      donc comptait une bascule PARTOUT, donc rendait le contrôle négatif vert par accident.
+
+- [ ] 🟡 **`[ACTIONS-02]`** **Treize modules `lib/` ne sont importés par aucun test.**
+      Recensé le 2026-09-18, après `[ACTIONS-01]` (qui en a retiré trois). Par taille :
+      `ingest/sources.ts` (269), `donnees.ts` (126, MOCKÉ seulement), `domicile.ts` (91),
+      `coutLlmStore.ts` (77, mocké), `mesureLieux.ts` (75), `adresse.ts` (58), `etat.ts` (51),
+      `navigation.ts` (50), `connexionHub.ts` (47), `analyseConservee.ts` (42), `db/index.ts`
+      (36), `mcp/origine.ts` (22), `session.ts` (21, mocké).
+      ⚠️ **« MOCKÉ seulement » n'est pas « couvert »** : un module qui n'apparaît que comme
+      cible de `vi.mock` n'est jamais exercé — c'est le patron exact que `[CV-09]` avait
+      trouvé (« un mock de confort de la fonction sous test masque à vie ses propres bugs »).
+      `session.ts` est dans ce cas, et c'est la garde de TOUTES les Server Actions.
+      ⚠️ **Le recensement lui-même s'est trompé DEUX FOIS avant d'être juste**, et le chiffre
+      annoncé a valu successivement 17, 39, 68 puis 13. Cause : le dépôt importe sous DEUX
+      formes (`@/lib/x` et `../lib/x`), et mes témoins de contrôle étaient tous de la première.
+      **Un recenseur ne voit que les formes que son auteur avait sous les yeux** — d'où des
+      témoins nommés dans CHAQUE forme avant de se servir de la sortie. Ne pas reprendre la
+      liste ci-dessus sans la re-mesurer : elle décrit une population, pas un mécanisme.
+
 ## Audit du backlog — 2026-09-17
 
 Demandé par Marc (« fais backlog »). **48 items ouverts** avant, **35 après** : treize fermés,
