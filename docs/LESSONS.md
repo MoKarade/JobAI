@@ -2207,3 +2207,40 @@ distincts.
   trop consommé », alors que l'utilisateur n'avait rien consommé du tout. Un compteur partagé
   entre un geste humain et un travail de fond doit pouvoir dire QUI a dépensé — sinon la
   première hypothèse est toujours la mauvaise.
+
+---
+
+## 154. Un recensement ancré sur `npm ci` ne voit pas `npx` (2026-09-18, lot L2 de l'audit)
+
+Le lot L2 de l'audit multi-outils devait fermer deux surfaces de la chaîne de build : le
+`GITHUB_TOKEN` laissé lisible par `actions/checkout`, et les scripts d'installation de paquets
+exécutés sur le runner. J'ai recensé la seconde en cherchant `npm ci` et `npm install -g`, posé
+`--ignore-scripts` sur les trois sites de ce dépôt, rejoué le compte, et déclaré le lot fini.
+
+**Il restait cinq `npx tsx scripts/sonder-*.ts`.** `npx` télécharge le paquet depuis le registre
+quand il ne le trouve pas localement, **et exécute ses scripts de cycle de vie** — exactement la
+surface que `--ignore-scripts` venait de fermer à l'étape d'installation, rouverte quelques
+étapes plus bas, et sur une version que le lockfile ne gouverne pas (le registre sert la
+dernière). Ces sondes tournent dans les workflows `sonde-sources.yml` et `sonde-registre.yml`,
+qui ne portent aucun secret — mais la règle ne se juge pas workflow par workflow : c'est la
+FORME de la commande qui décide, et elle est la même partout.
+
+Ce n'est pas mon recensement qui l'a trouvé : c'est le rapport SonarCloud d'un AUTRE dépôt
+(DriveAI), qui le disait dans des termes où je ne cherchais pas — « "npx" can install packages
+on-demand and run their lifecycle scripts ». La même requête élargie sur les huit dépôts a
+ensuite sorti **8 sites** hors de ma requête initiale : 5 ici, 3 chez FinanceAI.
+
+**Le correctif est `npx --no-install`**, jamais le retrait de l'étape : le binaire vient alors
+de `node_modules/.bin`, donc de la version qu'épingle le lockfile, et npx échoue franchement
+s'il manque au lieu d'aller le chercher. Mesuré ici avant d'être posé : `npx --no-install tsx
+--version` rend « tsx v4.23.1 », et `tsx` est bien une devDependency.
+
+⚠️ **Le drapeau exige que l'étape d'installation vive dans le MÊME job**, sinon il transforme un
+téléchargement silencieux en échec de CI. Vérifié job par job avant de le poser : les deux
+workflows font `npm ci --ignore-scripts` dans le même job que leurs `npx`.
+
+**La règle** : un recensement de commandes d'installation s'énumère par ce qu'elles FONT
+(installer un paquet, exécuter un binaire qui peut s'installer), jamais par le nom de l'une
+d'elles. C'est la leçon n° 127 (« une liste écrite à la main devient fausse au chantier
+suivant ») appliquée à une REQUÊTE de recensement, et la variante n° 5 du même piège en une
+session : un scan ne couvre que la forme qu'on lui a apprise.

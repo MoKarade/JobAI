@@ -134,4 +134,12 @@ jobs:
       # du REQ ne dit rien de ce que répond le fédéral.
       - name: Interroger le registre UNE entreprise à la fois
         if: always()
-        run: npx tsx scripts/sonder-registre-unitaire.ts
+        # [CI-NPX-NO-INSTALL] `--no-install` : sans lui, `npx` TÉLÉCHARGE le paquet depuis le
+        # registre quand il ne le trouve pas localement, puis exécute ses scripts de cycle de vie
+        # — la surface que `--ignore-scripts` ferme à l'étape d'installation, rouverte ici, et sur
+        # une version NON figée (le registre sert la dernière). Avec le drapeau, npx n'utilise que
+        # le binaire de `node_modules/.bin`, donc la version qu'épingle le lockfile, et échoue
+        # franchement s'il manque au lieu d'aller le chercher. Mesuré le 18/09 : `npx --no-install tsx --version` rend « tsx v4.23.1 », le binaire local (`tsx` est une devDependency).
+        # ⚠️ Vérifié aussi que l'étape d'installation vit dans le MÊME job — sans elle, le drapeau
+        # transformerait un téléchargement silencieux en échec.
+        run: npx --no-install tsx scripts/sonder-registre-unitaire.ts

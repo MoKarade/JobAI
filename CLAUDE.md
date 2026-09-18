@@ -457,6 +457,7 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
 151. Un message qui DÉDUIT sa cause d'un code de statut envoie au mauvais endroit — et il le fait avec aplomb.
 152. Libérer de la place au-dessus d'un élément qui est à son PLANCHER ne lui donne RIEN.
 153. Un frein qui compte ce que PERSONNE n'a dépensé ne protège rien : il enferme.
+154. Un recensement de commandes d'installation s'énumère par ce qu'elles FONT, jamais par le nom de l'une d'elles — `npm ci` recensé, `npx` oublié, et `npx` installe ET exécute des scripts.
 
 ## 10. Style et compte-rendu
 
