@@ -6,6 +6,76 @@
 
 ---
 
+## Contrôle 2026-09-18 (11:31:50 UTC) — six mesures armées la veille, et deux d'entre elles me contredisent
+
+Le contrôle programmé a lu la passe `cron-veille` du matin (`dep=dpl_6xoBitLR4kTXgxcftkZvqAw6MpXq`).
+Journal intégral :
+
+```
+[veille] cron-veille — ingérées=12/1600 périmées=3 revenues=1 doublons=1545 hors-région=5 sous-plancher=0 lieu-inconnu=38 en-sursis=232 liens=15 sources=2
+[bornes] 1/1 grappe(s) interrogée(s) · 255 borne(s) vue(s) · 14 lieu(x) mesuré(s) · marque=13/14 vitesse=4/14 tarif=3/14
+[distances] passe terminée — placées=7 mesurées=22 situées=2/14 … registre=2/1047 (39 ambigues) (1006 absentes) precisees=4/8 (+1079 en attente de quota) (3 par adresse) (0 par Google) (4 toujours au centre) bornes=14/14 details=0/0 budget restant=2126 ms
+[distances] budget par étape — villes:1ms centres:448ms situer:6403ms adresses:84ms registre:767ms raffinage:11922ms bornes:2617ms details:85ms mesure:615ms (total 22942 ms)
+[trajets] 40 durée(s) remplie(s) · 223 restante(s) pour les passes suivantes
+```
+
+### Ce que la passe a prouvé
+
+**`[BORNES-03]` — clos en EFFET, pas en cause.** Les bornes se mesurent de nouveau : 255 vues,
+14 lieux mesurés, `bornes=14/14`. Mais l'appel Overpass a pris **2 617 ms**, très loin des 25 s
+de patience — donc cette passe ne démontre PAS que le relèvement de la patience ait débloqué
+quoi que ce soit ; l'échec du 17/09 au soir était vraisemblablement une saturation transitoire
+du service. Ce qui EST prouvé, c'est que l'étape démarre : l'enveloppe de `[BORNES-02]`.
+La patience élargie garde sa justification (la marge), elle perd sa preuve.
+
+**`[DISTANCES-01]` — l'instrument réfute le soupçon qui l'a fait naître.** L'étape NON bornée
+(`adressesDepuisRegistre`) coûte **767 ms, 3,3 %** du total. Le vrai poste est le raffinage à
+**11 922 ms (52 %)**, puis `situer` à **6 403 ms (28 %)** : 80 % du budget part dans les deux
+étapes qui appellent Nominatim. Ma déduction du 17/09 (« ~17,5 s à Nominatim ») est corroborée
+en agrégat ; mon inquiétude sur l'étape sans borne est démentie. **Une déduction juste sur un
+total peut couvrir une erreur sur la cause** — c'est exactement ce pour quoi l'instrument a été
+écrit. Conséquence : borner cette étape ne servirait à rien aujourd'hui.
+
+**`[V-ROUTINE-QUOTA]` — répondu, et le quota est massivement mordant.** `precisees=4/8
+(+1079 en attente de quota)` : **1 087 positions éligibles au raffinage, huit servies par
+passe.** ~68 jours pour drainer la file, et elle grossit avec l'ingestion.
+⚠️ **Et ça corrige le critère de `[V-CARTE-03]`**, qui prescrivait « un reliquat qui ne baisse
+plus = les employeurs sont introuvables, une limite des DONNÉES ». Faux ici : c'est une limite
+de **DÉBIT**. Sans ce `+K`, on aurait conclu l'inverse en toute bonne foi — le compteur ajouté
+pour répondre à une question de réglage a d'abord servi à empêcher une fausse conclusion.
+
+**`[VEILLE-42]` — troisième passe, même verdict.** Aucun nom de l'île de Montréal dans les
+lieux inconnus, et `saint-michel×3` y est toujours : la règle de bande n'écrase pas l'homonyme.
+
+### Ce qui me contredit
+
+**`[TRAJETS-03]` — l'horizon « ~7 jours » que j'ai écrit hier est optimiste.** 241 restantes
+− 40 remplies aurait dû donner 201 ; le relevé dit **223**. Vingt-deux durées sont donc
+arrivées dans la journée, cinq fois mon estimation de « ~4 par jour ». Drainage net ≈ 18/jour,
+horizon **~12 jours**. ⚠️ Réserve assumée : la relance manuelle de Marc au soir du 17/09 a pu
+remplir jusqu'à 10 durées (le plafond quotidien de 50 était entamé de 40), ce qui mettrait les
+arrivées à 32 et l'horizon à ~28 jours. Le journal d'une seule passe ne tranche pas ; il
+faudrait deux relevés consécutifs sans passe manuelle entre eux. Ce qui ne dépend pas de la
+réserve : le stock grossit plus vite qu'annoncé, et « ~7 jours » ne doit pas être recopié.
+
+**`[VEILLE-13]` — le contrôle était armé sur le mauvais cron, et la fenêtre est perdue.** Ce
+correctif ne se prouve qu'à 03:00 UTC (cron de géocodage) ; le contrôle visait 11:42. Les
+journaux d'exécution Vercel hobby sont retenus ~17 minutes, donc ceux de 03:00 n'existaient
+plus. Une requête sur 12 h n'a rien rendu — ce n'est **pas** « aucun avertissement », c'est une
+absence de données, et les confondre aurait été déclarer vérifié ce qui ne l'est pas.
+Ce qu'il faudra lire, entre 03:00 et ~03:15 UTC : (a) plus de `veille en retard — reprise
+depuis ce cron` ; (b) la preuve POSITIVE que le chemin dédié a tourné (une ligne `[distances]`
+sans ligne `[veille]`). Le silence seul ne prouve rien si le cron n'a pas tourné.
+
+### Reste ouvert après ce contrôle
+
+- `[VEILLE-13]` : un relevé dans la fenêtre 03:00–03:15 UTC.
+- `[TRAJETS-03]` : deux passes consécutives sans relance manuelle, pour fixer le débit réel.
+- `[V-ROUTINE-QUOTA]` : le quota de 8 doit-il bouger ? C'est un arbitrage de dépense Nominatim,
+  donc une décision de Marc — rien n'est changé ici.
+- `[B-07]` : la suppression de la branche distante reste un clic pour Marc (le proxy git de la
+  session refuse la suppression de référence, 403 ; ce n'est pas un droit qui manque côté dépôt).
+
 ## Session 2026-09-17 (nuit, fin) — trois items du backlog, « continue les tâches backlog »
 
 **`[LIEN-04]` — une réserve démentie par la mesure cesse d'être affichée.** La fiche de

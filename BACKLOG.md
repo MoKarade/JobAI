@@ -292,6 +292,17 @@
       ⚠️ Le test qui affirmait « le géocodage la reprend CHAQUE JOUR » décrivait le DÉFAUT,
       pas une intention — son propre commentaire l'avouait (« ce test ne vérifie plus un
       arbitrage entre crons »). Il a été re-décidé, pas re-basé, avec son histoire écrite dedans.
+      ⏸️ **EFFET NON VÉRIFIÉ, ET LA FENÊTRE EST MANQUÉE — 2026-09-18.** Le contrôle armé
+      pour ce matin visait le cron de VEILLE (11:31 UTC) ; or ce correctif ne se prouve que sur
+      le cron de GÉOCODAGE (03:00 UTC). Les journaux d'exécution Vercel hobby sont retenus
+      ~17 minutes : à 11:42, ceux de 03:00 n'existaient plus. Une requête sur 12 h n'a rien
+      rendu, ce qui n'est PAS un « aucun warn » — c'est une absence de données.
+      **Ce qu'il faut pour clore** : un relevé pris entre 03:00 et ~03:15 UTC, et deux choses
+      seulement à y lire — (a) `veille en retard — reprise depuis ce cron` ne doit PLUS
+      apparaître ; (b) le chemin dédié doit s'être exécuté (`MAX_SITUATIONS_CRON` /
+      `BUDGET_GEOCODAGE_CRON_MS`), donc une ligne `[distances]` SANS ligne `[veille]`.
+      ⚠️ **Piège de lecture** : l'absence de warn ne prouve rien si le cron n'a pas tourné du
+      tout. Exiger la preuve POSITIVE (la ligne du chemin dédié), pas seulement le silence.
 
 ## Chantier #08 — CV et profil (ADR-0009) 🟩
 
@@ -1144,8 +1155,19 @@
       les bornes : la passe de distances a consommé 33,6 s de ses 35 s, une enveloppe vaut
       désormais 30 s, soit ~64 s pour la seule étape contre un mur de 60. Ça ne se règle pas,
       ça ne rentre pas.
-      ⚠️ **Moitié 1 (patience 25 s) TOUJOURS NON VÉRIFIÉE** : seul le cron de veille l'exerce.
-      Contrôle armé au 2026-09-18 11:42 UTC.
+      ✅ **CLOS EN EFFET le 2026-09-18 à 11:31:50 UTC** — passe `cron-veille`, première mesure
+      de bornes réussie depuis la famine :
+      `[bornes] 1/1 grappe(s) interrogée(s) · 255 borne(s) vue(s) · 14 lieu(x) mesuré(s) ·
+      marque=13/14 vitesse=4/14 tarif=3/14`, et `bornes=14/14` dans la ligne des distances.
+      `[BORNES-01]`, `[BORNES-02]` et `[BORNES-03]` produisent enfin leur donnée.
+      ⚠️ **MAIS LA CAUSE N'EST PAS PROUVÉE, ET JE NE LA REVENDIQUE PAS.** L'appel Overpass a
+      pris **2 617 ms** — très loin des 25 s de patience, et loin même des 15 s d'avant. Cette
+      passe ne démontre donc PAS que le relèvement de la patience soit ce qui a débloqué la
+      mesure : l'échec du 17/09 au soir était vraisemblablement une saturation TRANSITOIRE du
+      service. Ce que cette passe prouve, c'est que l'étape DÉMARRE (l'enveloppe de
+      `[BORNES-02]`, elle, est bien la cause) et qu'Overpass répond vite quand il répond.
+      La patience élargie reste justifiée par la marge (3 s → 13 s au-dessus du budget
+      d'exécution serveur), pas par ce relevé — et c'est dit plutôt que tu.
 
 - [ ] **[VEILLE-42]** ⚠️ **La moitie des offres quebecoises du flux tombent en « lieu
       inconnu »**, et la liste est dominee par des municipalites de l'ile de Montreal que
@@ -1218,6 +1240,9 @@
       par une passe différente. `hors-région` 4 → 6, `lieu-inconnu` 40 → 39.
       `saint-michel×3` reste en lieu inconnu — le cas d'homonymie que la règle devait éviter
       d'écraser, et qu'elle n'a pas écrasé.
+      ✔ **TENUE CONFIRMÉE le 2026-09-18 (passe `cron-veille`)** : la liste nommée des lieux
+      inconnus ne porte toujours AUCUN nom de l'île de Montréal, et `saint-michel×3` y est
+      encore — l'homonyme n'est toujours pas écrasé. Trois passes, trois fois le même verdict.
       ✅ **`J` TRANCHÉ PAR MARC le 2026-09-17 : on ne la rejette pas.** 48 % de la queue
       restent donc non triés, et c'est une décision, plus une question ouverte — 4,6 % de part
       régionale, soit une offre sur vingt-deux qu'on ne verrait jamais disparaître. Rouvrir
@@ -1610,6 +1635,13 @@ git) :
       plaçables. Le reliquat d'employeurs sans ADRESSE PRÉCISE (≈1 004) est une autre
       question : il ne retire personne de la carte, il laisse l'épingle au centre-ville, et
       l'écran le DIT (pointillé + fiche).
+      ⚠️ **ET LE CRITÈRE DE CET ITEM EST PIÉGÉ — corrigé le 2026-09-18.** Il prescrit : « un
+      reliquat qui ne baisse PLUS = ces employeurs sont introuvables sur les deux services
+      publics, une limite des DONNÉES ». La mesure de `[V-ROUTINE-QUOTA]` montre que le
+      reliquat ne baisse pas pour une TOUTE AUTRE raison : **1 079 candidates attendent leur
+      tour**, huit étant servies par passe. Appliquer le critère tel quel aurait conclu « les
+      données manquent » là où c'est le DÉBIT qui plafonne — et fait renoncer à un réglage qui,
+      lui, existe. Ne pas conclure cet item sans lire le `+K en attente de quota`.
 
 ### [CARTE-03] suite — Google Maps Geocoding + plafond de la Routine
 
@@ -1657,8 +1689,20 @@ RESTE — à observer sur les prochains dépôts (rien à coder) :
       « la moins récemment tentée d'abord », donc ces candidates repassent — c'est une FILE,
       pas un refus. Un quota à zéro rend « tout attend », pas « rien à faire ».
       Trois mutations : compte pris sur la tranche, quota nul traité comme 1, `slice` reposé à
-      part. **Reste à faire pour clore l'item** : lire ce `+K` sur une passe chargée, et voir
-      si le tri par date sert bien les plus anciennes.
+      part.
+      ✅ **MESURÉ le 2026-09-18 à 11:31:50 : `precisees=4/8 (+1079 en attente de quota)`.**
+      La réponse est nette — **le quota de 8 est MASSIVEMENT mordant** : 1 087 positions
+      éligibles au raffinage, 8 servies par passe. À ce rythme (8/passe, deux passes par jour
+      une fois `[VEILLE-13]` effectif), il faut ~68 jours pour drainer la file, et elle
+      grossit avec l'ingestion.
+      ⚠️ **ET ÇA CHANGE LA LECTURE DE `[V-CARTE-03]`.** Son critère disait « un reliquat qui ne
+      baisse plus après plusieurs passes = ces employeurs sont introuvables, une limite des
+      DONNÉES ». Faux ici : le reliquat ne baisse pas parce que **huit** sont tentées par
+      passe. C'est une limite de DÉBIT, pas de données — et sans ce `+K`, on aurait conclu
+      l'inverse en toute bonne foi.
+      **Reste pour clore** : vérifier que le tri « la moins récemment tentée d'abord » sert
+      bien les plus anciennes (le compte ne le dit pas), et décider si 8 doit bouger — c'est
+      un arbitrage de quota Nominatim, donc une décision de Marc.
 
 **[CARTE-03-GOOGLE] — Google Maps Geocoding, troisième repli.** ADR-0007. Marc a choisi
 Google Maps Geocoding (sur 4 options présentées) pour les entreprises que Nominatim ET le
@@ -2278,6 +2322,21 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       Le mode de panne de l'instrument est l'oubli : un inventaire des neuf noms rougit si une
       étape est ajoutée sans son jalon. Trois mutations prouvées (horodatages cumulés, zéros
       masqués, jalon retiré).
+      ✅ **PREMIÈRE MESURE, 2026-09-18 11:31:50 — ET ELLE RÉFUTE LE SOUPÇON DE CET ITEM.**
+      `[distances] budget par étape — villes:1ms centres:448ms situer:6403ms adresses:84ms
+      registre:767ms raffinage:11922ms bornes:2617ms details:85ms mesure:615ms (total 22 942 ms)`
+      ⚠️ **L'étape NON BORNÉE — `adressesDepuisRegistre` — coûte 767 ms, soit 3,3 % du total.**
+      C'était elle que cet item désignait comme le risque. Le vrai poste est `raffinage` à
+      **11 922 ms (52 %)**, suivi de `situer` à **6 403 ms (28 %)** : 80 % du budget part dans
+      DEUX étapes qui appellent Nominatim.
+      ⚠️ **Ce qui est corroboré et ce qui ne l'est pas, séparément** : ma déduction du 17/09
+      (« l'amont consomme ~17,5 s », attribués à Nominatim) est CONFIRMÉE en agrégat — 18,3 s
+      pour les deux étapes Nominatim. Mon inquiétude sur l'étape sans borne, elle, est
+      DÉMENTIE. Une déduction juste sur un total peut couvrir une erreur sur la cause : c'est
+      exactement pour ça que l'instrument existe.
+      ➜ **Conséquence** : borner `adressesDepuisRegistre` ne servirait à rien aujourd'hui. Si
+      un jour il faut gagner du budget, c'est le raffinage qu'il faut regarder — et il est
+      déjà plafonné à 8 candidates (voir `[V-ROUTINE-QUOTA]`).
 - [x] 🟡 **`[TRAJETS-03]`** ✅ **Livré le 2026-09-16, sur « accélère les trajets » (Marc).** **Le débit des durées était plafonné par la PASSE, pas par le budget
       — et la justification de la constante a rôti.** `MATRICE_MAX_PAR_PASSE` = 12, avec en
       commentaire « douze par nuit couvrent le stock d'entreprises placées en trois jours ».
@@ -2323,6 +2382,20 @@ Les deux points laissés en suspens la veille, tranchés sur la ligne de journal
       s'est pas matérialisé sur le cron de veille, qui a 300 s). Attendu 237, mesuré 241 : le
       stock GROSSIT d'environ quatre par jour (offres ingérées puis entreprises placées), donc
       le drainage NET est ~36/jour et l'horizon reste ~7 jours.
+      ⚠️ **DEUXIÈME MESURE, 2026-09-18 11:31:50 — et elle CORRIGE l'horizon ci-dessus** :
+      `[trajets] 40 durée(s) remplie(s) · 223 restante(s) pour les passes suivantes`.
+      La borne tient toujours (40/40, aucun refus de budget). Mais l'arithmétique dément le
+      « ~4 par jour » : 241 − 40 aurait dû donner **201**, le relevé dit **223**. Il est donc
+      arrivé **22 nouvelles durées à remplir** dans la journée — cinq fois mon estimation.
+      Drainage NET ≈ 18/jour, horizon **~12 jours** et non ~7. [Certain sur le delta mesuré]
+      ⚠️ **Avec une réserve que je ne masque pas** : Marc a relancé une veille à la main le
+      17/09 au soir, et cette passe a pu remplir jusqu'à **10** durées (le plafond quotidien de
+      50 était déjà entamé de 40). Si c'est le cas, les arrivées valent 32 et le drainage net
+      ~8/jour. La fourchette honnête est donc **18 à 8 par jour, soit 12 à 28 jours** — le
+      journal d'une passe ne permet pas de trancher, il faudrait DEUX relevés consécutifs sans
+      passe manuelle entre eux. [À vérifier]
+      ➜ Ce qui est SÛR et ne dépend pas de la réserve : le stock grossit plus vite qu'annoncé,
+      et l'horizon « ~7 jours » écrit le 17/09 est optimiste. Ne pas le recopier.
 - [ ] 🟡 **`[TEST-FLAKE-01]`** **Bug préexistant, vu au gate du 2026-09-16.**
       `tests/oauthStore.test.ts` a échoué sur `Hook timed out in 10000ms` — son `beforeAll`
       démarre une base PGlite en mémoire et applique les migrations. Relancé SEUL dans la
