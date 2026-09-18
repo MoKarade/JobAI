@@ -62,6 +62,24 @@ plafond et en le dérivant de la constante.
 5 rouges ; retirer `situation` de la liste de colonnes ⇒ 1 rouge (la garde dérivée de la
 persistance l'a vu sans qu'on lui demande).
 
+### En ligne — après un incident de file Vercel de vingt minutes
+
+`emploi.hubperso.com` sert `5ee418e` (arbre identique à `2410683`), vérifié en résolvant le
+DOMAINE, pas en lisant le champ `alias` d'un déploiement ni en comptant le trafic.
+
+⚠️ **Trois symptômes se sont enchaînés, et aucun n'était rouge nulle part** : le déploiement du
+lot 1 (`eacef67`) a été construit et n'a JAMAIS pris l'alias de production ; le push du lot 2
+n'a déclenché AUCUN build ; et le déploiement déclenché ensuite est resté **1 175 s en
+`INITIALIZING`** avant même de commencer à construire — contre 46 s et 79 s de bout en bout
+pour les deux précédents du même projet. La file s'est résorbée seule, Vercel a rattrapé les
+deux commits dans l'ordre. Pendant tout ce temps, la CI était verte et la production servait
+le commit d'une autre session.
+
+⚠️ **Ce qui reste à vérifier est l'EFFET, pas le déploiement.** Le lot est en ligne ; le
+chiffre qui le prouvera est la prochaine passe de veille — elle doit ramener des milliers
+d'offres au lieu de 21. Tant qu'aucune passe n'a tourné, « déployé » ne veut pas dire
+« ça marche ».
+
 ### Points d'attention
 
 - **`[UI-FILTRE-KM]` et `[GEO-BOOTSTRAP]` sont au BACKLOG et non faits.** Ce sont eux qui
