@@ -2931,3 +2931,35 @@ La table `villes` (centres de municipalités, géocodés une fois) existe et n'e
 pour donner un km approché aux offres. Manque le repli par bande postale pour les 3 748 offres
 dont personne ne nomme la ville. Sans ce lot, le filtre km n'a presque rien à filtrer : le
 géocodage plafonne à 8 villes par passe.
+
+### `[OBS-01]` — la preuve qu'un cron a tourné n'est lisible NULLE PART ⬜
+
+Constat du 2026-09-19, après **deux** tentatives ratées de vérifier `[VEILLE-13]` la même nuit.
+
+Le protocole de vérification était : lire les journaux runtime Vercel pendant la fenêtre du
+cron de géocodage, et y trouver une ligne `[distances]` sans ligne `[veille]`. Il est
+**structurellement impossible à tenir**, et les trois raisons se composent :
+
+| Contrainte | Mesure |
+|---|---|
+| Rétention des journaux (Vercel hobby) | **~17 min** — à 03:39 on ne voit plus rien d'avant ~03:22 |
+| Heure RÉELLE de départ du cron | **inconnue** — `0 3 * * *` n'est pas parti à 03:00, ni vers 03:31 (le décalage ~31 min mesuré sur le cron de veille ne s'applique pas ici) |
+| Fenêtres observées | 02:49→03:09 et 03:14→03:39. **Trou de 03:09→03:22, définitivement perdu** |
+
+Viser une heure devinée avec une fenêtre de 17 minutes est un pari, et il a été perdu deux
+fois de suite. Ce n'est pas un problème de calibrage : c'est que **la preuve ne survit pas
+assez longtemps pour être allée la chercher**.
+
+**Ce qu'il faut à la place** : un état PERSISTANT que le cron écrit et qu'on peut lire à
+n'importe quelle heure. `sync_state` porte déjà `geocodage-auto` (`CLE_GEOCODAGE`) et
+`distances-auto` — leur `majLe` dirait quand la dernière passe a été RÉSERVÉE. Il manque
+seulement de quoi les LIRE : aucun outil MCP ne les expose, et il n'y a pas d'écran de
+diagnostic qui les montre. ⚠️ Et ça ne prouverait qu'un DÉMARRAGE, pas un succès — la
+réservation se pose avant le travail (voir la note de `CLE_VEILLE` dans `lib/synchro.ts`).
+
+**Ce qui a été possible malgré tout, et qui vaut d'être noté** : le signal INDÉPENDANT.
+`resume_suivi.nonSituees` est passé de **34** (18/09 ~20:05 UTC) à **13** (19/09 03:39) —
+**21 offres situées** dans l'intervalle. Donc un chemin de géocodage a bien tourné.
+⚠️ Ce chiffre ne dit PAS que c'est le cron dédié : une visite de page déclenche aussi une
+passe (`DELAI_PASSE_AUTO_MS`). `[VEILLE-13]` reste donc **ouvert**, et la mesure n'est pas
+une conclusion.

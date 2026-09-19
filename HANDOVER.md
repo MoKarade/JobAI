@@ -6,6 +6,45 @@
 
 ---
 
+## Nuit du 2026-09-19 — la vérification du cron est impossible telle qu'elle est écrite
+
+Check-in automatique de 03:08, puis un second de 03:39. **Les deux ont raté leur cible**, et
+c'est le dispositif qui est en cause, pas le hasard.
+
+### Ce qui a été mesuré
+
+| Fenêtre lue | Contenu |
+|---|---|
+| 02:49 → 03:09 | `/api/mcp` ×2, `/oauth/token` ×1. Aucun `/api/cron/geocodage`. |
+| 03:14 → 03:39 | `/api/mcp` ×1. Aucun `/api/cron/geocodage`. |
+
+Les journaux n'étaient pas vides : le canal fonctionne, il n'y a simplement rien du cron
+dedans. Et il reste un **trou de 03:09 à 03:22**, irrécupérable — la rétention hobby est
+d'environ 17 minutes.
+
+⚠️ **L'hypothèse du décalage ne tient pas.** Le cron de veille part à ~11:31:50 pour un
+`0 11 * * *` (mesuré le 18/09), et j'ai supposé le même décalage pour `0 3 * * *`. Ni 03:00
+ni ~03:31 : le cron n'était dans aucune des deux fenêtres. Le décalage de Vercel hobby n'est
+pas une constante qu'on peut reporter d'un cron à l'autre.
+
+### Le fait neuf, par un signal INDÉPENDANT
+
+`resume_suivi.nonSituees` : **34** (18/09 ~20:05) → **13** (19/09 03:39). **21 offres
+situées** dans l'intervalle, donc le géocodage a bien avancé. ⚠️ Ça ne dit PAS que c'est le
+cron dédié — une visite de page déclenche aussi une passe. `[VEILLE-13]` reste **ouvert** :
+ce qu'il demande est une preuve POSITIVE du chemin dédié, et elle n'existe nulle part une
+fois la fenêtre passée. Voir `[OBS-01]` au BACKLOG.
+
+### Ce qui a été fait de ce constat
+
+La Routine récurrente a été **reformulée** : elle ne va plus chercher une ligne de journal à
+une heure devinée, elle lit un ÉTAT (`resume_suivi`, `diagnostic_flux`) qui répond à n'importe
+quelle heure. Et elle a été recalée **après le cron de veille**, là où il y a désormais
+quelque chose d'important à voir : la passe de 11:00 UTC est le PREMIER passage du lot
+`[VEILLE-52]`, et c'est elle qui dira si les milliers d'offres entrent vraiment.
+
+---
+
 ## Session 2026-09-18 (suite 6) — le lieu ne refuse plus rien, et le plafond ne mord plus
 
 Marc : « je viens de faire une passe je pensais avoir plein d'offres mais juste 20 de plus ».
