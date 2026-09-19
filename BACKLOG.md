@@ -2963,3 +2963,42 @@ réservation se pose avant le travail (voir la note de `CLE_VEILLE` dans `lib/sy
 ⚠️ Ce chiffre ne dit PAS que c'est le cron dédié : une visite de page déclenche aussi une
 passe (`DELAI_PASSE_AUTO_MS`). `[VEILLE-13]` reste donc **ouvert**, et la mesure n'est pas
 une conclusion.
+
+### `[VEILLE-52]` — PREMIER PASSAGE RÉEL, mesuré le 2026-09-19 à 12:15 UTC ✅
+
+Le lot produit son effet. Passe de veille de 11:00 UTC, première sur le nouveau code :
+
+| Mesure | Avant (18/09 ~20:05) | Après (19/09 12:15) |
+|---|---|---|
+| `suivies` | 1 689 | **6 271** (+4 582) |
+| `nonSituees` | 13 | **4 285** (68 % du stock) |
+| `perimees` | 637 | 605 |
+| `nonNotees` | 0 | 0 |
+
+⚠️ **+4 582, et non les ~5 500 annoncés** (7 239 québécoises − 1 689 déjà suivies). L'écart
+vient des doublons par clé canonique (même employeur écrit autrement) et de la variation
+quotidienne de la population du flux. L'ordre de grandeur est bon ; le chiffre exact ne
+l'était pas, et c'était une soustraction, pas une mesure.
+
+**Preuve de bout en bout, pas seulement un compteur** : des offres de Montréal, Dorval et
+Saint-Léonard sont en base, datées du 19/09. Le lieu ne refuse donc plus rien.
+
+### `[GEO-BOOTSTRAP]` — chiffré par la même mesure ⬜
+
+Le risque annoncé est réalisé, et il se mesure en tête de liste :
+
+| Population | Compte |
+|---|---|
+| Offres notées ≥ 65 | **238** |
+| … dont distance mesurée ET ≤ 50 km | **15** |
+
+⚠️ **Les 223 autres ne sont PAS « lointaines »** : le filtre `kmMax` écarte aussi les `km:
+null`, qu'il ne peut pas juger. Ce sont donc « lointaines OU de distance inconnue ». Ne pas
+lire ce nombre comme un compte d'offres à jeter.
+
+**Ce que la mesure établit quand même, et c'est l'essentiel** : le barème SAIT déclasser une
+offre lointaine — `Chapiteau Montréal inc` à Saint-Bernard-de-Lacolle, distance mesurée à
+**260,6 km**, note **38**. Les offres montréalaises sans distance, elles, notent **70**, à
+huit points de la meilleure du suivi (78). Ce n'est donc pas la notation qui est en cause :
+il lui manque la seule entrée qui tranche. Donner une distance approchée tout de suite
+(table `villes`, puis repli par bande postale) suffit à remettre la tête de liste d'aplomb.

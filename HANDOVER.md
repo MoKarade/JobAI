@@ -6,6 +6,45 @@
 
 ---
 
+## 2026-09-19 12:15 UTC — le lot 2 produit son effet : 1 689 → 6 271 offres
+
+Première passe de veille sur le nouveau code. C'est le relevé qui manquait depuis hier soir.
+
+| Mesure | 18/09 ~20:05 | 19/09 12:15 |
+|---|---|---|
+| `suivies` | 1 689 | **6 271** (+4 582) |
+| `nonSituees` | 13 | **4 285** |
+| `perimees` | 637 | 605 |
+
+⚠️ **+4 582, pas les ~5 500 que j'avais annoncés.** Ce chiffre-là était une soustraction
+(7 239 − 1 689), pas une mesure : il ignorait les doublons par clé canonique et la variation
+quotidienne du flux. L'ordre de grandeur tient, le chiffre exact non — et c'est le genre
+d'écart qu'il vaut mieux nommer que laisser passer pour une prédiction réussie.
+
+**Preuve de bout en bout** : des offres de Montréal, Dorval et Saint-Léonard sont en base,
+datées du jour. Le lieu ne refuse plus rien, et ça se vérifie sur des enregistrements réels,
+pas seulement sur un compteur qui monte.
+
+### Le risque annoncé est réalisé, et il se chiffre
+
+| Population | Compte |
+|---|---|
+| Offres notées ≥ 65 | **238** |
+| … dont distance mesurée ET ≤ 50 km | **15** |
+
+⚠️ Les 223 autres ne sont pas « lointaines » : `kmMax` écarte AUSSI les `km: null`, qu'il ne
+peut pas juger. C'est « lointaines OU inconnues ». La nuance compte — le contraire ferait
+croire à 223 offres à jeter.
+
+**Ce que la mesure établit, et qui décide de la suite** : le barème SAIT déclasser une offre
+lointaine quand il a la distance. `Chapiteau Montréal inc`, Saint-Bernard-de-Lacolle, **260,6
+km mesurés → note 38**. Les offres montréalaises sans distance notent **70**, à huit points de
+la meilleure du suivi (78). La notation n'est donc pas en cause : il lui manque la seule
+entrée qui tranche. C'est exactement ce que `[GEO-BOOTSTRAP]` apporte, et c'est devenu la
+prochaine chose à faire.
+
+---
+
 ## Nuit du 2026-09-19 — la vérification du cron est impossible telle qu'elle est écrite
 
 Check-in automatique de 03:08, puis un second de 03:39. **Les deux ont raté leur cible**, et
