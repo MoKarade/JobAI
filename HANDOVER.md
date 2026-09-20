@@ -22,6 +22,25 @@ imposée, 1,1 s par requête), aucun réglage ne rattrape 3 332 offres. Il faut 
 APPROCHÉE sans réseau. `[GEO-BOOTSTRAP]` n'est plus « la prochaine bonne idée », c'est ce qui
 débloque l'app.
 
+### Le relevé d'état du même jour (12:15), et le compte FERME
+
+| Mesure | 19/09 | 20/09 |
+|---|---|---|
+| `suivies` | 6 271 | **6 190** |
+| `perimees` | 605 | **698** |
+| `nonSituees` | 4 285 | **4 291** |
+| `plusVieilleVueJours` | 4 | **1** |
+
+⚠️ `suivies` BAISSE de 81 alors que la passe a ingéré 12 — et c'est normal : le compte ferme
+au chiffre près. **6 271 + 12 ingérées − 94 périmées + 1 revenue = 6 190.** C'est le contrôle
+le moins cher qui existe sur cette app, et il ne coûte qu'une soustraction : un écart, même de
+1, dirait qu'un chemin d'écriture perd ou double quelque chose.
+
+⚠️ Et `nonSituees` MONTE (4 285 → 4 291). C'est la confirmation, vue depuis l'état, de ce que
+les journaux disaient au même moment : le géocodage n'avance plus du tout, et les nouvelles
+offres s'ajoutent à la file. Tant que `[GEO-BOOTSTRAP]` n'est pas livré, c'est l'état ATTENDU
+— une baisse serait le fait surprenant, pas l'inverse.
+
 ### Les deux autres items du contrôle : rien d'alarmant
 
 - **`[TRAJETS-03]`** : 277 (16/09) → 241 (17/09) → **160** (20/09). Soit 27/jour net, contre
