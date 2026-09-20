@@ -6,6 +6,42 @@
 
 ---
 
+## 2026-09-20 — le géocodage est noyé, et c'est maintenant écrit dans les journaux
+
+Relevé du cron de 11:31:50. Un seul fait vraiment neuf, mais il est gros.
+
+### 🔴 `situées=0/3332`, budget restant `0 ms`
+
+L'étape de localisation avait 3 332 offres en file et n'en a situé AUCUNE. Le budget total
+(47 924 ms) part ailleurs : `centres` 20 765 ms et `mesure` 20 269 ms prennent 86 % à elles
+deux ; `situer` n'a eu que 5 334 ms.
+
+La saturation que `[VEILLE-52]` devait provoquer n'est plus une prévision : elle est mesurée.
+⚠️ Et **elle ne se règle pas en relevant un budget** — à 8 villes par passe (cadence Nominatim
+imposée, 1,1 s par requête), aucun réglage ne rattrape 3 332 offres. Il faut une distance
+APPROCHÉE sans réseau. `[GEO-BOOTSTRAP]` n'est plus « la prochaine bonne idée », c'est ce qui
+débloque l'app.
+
+### Les deux autres items du contrôle : rien d'alarmant
+
+- **`[TRAJETS-03]`** : 277 (16/09) → 241 (17/09) → **160** (20/09). Soit 27/jour net, contre
+  ~36 projeté. ⚠️ Je NE re-projette PAS de date de fin : le régime a changé le 19/09 (stock
+  d'offres ×3,7), et une moyenne qui enjambe ce changement décrit deux mondes. Ce qui se dit :
+  160 restantes, et ça descend.
+- **`[BORNES-02]`** : `bornes=0/1`, contre `0/14` et `0/21`. Le reste a fondu, donc l'enveloppe
+  dédiée atteint bien l'étape (643 ms consommées) — le câblage est bon. La grappe restante
+  échoue sur une réponse vide, traitée honnêtement comme un échec et non comme « aucune
+  borne ». À re-regarder dans quelques jours.
+
+### Le lot 2 se voit en production, en passant
+
+`ingérées=12/7052 · doublons=7040 · hors-région=12 · lieu-inconnu=0`. Deux preuves dans une
+ligne : `trouvees=7052` (le plafond de 12 000 ne mord plus, contre 1 600 où la lecture
+s'arrêtait), et 12 offres comptées « hors région » ET entrées quand même — le nouveau contrat,
+vu en vrai. La ligne les nomme, de `montreal×2` à `westmount`.
+
+---
+
 ## 2026-09-19 12:15 UTC — le lot 2 produit son effet : 1 689 → 6 271 offres
 
 Première passe de veille sur le nouveau code. C'est le relevé qui manquait depuis hier soir.

@@ -3002,3 +3002,68 @@ offre lointaine — `Chapiteau Montréal inc` à Saint-Bernard-de-Lacolle, dista
 huit points de la meilleure du suivi (78). Ce n'est donc pas la notation qui est en cause :
 il lui manque la seule entrée qui tranche. Donner une distance approchée tout de suite
 (table `villes`, puis repli par bande postale) suffit à remettre la tête de liste d'aplomb.
+
+### Relevé du 2026-09-20 (cron de 11:31:50) — trois items, un seul vraiment neuf
+
+#### `[GEO-BOOTSTRAP]` — la saturation annoncée est maintenant MESURÉE 🔴
+
+```
+[distances] passe terminée — placées=0 mesurées=5 situées=0/3332 villes=0 adresses=0/0
+            registre=0/1122 (39 ambigues) (1083 absentes) precisees=0/8
+            (+1136 en attente de quota) bornes=0/1 budget restant=0 ms
+[distances] budget par étape — villes:1ms centres:20765ms situer:5334ms adresses:74ms
+            registre:712ms raffinage:74ms bornes:643ms details:52ms mesure:20269ms
+            (total 47924 ms)
+```
+
+**`situées=0/3332`, budget restant `0 ms`.** L'étape de localisation avait 3 332 offres à
+traiter et n'en a situé AUCUNE. Le budget total (47 924 ms) est parti ailleurs : `centres`
+20 765 ms et `mesure` 20 269 ms en mangent 86 % à elles deux, `situer` n'a eu que 5 334 ms.
+
+Ce n'est plus une prévision, c'est un constat : depuis `[VEILLE-52]`, le géocodage est noyé.
+⚠️ Ne pas confondre `3332` (ce que l'étape avait en file ce jour-là) avec les `4285` de
+`resume_suivi.nonSituees` — deux populations, deux moments.
+
+⚠️ **Le remède n'est pas de relever un budget.** À 8 villes par passe Nominatim (cadence
+imposée, 1,1 s/requête), aucun réglage ne rattrape 3 332 offres. Il faut une distance
+APPROCHÉE sans réseau : la table `villes` porte déjà des centres de municipalités géocodés.
+
+#### `[TRAJETS-03]` — ça descend, mais moins vite que projeté ⬜
+
+`[trajets] 40 durée(s) remplie(s) · 160 restante(s)`
+
+| Date | Restantes |
+|---|---|
+| 16/09 | 277 |
+| 17/09 | 241 |
+| 20/09 | **160** |
+
+241 → 160 = **27/jour net** sur trois jours, contre ~36/jour projeté (donc ~130 attendues,
+30 de plus que prévu).
+
+⚠️ **Ne pas re-projeter une date de fin sur cette série.** Le régime a changé le 19/09 : le
+stock d'offres est passé de 1 689 à 6 271. Une moyenne qui enjambe ce changement décrit deux
+mondes différents. Ce qui se dit honnêtement : **160 restantes, et ça descend**.
+
+#### `[BORNES-02]` — le reste descend, la dernière grappe échoue ⬜
+
+`bornes=0/1` — contre `0/14` le 16/09 et `0/21` le 17/09. Le reste à mesurer a bien fondu,
+donc l'enveloppe dédiée (`BUDGET_BORNES_VEILLE_MS`, `b9f60b1`) atteint l'étape : elle a
+consommé 643 ms cette passe. Le câblage est bon.
+
+Mais la grappe restante échoue, et honnêtement :
+`[bornes] réponse VIDE sur 30 km — traitée comme un échec, pas comme « aucune borne » : la
+grappe repassera`. Une réponse vide n'est pas « il n'y a pas de borne » — c'est le bon
+comportement, et c'est pour ça que le compteur ne descend pas à 0. À re-regarder si elle
+échoue encore dans quelques jours.
+
+#### Preuve de production du lot `[VEILLE-52]`, en passant
+
+`[veille] cron-veille — ingérées=12/7052 · doublons=7040 · hors-région=12 · lieu-inconnu=0`
+
+Deux choses s'y lisent : **`trouvees=7052`** (le plafond de 12 000 ne mord plus — il valait
+1 600 et la lecture s'arrêtait dessus), et **`hors-région=12` sur 12 ingérées**, c'est-à-dire
+des offres COMPTÉES par le lieu et ENTRÉES quand même. C'est exactement le nouveau contrat,
+vu en production. La ligne les nomme : `montreal×2 · chicoutimi · gatineau · granby ·
+longueuil · mont-royal · rouyn-noranda · saint-leonard · trois-rivieres · val-d'or ·
+westmount`.
