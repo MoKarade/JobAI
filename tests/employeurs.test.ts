@@ -1,20 +1,21 @@
 // tests/employeurs.test.ts — le même employeur sous deux noms.
 //
-// DEUX règles, et c'est la frontière entre elles qui compte le plus ici.
-//
-// `apparier` (sous-chaîne) GROUPE un affichage : elle vivait dans `lib/carte.ts` et n'était
-// appliquée que par la carte, si bien que la mesure des distances comparait les noms
-// littéralement et re-géocodait « Laserax inc. » alors que « Laserax » était déjà situé.
-//
-// `memeEmployeur` (égalité après normalisation) décide de DONNÉES : quelle position sert à
-// écrire une distance et une note. La première version de ce module laissait `positionDe`
-// employer la règle floue — mesuré : une offre de « Robert » aurait pris la position de
-// « Groupe Robert ». Les tests du bas verrouillent cette séparation.
+// ⚠️ HISTORIQUE (ADR-0022, 2026-09-21). Ce module portait deux règles à la frontière nette :
+// `apparier` (sous-chaîne, GROUPAIT l'affichage) et `memeEmployeur` (égalité, DÉCIDAIT des
+// données). `memeEmployeur` couvre désormais LES DEUX rôles — via `cleGroupement` côté
+// affichage — parce que le flou d'`apparier` groupait aussi ce qu'il n'aurait pas dû : le
+// même défaut qui faisait fusionner « Robert » et « Groupe Robert » côté DONNÉES existait
+// côté AFFICHAGE depuis le début (mesuré : `lib/carte.ts` et `lib/groupesEntreprise.ts`
+// l'employaient pour regrouper les épingles et les cartes de la liste). `apparier` survit
+// pour un usage distinct : le proofreading (`tests/reference.test.ts`), où un faux positif
+// coûte un coup d'œil humain, jamais une fusion silencieuse. Les tests du bas verrouillent
+// cette nouvelle frontière.
 
 import { describe, it, expect } from "vitest";
 import {
   LONGUEUR_MIN_APPARIEMENT,
   apparier,
+  cleGroupement,
   memeEmployeur,
   normaliserNomEmployeur,
   positionDe,
@@ -122,6 +123,49 @@ describe("l'égalité STRICTE, celle qui décide des données", () => {
       }
     }
     expect(confusions).toEqual([]);
+  });
+});
+
+describe("cleGroupement — la même identité que memeEmployeur, en O(1) (ADR-0022)", () => {
+  it("deux noms qui apparient au sens STRICT rendent la MÊME clé", () => {
+    expect(cleGroupement("Laserax", "secours")).toBe(cleGroupement("Laserax inc.", "secours"));
+    expect(cleGroupement("LASERAX INC", "secours")).toBe(cleGroupement("laserax", "secours"));
+  });
+
+  it("deux noms qui ne s'égalent QUE par sous-chaîne rendent des clés DIFFÉRENTES", () => {
+    // Le cœur du changement : `apparier("Robert", "Groupe Robert")` vaut `true`, mais
+    // `cleGroupement` ne doit PAS les confondre — c'est exactement ce que `memeEmployeur`
+    // refuse déjà.
+    expect(apparier("Robert", "Groupe Robert")).toBe(true);
+    expect(cleGroupement("Robert", "s1")).not.toBe(cleGroupement("Groupe Robert", "s2"));
+  });
+
+  it("l'équivalence tient : cleGroupement(a) === cleGroupement(b) ⟺ memeEmployeur(a, b)", () => {
+    const paires: [string, string][] = [
+      ["Laserax", "Laserax inc."],
+      ["Robert", "Groupe Robert"],
+      ["STERIS", "STERIS Canada"],
+      ["Machin ltée", "Machin"],
+      ["Canam Ponts", "Robotiq"],
+      ["ISS", "ISS Facility Services"],
+    ];
+    for (const [a, b] of paires) {
+      expect(cleGroupement(a, "s") === cleGroupement(b, "s"), `${a} / ${b}`).toBe(
+        memeEmployeur(a, b),
+      );
+    }
+  });
+
+  it("un nom vide ne fusionne PAS avec un autre nom vide — le secours les distingue", () => {
+    // `memeEmployeur("", "")` vaut `false` : une clé de Map, elle, ne peut pas « refuser »
+    // une égalité — sans secours, deux offres à l'entreprise vide fusionneraient en silence.
+    expect(cleGroupement("", "offre-1")).not.toBe(cleGroupement("", "offre-2"));
+    // Mais un même secours pour un même nom vide reste déterministe (même offre, même clé).
+    expect(cleGroupement("", "offre-1")).toBe(cleGroupement("", "offre-1"));
+  });
+
+  it("le secours n'entre PAS en jeu quand le nom est réel — deux offres du même employeur se retrouvent malgré des secours différents", () => {
+    expect(cleGroupement("Laserax", "offre-a")).toBe(cleGroupement("Laserax", "offre-b"));
   });
 });
 

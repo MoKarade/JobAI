@@ -32,7 +32,7 @@ import type { EntrepriseCible } from "./reference";
 import type { Offre } from "./types";
 import { villeGeocodable } from "./geocodage";
 import type { ProximiteBorne } from "./bornes";
-import { apparier as apparierNoms, indexEmployeurs, positionDe } from "./employeurs";
+import { apparier, cleGroupement, positionDe } from "./employeurs";
 
 // L'appariement des noms d'employeur vit dans `lib/employeurs.ts` : la carte n'est pas
 // seule à s'en servir, et la mesure des distances comparait les noms littéralement — deux
@@ -44,7 +44,9 @@ export function villeDeLEntreprise(
   entreprise: string,
   cibles: readonly EntrepriseCible[],
 ): string | null {
-  return cibles.find((c) => apparierNoms(entreprise, c.nom))?.ville ?? null;
+  // Loose exprès, comme `apparier` partout où un humain voit le résultat ensuite : cette
+  // ville n'alimente qu'un lien Google Maps, jamais une fusion d'entités ni une écriture.
+  return cibles.find((c) => apparier(entreprise, c.nom))?.ville ?? null;
 }
 
 export interface OffreSurCarte {
@@ -182,18 +184,19 @@ export function construireVue(
 ): VueCarte {
   const vivantes = offres.filter(estVivante);
 
+  // Clé de `Map` = `cleGroupement(nom, …)`, PAS le nom brut : deux annonces du même employeur
+  // sous des noms voisins (« Laserax », « Laserax inc. ») doivent tomber dans LA MÊME
+  // entrée. C'est la même identité que `memeEmployeur`/`positionDe` plus bas (ADR-0022) —
+  // affichage et données ne divergent plus. O(1) par offre, natif : aucune structure
+  // auxiliaire, contrairement à la version substring qu'elle remplace (mesurée à 1 900 ms
+  // sur un corpus de forme production, contre 615 ms pour la version O(1) intermédiaire, et
+  // ça recommençait à chaque changement de filtre).
   const parEntreprise = new Map<string, EntrepriseSurCarte>();
-  // Les mêmes noms que `parEntreprise`, dans le MÊME ordre, interrogeables sans ré-allouer
-  // la liste des clés ni re-normaliser à chaque comparaison. Mesuré le 2026-09-21 : 1 900 ms
-  // pour assembler la vue sur un corpus de forme production, contre 19 ms à deux cents
-  // offres — et ça recommence à chaque changement de filtre. Voir `indexEmployeurs`.
-  const connus = indexEmployeurs();
 
   // Les cibles d'abord : leur nom fait autorité, et leurs faits relevés à la main
   // (distance de référence, lecture) valent mieux que ce qu'une offre en dit.
   for (const c of cibles) {
-    connus.ajouter(c.nom);
-    parEntreprise.set(c.nom, {
+    parEntreprise.set(cleGroupement(c.nom, c.nom), {
       nom: c.nom,
       ville: villeGeocodable(c.ville) ?? c.ville,
       km: c.km,
@@ -216,20 +219,18 @@ export function construireVue(
     //
     // Le second essai compte : deux sources nomment le même employeur différemment
     // (« Groupe Test » et « Groupe Test Canada »), et sans lui la carte porterait DEUX
-    // épingles pour un seul lieu — plus un géocodage inutile chacune. L'appariement reste
-    // borné par le plancher de longueur : un sigle court (« ISS ») exige l'égalité stricte
-    // et ne fusionne donc pas, ce qui est voulu — sous quatre lettres, la sous-chaîne
-    // apparierait n'importe quoi.
-    // `connus` contient déjà les cibles, EN TÊTE et dans leur ordre : une seule recherche
-    // rend donc exactement ce que rendaient les deux `find` enchaînés d'avant (la cible qui
-    // apparie, sinon un employeur déjà rencontré, sinon le nom de l'annonce).
-    const nom = connus.trouver(o.entreprise) ?? o.entreprise;
+    // épingles pour un seul lieu — plus un géocodage inutile chacune. Mais l'égalité reste
+    // STRICTE, après normalisation : « Robert » ne tombe PLUS sur « Groupe Robert » — c'est
+    // le changement de fond d'ADR-0022, pas seulement une accélération. Une clé de `Map`
+    // n'a pas de « plancher de longueur » à gérer : contrairement à une sous-chaîne d'un
+    // sigle court, une ÉGALITÉ de deux formes courtes ne risque jamais de confondre.
+    const cle = cleGroupement(o.entreprise, o.id);
     const villeOffre = o.ville ? (villeGeocodable(o.ville) ?? o.ville) : "";
 
-    let entreprise = parEntreprise.get(nom);
+    let entreprise = parEntreprise.get(cle);
     if (!entreprise) {
       entreprise = {
-        nom,
+        nom: o.entreprise,
         ville: villeOffre,
         // Pas de distance de référence pour un employeur hors liste : elle sera reprise
         // des offres plus bas, MESURÉE, jamais déduite de l'épingle.
@@ -243,8 +244,7 @@ export function construireVue(
         lecture: "",
         offres: [],
       };
-      parEntreprise.set(nom, entreprise);
-      connus.ajouter(nom);
+      parEntreprise.set(cle, entreprise);
     }
 
     // La ville d'une cible fait foi ; pour les autres, la première ville annoncée sert.

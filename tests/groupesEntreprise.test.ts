@@ -39,16 +39,29 @@ describe("grouperParEntreprise — la meilleure moyenne d'abord", () => {
     expect(g[0]!.noteMoyenne).toBe(75);
   });
 
-  it("regroupe les graphies qui désignent le même employeur", () => {
-    // La règle de la carte : « Gamma Robotique » et « Gamma Robotique Canada » sont un seul
-    // employeur. Sans ça, la liste montrerait deux entreprises là où la carte pose une
-    // épingle — et rien ne dirait laquelle a raison.
+  it("regroupe les graphies JURIDIQUES qui désignent le même employeur", () => {
+    // La règle de la carte (ADR-0022, `cleGroupement`) : « Gamma Robotique » et
+    // « Gamma Robotique inc. » sont un seul employeur — même forme normalisée. Sans ça, la
+    // liste montrerait deux entreprises là où la carte pose une épingle.
+    const g = grouperParEntreprise([
+      offre("Gamma Robotique", 70),
+      offre("Gamma Robotique inc.", 60),
+    ]);
+    expect(g).toHaveLength(1);
+    expect(g[0]!.offres).toHaveLength(2);
+  });
+
+  it("⚠️ ADR-0022 : ne regroupe PLUS deux noms voisins mais pas ÉGAUX", () => {
+    // « Gamma Robotique » et « Gamma Robotique Canada » : « Canada » n'est pas un suffixe
+    // juridique — ce sont peut-être deux entités réellement distinctes (vécu : STERIS /
+    // STERIS Canada, dans `lib/reference.ts`). L'ancienne règle (`apparier`, sous-chaîne)
+    // les aurait fusionnées, exactement comme elle fusionnait « Robert » et « Groupe
+    // Robert » côté données — c'est ce défaut que ce lot retire du regroupement d'affichage.
     const g = grouperParEntreprise([
       offre("Gamma Robotique", 70),
       offre("Gamma Robotique Canada", 60),
     ]);
-    expect(g).toHaveLength(1);
-    expect(g[0]!.offres).toHaveLength(2);
+    expect(g).toHaveLength(2);
   });
 
   it("⚠️ une entreprise SANS aucune note passe en dernier, pas en premier", () => {

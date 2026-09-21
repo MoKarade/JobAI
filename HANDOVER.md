@@ -6,6 +6,41 @@
 
 ---
 
+## 2026-09-21 (Lot 6) — la carte rejoint la règle stricte des données, le serveur en parallèle
+
+Marc : cadrage en trois questions, réponses : égalité stricte pour regrouper, pas de mesure
+téléphone préalable, coût serveur inclus dans ce lot.
+
+**Le regroupement d'affichage utilisait un défaut déjà corrigé côté données.** En rouvrant
+`lib/employeurs.ts` pour rendre le regroupement vraiment O(1) (une égalité, pas un meilleur
+index de sous-chaîne), son propre en-tête racontait l'histoire : `apparier("Robert", "Groupe
+Robert")` vaut `true`, et ce flou avait un jour fait ÉCRIRE une position fausse — corrigé
+depuis (`positionDe` utilise `memeEmployeur`, l'égalité stricte). **Le même flou vivait
+encore dans `construireVue` et `grouperParEntreprise`** : un faux regroupement visuel se
+corrige à l'œil, donc personne ne l'avait signalé — mais il reste faux.
+
+Livré ([ADR-0022](./docs/adr/0022-la-carte-cesse-de-reallouer-et-de-relire-en-serie.md)) :
+`cleGroupement`, MÊME identité que `memeEmployeur`, clé de `Map` native (O(1) vrai, pas
+seulement plus rapide). « Robert » ne tombe plus sur « Groupe Robert ». `apparier` garde un
+seul rôle : le proofreading (`tests/reference.test.ts`, lien Google Maps) — là où un faux
+positif coûte un coup d'œil humain, jamais une fusion silencieuse.
+
+⚠️ **Coût mesuré avant de trancher** : `STERIS`/`STERIS Canada` et `Exo-s Saint-Damien`/
+`Exo-s` cessent de s'égaler (« Canada », « Saint-Damien » ne sont pas des suffixes
+juridiques). Sans effet aujourd'hui (`km` manuel dans SEED, jamais retouché), mais une vraie
+propriété préexistante de `memeEmployeur`, rendue visible pas créée. Porté au BACKLOG
+(`[EMPLOYEUR-VARIANTE]`), non corrigé.
+
+**Côté serveur** (demandé explicitement) : la page Carte lisait CINQ sources Neon en SÉRIE
+(`domicile`, rayon, offres, positions, trajets) — quatre des cinq ne dépendaient d'aucune
+autre. `app/page.tsx` avait déjà la bonne forme (`Promise.all`) ; cette page-ci était la
+seule restante. Passée en parallèle, vérifiée par scan de source.
+
+Perturbations jouées : `cleGroupement` (2, dont le nom vide et le retour à la sous-chaîne),
+le câblage `Promise.all` (1, un `await` isolé réintroduit). Toutes rouges.
+
+---
+
 ## 2026-09-21 (Lot 5) — la carte lente : j'ai recommandé le mauvais levier
 
 Marc : « la carte met un temps fou à charger ».

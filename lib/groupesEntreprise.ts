@@ -1,13 +1,12 @@
 // lib/groupesEntreprise.ts — les offres regroupées par employeur, classées par mérite. PUR.
 //
-// ⚠️ LA MÊME RÈGLE DE REGROUPEMENT QUE LA CARTE, PAS UNE SECONDE. `nomCanonique` applique
-// exactement ce que fait `construireVue` : la cible qui apparie, sinon un employeur déjà
-// rencontré qui apparie, sinon l'employeur tel que l'offre le nomme. Deux règles écrites
-// séparément divergent toujours — et ici la divergence serait VISIBLE : la carte montrerait
-// une épingle là où la liste montre deux entreprises, sans que rien ne dise laquelle a
-// raison.
+// ⚠️ LA MÊME RÈGLE DE REGROUPEMENT QUE LA CARTE, PAS UNE SECONDE. `cleGroupement`
+// (`lib/employeurs.ts`, ADR-0022) décide de l'identité d'un employeur — la MÊME que
+// `construireVue` emploie. Deux règles écrites séparément divergent toujours — et ici la
+// divergence serait VISIBLE : la carte montrerait une épingle là où la liste montre deux
+// entreprises, sans que rien ne dise laquelle a raison.
 
-import { indexEmployeurs } from "./employeurs";
+import { cleGroupement } from "./employeurs";
 import type { Offre } from "./types";
 
 /** Une entreprise et ses offres, telles que la liste les présente. */
@@ -31,16 +30,6 @@ export interface GroupeEntreprise {
   /** La distance mesurée la plus courte du groupe, ou `null` si aucune ne l'est. */
   kmMin: number | null;
 }
-
-/**
- * Le nom sous lequel une offre rejoint un groupe.
- *
- * Reprend la règle de `construireVue` : on cherche d'abord parmi les noms DÉJÀ retenus un
- * employeur qui apparie, et on ne crée un groupe que si aucun ne correspond. L'appariement
- * est borné par le plancher de longueur d'`apparier` — un sigle court exige l'égalité
- * stricte, sinon une sous-chaîne apparierait n'importe quoi.
- */
-
 
 /** La moyenne des notes présentes, arrondie. `null` s'il n'y en a aucune. */
 function moyenneDesNotes(offres: readonly Offre[]): number | null {
@@ -84,23 +73,22 @@ function trierOffresDuGroupe(offres: readonly Offre[]): Offre[] {
  * alphabétique — et l'interface dit « pas encore notée » plutôt qu'un chiffre.
  */
 export function grouperParEntreprise(offres: readonly Offre[]): GroupeEntreprise[] {
-  const groupes = new Map<string, Offre[]>();
-  // L'index remplace `[...groupes.keys()].find(...)` : MÊME règle, MÊME ordre, sans
-  // ré-allouer la liste des clés ni re-normaliser les deux côtés à chaque comparaison.
-  // Mesuré le 2026-09-21 : 1 471 ms sur un corpus de forme production, et ça recommence à
-  // chaque changement de filtre. Voir `indexEmployeurs`.
-  const connus = indexEmployeurs();
+  // Clé = `cleGroupement`, PAS le nom brut : deux annonces du même employeur sous des noms
+  // voisins doivent tomber dans le MÊME groupe. O(1) par offre, natif (`Map.get`), sans
+  // structure auxiliaire — contrairement à la version substring qu'elle remplace (mesurée à
+  // 1 471 ms sur un corpus de forme production, et ça recommençait à chaque changement de
+  // filtre). Voir `cleGroupement` (ADR-0022) pour ce que ce choix change côté regroupement.
+  const groupes = new Map<string, { nom: string; offres: Offre[] }>();
   for (const o of offres) {
-    const nom = connus.trouver(o.entreprise) ?? o.entreprise;
-    const liste = groupes.get(nom);
-    if (liste) liste.push(o);
-    else {
-      groupes.set(nom, [o]);
-      connus.ajouter(nom);
-    }
+    const cle = cleGroupement(o.entreprise, o.id);
+    const groupe = groupes.get(cle);
+    if (groupe) groupe.offres.push(o);
+    // Le nom RETENU est celui de la PREMIÈRE offre rencontrée pour cet employeur — la
+    // règle documentée sur `GroupeEntreprise.nom`, inchangée.
+    else groupes.set(cle, { nom: o.entreprise, offres: [o] });
   }
 
-  const tous: GroupeEntreprise[] = [...groupes.entries()].map(([nom, liste]) => {
+  const tous: GroupeEntreprise[] = [...groupes.values()].map(({ nom, offres: liste }) => {
     const notes = liste.map((o) => o.score).filter((n): n is number => typeof n === "number");
     const kms = liste.map((o) => o.km).filter((n): n is number => typeof n === "number");
     return {

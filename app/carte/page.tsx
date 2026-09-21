@@ -77,14 +77,28 @@ export default async function PageCarte() {
   let rayonMaxKm = RAYON_DEFAUT_KM;
 
   try {
-    maison = await domicile();
-    rayonMaxKm = await lireEtat<number>(CLE_RAYON, RAYON_DEFAUT_KM);
-    offres = await lireOffres();
+    // ⚠️ CINQ LECTURES, EN PARALLÈLE — PAS EN SÉRIE (`[CARTE-PERF]`, ADR-0022). Cette page
+    // enchaînait `await domicile()`, `await lireEtat(rayon)`, `await lireOffres()`, `await
+    // entreprisesLieux`, `await trajets` : cinq allers-retours Neon SÉQUENTIELS alors
+    // qu'AUCUN des quatre premiers ne dépend d'un autre — seuls `lieux`/`durees`
+    // dépendaient logiquement d'un `offres` non nul, ce qui n'exigeait pas de les lire
+    // APRÈS lui, juste de ne pas s'en SERVIR si `offres` est `null`. `app/page.tsx` avait
+    // déjà cette forme (`Promise.all`) ; cette page-ci en était la seule restante.
+    const [maisonLue, rayonLu, offresLues, entreprisesLues, trajetsLus] = await Promise.all([
+      domicile(),
+      lireEtat<number>(CLE_RAYON, RAYON_DEFAUT_KM),
+      lireOffres(),
+      db.select().from(entreprisesLieux),
+      db.select().from(trajets),
+    ]);
+    maison = maisonLue;
+    rayonMaxKm = rayonLu;
+    offres = offresLues;
     if (offres !== null) {
-      const lignes = await db.select().from(entreprisesLieux);
+      const lignes = entreprisesLues;
       // Les durées du cache (remplies la nuit, lot C) : lues en bloc, sérialisées comme
       // les positions — une Map ne traverse pas la frontière serveur→client.
-      durees = (await db.select().from(trajets)).map((t) => [
+      durees = trajetsLus.map((t) => [
         t.destinationNom,
         { dureeS: t.dureeS, distanceM: t.distanceM },
       ]);

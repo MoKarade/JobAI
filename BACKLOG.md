@@ -2985,7 +2985,7 @@ villes par ce qu'elles débloquent.
   (`lieu-inconnu` au flux complet du 2026-09-21). Non commencé.
 - La preuve en production : `bornes`, `effacées` et `centresCorrigés` se lisent au cron suivant.
 
-### `[CARTE-PERF]` — l'assemblage des écrans est quadratique 🟦
+### `[CARTE-PERF]` — l'assemblage des écrans est quadratique ✅
 
 Marc, 2026-09-21 : « la carte met un temps fou à charger ». Mesuré avant de corriger, sur un
 corpus de FORME production (6 923 offres, 3 000 employeurs, 400 villes) :
@@ -3009,12 +3009,35 @@ confirmé sur `emploi.hubperso.com`. `JSON.parse` vaut ~103 ms sur ce conteneur.
 dégraissage du payload (table de textes dédoublonnés : −34 %) aurait été du travail que le
 réseau n'aurait pas vu.
 
-**Ce qui RESTE** ⬜ — il faut un ADR, parce que ça touche la règle de regroupement.
-Le balayage est toujours en O(offres × employeurs) : ~1,1 s sur ce conteneur, donc
-probablement 3 à 6 s sur le téléphone de Marc. Passer en O(1) demande un index par égalité,
-qui CHANGE quel employeur absorbe quel nom : aujourd'hui « Robert » tombe sur « Groupe
-Robert » parce que `find` rend le PREMIER qui apparie, pas le meilleur. C'est une décision de
-produit (que veut-on voir regroupé ?), pas une optimisation.
+**Livré le 2026-09-21** ([ADR-0022](./docs/adr/0022-la-carte-cesse-de-reallouer-et-de-relire-en-serie.md)) —
+`cleGroupement` : le regroupement d'affichage passe à l'égalité stricte (`memeEmployeur`),
+la MÊME identité que les données. O(1) natif (`Map.get`), plus de balayage. « Robert » ne
+tombe plus sur « Groupe Robert ». `apparier` survit pour le proofreading uniquement
+(`tests/reference.test.ts`, lien Google Maps). Côté serveur : la page Carte lisait cinq
+sources en SÉRIE (`domicile`, rayon, offres, positions, trajets) alors qu'aucune des quatre
+premières ne dépend d'une autre — passées en `Promise.all`.
+
+Découvert en chemin, **non corrigé** : `STERIS`/`STERIS Canada` et `Exo-s Saint-Damien`/
+`Exo-s` ne s'égalent plus sous la règle stricte (« Canada », « Saint-Damien » ne sont pas des
+suffixes juridiques). Sans effet aujourd'hui (les deux offres SEED ont un `km` manuel, jamais
+retouché), mais une offre future ingérée sous « STERIS » referait un géocodage au lieu de
+retrouver la position de « STERIS Canada ». Porté sous `[EMPLOYEUR-VARIANTE]`.
+
+### `[EMPLOYEUR-VARIANTE]` — une variante de nom re-géocode au lieu de retrouver sa position ⬜
+
+Trouvé en mesurant l'impact d'ADR-0022 (2026-09-21), PRÉEXISTANT à ce lot — `positionDe`
+utilise `memeEmployeur` (égalité stricte après normalisation) depuis sa correction
+antérieure, et cette règle ne rapproche pas deux noms qui ne diffèrent que par un
+qualificatif de lieu/région (« STERIS Canada » vs « STERIS », « Exo-s Saint-Damien » vs
+« Exo-s » — mesuré sur `SEED` × `ENTREPRISES_CIBLES`, 2 cas sur les offres actives).
+
+Une offre ingérée sous « STERIS » quand seul « STERIS Canada » est géocodé ne retrouve pas
+sa position existante : elle repasse par `employeursASituer` et se fait géocoder à nouveau
+sous son propre nom. Coût : un appel Nominatim de plus (le service est gratuit et borné à
+une passe / 5 min), jamais une donnée fausse — `memeEmployeur` refuse à raison de deviner.
+
+Piste, non creusée : une table d'ALIAS explicite (« STERIS » → « STERIS Canada ») plutôt
+qu'une heuristique de nom, pour les cas RENCONTRÉS réellement plutôt que devinés à l'avance.
 
 ### `[OBS-01]` — la preuve qu'un cron a tourné n'est lisible NULLE PART ⬜
 

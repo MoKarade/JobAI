@@ -12,26 +12,41 @@
 // grouper les épingles, `lib/distances.ts` pour retrouver une position et décider qui reste
 // à situer.
 //
-// ⚠️ DEUX RÈGLES, ET LA FRONTIÈRE ENTRE ELLES EST LE CŒUR DE CE FICHIER
+// ⚠️ HISTORIQUE — CE FICHIER PORTAIT DEUX RÈGLES, ET NE LES PORTE PLUS QUE POUR UN SEUL USAGE
+// (ADR-0022, 2026-09-21). Jusque-là :
 //
-//   `apparier`      — SOUS-CHAÎNE, floue. Elle GROUPE un affichage : deux annonces du même
-//                     employeur sous des noms voisins tombent sur une seule épingle. Une
-//                     erreur ici coûte un regroupement discutable, que l'œil rattrape.
+//   `apparier`      — SOUS-CHAÎNE, floue. GROUPAIT l'affichage (carte, liste) : deux
+//                     annonces du même employeur sous des noms voisins tombaient sur une
+//                     seule épingle. Une erreur ici coûtait un regroupement discutable.
 //
-//   `memeEmployeur` — ÉGALITÉ après normalisation (accents, casse, forme juridique). Elle
-//                     décide de DONNÉES : quelle position sert à mesurer une distance, quel
-//                     employeur n'a plus besoin d'être géocodé. Une erreur ici écrit un
-//                     chiffre faux en base, sans bruit.
+//   `memeEmployeur` — ÉGALITÉ après normalisation (accents, casse, forme juridique).
+//                     DÉCIDAIT des données : quelle position sert à mesurer une distance,
+//                     quel employeur n'a plus besoin d'être géocodé.
 //
-// La distinction n'est pas théorique — elle a été violée le jour même où ce fichier a été
+// La distinction n'était pas théorique — elle a été violée le jour même où ce fichier a été
 // écrit. `positionDe` employait `apparier`, et `lib/distances.ts` s'en servait pour ÉCRIRE
 // la distance et la note. Mesuré : `apparier("Robert", "Groupe Robert")` est VRAI, donc une
 // offre d'un employeur nommé « Robert » aurait reçu en silence la position de « Groupe
-// Robert » — deux entreprises sans le moindre rapport. Rien dans les tests ne l'aurait vu.
+// Robert » — deux entreprises sans le moindre rapport.
 //
-// RÈGLE : une heuristique peut grouper ce qu'on REGARDE, jamais décider ce qu'on ÉCRIT.
-// Ce n'est de toute façon pas une résolution d'identité d'entreprise — il n'y a ici ni
-// registre ni numéro d'entreprise, et `apparier` se trompera un jour.
+// ADR-0022 est allé plus loin : l'AFFICHAGE utilise désormais `memeEmployeur` LUI AUSSI
+// (via `cleGroupement`, ci-dessous), pas `apparier`. Deux raisons. (1) `apparier` était en
+// O(n) par recherche — ré-allouer la liste des clés et re-normaliser les deux côtés à
+// chaque comparaison, mesuré à 1 900 ms sur un corpus de forme production — alors qu'une
+// égalité de clé normalisée est du O(1) natif (`Map.get`), sans structure auxiliaire.
+// (2) Le flou d'`apparier` groupait AUSSI ce qu'il n'aurait pas dû : le même défaut qui
+// avait fait fusionner « Robert » et « Groupe Robert » côté données existait côté affichage
+// depuis le début, personne ne l'avait remarqué parce qu'un regroupement visuel se corrige
+// à l'œil — mais il reste faux.
+//
+// `apparier` SURVIT pour un usage distinct et légitime : une comparaison de PROOFREADING,
+// large exprès (`tests/reference.test.ts` — « ai-je oublié une cible pour cet employeur,
+// même sous un nom approximatif ? »). Là, un faux positif coûte un coup d'œil humain ; en
+// grouper d'affichage ou en données, il coûtait une fusion silencieuse.
+//
+// RÈGLE : une heuristique peut SIGNALER ce qu'on REGARDE, jamais décider ce qu'on GROUPE ni
+// ce qu'on ÉCRIT. Ce n'est de toute façon pas une résolution d'identité d'entreprise — il
+// n'y a ici ni registre ni numéro d'entreprise, et `apparier` se trompera un jour.
 
 /**
  * En deçà de cette longueur, seule l'égalité stricte apparie.
@@ -43,75 +58,14 @@
  */
 export const LONGUEUR_MIN_APPARIEMENT = 4;
 
-/** La forme comparable d'un nom d'employeur, pour `apparier`. */
-export function formeComparable(nom: string): string {
-  return nom.trim().toLowerCase();
-}
-
-/**
- * `apparier`, mais sur deux formes DÉJÀ comparables.
- *
- * Extrait pour que l'appelant qui compare un nom à des centaines d'autres ne re-normalise
- * pas les deux côtés à chaque comparaison — voir `IndexEmployeurs`. La règle vit ici, en un
- * seul exemplaire : `apparier` normalise puis appelle cette fonction, donc les deux chemins
- * ne peuvent pas diverger.
- */
-export function apparierFormes(x: string, y: string): boolean {
+/** Deux noms d'entreprise désignent-ils le même employeur, au sens LARGE ? Voir l'en-tête. */
+export function apparier(a: string, b: string): boolean {
+  const x = a.trim().toLowerCase();
+  const y = b.trim().toLowerCase();
   if (x.length < LONGUEUR_MIN_APPARIEMENT || y.length < LONGUEUR_MIN_APPARIEMENT) {
     return x === y && x.length > 0;
   }
   return x === y || x.includes(y) || y.includes(x);
-}
-
-/** Deux noms d'entreprise désignent-ils le même employeur ? */
-export function apparier(a: string, b: string): boolean {
-  return apparierFormes(formeComparable(a), formeComparable(b));
-}
-
-/**
- * Les employeurs déjà rencontrés, interrogeables sans re-normaliser.
- *
- * ⚠️ POURQUOI IL EXISTE — MESURÉ LE 2026-09-21. `grouperParEntreprise` et `construireVue`
- * répondaient à « cet employeur est-il déjà connu ? » par
- * `[...map.keys()].find((connu) => apparier(nom, connu))`. Deux coûts s'y empilent, et
- * aucun ne se voyait tant que le suivi tenait en deux cents offres : la liste des clés est
- * RE-ALLOUÉE à chaque offre (jusqu'à 3 000 éléments), et `apparier` re-normalise LES DEUX
- * côtés à chaque comparaison — soit ~18 millions de `trim().toLowerCase()` pour une seule
- * carte. Mesuré sur un corpus de forme production : 1 900 ms pour la carte et 1 471 ms pour
- * la liste, contre 19 et 11 ms à deux cents offres. Et ça recommence à CHAQUE changement de
- * filtre.
- *
- * ⚠️ L'ORDRE EST LE MÊME QUE `find`, ET C'EST LA CONDITION DE L'ÉQUIVALENCE. `find` rend le
- * PREMIER nom qui apparie, pas le meilleur : « Robert » peut tomber sur « Groupe Robert »
- * s'il a été rencontré avant. Cet index parcourt donc les noms dans leur ordre d'insertion,
- * exactement comme avant. Ce n'est pas une amélioration de la règle — c'est la même règle,
- * sans le gaspillage. Une résolution d'identité d'entreprise reste un autre sujet.
- */
-export interface IndexEmployeurs {
-  /** Inscrit un nom, dans l'ordre. */
-  ajouter(nom: string): void;
-  /** Le premier nom connu qui apparie, ou `null`. */
-  trouver(nom: string): string | null;
-}
-
-export function indexEmployeurs(noms: readonly string[] = []): IndexEmployeurs {
-  const affichage: string[] = [];
-  const formes: string[] = [];
-  const index: IndexEmployeurs = {
-    ajouter(nom) {
-      affichage.push(nom);
-      formes.push(formeComparable(nom));
-    },
-    trouver(nom) {
-      const x = formeComparable(nom);
-      for (let i = 0; i < formes.length; i++) {
-        if (apparierFormes(x, formes[i]!)) return affichage[i]!;
-      }
-      return null;
-    },
-  };
-  for (const n of noms) index.ajouter(n);
-  return index;
 }
 
 /**
@@ -168,6 +122,27 @@ export function normaliserNomEmployeur(nom: string): string {
 export function memeEmployeur(a: string, b: string): boolean {
   const x = normaliserNomEmployeur(a);
   return x !== "" && x === normaliserNomEmployeur(b);
+}
+
+/**
+ * La clé de regroupement d'un employeur — MÊME identité que `memeEmployeur`, en O(1).
+ *
+ * ⚠️ POURQUOI ELLE EXISTE, ET PAS UN INDEX (ADR-0022). Une égalité (contrairement à une
+ * sous-chaîne) se prête à une clé de `Map` native : `cleGroupement(a) === cleGroupement(b)`
+ * ⟺ `memeEmployeur(a, b)`, sans structure auxiliaire ni boucle de recherche. C'est ce qui
+ * rend le regroupement de la carte et de la liste O(1) par offre, pas seulement plus rapide
+ * que la version substring qu'elles employaient avant.
+ *
+ * ⚠️ LE SECOURS EXISTE PARCE QUE `memeEmployeur` REFUSE D'ÉGALER DEUX CHAÎNES VIDES —
+ * délibérément, ci-dessus. Une clé de `Map`, elle, ne peut pas « refuser » : la chaîne vide
+ * SERAIT une clé comme une autre, et deux offres à l'entreprise vide fusionneraient en
+ * silence — une affirmation qu'on n'a pas le droit de faire (garde-fou n°3, no fake data).
+ * `secours` — un identifiant déjà unique à l'appelant (l'id de l'offre, par exemple) — sert
+ * de clé de repli SEULEMENT dans ce cas, pour que chaque nom vide reste son PROPRE groupe.
+ */
+export function cleGroupement(nom: string, secours: string): string {
+  const forme = normaliserNomEmployeur(nom);
+  return forme === "" ? `\u0000${secours}` : forme;
 }
 
 /**

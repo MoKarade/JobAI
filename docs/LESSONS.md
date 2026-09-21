@@ -2553,3 +2553,46 @@ compte : `find` rend le PREMIER nom qui apparie, pas le meilleur, donc « Robert
 encore et rendrait « Robert » : c'est une décision de produit, pas une optimisation, et la
 perturbation qui l'introduit fait rougir deux tests — c'est exactement ce qu'on attend d'eux.
 
+## 2026-09-21 (Lot 6) — Le même défaut vivait aux DEUX bouts du fichier, personne ne l'avait vu à l'affichage
+
+Suite directe de `[CARTE-PERF]`. Le lot précédent avait rendu O(1) le regroupement par
+sous-chaîne (`apparier`) sans toucher à la règle — ~1,1 s restaient par écran. Pour aller
+plus vite, il fallait une VRAIE clé de `Map` (une égalité), pas un meilleur index d'une
+recherche floue. Ça a changé la question posée : est-ce qu'une égalité stricte, la MÊME que
+`memeEmployeur` (déjà écrite, déjà testée, déjà utilisée pour les DONNÉES), convient aussi
+pour l'AFFICHAGE ?
+
+En rouvrant `lib/employeurs.ts` pour répondre, son propre en-tête racontait déjà l'histoire :
+`apparier("Robert", "Groupe Robert")` vaut `true`, et ce défaut avait un jour fait fusionner
+deux entreprises sans rapport côté DONNÉES — corrigé depuis, `positionDe` utilise
+`memeEmployeur`. **Ce même défaut vivait encore côté AFFICHAGE**, dans `construireVue` et
+`grouperParEntreprise`, personne ne l'avait signalé — parce qu'un faux regroupement visuel se
+corrige à l'œil (on voit deux offres sous une seule carte, ça semble juste une bizarrerie de
+présentation), alors qu'un faux regroupement de DONNÉES écrit un chiffre faux en silence. Le
+défaut est le même ; seule sa VISIBILITÉ diffère, et la visibilité n'est pas une preuve
+d'innocuité.
+
+Passer à `memeEmployeur` avait un coût mesurable, mesuré AVANT de trancher :
+`SEED` × `ENTREPRISES_CIBLES`, offres actives → 2 employeurs (`STERIS`/`STERIS Canada`,
+`Exo-s Saint-Damien`/`Exo-s`) qui appariaient au sens flou et pas au sens strict, parce que
+« Canada » et « Saint-Damien » ne sont pas des suffixes juridiques. Sans conséquence
+PRODUCTION aujourd'hui (ces deux offres ont un `km` manuel, jamais retouché), mais une vraie
+propriété PRÉEXISTANTE de `memeEmployeur` que ce lot a rendue visible, pas créée — portée au
+BACKLOG (`[EMPLOYEUR-VARIANTE]`), pas corrigée (scope non demandé).
+
+Second fait trouvé en investiguant le « coût serveur » que Marc a demandé d'inclure : la
+page Carte lisait CINQ sources Neon en SÉRIE (`domicile`, rayon, offres, positions, trajets),
+alors qu'aucune des quatre premières ne dépend d'une autre. `app/page.tsx` avait déjà la
+bonne forme (`Promise.all`, posée deux lots plus tôt) — cette page-ci était la seule
+restante. Passée en parallèle, vérifiée par scan de source (pas de harnais de rendu dans ce
+dépôt) : un motif qui isole le bloc `Promise.all` et vérifie qu'aucune des cinq lectures ne
+réapparaît en `await` isolé au-dehors.
+
+Le scan de câblage (`tests/cartePageParallele.test.ts`) applique directement la règle n° 167
+(lot précédent) : une assertion « aucun `await` isolé hors du bloc » n'a de sens que si le
+motif RETIRE d'abord le contenu du `Promise.all` avant de chercher — sinon les cinq `await`
+qui sont légitimement DEDANS se compteraient comme « hors bloc » et le test échouerait
+toujours, quelle que soit la vraie structure du code. Écrit ainsi dès le premier jet cette
+fois ; la mutation (Q1, un `await` isolé réintroduit) confirme qu'il rougit pour la BONNE
+raison.
+

@@ -7,6 +7,7 @@
 // épinglée, hors cibles, ou en attente de localisation.
 
 import { describe, it, expect } from "vitest";
+import { memeEmployeur } from "../lib/employeurs";
 import {
   LONGUEUR_MIN_APPARIEMENT,
   aplatirEntreprises,
@@ -267,8 +268,10 @@ describe("ce qui manque est COMPTÉ, jamais masqué", () => {
       0,
     );
     const enAttente = new Set([...vue.aSituer, ...vue.sansLieu]);
+    // Le mirroir emploie `memeEmployeur`, la RÈGLE RÉELLE de `construireVue` depuis
+    // ADR-0022 (`cleGroupement`) — pas `apparier`, qui ne groupe plus rien ici.
     const enAttenteParOffre = vivantes.filter((o) => {
-      const cible = ENTREPRISES_CIBLES.find((c) => apparier(o.entreprise, c.nom));
+      const cible = ENTREPRISES_CIBLES.find((c) => memeEmployeur(o.entreprise, c.nom));
       return enAttente.has(cible?.nom ?? o.entreprise);
     }).length;
 
@@ -334,10 +337,32 @@ describe("la carte part des OFFRES, pas d'une liste tenue à la main", () => {
     );
   });
 
-  it("deux NOMS du même employeur hors cibles ne font qu'UNE épingle", () => {
-    // Deux sources nomment le même employeur différemment. Sans appariement entre
-    // employeurs hors cibles, la carte porterait deux épingles pour un seul lieu — et
-    // chacune aurait coûté un géocodage. Vérifié par sonde avant correction : 2 épingles.
+  it("deux GRAPHIES JURIDIQUES du même employeur hors cibles ne font qu'UNE épingle", () => {
+    // « Groupe Test » et « Groupe Test inc. » : même employeur, forme juridique en plus.
+    // `memeEmployeur` (ADR-0022) le sait, `apparier` (substring) le savait aussi — ce test
+    // survit au changement de règle parce que le legal-suffix est un cas des DEUX.
+    const vue = construireVue(
+      [
+        offre({ id: "1", entreprise: "Groupe Test", ville: "Québec" }),
+        offre({ id: "2", entreprise: "Groupe Test inc.", ville: "Québec" }),
+      ],
+      ENTREPRISES_CIBLES,
+      positions([["Groupe Test", "exacte", 46.81, -71.22]]),
+    );
+    const avecTest = vue.epingles.filter((e) =>
+      e.entreprises.some((x) => x.nom.startsWith("Groupe Test")),
+    );
+    expect(avecTest).toHaveLength(1);
+    expect(avecTest[0]!.entreprises[0]!.offres).toHaveLength(2);
+  });
+
+  it("⚠️ ADR-0022 : deux noms VOISINS mais pas ÉGAUX ne fusionnent plus", () => {
+    // C'était le cœur du changement. Avant : `apparier("Groupe Test", "Groupe Test Canada")`
+    // vaut `true` (sous-chaîne), donc UNE épingle — exactement le défaut qui avait fait
+    // fusionner « Robert » et « Groupe Robert » côté DONNÉES (tests/employeurs.test.ts).
+    // « Canada » n'est pas un suffixe juridique : `memeEmployeur` refuse, à raison — ce
+    // sont peut-être deux entités RÉELLEMENT distinctes (vécu : STERIS / STERIS Canada,
+    // Exo-s / Exo-s Saint-Damien, tous deux dans `lib/reference.ts`).
     const vue = construireVue(
       [
         offre({ id: "1", entreprise: "Groupe Test", ville: "Québec" }),
@@ -349,8 +374,11 @@ describe("la carte part des OFFRES, pas d'une liste tenue à la main", () => {
     const avecTest = vue.epingles.filter((e) =>
       e.entreprises.some((x) => x.nom.startsWith("Groupe Test")),
     );
+    // Deux entités affichées : « Groupe Test » épinglée, « Groupe Test Canada » sans
+    // position propre → en attente de géocodage, PAS fusionnée dans la première.
     expect(avecTest).toHaveLength(1);
-    expect(avecTest[0]!.entreprises[0]!.offres).toHaveLength(2);
+    expect(avecTest[0]!.entreprises[0]!.offres).toHaveLength(1);
+    expect(vue.aSituer).toContain("Groupe Test Canada");
   });
 
   it("mais un SIGLE court ne fusionne pas : sous quatre lettres, tout apparierait", () => {
