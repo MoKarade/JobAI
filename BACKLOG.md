@@ -3060,14 +3060,12 @@ qu'une heuristique de nom, pour les cas RENCONTRÉS réellement plutôt que devi
 `km` puis `scoreDistance` : protocole §11, ADR avant toute ligne de code. En attente de la
 ratification de Marc avant l'audit sur `SEED` et l'implémentation.
 
-### `[ADR-INDEX-01]` — ADR-0019 existe mais n'a aucune ligne dans l'index ⬜
+### `[ADR-INDEX-01]` — ADR-0019 existe mais n'a aucune ligne dans l'index ✅
 
-Découvert en chemin (2026-09-21), non corrigé — hors périmètre de la tâche en cours.
-`docs/adr/0019-toutes-les-quebecoises-entrent.md` existe et est cité PAR ADR-0021
-(« élargit les bornes ouvertes par ADR-0019 »), mais `docs/adr/README.md` saute directement
-de la ligne 0018 à la ligne 0020 : aucune entrée ne le liste. Un lecteur qui parcourt
-l'index seul ne le trouve pas. Correctif trivial (une ligne de tableau) mais pas fait sans
-feu vert (§6 de la convention commune).
+Découvert en chemin (2026-09-21). `docs/adr/0019-toutes-les-quebecoises-entrent.md` existe
+et est cité PAR ADR-0021 (« élargit les bornes ouvertes par ADR-0019 »), mais
+`docs/adr/README.md` sautait directement de la ligne 0018 à la ligne 0020. Ligne ajoutée,
+sur feu vert de Marc.
 
 ### `[OBS-01]` — la preuve qu'un cron a tourné n'est lisible NULLE PART ✅
 
@@ -3219,7 +3217,7 @@ vu en production. La ligne les nomme : `montreal×2 · chicoutimi · gatineau ·
 longueuil · mont-royal · rouyn-noranda · saint-leonard · trois-rivieres · val-d'or ·
 westmount`.
 
-### `[BORNES-03]` — la grappe Overpass a explosé avec le périmètre des offres 🔴
+### `[BORNES-03]` — la grappe Overpass a explosé avec le périmètre des offres ✅
 
 **Régression NEUVE, causée par `[VEILLE-52]`.** Relevé du 21/09 (cron de 11:31:50) :
 
