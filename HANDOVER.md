@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-09-21 (Lot 7) — `[PERSIST-02]` : la liste des chemins d'écriture, découverte
+
+Marc : « fais tout » (BACKLOG). `[PERSIST-02]` était marqué « découvert en chemin, non
+corrigé » depuis le lot précédent.
+
+`tests/persistance.test.ts` gardait trois chemins écrits à la main. Remplacés par une
+découverte par balayage (même patron que `cheminsQuiEcriventLeLien`, 18/09) : elle en trouve
+**cinq**, pas trois — `app/api/mcp/route.ts` et `lib/cv/actions.ts` manquaient, deux
+écritures CIBLÉES (ADR-0011 pour la première) qui n'appellent jamais `colonnesOffre`/
+`colonnesSeed` et n'en ont pas besoin (elles ne posent jamais une ligne complète).
+L'invariant a été scindé en deux plutôt que forcé en un seul : aucune réénumération de
+colonnes nulle part (universel) ; appel à la source unique seulement pour les vrais
+`.insert(offers)`. Détail dans `docs/LESSONS.md`.
+
+Vérifications : gate complet vert (1778 tests, typecheck, lint, build).
+
+---
+
 ## 2026-09-21 (Lot 6) — la carte rejoint la règle stricte des données, le serveur en parallèle
 
 Marc : cadrage en trois questions, réponses : égalité stricte pour regrouper, pas de mesure

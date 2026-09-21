@@ -2899,16 +2899,20 @@ un dépôt **public**, invisibles depuis cinq semaines. Remplacés par des valeu
 sans personne derrière. L'exemption du champ `adresse` des dépôts a été retirée avec eux :
 `piiGuard` ne neutralise plus rien nulle part.
 
-### `[PERSIST-02]` — la liste des chemins d'écriture d'offres est incomplète ⬜
+### `[PERSIST-02]` — la liste des chemins d'écriture d'offres est incomplète ✅
 
-Découvert en chemin, **non corrigé** (hors périmètre). `tests/persistance.test.ts` garde une
-liste ÉCRITE À LA MAIN des fichiers qui écrivent des offres. Mesuré : cinq fichiers font
-`insert(offers)` ou `update(offers)` — `lib/veilleComplete.ts`, `lib/actions.ts`,
-`lib/synchro.ts`, plus **`app/api/mcp/route.ts` et `lib/cv/actions.ts`**, qui ne sont pas dans
-la liste. Les deux manquants font des écritures CIBLÉES (deux champs), pas une réénumération
-de colonnes : ce n'est probablement pas un défaut, mais personne ne l'a tranché et la liste
-prétend être complète. Le remède est le même que celui posé le 18/09 dans
-`tests/ingest-pipeline.test.ts` : **découvrir** la liste par balayage au lieu de l'écrire.
+`tests/persistance.test.ts` gardait une liste ÉCRITE À LA MAIN des fichiers qui écrivent des
+offres. Remplacée par une découverte par balayage (`cheminsQuiEcriventDesOffres`), même
+patron que `cheminsQuiEcriventLeLien` (18/09, `tests/ingest-pipeline.test.ts`) : elle a trouvé
+les deux manquants (`app/api/mcp/route.ts`, `lib/cv/actions.ts`), des écritures CIBLÉES (deux
+champs chacune, ADR-0011 pour la première) qui n'appellent ni `colonnesOffre` ni
+`colonnesSeed` — légitimement, elles n'insèrent jamais une ligne complète. L'invariant a donc
+été scindé en deux : aucun chemin ne réénumère les colonnes à la main (universel), et seuls
+les `.insert(offers)` doivent passer par la source unique. Un second test fige que les deux
+chemins ciblés restent découverts. Un piège trouvé en route (mutation testing) : ma première
+vérification « au moins un inséreur existe » relisait les fichiers séparément avec le même
+motif — vert même si la branche `if (/\.insert\(offers\)/…)` était débranchée. Remplacée par
+un compteur incrémenté DANS la branche.
 
 ### `[VEILLE-52]` — toutes les québécoises entrent, le lieu ne refuse plus ✅
 

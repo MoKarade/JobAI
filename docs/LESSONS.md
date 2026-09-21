@@ -2596,3 +2596,34 @@ toujours, quelle que soit la vraie structure du code. Écrit ainsi dès le premi
 fois ; la mutation (Q1, un `await` isolé réintroduit) confirme qu'il rougit pour la BONNE
 raison.
 
+### `[PERSIST-02]` — la liste des chemins d'écriture d'offres, découverte plutôt qu'écrite
+
+`tests/persistance.test.ts` gardait trois chemins ÉCRITS À LA MAIN (`lib/veilleComplete.ts`,
+`lib/actions.ts`, `lib/synchro.ts`). Remplacés par une découverte par balayage récursif de
+`lib`, `app`, `scripts` — même patron que `cheminsQuiEcriventLeLien` posé le 18/09 dans
+`tests/ingest-pipeline.test.ts` pour un défaut jumeau (un chemin supprimé y était resté
+listé). Le balayage a trouvé **cinq** chemins, pas trois : les deux manquants,
+`app/api/mcp/route.ts` (ADR-0011, n'écrit que les champs de Marc) et `lib/cv/actions.ts`
+(ne pose que la note et sa version de profil), sont des écritures CIBLÉES qui n'appellent
+jamais `colonnesOffre`/`colonnesSeed` — légitimement : ni l'une ni l'autre n'insère une
+ligne complète, et Postgres refuserait de toute façon un `.insert` sans les colonnes
+`NOT NULL`.
+
+Le premier réflexe — exiger que TOUS les chemins découverts appellent la source unique de
+colonnes — cassait sur ces deux-là. Le bon découpage suit ce que chaque chemin FAIT : un
+invariant universel (aucun chemin ne réénumère la liste de colonnes à la main, détecté par
+la présence du marqueur `salaireAffiche:` dans un objet `.values({`/`.set({`) et un
+invariant plus étroit (seuls les `.insert(offers)` doivent appeler `colonnesOffre`/
+`colonnesSeed`, parce qu'eux seuls ont besoin de la liste complète). Un second test fige
+que les deux chemins ciblés restent dans la population découverte, pour qu'une disparition
+ou un troisième cas similaire se signale plutôt que de rétrécir silencieusement ce que le
+premier test vérifie.
+
+Une vacuité trouvée en cours de route, par mutation testing (perturber `if
+(/\.insert\(offers\)/.test(source))` en `if (false)`) : ma première version de « au moins un
+chemin insère réellement » relisait les fichiers avec le MÊME motif, mais dans une
+expression SÉPARÉE du `if` testé — donc restée VRAIE même quand la branche du `if` était
+débranchée. Le test restait vert alors que la garde qu'il prétendait vérifier ne tournait
+plus. Remplacée par un compteur (`inserteurs`) incrémenté DANS la branche : lui seul peut
+prouver qu'elle s'est exécutée. Reperturbé, il rougit correctement.
+

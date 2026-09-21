@@ -483,6 +483,7 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
 172. Une heuristique de REGROUPEMENT (affichage) peut porter le MÊME défaut qu'une heuristique de DONNÉES qu'on a déjà corrigée — un faux regroupement visuel se corrige à l'œil, il ne cesse pas d'être faux pour autant, et personne ne le signale.
 173. Rendre O(1) un regroupement par SOUS-CHAÎNE exige une ÉGALITÉ, pas un meilleur index : une égalité a une clé de Map native, une sous-chaîne n'en a pas — le passage à l'égalité change la RÈGLE, pas seulement la vitesse.
 174. Cinq lectures indépendantes `await`ées l'une après l'autre coûtent cinq allers-retours réseau payés en série — un `Promise.all` ne change aucun résultat, seulement l'ordonnancement, et se vérifie par scan de source à défaut de harnais de rendu.
+175. Un scan de découverte qui remplace une liste écrite à la main peut révéler des membres LÉGITIMEMENT différents : ne pas forcer un invariant unique sur une population hétérogène — le scinder par ce que chaque chemin FAIT réellement. Et une assertion « au moins un cas existe » qui relit les fichiers séparément du reste du test ne prouve pas que la branche visée s'est exécutée : compter DANS la branche.
 
 ## 10. Style et compte-rendu
 

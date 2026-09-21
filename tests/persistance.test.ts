@@ -10,7 +10,7 @@
 // exactement comme les quatre copies qu'elle remplace.
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { CHAMPS_HORS_TABLE_OFFERS, colonnesOffre, colonnesSeed } from "../lib/persistance";
 import { OffreSchema } from "../lib/types";
@@ -51,26 +51,51 @@ describe("colonnesOffre", () => {
   });
 });
 
+/**
+ * Les fichiers du dépôt qui ÉCRIVENT une offre en base.
+ *
+ * Découverte, jamais listée : c'est la seule forme qui reste juste quand un chemin
+ * disparaît (la route de dépôt, 2026-09-18) comme quand un nouveau apparaît (le connecteur
+ * MCP, l'action de génération de CV). Le motif vise l'ÉCRITURE Drizzle sur la table
+ * `offers` (`.insert(offers)`, `.update(offers)`), pas la mention du mot — et il lit la
+ * source DÉCOMMENTÉE, sinon un commentaire qui explique la règle se compterait comme un
+ * chemin. Même patron que `cheminsQuiEcriventLeLien` (`tests/ingest-pipeline.test.ts`).
+ */
+function cheminsQuiEcriventDesOffres(): string[] {
+  const trouves: string[] = [];
+  const parcourir = (dossier: string): void => {
+    for (const e of readdirSync(resolve(process.cwd(), dossier), { withFileTypes: true })) {
+      const chemin = `${dossier}/${e.name}`;
+      if (e.isDirectory()) {
+        if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+        parcourir(chemin);
+      } else if (e.name.endsWith(".ts") || e.name.endsWith(".tsx")) {
+        const src = sansCommentaires(readFileSync(resolve(process.cwd(), chemin), "utf8"));
+        if (/\.(insert|update)\(offers\)/.test(src)) trouves.push(chemin);
+      }
+    }
+  };
+  for (const racine of ["lib", "app", "scripts"]) parcourir(racine);
+  return trouves.sort();
+}
+
+/** Les lignes de commentaire retirées : un scan ne lit pas de la prose. */
+function sansCommentaires(source: string): string {
+  return source
+    .split("\n")
+    .filter((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l))
+    .join("\n");
+}
+
 describe("une seule copie de la liste de colonnes", () => {
-  // Le vrai risque n'est pas le code d'aujourd'hui : c'est la CINQUIÈME copie, écrite dans
-  // six mois par quelqu'un qui recopiera le bloc d'à côté sans savoir pourquoi il existe.
-  const CHEMINS = [
-    // ⚠️ LA VEILLE A DÉMÉNAGÉ le 2026-08-14 : elle écrivait depuis sa route, elle écrit
-    // maintenant depuis `lib/veilleComplete.ts` — parce que DEUX crons peuvent désormais la
-    // déclencher (celui de veille s'était tu trois jours sans que rien ne le dise). Ce garde
-    // a bien fait son travail au moment du déplacement : il a refusé de laisser un chemin
-    // d'écriture sortir de sa surveillance. C'est la LISTE qu'on met à jour, jamais
-    // l'assertion — un chemin retiré d'ici est un chemin qui n'est plus gardé.
-    //
-    // ⚠️ `app/api/ingest/depot/route.ts` EN EST SORTI le 2026-09-18 — parce que le fichier
-    // n'existe plus. Le canal de dépôt de fichiers a été supprimé en entier (il ne rendait
-    // plus rien depuis le 21/08). Ce n'est donc PAS un chemin qu'on cesse de garder : c'est
-    // un chemin qui a cessé d'exister. La distinction compte, et c'est la seule raison
-    // admissible de raccourcir cette liste.
-    "lib/veilleComplete.ts",
-    "lib/actions.ts",
-    "lib/synchro.ts",
-  ];
+  // ⚠️ LA LISTE SE DÉCOUVRE, ELLE NE S'ÉCRIT PLUS À LA MAIN (`[PERSIST-02]`, 2026-09-21).
+  // Elle en portait TROIS, écrites à la main : mesuré, deux chemins d'écriture RÉELS lui
+  // échappaient (`app/api/mcp/route.ts`, `lib/cv/actions.ts` — des écritures CIBLÉES, deux
+  // champs, jamais gardées) et un ancien membre (`app/api/ingest/depot/route.ts`, supprimé
+  // le 2026-09-18) y serait resté à désigner un fichier absent. C'est « une liste écrite à
+  // la main devient fausse au chantier suivant », déjà réglé pour `[LIEN-03]` le même jour
+  // par le même patron (`tests/ingest-pipeline.test.ts`) — repris ici tel quel.
+  const CHEMINS = cheminsQuiEcriventDesOffres();
 
   /**
    * Les ouvertures d'un objet passé à une écriture Drizzle : `.values({` et `.set({`.
@@ -90,7 +115,17 @@ describe("une seule copie de la liste de colonnes", () => {
   }
 
   it("aucun chemin d'écriture ne réénumère les colonnes dans son coin", () => {
+    // ⚠️ DEUX INVARIANTS, PAS UN (`[PERSIST-02]`, 2026-09-21). La découverte par scan a
+    // trouvé deux chemins RÉELS qui n'appellent ni `colonnesOffre` ni `colonnesSeed` —
+    // `app/api/mcp/route.ts` (ADR-0011 : n'écrit QUE les champs de Marc, jamais la ligne
+    // entière) et `lib/cv/actions.ts` (ne pose QUE la note et sa version de profil). Les
+    // deux sont des écritures CIBLÉES, documentées comme telles, et l'exiger d'eux serait
+    // se tromper de garde. Ce que ce test protège reste vrai pour eux : ne JAMAIS
+    // réénumérer une liste de colonnes à la main. Ce qu'il n'exige QUE des chemins qui
+    // INSÈRENT une ligne (une écriture ciblée ne peut, par construction, pas être un
+    // `.insert` complet — Postgres refuserait les colonnes `NOT NULL` manquantes).
     let objetsInspectes = 0;
+    let inserteurs = 0;
 
     for (const chemin of CHEMINS) {
       const source = readFileSync(resolve(process.cwd(), chemin), "utf8");
@@ -105,14 +140,32 @@ describe("une seule copie de la liste de colonnes", () => {
         ).toBe(false);
       }
 
-      expect(source, `${chemin} n'utilise pas la source unique`).toMatch(
-        /colonnes(Offre|Seed)\(/,
-      );
+      if (/\.insert\(offers\)/.test(source)) {
+        inserteurs++;
+        expect(source, `${chemin} insère une ligne sans la source unique`).toMatch(
+          /colonnes(Offre|Seed)\(/,
+        );
+      }
     }
 
     // Volume prouvé : sans ça, une expression qui ne trouve plus rien ferait passer le
     // test à vide, et le garde ne garderait plus rien.
     expect(objetsInspectes).toBeGreaterThanOrEqual(CHEMINS.length);
+    // ⚠️ LE COMPTEUR, PAS UN SECOND SCAN INDÉPENDANT. Une assertion qui relit les fichiers
+    // avec le MÊME motif à côté du `if` ne prouve pas que le `if` s'est exécuté — perturbé
+    // (`if (/\.insert\(offers\)/.test(source))` remplacé par `if (false)`), un second scan
+    // séparé reste vrai tel quel et laisse ce test vert malgré une garde débranchée.
+    // `inserteurs` est incrémenté DANS la branche : lui seul prouve qu'elle a tourné.
+    expect(inserteurs).toBeGreaterThan(0);
+  });
+
+  it("les deux chemins CIBLÉS restent découverts, et restent ciblés", () => {
+    // Fige la population trouvée par le scan : si l'un des deux disparaît (fichier
+    // supprimé) ou qu'un troisième apparaît, ce test le dit — plutôt que de laisser le
+    // premier test au-dessus se contenter d'un sous-ensemble plus étroit sans le signaler.
+    expect(CHEMINS).toEqual(
+      expect.arrayContaining(["app/api/mcp/route.ts", "lib/cv/actions.ts"]),
+    );
   });
 
   it("le jeu de départ n'écrit PAS `perimeeLe` : il ne ressuscite pas une offre fermée", () => {
