@@ -477,6 +477,9 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
 166. Un identifiant d'ENTITÉ n'est pas l'identifiant du FAIT : une clé primaire par employeur fait hériter une position à des offres qui n'ont rien à voir, et le chiffre qui en sort est plausible.
 167. Un scan de source qui cherche un JETON prouve qu'on l'a TAPÉ, jamais qu'il s'affiche : une assertion de rendu vise la CONDITION de rendu, sinon remplacer celle-ci par `false` laisse le test vert.
 168. Un COMPTE affiché et le GROUPE affiché doivent être le même ensemble, calculé une fois : deux calculs séparés appliquent deux sous-ensembles de filtres et l'un des deux ment sans que rien ne rougisse.
+169. Le poids d'un payload se mesure COMPRESSÉ, jamais en JSON brut : l'hébergeur compresse par défaut (`content-encoding: br` vérifié), 4,93 Mo de JSON répétitif valent 0,12 Mo sur le fil — prescrire un dégraissage depuis la taille brute, c'est proposer un lot que le réseau ne verra pas.
+170. Un coût en O(n × m) est invisible tant que n et m sont petits : tout lot qui multiplie le VOLUME oblige à relire les boucles qui balayent une liste PAR ÉLÉMENT, pas seulement les bornes qu'on s'était données.
+171. Une recommandation donnée AVANT la mesure engage l'utilisateur dans le mauvais lot : mesurer d'abord, recommander ensuite — et quand la mesure dément la recommandation, le dire avant de faire le travail qu'elle a fait approuver.
 
 ## 10. Style et compte-rendu
 

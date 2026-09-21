@@ -2514,3 +2514,42 @@ VERT — le JSX était toujours écrit dans le fichier. Un scan prouve qu'on a T
 qu'il s'affiche : l'assertion doit viser la CONDITION. Sept perturbations jouées, celle-là
 trouvée par la sixième.
 
+## 2026-09-21 (Lot 5) — J'ai recommandé le mauvais levier, et la compression me l'a dit
+
+Marc : « la carte met un temps fou à charger ». J'ai mesuré deux choses et j'en ai classé une
+à l'envers.
+
+**Le poids.** Un corpus de forme production (6 923 offres, 3 000 employeurs, 400 villes) pèse
+**4,93 Mo** de JSON, dont 38 % pour les `raisons` — la même phrase « Trouvée automatiquement :
+… » répétée six mille fois. J'en ai conclu que le payload était le premier levier, je l'ai
+recommandé à Marc, et il a choisi de commencer par là sur cette recommandation. Puis j'ai
+mesuré ce qui passe VRAIMENT : **0,12 Mo en gzip, 0,05 Mo en brotli** — 2,4 % et 0,9 %. Et
+`content-encoding: br` est confirmé sur une vraie réponse de `emploi.hubperso.com`. Le
+dégraissage que j'avais chiffré (table de textes dédoublonnés, −34 % sur le brut) aurait été
+un lot entier que le réseau n'aurait pas vu. `JSON.parse` du brut : 103 ms sur ce conteneur.
+
+La règle : **le poids d'un payload se mesure compressé.** L'hébergeur le fait par défaut, et
+du JSON répétitif est exactement ce que la compression avale le mieux. Corollaire de conduite :
+une recommandation donnée avant la mesure engage l'utilisateur dans le mauvais lot — et quand
+la mesure la dément, on le dit AVANT de faire le travail qu'elle a fait approuver.
+
+**Le calcul.** C'était ça, le vrai. `construireVue` (carte) et `grouperParEntreprise` (liste)
+répondaient toutes deux à « cet employeur est-il déjà connu ? » par
+`[...map.keys()].find((c) => apparier(nom, c))`. Deux coûts s'y empilaient : la liste des clés
+RÉ-ALLOUÉE à chaque offre (jusqu'à 3 000 éléments), et `apparier` qui re-normalise les deux
+côtés à chaque comparaison — ~18 millions de `trim().toLowerCase()` pour un seul écran. Mesuré
+**1 900 ms** et **1 471 ms**, contre 19 et 11 ms à deux cents offres. Et ça recommence à chaque
+changement de filtre.
+
+Rien de tout ça n'était un défaut le jour où ça a été écrit : à deux cents offres, c'est
+instantané. C'est ADR-0019 — multiplier le volume par trente — qui l'a transformé en panne.
+**Un coût en O(n × m) est invisible tant que n et m sont petits** : un lot qui change le volume
+oblige à relire les boucles qui balayent une liste par élément, pas seulement les bornes qu'on
+s'était données.
+
+`indexEmployeurs` garde la règle et l'ORDRE à l'identique — ×3, 1 767 tests verts. L'ordre
+compte : `find` rend le PREMIER nom qui apparie, pas le meilleur, donc « Robert » tombe sur
+« Groupe Robert » s'il a été rencontré avant. Un index par égalité exacte serait plus rapide
+encore et rendrait « Robert » : c'est une décision de produit, pas une optimisation, et la
+perturbation qui l'introduit fait rougir deux tests — c'est exactement ce qu'on attend d'eux.
+

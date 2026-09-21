@@ -43,14 +43,75 @@
  */
 export const LONGUEUR_MIN_APPARIEMENT = 4;
 
-/** Deux noms d'entreprise désignent-ils le même employeur ? */
-export function apparier(a: string, b: string): boolean {
-  const x = a.trim().toLowerCase();
-  const y = b.trim().toLowerCase();
+/** La forme comparable d'un nom d'employeur, pour `apparier`. */
+export function formeComparable(nom: string): string {
+  return nom.trim().toLowerCase();
+}
+
+/**
+ * `apparier`, mais sur deux formes DÉJÀ comparables.
+ *
+ * Extrait pour que l'appelant qui compare un nom à des centaines d'autres ne re-normalise
+ * pas les deux côtés à chaque comparaison — voir `IndexEmployeurs`. La règle vit ici, en un
+ * seul exemplaire : `apparier` normalise puis appelle cette fonction, donc les deux chemins
+ * ne peuvent pas diverger.
+ */
+export function apparierFormes(x: string, y: string): boolean {
   if (x.length < LONGUEUR_MIN_APPARIEMENT || y.length < LONGUEUR_MIN_APPARIEMENT) {
     return x === y && x.length > 0;
   }
   return x === y || x.includes(y) || y.includes(x);
+}
+
+/** Deux noms d'entreprise désignent-ils le même employeur ? */
+export function apparier(a: string, b: string): boolean {
+  return apparierFormes(formeComparable(a), formeComparable(b));
+}
+
+/**
+ * Les employeurs déjà rencontrés, interrogeables sans re-normaliser.
+ *
+ * ⚠️ POURQUOI IL EXISTE — MESURÉ LE 2026-09-21. `grouperParEntreprise` et `construireVue`
+ * répondaient à « cet employeur est-il déjà connu ? » par
+ * `[...map.keys()].find((connu) => apparier(nom, connu))`. Deux coûts s'y empilent, et
+ * aucun ne se voyait tant que le suivi tenait en deux cents offres : la liste des clés est
+ * RE-ALLOUÉE à chaque offre (jusqu'à 3 000 éléments), et `apparier` re-normalise LES DEUX
+ * côtés à chaque comparaison — soit ~18 millions de `trim().toLowerCase()` pour une seule
+ * carte. Mesuré sur un corpus de forme production : 1 900 ms pour la carte et 1 471 ms pour
+ * la liste, contre 19 et 11 ms à deux cents offres. Et ça recommence à CHAQUE changement de
+ * filtre.
+ *
+ * ⚠️ L'ORDRE EST LE MÊME QUE `find`, ET C'EST LA CONDITION DE L'ÉQUIVALENCE. `find` rend le
+ * PREMIER nom qui apparie, pas le meilleur : « Robert » peut tomber sur « Groupe Robert »
+ * s'il a été rencontré avant. Cet index parcourt donc les noms dans leur ordre d'insertion,
+ * exactement comme avant. Ce n'est pas une amélioration de la règle — c'est la même règle,
+ * sans le gaspillage. Une résolution d'identité d'entreprise reste un autre sujet.
+ */
+export interface IndexEmployeurs {
+  /** Inscrit un nom, dans l'ordre. */
+  ajouter(nom: string): void;
+  /** Le premier nom connu qui apparie, ou `null`. */
+  trouver(nom: string): string | null;
+}
+
+export function indexEmployeurs(noms: readonly string[] = []): IndexEmployeurs {
+  const affichage: string[] = [];
+  const formes: string[] = [];
+  const index: IndexEmployeurs = {
+    ajouter(nom) {
+      affichage.push(nom);
+      formes.push(formeComparable(nom));
+    },
+    trouver(nom) {
+      const x = formeComparable(nom);
+      for (let i = 0; i < formes.length; i++) {
+        if (apparierFormes(x, formes[i]!)) return affichage[i]!;
+      }
+      return null;
+    },
+  };
+  for (const n of noms) index.ajouter(n);
+  return index;
 }
 
 /**

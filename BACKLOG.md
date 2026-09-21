@@ -2985,6 +2985,37 @@ villes par ce qu'elles débloquent.
   (`lieu-inconnu` au flux complet du 2026-09-21). Non commencé.
 - La preuve en production : `bornes`, `effacées` et `centresCorrigés` se lisent au cron suivant.
 
+### `[CARTE-PERF]` — l'assemblage des écrans est quadratique 🟦
+
+Marc, 2026-09-21 : « la carte met un temps fou à charger ». Mesuré avant de corriger, sur un
+corpus de FORME production (6 923 offres, 3 000 employeurs, 400 villes) :
+
+| | avant | après |
+|---|---|---|
+| `construireVue` (carte) | **1 900 ms** | **615 ms** |
+| `grouperParEntreprise` (liste) | **1 471 ms** | **483 ms** |
+| à 200 offres / 100 employeurs | 19 et 11 ms | 16 et 2 ms |
+
+Les deux répondaient à « cet employeur est-il déjà connu ? » par
+`[...map.keys()].find((c) => apparier(nom, c))` : la liste des clés RÉ-ALLOUÉE par offre, et
+`apparier` qui re-normalise LES DEUX côtés à chaque comparaison — ~18 millions de
+`trim().toLowerCase()` pour un seul écran. Et ça recommence à CHAQUE changement de filtre.
+`indexEmployeurs` garde la règle et l'ordre à l'identique (1 767 tests verts, quatre
+perturbations rouges) : ×3.
+
+⚠️ **Le POIDS n'était PAS le problème, contrairement à ce que j'avais recommandé.** Mesuré :
+4,93 Mo de JSON → **0,12 Mo en gzip, 0,05 Mo en brotli**, et `content-encoding: br` est
+confirmé sur `emploi.hubperso.com`. `JSON.parse` vaut ~103 ms sur ce conteneur. Un
+dégraissage du payload (table de textes dédoublonnés : −34 %) aurait été du travail que le
+réseau n'aurait pas vu.
+
+**Ce qui RESTE** ⬜ — il faut un ADR, parce que ça touche la règle de regroupement.
+Le balayage est toujours en O(offres × employeurs) : ~1,1 s sur ce conteneur, donc
+probablement 3 à 6 s sur le téléphone de Marc. Passer en O(1) demande un index par égalité,
+qui CHANGE quel employeur absorbe quel nom : aujourd'hui « Robert » tombe sur « Groupe
+Robert » parce que `find` rend le PREMIER qui apparie, pas le meilleur. C'est une décision de
+produit (que veut-on voir regroupé ?), pas une optimisation.
+
 ### `[OBS-01]` — la preuve qu'un cron a tourné n'est lisible NULLE PART ⬜
 
 Constat du 2026-09-19, après **deux** tentatives ratées de vérifier `[VEILLE-13]` la même nuit.

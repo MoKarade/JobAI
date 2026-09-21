@@ -32,7 +32,7 @@ import type { EntrepriseCible } from "./reference";
 import type { Offre } from "./types";
 import { villeGeocodable } from "./geocodage";
 import type { ProximiteBorne } from "./bornes";
-import { apparier as apparierNoms, positionDe } from "./employeurs";
+import { apparier as apparierNoms, indexEmployeurs, positionDe } from "./employeurs";
 
 // L'appariement des noms d'employeur vit dans `lib/employeurs.ts` : la carte n'est pas
 // seule à s'en servir, et la mesure des distances comparait les noms littéralement — deux
@@ -183,10 +183,16 @@ export function construireVue(
   const vivantes = offres.filter(estVivante);
 
   const parEntreprise = new Map<string, EntrepriseSurCarte>();
+  // Les mêmes noms que `parEntreprise`, dans le MÊME ordre, interrogeables sans ré-allouer
+  // la liste des clés ni re-normaliser à chaque comparaison. Mesuré le 2026-09-21 : 1 900 ms
+  // pour assembler la vue sur un corpus de forme production, contre 19 ms à deux cents
+  // offres — et ça recommence à chaque changement de filtre. Voir `indexEmployeurs`.
+  const connus = indexEmployeurs();
 
   // Les cibles d'abord : leur nom fait autorité, et leurs faits relevés à la main
   // (distance de référence, lecture) valent mieux que ce qu'une offre en dit.
   for (const c of cibles) {
+    connus.ajouter(c.nom);
     parEntreprise.set(c.nom, {
       nom: c.nom,
       ville: villeGeocodable(c.ville) ?? c.ville,
@@ -214,11 +220,10 @@ export function construireVue(
     // borné par le plancher de longueur : un sigle court (« ISS ») exige l'égalité stricte
     // et ne fusionne donc pas, ce qui est voulu — sous quatre lettres, la sous-chaîne
     // apparierait n'importe quoi.
-    const cible = cibles.find((c) => apparierNoms(o.entreprise, c.nom));
-    const nom =
-      cible?.nom ??
-      [...parEntreprise.keys()].find((connu) => apparierNoms(o.entreprise, connu)) ??
-      o.entreprise;
+    // `connus` contient déjà les cibles, EN TÊTE et dans leur ordre : une seule recherche
+    // rend donc exactement ce que rendaient les deux `find` enchaînés d'avant (la cible qui
+    // apparie, sinon un employeur déjà rencontré, sinon le nom de l'annonce).
+    const nom = connus.trouver(o.entreprise) ?? o.entreprise;
     const villeOffre = o.ville ? (villeGeocodable(o.ville) ?? o.ville) : "";
 
     let entreprise = parEntreprise.get(nom);
@@ -239,6 +244,7 @@ export function construireVue(
         offres: [],
       };
       parEntreprise.set(nom, entreprise);
+      connus.ajouter(nom);
     }
 
     // La ville d'une cible fait foi ; pour les autres, la première ville annoncée sert.

@@ -6,6 +6,47 @@
 
 ---
 
+## 2026-09-21 (Lot 5) — la carte lente : j'ai recommandé le mauvais levier
+
+Marc : « la carte met un temps fou à charger ».
+
+⚠️ **Ce que j'ai classé à l'envers.** Le payload de la carte pèse **4,93 Mo** de JSON (corpus
+de forme production : 6 923 offres, 3 000 employeurs, 400 villes), dont 38 % de `raisons` —
+la même phrase répétée six mille fois. J'en ai fait le premier levier et Marc a choisi de
+commencer par là **sur ma recommandation**. Puis j'ai mesuré ce qui passe vraiment :
+**0,12 Mo en gzip, 0,05 Mo en brotli**, et `content-encoding: br` est confirmé sur une vraie
+réponse de `emploi.hubperso.com`. Le dégraissage que j'avais chiffré (−34 % sur le brut)
+aurait été un lot que le réseau n'aurait pas vu. Je ne l'ai donc pas fait.
+
+**Le vrai coût était le calcul côté navigateur**, et il est quadratique. `construireVue`
+(carte) et `grouperParEntreprise` (liste) répondaient toutes deux à « cet employeur est-il
+déjà connu ? » par `[...map.keys()].find((c) => apparier(nom, c))` : liste des clés
+ré-allouée à chaque offre, et `apparier` qui re-normalise les deux côtés à chaque
+comparaison — ~18 millions de `trim().toLowerCase()` par écran, **qui recommencent à chaque
+changement de filtre**.
+
+| | avant | après |
+|---|---|---|
+| `construireVue` (carte) | 1 900 ms | **615 ms** |
+| `grouperParEntreprise` (liste) | 1 471 ms | **483 ms** |
+| à 200 offres / 100 employeurs | 19 et 11 ms | 16 et 2 ms |
+
+`indexEmployeurs` (`lib/employeurs.ts`) garde la règle ET l'ordre à l'identique — ce n'est pas
+une meilleure règle, c'est la même sans le gaspillage. 1 767 tests verts, quatre perturbations
+rouges dont celle qui introduit un raccourci par égalité exacte : elle CHANGE le résultat
+(« Robert » cesserait de tomber sur « Groupe Robert ») et deux tests le disent.
+
+⚠️ **Ce qui reste, et pourquoi je m'arrête là.** Le balayage est toujours en O(offres ×
+employeurs) : ~1,1 s sur ce conteneur, donc probablement **3 à 6 s sur un téléphone**. Le
+rendre constant exige un index par égalité, qui change quel employeur absorbe quel nom —
+décision de produit, donc ADR. Porté au BACKLOG sous `[CARTE-PERF]`.
+
+⚠️ Non mesuré : le temps SERVEUR (`lireOffres` lit toutes les offres et toutes leurs
+justifications à chaque affichage, sans limite — son commentaire dit encore « quelques
+dizaines de lignes »). Signalé, pas corrigé.
+
+---
+
 ## 2026-09-21 (Lot 4) — le filtre par km existait ; mon rayon et l'honnêteté manquaient
 
 `[UI-FILTRE-KM]`, dernier lot du plan. ⚠️ **Deux de ses trois volets étaient déjà livrés** —
