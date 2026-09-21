@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-09-21 (Lot 8) — `[OBS-01]` : un outil MCP pour lire `sync_state`
+
+Marc : « fais tout » (BACKLOG, suite).
+
+Les journaux runtime Vercel (~17 min de rétention) ne suffisaient pas à prouver qu'un cron
+avait tourné — deux tentatives ratées le 19/09 (`[VEILLE-13]`). `sync_state` porte déjà
+`majLe` par réservation ; il manquait un moyen de le LIRE à toute heure. Ajouté :
+`etat_synchro` (outil MCP), qui rend `cle`/`majLe`/`ageMs` pour chaque ligne — DÉCOUVERTES,
+pas nommées une par une (même réflexe que `[PERSIST-02]`, un lot plus tôt). Ne rend jamais
+`valeur` : certaines clés portent des blocs JSON énormes, et le type d'entrée ne laisse
+structurellement pas de place pour la faire fuiter.
+
+⚠️ Reste vrai : prouve un DÉMARRAGE, pas un succès. `[VEILLE-13]` reste ouvert.
+
+Vérifications : gate complet vert (1785 tests, typecheck, lint, build).
+
+---
+
 ## 2026-09-21 (Lot 7) — `[PERSIST-02]` : la liste des chemins d'écriture, découverte
 
 Marc : « fais tout » (BACKLOG). `[PERSIST-02]` était marqué « découvert en chemin, non

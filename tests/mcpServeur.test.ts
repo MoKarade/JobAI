@@ -51,6 +51,7 @@ async function brancher(io: Partial<EntreesSorties> = {}) {
     },
     aujourdhui: () => "2026-08-19",
     lireJournal: async () => ({}),
+    lireEtatSynchro: async () => [],
     diagnostiquerFlux: async () => ({
       fin: "flux-termine",
       verdicts: { "dans-la-region": 2 },
@@ -87,6 +88,7 @@ describe("la surface exposée à claude.ai", () => {
     expect(noms).toEqual([
       "chercher_offres",
       "diagnostic_flux",
+      "etat_synchro",
       "lire_offre",
       "modifier_suivi",
       "resume_suivi",
@@ -102,6 +104,7 @@ describe("la surface exposée à claude.ai", () => {
     expect(parNom.get("chercher_offres")).toBe(true);
     expect(parNom.get("resume_suivi")).toBe(true);
     expect(parNom.get("diagnostic_flux")).toBe(true);
+    expect(parNom.get("etat_synchro")).toBe(true);
     expect(parNom.get("modifier_suivi")).toBe(false);
   });
 });
@@ -195,6 +198,28 @@ describe("diagnostic_flux — la table qui décide, pas les onze inventaires", (
     // lointaine, et la règle de bande se déciderait de mémoire.
     expect(r.lettresHorsRegion).toEqual([{ nom: "H", n: 9 }]);
     expect(r.verdicts).toEqual({ "lieu-inconnu": 3 });
+  });
+});
+
+describe("etat_synchro — la fraîcheur des passes de fond, jamais leur contenu", () => {
+  it("rend cle/majLe/ageMs pour chaque ligne, triées", async () => {
+    const { client } = await brancher({
+      lireEtatSynchro: async () => [
+        { cle: "veille-auto", majLe: new Date("2026-09-21T11:00:00.000Z") },
+        { cle: "distances-auto", majLe: new Date("2026-09-21T11:55:00.000Z") },
+      ],
+    });
+    const r = await client.callTool({ name: "etat_synchro", arguments: {} });
+    const lignes = corps(r) as unknown as { cle: string; majLe: string; ageMs: number }[];
+    expect(lignes.map((l) => l.cle)).toEqual(["distances-auto", "veille-auto"]);
+    expect(Object.keys(lignes[0]!).sort()).toEqual(["ageMs", "cle", "majLe"]);
+  });
+
+  it("rend une ERREUR, pas une liste vide, quand la base n'a pas répondu", async () => {
+    const { client } = await brancher({ lireEtatSynchro: async () => null });
+    const r = await client.callTool({ name: "etat_synchro", arguments: {} });
+    expect(r.isError).toBe(true);
+    expect(String(corps(r).erreur)).toContain("pas répondu");
   });
 });
 

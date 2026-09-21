@@ -3043,7 +3043,7 @@ une passe / 5 min), jamais une donnée fausse — `memeEmployeur` refuse à rais
 Piste, non creusée : une table d'ALIAS explicite (« STERIS » → « STERIS Canada ») plutôt
 qu'une heuristique de nom, pour les cas RENCONTRÉS réellement plutôt que devinés à l'avance.
 
-### `[OBS-01]` — la preuve qu'un cron a tourné n'est lisible NULLE PART ⬜
+### `[OBS-01]` — la preuve qu'un cron a tourné n'est lisible NULLE PART ✅
 
 Constat du 2026-09-19, après **deux** tentatives ratées de vérifier `[VEILLE-13]` la même nuit.
 
@@ -3074,6 +3074,20 @@ réservation se pose avant le travail (voir la note de `CLE_VEILLE` dans `lib/sy
 ⚠️ Ce chiffre ne dit PAS que c'est le cron dédié : une visite de page déclenche aussi une
 passe (`DELAI_PASSE_AUTO_MS`). `[VEILLE-13]` reste donc **ouvert**, et la mesure n'est pas
 une conclusion.
+
+**Livré** : un outil MCP, `etat_synchro`, qui rend `cle`/`majLe`/`ageMs` pour CHAQUE ligne
+de `sync_state` (`lib/diagnosticSynchro.ts`, fonction pure `resumerEtatSynchro`) — pas
+seulement les deux clés nommées ci-dessus. Les clés se DÉCOUVRENT à la lecture plutôt que
+d'être nommées une par une dans le code : la table en porte onze aujourd'hui, une liste
+écrite à la main deviendrait fausse au premier ajout, exactement le défaut que `[PERSIST-02]`
+vient de corriger sur les chemins d'écriture. Ne rend JAMAIS `valeur` — certaines lignes
+(`veille-journal`, `veille-historique`, `veille-rapport`) portent des blocs JSON de
+plusieurs dizaines de milliers de caractères, et ce diagnostic sert à DATER un passage, pas
+à le relire. Le type d'entrée (`LigneSynchroBrute`) ne porte que `cle`/`majLe` : `valeur`
+n'a structurellement pas de place pour fuiter.
+
+⚠️ Ne prouve toujours qu'un DÉMARRAGE, pas un succès — la limite était déjà connue et reste
+entière, la description de l'outil le redit explicitement à qui l'appelle.
 
 ### `[VEILLE-52]` — PREMIER PASSAGE RÉEL, mesuré le 2026-09-19 à 12:15 UTC ✅
 

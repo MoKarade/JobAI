@@ -19,7 +19,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { offers } from "@/lib/db/schema";
+import { offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { BUDGET_MS_MCP, diagnostiquerFlux } from "@/lib/ingest/diagnosticFlux";
 import { creerServeur } from "@/lib/mcp/serveur";
@@ -151,6 +151,17 @@ export async function POST(requete: Request): Promise<Response> {
         console.error("[mcp] journal de veille illisible", err);
         return {} as JournalVeille;
       }),
+    // ⚠️ `cle`/`majLe` SEULEMENT — jamais `valeur` (`[OBS-01]`). Certaines lignes portent un
+    // JSON de plusieurs dizaines de milliers de caractères ; ce diagnostic sert à dater un
+    // passage, pas à le relire.
+    lireEtatSynchro: () =>
+      db
+        .select({ cle: syncState.cle, majLe: syncState.majLe })
+        .from(syncState)
+        .catch((err) => {
+          console.error("[api/mcp] lecture de sync_state impossible", err);
+          return null;
+        }),
   });
 
   await serveur.connect(transport);

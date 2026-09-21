@@ -60,6 +60,7 @@ async function appel(corps: unknown, accept = "application/json, text/event-stre
     enregistrer: async () => undefined,
     aujourdhui: () => "2026-08-19",
     lireJournal: async () => ({}),
+    lireEtatSynchro: async () => [],
     diagnostiquerFlux: async () => ({ fin: "flux-termine" }),
   });
   await serveur.connect(t);
@@ -106,6 +107,7 @@ describe("le transport HTTP répond aux requêtes réelles", () => {
     expect((corps.result?.tools ?? []).map((o) => o.name).sort()).toEqual([
       "chercher_offres",
       "diagnostic_flux",
+      "etat_synchro",
       "lire_offre",
       "modifier_suivi",
       "resume_suivi",

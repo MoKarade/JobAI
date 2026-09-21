@@ -20,6 +20,8 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { LigneSynchroBrute } from "../diagnosticSynchro";
+import { resumerEtatSynchro } from "../diagnosticSynchro";
 import type { Offre } from "../types";
 import type { SuiviVeille } from "../veille";
 import { FiltresSchema, chercherOffres, lireOffreVue, resumerPourMcp } from "./lecture.spec";
@@ -52,6 +54,11 @@ export interface EntreesSorties {
    * empêcher de lire le suivi.
    */
   lireJournal: () => Promise<Readonly<Record<string, SuiviVeille>>>;
+  /**
+   * Le nom et la dernière écriture (`majLe`) de chaque ligne de `sync_state` — jamais sa
+   * valeur (`[OBS-01]`). `null` si la base n'a pas répondu.
+   */
+  lireEtatSynchro: () => Promise<readonly LigneSynchroBrute[] | null>;
 }
 
 /** Une réponse d'outil : du JSON, dans le seul format que le protocole transporte. */
@@ -191,6 +198,30 @@ export function creerServeur(io: EntreesSorties): McpServer {
         exemples: exemples[cle] ?? null,
         professions: r["professions"],
       });
+    },
+  );
+
+  serveur.registerTool(
+    "etat_synchro",
+    {
+      title: "Depuis quand une passe de fond a tourné",
+      description:
+        "Le nom et la dernière écriture (`majLe`, `ageMs`) de chaque ligne de `sync_state` — " +
+        "jamais son contenu. Sert quand les journaux runtime Vercel ont expiré (~17 min de " +
+        "rétention) : les clés `geocodage-auto` et `distances-auto` disent quand le cron de " +
+        "géocodage a réservé son tour pour la dernière fois ; `veille-auto`, la passe " +
+        "d'ingestion ; `seed`, la dernière synchronisation du jeu de départ. ⚠️ NE PROUVE " +
+        "QU'UN DÉMARRAGE, PAS UN SUCCÈS : la réservation se pose AVANT le travail — un " +
+        "`ageMs` bas dit « une passe a été prise récemment », jamais « elle a réussi ».",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    async () => {
+      const lignes = await io.lireEtatSynchro();
+      if (lignes === null) {
+        return panne("La base n'a pas répondu : impossible de lire l'état des passes de fond.");
+      }
+      return json(resumerEtatSynchro(lignes, new Date()));
     },
   );
 
