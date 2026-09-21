@@ -2986,7 +2986,19 @@ villes par ce qu'elles débloquent.
   chiffre qui dimensionne ce choix ; il n'existait pas avant, d'où un lot dimensionné le
   2026-09-21 sur le mauvais des deux nombres.
 - Le repli par **bande postale** pour les 3 751 offres dont personne ne nomme la ville
-  (`lieu-inconnu` au flux complet du 2026-09-21). Non commencé.
+  (`lieu-inconnu` au flux complet du 2026-09-21). **Investigué le 2026-09-21, BLOQUÉ dans cet
+  environnement — pas seulement en retard.** Une bande postale exige un jeu de centroïdes de
+  codes postaux (FSA) que ce sous-chantier doit lire quelque part ; aucune source mesurée
+  n'est joignable depuis le proxy de ce conteneur : `geogratis.gc.ca`, `www12.statcan.gc.ca`
+  et `download.geonames.org` refusent la connexion (bloqués par la politique réseau du
+  bac à sable), et `api.github.com` n'accepte que des appels scopés à un dépôt (pas de
+  recherche générale pour trouver un jeu de données tiers). `WebFetch` reste disponible mais
+  résume via un petit modèle plutôt que d'extraire des nombres exacts — risque de coordonnées
+  **inventées**, inacceptable pour un dataset qui alimenterait directement des distances
+  affichées à Marc (garde-fou n°3, no fake data). Décision de Marc (2026-09-21) : laisser
+  ouvert tel quel plutôt que d'improviser une source non fiable. Si une source de centroïdes
+  FSA est fournie (fichier ou URL lisible directement, sans passer par un résumé de modèle),
+  ce sous-chantier redevient un travail normal.
 - La preuve en production : `bornes`, `effacées` et `centresCorrigés` se lisent au cron suivant.
 
 ### `[CARTE-PERF]` — l'assemblage des écrans est quadratique ✅
@@ -3027,7 +3039,7 @@ suffixes juridiques). Sans effet aujourd'hui (les deux offres SEED ont un `km` m
 retouché), mais une offre future ingérée sous « STERIS » referait un géocodage au lieu de
 retrouver la position de « STERIS Canada ». Porté sous `[EMPLOYEUR-VARIANTE]`.
 
-### `[EMPLOYEUR-VARIANTE]` — une variante de nom re-géocode au lieu de retrouver sa position ⬜
+### `[EMPLOYEUR-VARIANTE]` — une variante de nom re-géocode au lieu de retrouver sa position 🟦
 
 Trouvé en mesurant l'impact d'ADR-0022 (2026-09-21), PRÉEXISTANT à ce lot — `positionDe`
 utilise `memeEmployeur` (égalité stricte après normalisation) depuis sa correction
@@ -3042,6 +3054,20 @@ une passe / 5 min), jamais une donnée fausse — `memeEmployeur` refuse à rais
 
 Piste, non creusée : une table d'ALIAS explicite (« STERIS » → « STERIS Canada ») plutôt
 qu'une heuristique de nom, pour les cas RENCONTRÉS réellement plutôt que devinés à l'avance.
+
+**Cadré le 2026-09-21** ([ADR-0023](./docs/adr/0023-une-table-d-alias-fermee-pour-les-employeurs-deja-rencontres.md),
+**Proposé** — soumis à Marc, AUCUN CODE ÉCRIT). Ça touche `lib/employeurs.ts`, qui alimente
+`km` puis `scoreDistance` : protocole §11, ADR avant toute ligne de code. En attente de la
+ratification de Marc avant l'audit sur `SEED` et l'implémentation.
+
+### `[ADR-INDEX-01]` — ADR-0019 existe mais n'a aucune ligne dans l'index ⬜
+
+Découvert en chemin (2026-09-21), non corrigé — hors périmètre de la tâche en cours.
+`docs/adr/0019-toutes-les-quebecoises-entrent.md` existe et est cité PAR ADR-0021
+(« élargit les bornes ouvertes par ADR-0019 »), mais `docs/adr/README.md` saute directement
+de la ligne 0018 à la ligne 0020 : aucune entrée ne le liste. Un lecteur qui parcourt
+l'index seul ne le trouve pas. Correctif trivial (une ligne de tableau) mais pas fait sans
+feu vert (§6 de la convention commune).
 
 ### `[OBS-01]` — la preuve qu'un cron a tourné n'est lisible NULLE PART ✅
 

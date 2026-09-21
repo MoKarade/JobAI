@@ -6,6 +6,31 @@
 
 ---
 
+## 2026-09-21 (Lot 9) — `[EMPLOYEUR-VARIANTE]` cadré, `[GEO-BOOTSTRAP]` bloqué (doc seulement)
+
+Marc : « fais tout » (BACKLOG, fin de ronde). Deux items restants tranchés par question à
+Marc plutôt que codés à l'aveugle — ils touchent tous deux une vraie décision de conception.
+
+**`[EMPLOYEUR-VARIANTE]`** : ça change `lib/employeurs.ts`, qui alimente `km` puis
+`scoreDistance` — protocole §11, ADR avant code. Écrit
+([ADR-0023](./docs/adr/0023-une-table-d-alias-fermee-pour-les-employeurs-deja-rencontres.md),
+**Proposé**) : une table d'alias FERMÉE (2 entrées connues), consultée par
+`normaliserNomEmployeur` — donc par `memeEmployeur`/`cleGroupement`/`positionDe` d'un seul
+mouvement, pas une troisième règle. Aucun code écrit ; en attente de ratification.
+
+**`[GEO-BOOTSTRAP]` (bande postale)** : investigué, **bloqué dans cet environnement**. Aucune
+source de centroïdes FSA n'est joignable (proxy sandbox bloque `geogratis.gc.ca`,
+`www12.statcan.gc.ca`, `download.geonames.org`) et `WebFetch` résume via un petit modèle —
+inutilisable pour un dataset numérique précis sans risquer des coordonnées inventées. Marc :
+laisser ouvert tel quel.
+
+Découvert en chemin, non corrigé : `docs/adr/README.md` n'a aucune ligne pour ADR-0019
+(existe, cité par ADR-0021, absent de l'index). `[ADR-INDEX-01]`.
+
+Vérifications : gate complet vert (aucun code touché, doc + ADR seulement).
+
+---
+
 ## 2026-09-21 (Lot 8) — `[OBS-01]` : un outil MCP pour lire `sync_state`
 
 Marc : « fais tout » (BACKLOG, suite).
