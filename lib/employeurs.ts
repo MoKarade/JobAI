@@ -47,6 +47,12 @@
 // RÈGLE : une heuristique peut SIGNALER ce qu'on REGARDE, jamais décider ce qu'on GROUPE ni
 // ce qu'on ÉCRIT. Ce n'est de toute façon pas une résolution d'identité d'entreprise — il
 // n'y a ici ni registre ni numéro d'entreprise, et `apparier` se trompera un jour.
+//
+// ADR-0023 (2026-09-21) : deux cas où même `memeEmployeur` (strict) ne rapprochait pas deux
+// noms d'un même employeur — un qualificatif de pays/lieu (« STERIS Canada », « Exo-s
+// Saint-Damien »), pas une forme juridique. Pas de troisième règle : `normaliserNomEmployeur`
+// consulte `ALIAS_EMPLOYEUR`, une liste FERMÉE de faits vérifiés (jamais une règle de
+// rapprochement géographique, qui se tromperait comme `apparier`).
 
 /**
  * En deçà de cette longueur, seule l'égalité stricte apparie.
@@ -89,8 +95,29 @@ const SUFFIXES_CORPORATIFS = [
 ];
 
 /**
- * La forme canonique d'une raison sociale : accents, casse, ponctuation et forme juridique
- * retirés. « Laserax inc. » et « LASERAX » y arrivent tous deux à « laserax ».
+ * Paires CONNUES d'un même employeur sous deux noms qu'aucune règle syntaxique ne rapproche
+ * (ni suffixe juridique, ni casse/accent) — ADR-0023.
+ *
+ * ⚠️ CE N'EST PAS UNE HEURISTIQUE, ET C'EST LA DISTINCTION QUI COMPTE. `apparier` se trompe
+ * un jour sur un cas qu'il n'a jamais vu (`apparier("Robert", "Groupe Robert")` est vrai) ;
+ * une entrée ICI est un FAIT vérifié à la main avant d'entrer dans la table, exactement le
+ * patron déjà accepté pour `SUFFIXES_CORPORATIFS` — sauf qu'un suffixe est une classe fermée
+ * énumérable d'avance, alors qu'un alias d'entreprise s'ajoute un par un, au fil des cas
+ * RENCONTRÉS réellement (audit `SEED` × `ENTREPRISES_CIBLES`), jamais devinés à l'avance.
+ * Chaque entrée nouvelle se vérifie par le même audit AVANT d'être ajoutée (protocole §11).
+ *
+ * Volontairement PETITE : une table qui grossit sans être relue redevient une heuristique
+ * qu'on cesse de vérifier — voir le test dédié qui la garde sous une borne haute.
+ */
+export const ALIAS_EMPLOYEUR: ReadonlyMap<string, string> = new Map([
+  ["steris canada", "steris"],
+  ["exo-s saint-damien", "exo-s"],
+]);
+
+/**
+ * La forme canonique d'une raison sociale : accents, casse, ponctuation, forme juridique et
+ * alias connu retirés. « Laserax inc. » et « LASERAX » y arrivent tous deux à « laserax » ;
+ * « STERIS Canada » et « STERIS » y arrivent tous deux à « steris » (`ALIAS_EMPLOYEUR`).
  */
 export function normaliserNomEmployeur(nom: string): string {
   let n = nom
@@ -111,7 +138,8 @@ export function normaliserNomEmployeur(nom: string): string {
       }
     }
   }
-  return n;
+  // Après le retrait des suffixes : un alias vise la forme déjà nettoyée, jamais le nom brut.
+  return ALIAS_EMPLOYEUR.get(n) ?? n;
 }
 
 /**

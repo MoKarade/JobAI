@@ -3039,7 +3039,7 @@ suffixes juridiques). Sans effet aujourd'hui (les deux offres SEED ont un `km` m
 retouché), mais une offre future ingérée sous « STERIS » referait un géocodage au lieu de
 retrouver la position de « STERIS Canada ». Porté sous `[EMPLOYEUR-VARIANTE]`.
 
-### `[EMPLOYEUR-VARIANTE]` — une variante de nom re-géocode au lieu de retrouver sa position 🟦
+### `[EMPLOYEUR-VARIANTE]` — une variante de nom re-géocode au lieu de retrouver sa position ✅
 
 Trouvé en mesurant l'impact d'ADR-0022 (2026-09-21), PRÉEXISTANT à ce lot — `positionDe`
 utilise `memeEmployeur` (égalité stricte après normalisation) depuis sa correction
@@ -3055,10 +3055,13 @@ une passe / 5 min), jamais une donnée fausse — `memeEmployeur` refuse à rais
 Piste, non creusée : une table d'ALIAS explicite (« STERIS » → « STERIS Canada ») plutôt
 qu'une heuristique de nom, pour les cas RENCONTRÉS réellement plutôt que devinés à l'avance.
 
-**Cadré le 2026-09-21** ([ADR-0023](./docs/adr/0023-une-table-d-alias-fermee-pour-les-employeurs-deja-rencontres.md),
-**Proposé** — soumis à Marc, AUCUN CODE ÉCRIT). Ça touche `lib/employeurs.ts`, qui alimente
-`km` puis `scoreDistance` : protocole §11, ADR avant toute ligne de code. En attente de la
-ratification de Marc avant l'audit sur `SEED` et l'implémentation.
+**Livré le 2026-09-21** ([ADR-0023](./docs/adr/0023-une-table-d-alias-fermee-pour-les-employeurs-deja-rencontres.md),
+**Accepté**). Audit AVANT code (§11 point 2) sur les 1 908 paires `SEED` × `ENTREPRISES_CIBLES` :
+39 paires déjà égales inchangées, exactement les 2 visées basculent, zéro autre paire
+touchée. `ALIAS_EMPLOYEUR` (table fermée, exportée, bornée par test) consultée par
+`normaliserNomEmployeur` — donc par `memeEmployeur`/`cleGroupement`/`positionDe` d'un seul
+mouvement, aucune troisième règle. Mutation testée (alias débranché → 4 tests dédiés
+rougissent).
 
 ### `[ADR-INDEX-01]` — ADR-0019 existe mais n'a aucune ligne dans l'index ✅
 

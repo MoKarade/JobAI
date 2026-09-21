@@ -6,6 +6,27 @@
 
 ---
 
+## 2026-09-21 (Lot 10) — `[EMPLOYEUR-VARIANTE]` livré (ADR-0023 ratifié) + 2 fixes doc
+
+Marc a répondu au batch de questions du lot précédent : ADR-0023 ratifié (code-le), les deux
+corrections doc mineures approuvées.
+
+**Doc** : `[ADR-INDEX-01]` (ligne d'ADR-0019 ajoutée à `docs/adr/README.md`) et l'en-tête
+`[BORNES-03]` (🔴 → ✅, cohérente avec son propre corps déjà « Livré »). Commit séparé,
+avant le code, aucun risque.
+
+**`[EMPLOYEUR-VARIANTE]`** : audit AVANT code (§11 point 2, script jetable, supprimé après
+usage) sur les 1 908 paires `SEED` × `ENTREPRISES_CIBLES` — 39 déjà égales inchangées,
+exactement les 2 paires visées basculent, zéro régression sur 4 paires témoins. `lib/employeurs.ts` :
+`ALIAS_EMPLOYEUR` (2 entrées, exportée, bornée à ≤10 par test) consultée par
+`normaliserNomEmployeur`, donc par `memeEmployeur`/`cleGroupement`/`positionDe` d'un seul
+mouvement — pas une troisième règle. Mutation testée : alias débranché → 4 des 5 tests
+dédiés rougissent.
+
+Vérifications : gate complet vert (1791 tests, typecheck, lint, build).
+
+---
+
 ## 2026-09-21 (Lot 9) — `[EMPLOYEUR-VARIANTE]` cadré, `[GEO-BOOTSTRAP]` bloqué (doc seulement)
 
 Marc : « fais tout » (BACKLOG, fin de ronde). Deux items restants tranchés par question à

@@ -1,6 +1,6 @@
 # ADR-0023 — Une table d'alias FERMÉE pour les employeurs déjà rencontrés
 
-**Date** : 2026-09-21 · **Statut** : Proposé — soumis à Marc, aucun code écrit
+**Date** : 2026-09-21 · **Statut** : Accepté (Marc, 2026-09-21)
 
 ## Contexte
 
@@ -60,6 +60,22 @@ importe lequel des deux noms a été géocodé en premier.
 
 Une seule fonction pure modifiée (`normaliserNomEmployeur`), zéro nouvelle surface : c'est le
 même principe qu'ADR-0022 vient d'établir — une identité, un seul endroit qui la décide.
+
+## Audit réalisé (§11 point 2) — AVANT d'écrire le code
+
+Exécuté sur `SEED` (53 offres) × `ENTREPRISES_CIBLES` (36 entrées) = 1 908 paires, comparant
+`memeEmployeur` SANS et AVEC la table :
+
+| | Compte |
+|---|---|
+| Paires déjà égales AVANT (inchangées) | 39 |
+| Paires qui BASCULENT de faux à vrai | **2**, exactement les deux visées |
+| Paires qui basculent de vrai à faux, ou toute autre paire touchée | **0** |
+
+Les deux seules bascules : `STERIS`/`STERIS Canada` et `Exo-s Saint-Damien`/`Exo-s`.
+Non-régression testée en plus sur `Robert`/`Groupe Robert`, `Novatech`/`Groupe Novatech`,
+`Novatech`/`Novatech Canada`, `ISS`/`ISS Facility Services` : toutes restent distinctes.
+Reproduit dans `tests/employeurs.test.ts` (« audit SEED × ENTREPRISES_CIBLES »).
 
 ## Pourquoi ce n'est PAS la règle qu'ADR-0006 a refusée
 

@@ -13,6 +13,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  ALIAS_EMPLOYEUR,
   LONGUEUR_MIN_APPARIEMENT,
   apparier,
   cleGroupement,
@@ -21,6 +22,7 @@ import {
   positionDe,
 } from "../lib/employeurs";
 import { ENTREPRISES_CIBLES } from "../lib/reference";
+import { SEED } from "../lib/seed";
 
 describe("appariement des noms", () => {
   it("apparie une désignation plus longue à sa forme courte", () => {
@@ -187,5 +189,78 @@ describe("positionDe ne décide jamais au hasard", () => {
     const b = positionDe("Machin", new Map([...entrees].reverse()));
     expect(a).toEqual(b);
     expect(a).not.toBeNull();
+  });
+});
+
+describe("ALIAS_EMPLOYEUR — deux cas RENCONTRÉS, jamais une heuristique (ADR-0023)", () => {
+  it("rapproche les deux paires connues, dans les DEUX sens", () => {
+    expect(memeEmployeur("STERIS", "STERIS Canada")).toBe(true);
+    expect(memeEmployeur("STERIS Canada", "STERIS")).toBe(true);
+    expect(memeEmployeur("Exo-s Saint-Damien", "Exo-s")).toBe(true);
+    expect(memeEmployeur("Exo-s", "Exo-s Saint-Damien")).toBe(true);
+  });
+
+  it("joue APRÈS le retrait des suffixes juridiques, pas à la place", () => {
+    // « STERIS Canada inc. » doit perdre son suffixe ET son alias, dans cet ordre — l'alias
+    // vise la forme déjà nettoyée, jamais le nom brut.
+    expect(memeEmployeur("STERIS Canada inc.", "STERIS")).toBe(true);
+  });
+
+  it("ne rapproche PAS un cas voisin non vérifié — ce n'est pas une règle générale de pays/lieu", () => {
+    // Le risque nommé par ADR-0023 : une règle syntaxique (retirer tout qualificatif
+    // géographique) se tromperait un jour. La table n'énumère QUE ce qui a été vérifié.
+    expect(memeEmployeur("Robert", "Groupe Robert")).toBe(false);
+    expect(memeEmployeur("Novatech", "Novatech Canada")).toBe(false);
+    expect(memeEmployeur("Groupe Novatech", "Novatech")).toBe(false);
+    expect(memeEmployeur("ISS", "ISS Facility Services")).toBe(false);
+  });
+
+  it("positionDe retrouve désormais la position déjà connue sous l'autre nom", () => {
+    const positions = new Map([["STERIS Canada", { lat: 46.85, lon: -71.2 }]]);
+    expect(positionDe("STERIS", positions)).toEqual({ lat: 46.85, lon: -71.2 });
+  });
+
+  it("reste PETITE : une borne haute, mutation-testée par ce test lui-même", () => {
+    // Volontairement PETITE (voir le commentaire de la table) : une table qui grossit sans
+    // être relue à chaque ajout redevient une heuristique. La borne est haute exprès —
+    // ce test doit ALERTER en cas de croissance, pas empêcher un ajout vérifié.
+    expect(ALIAS_EMPLOYEUR.size).toBeGreaterThan(0);
+    expect(ALIAS_EMPLOYEUR.size).toBeLessThanOrEqual(10);
+  });
+
+  it("audit SEED × ENTREPRISES_CIBLES : SEULES les deux paires visées changent (§11 point 2)", () => {
+    // Reproduit l'audit qui a précédé le code (ADR-0023) : sur l'ensemble croisé, la table
+    // ne doit faire basculer AUCUNE autre paire de « distincts » à « même employeur ».
+    const avantAlias = (nom: string): string => {
+      // La normalisation SANS l'alias — pour isoler l'effet de la table seule.
+      let n = nom
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .replace(/[.,;()]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      for (let encore = true; encore; ) {
+        encore = false;
+        for (const s of ["inc", "ltee", "ltd", "limitee", "corp", "corporation", "enr", "cie", "co", "senc", "sencrl"]) {
+          if (n.endsWith(` ${s}`)) {
+            n = n.slice(0, -(s.length + 1)).trim();
+            encore = true;
+          }
+        }
+      }
+      return n;
+    };
+    const bascules: string[] = [];
+    for (const o of SEED) {
+      for (const c of ENTREPRISES_CIBLES) {
+        const avant = avantAlias(o.entreprise) !== "" && avantAlias(o.entreprise) === avantAlias(c.nom);
+        const apres = memeEmployeur(o.entreprise, c.nom);
+        if (avant !== apres) bascules.push(`${o.entreprise} / ${c.nom}`);
+      }
+    }
+    // Volume prouvé : sans lui, une liste vidée ferait passer l'audit à vide.
+    expect(SEED.length * ENTREPRISES_CIBLES.length).toBeGreaterThan(1000);
+    expect(bascules.sort()).toEqual(["Exo-s Saint-Damien / Exo-s", "STERIS / STERIS Canada"]);
   });
 });
