@@ -4,11 +4,17 @@
 // couverture sur le vrai jeu de départ plutôt que sur des objets fabriqués.
 
 import { describe, it, expect } from "vitest";
+import { RAYON_DEFAUT_KM } from "../lib/rayon";
+import type { Offre } from "../lib/types";
+
+/** Les paliers du rayon PAR DÉFAUT — les tests ci-dessous portent sur la mécanique du seuil. */
+const PALIERS = paliersDistance(RAYON_DEFAUT_KM);
 import { SEED } from "../lib/seed";
 import type { EtatFiltres } from "../lib/filtres";
 import {
   FILTRES_VIDES,
-  PALIERS_DISTANCE_KM,
+  paliersDistance,
+  separerParDistance,
   PALIERS_JOURS,
   PALIERS_NOTE,
   sansNoteCalculee,
@@ -98,7 +104,7 @@ describe("filtres", () => {
     // « montre-moi ce qui est à 25 km » est une demande de certitude, pas de tolérance :
     // une offre dont on ignore la distance ne peut pas y répondre. Ce que ça écarte est
     // compté à part (`sansDistanceMesuree`) pour ne pas passer pour une absence d'offres.
-    const seuil = PALIERS_DISTANCE_KM[1]!;
+    const seuil = PALIERS[1]!;
     const r = filtrer(SEED, { ...FILTRES_VIDES, distanceMaxKm: seuil });
     expect(r.every((o) => o.km !== null && o.km <= seuil)).toBe(true);
     expect(r.every((o) => !o.histo)).toBe(true); // l'historique n'a pas de distance
@@ -107,7 +113,7 @@ describe("filtres", () => {
   it("chaque palier est plus large que le précédent", () => {
     // Les cas DÉRIVENT des paliers : codés « 10 » et « 25 », ils mentiraient au premier
     // ajustement de la constante.
-    const tailles = PALIERS_DISTANCE_KM.map(
+    const tailles = PALIERS.map(
       (km) => filtrer(SEED, { ...FILTRES_VIDES, distanceMaxKm: km }).length,
     );
     for (let i = 1; i < tailles.length; i++) {
@@ -122,7 +128,7 @@ describe("filtres", () => {
   });
 
   it("compte ce qu'un seuil écarte FAUTE DE MESURE, et pas ce qui est loin", () => {
-    const seuil = PALIERS_DISTANCE_KM[0]!;
+    const seuil = PALIERS[0]!;
     const filtres = { ...FILTRES_VIDES, distanceMaxKm: seuil };
     const attendu = SEED.filter((o) => o.perimeeLe === null && o.km === null).length;
     expect(sansDistanceMesuree(SEED, filtres)).toBe(attendu);
@@ -154,19 +160,19 @@ describe("filtres", () => {
     const r = filtrer(SEED, {
       ...FILTRES_VIDES,
       activesSeules: true,
-      distanceMaxKm: PALIERS_DISTANCE_KM[1]!,
+      distanceMaxKm: PALIERS[1]!,
       noteMinimale: PALIERS_NOTE[1]!,
     });
     expect(
       r.every(
-        (o) => !o.histo && o.km! <= PALIERS_DISTANCE_KM[1]! && o.score! >= PALIERS_NOTE[1]!,
+        (o) => !o.histo && o.km! <= PALIERS[1]! && o.score! >= PALIERS_NOTE[1]!,
       ),
     ).toBe(true);
   });
 
   it("ne modifie jamais le tableau d'entrée", () => {
     const avant = SEED.map((o) => o.id);
-    filtrer(SEED, { ...FILTRES_VIDES, texte: "laserax", distanceMaxKm: PALIERS_DISTANCE_KM[0]! });
+    filtrer(SEED, { ...FILTRES_VIDES, texte: "laserax", distanceMaxKm: PALIERS[0]! });
     expect(SEED.map((o) => o.id)).toEqual(avant);
   });
 });
@@ -221,7 +227,7 @@ describe("« un filtre est-il posé ? »", () => {
       { ...FILTRES_VIDES, texte: "laserax" },
       { ...FILTRES_VIDES, activesSeules: true },
       { ...FILTRES_VIDES, noteMinimale: PALIERS_NOTE[1]! },
-      { ...FILTRES_VIDES, distanceMaxKm: PALIERS_DISTANCE_KM[0]! },
+      { ...FILTRES_VIDES, distanceMaxKm: PALIERS[0]! },
       { ...FILTRES_VIDES, historique: true },
       { ...FILTRES_VIDES, avecPerimees: true },
       { ...FILTRES_VIDES, jours: PALIERS_JOURS[0]! },
@@ -270,5 +276,85 @@ describe("filtre de CATÉGORIE", () => {
     const sansCode = { ...OFFRE_TEST, id: "s", poste: "computer network technician", noc: null };
     const r = filtrer([parLeCode, sansCode], { ...FILTRES_VIDES, categorie: "coordination" }, ["22"]);
     expect(r.map((o) => o.id)).toEqual(["n"]);
+  });
+});
+
+// ── `[UI-FILTRE-KM]` — le rayon de Marc est un palier, et l'inconnu ne se masque pas ─────
+
+describe("paliersDistance — le rayon réglé devient un seuil proposé", () => {
+  it("ajoute le rayon aux repères fixes, trié", () => {
+    expect(paliersDistance(75)).toEqual([10, 25, 50, 75]);
+    expect(paliersDistance(120)).toEqual([10, 25, 50, 120]);
+  });
+
+  it("ne dédouble pas un rayon qui coïncide avec un repère", () => {
+    // Sans le dédoublonnage, l'écran afficherait deux fois « ≤ 25 km » — dont un qui se
+    // désactiverait tout seul au clic sur l'autre.
+    expect(paliersDistance(25)).toEqual([10, 25, 50]);
+  });
+
+  it("intercale un rayon plus court plutôt que de l'ajouter à la fin", () => {
+    // L'ordre est celui de la lecture : un palier hors séquence se lit comme une erreur.
+    expect(paliersDistance(15)).toEqual([10, 15, 25, 50]);
+  });
+
+  it("arrondit, et refuse un rayon absurde plutôt que d'afficher « ≤ 0 km »", () => {
+    expect(paliersDistance(74.6)).toEqual([10, 25, 50, 75]);
+    expect(paliersDistance(0)).toEqual([10, 25, 50]);
+  });
+
+  it("le défaut du profil FIGURE dans les paliers — c'est la raison du lot", () => {
+    // Dérivé de la constante : écrit « 75 », ce test mentirait au premier réglage du
+    // profil. Avant ce lot, les paliers s'arrêtaient à 50 et la question « qu'est-ce qui
+    // est dans mon rayon ? » n'était pas offerte.
+    expect(paliersDistance(RAYON_DEFAUT_KM)).toContain(RAYON_DEFAUT_KM);
+  });
+});
+
+describe("separerParDistance — l'inconnu sort de la liste, pas de l'écran", () => {
+  const avecKm = (id: string, km: number | null): Offre => ({
+    ...SEED[0]!,
+    id,
+    km,
+    histo: false,
+    perimeeLe: null,
+  });
+
+  it("sans seuil, tout est retenu et rien n'est mis de côté", () => {
+    const r = separerParDistance([avecKm("a", 5), avecKm("b", null)], FILTRES_VIDES);
+    expect(r.retenues).toHaveLength(2);
+    expect(r.distanceInconnue).toEqual([]);
+  });
+
+  it("avec un seuil : le proche est retenu, le lointain écarté, l'inconnu mis DE CÔTÉ", () => {
+    const r = separerParDistance(
+      [avecKm("proche", 5), avecKm("loin", 200), avecKm("inconnu", null)],
+      { ...FILTRES_VIDES, distanceMaxKm: 25 },
+    );
+    expect(r.retenues.map((o) => o.id)).toEqual(["proche"]);
+    // Le lointain DISPARAÎT — on sait qu'il est loin. L'inconnu, non : on ne sait pas.
+    expect(r.distanceInconnue.map((o) => o.id)).toEqual(["inconnu"]);
+  });
+
+  it("les AUTRES filtres s'appliquent aux deux groupes", () => {
+    // C'est ce que l'ancien compte ne faisait pas : il annonçait toutes les offres sans
+    // distance, y compris celles qu'une recherche textuelle venait d'écarter.
+    const a = { ...avecKm("a", null), entreprise: "Alpha" };
+    const b = { ...avecKm("b", null), entreprise: "Beta" };
+    const r = separerParDistance([a, b], {
+      ...FILTRES_VIDES,
+      distanceMaxKm: 25,
+      texte: "alpha",
+    });
+    expect(r.distanceInconnue.map((o) => o.id)).toEqual(["a"]);
+  });
+
+  it("le compte affiché EST la taille du groupe affiché", () => {
+    // Deux nombres calculés séparément finissent par diverger : ici l'un dérive de l'autre,
+    // et ce test le fige.
+    const offres = [avecKm("a", null), avecKm("b", null), avecKm("c", 5)];
+    const f = { ...FILTRES_VIDES, distanceMaxKm: 25 };
+    expect(sansDistanceMesuree(offres, f)).toBe(separerParDistance(offres, f).distanceInconnue.length);
+    expect(sansDistanceMesuree(offres, f)).toBe(2);
   });
 });

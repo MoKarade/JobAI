@@ -2929,12 +2929,27 @@ Ce qui a été mesuré avant d'être codé, le 2026-09-18 :
 sur un PRÉFIXE du flux. Trois changements : plafond 1 600 → 12 000, plus aucun refus de lieu
 dans le flux ni dans `trier`, et le verdict ENREGISTRÉ (colonne `situation`).
 
-### `[UI-FILTRE-KM]` — le filtre de distance à l'écran ⬜
+### `[UI-FILTRE-KM]` — le filtre de distance à l'écran ✅
 
-**C'est le lot qui rend `[VEILLE-52]` utilisable, et il n'est pas fait.** Filtre par km sur le
-rayon du profil, tri par note, et un groupe « distance inconnue » qui n'est PAS masqué (masquer
-une offre dont la distance est inconnue affirmerait qu'elle est loin). `situation` est en base
-et porte déjà de quoi le dire honnêtement.
+⚠️ **Deux des trois volets étaient DÉJÀ faits, et l'entrée ne le disait pas** (constaté le
+2026-09-21, troisième « déjà fait ? » de la semaine — règle n° 1). Le filtre par km existe
+depuis le 2026-07-31 (`distanceMaxKm`, paliers 10/25/50, et un compte des offres écartées
+faute de mesure) ; le tri par note existe depuis le 2026-08-21 (`grouperParEntreprise` trie
+par note moyenne décroissante, avec trois départages). Ce qui manquait vraiment :
+
+1. **Le rayon de Marc n'était pas un palier.** Les repères s'arrêtaient à 50 km alors que le
+   rayon réglé vaut 75 par défaut et se règle jusqu'à 300 : la seule question qui a un sens
+   métier — « qu'est-ce qui est DANS mon rayon ? » — n'était pas offerte par l'écran.
+   `paliersDistance(rayonMaxKm)` l'ajoute, trié et dédoublonné, et les deux écrans lisent le
+   rayon dans l'état (`CLE_RAYON`) au lieu de le recopier.
+2. **Les offres sans distance étaient MASQUÉES, pas montrées.** Un compte les résumait
+   au-dessus de la liste ; elles disparaissaient de l'écran. Depuis ADR-0019 c'est la majorité
+   du suivi : un seuil posé le matin vidait la liste et laissait croire qu'il n'y avait rien à
+   moins de 25 km. `separerParDistance` en fait un GROUPE, sous la liste, qui dit ce qu'il est.
+3. **Le compte et le groupe n'étaient pas le même ensemble** : `sansDistanceMesuree`
+   n'appliquait que trois des huit filtres, donc il annonçait une population que l'écran ne
+   montrait pas (une recherche textuelle ne le faisait pas bouger). Il DÉRIVE désormais du
+   groupe.
 
 ### `[GEO-BOOTSTRAP]` — une distance approchée tout de suite 🟦
 

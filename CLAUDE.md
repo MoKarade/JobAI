@@ -475,6 +475,8 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
 164. Une garde de plausibilité posée à l'ÉCRITURE doit être re-posée à la LECTURE quand ce n'est pas la même entité qui porte le critère : un employeur a une position, une offre a SA ville.
 165. Élargir ce qu'on INGÈRE sans élargir ce qu'on sait SITUER transforme une garde régionale en plafond invisible — et le refus se compte comme « introuvable », indistinguable de « la source ne sait pas ».
 166. Un identifiant d'ENTITÉ n'est pas l'identifiant du FAIT : une clé primaire par employeur fait hériter une position à des offres qui n'ont rien à voir, et le chiffre qui en sort est plausible.
+167. Un scan de source qui cherche un JETON prouve qu'on l'a TAPÉ, jamais qu'il s'affiche : une assertion de rendu vise la CONDITION de rendu, sinon remplacer celle-ci par `false` laisse le test vert.
+168. Un COMPTE affiché et le GROUPE affiché doivent être le même ensemble, calculé une fois : deux calculs séparés appliquent deux sous-ensembles de filtres et l'un des deux ment sans que rien ne rougisse.
 
 ## 10. Style et compte-rendu
 

@@ -2478,3 +2478,39 @@ Neuf perturbations jouées, neuf rouges. Et un seuil d'anti-vacuité écrit avan
 (`> 10 000` caractères pour un fichier qui en fait 9 557) — le piège se re-commet même en le
 connaissant.
 
+## 2026-09-21 (Lot 4) — Le filtre par km existait ; ce qui manquait, c'était mon rayon et l'honnêteté
+
+Troisième « déjà fait ? » de la semaine. `[UI-FILTRE-KM]` annonçait trois volets ; deux
+tournaient déjà. Le filtre par distance existe depuis le 2026-07-31 (`distanceMaxKm`, paliers
+10/25/50) et le tri par note depuis le 2026-08-21 (`grouperParEntreprise`, note moyenne
+décroissante et trois départages). Écrire une entrée de backlog sans rouvrir le code, c'est
+décrire ce qu'on ferait à partir de rien.
+
+Ce qui manquait vraiment tenait en deux points, et les deux sont des défauts d'HONNÊTETÉ plus
+que de fonctionnalité.
+
+**Le rayon de Marc n'était pas proposé.** Les paliers s'arrêtaient à 50 km ; le rayon réglé
+vaut 75 par défaut et se règle jusqu'à 300. La seule question qui a un sens métier — « qu'est-ce
+qui est DANS mon rayon ? », celle pour laquelle tout l'import d'ADR-0019 a été fait — n'était
+pas offerte par l'écran. Le correctif n'est pas d'ajouter « 75 » à la liste : c'est de la
+DÉRIVER du rayon, sinon elle se périme au premier réglage — exactement ce que `PALIERS_NOTE`
+fait déjà en dérivant du barème.
+
+**Les offres sans distance étaient masquées.** Le seuil les écartait et un compte les résumait
+au-dessus de la liste. Écarter une offre dont la distance est INCONNUE revient à affirmer
+qu'elle est loin ; depuis ADR-0019 c'est la majorité du suivi, donc un seuil posé le matin
+vidait l'écran et laissait croire qu'il n'y avait rien à moins de 25 km. Elles forment
+maintenant un groupe visible, sous la liste, qui dit pourquoi il existe.
+
+Et un défaut trouvé en chemin : **le compte et le groupe n'étaient pas le même ensemble**.
+`sansDistanceMesuree` n'appliquait que `historique`, `activesSeules` et `avecPerimees` — trois
+des huit filtres. Il annonçait donc « 412 sans distance » quand une recherche textuelle n'en
+laissait que trois. Le compte dérive désormais du groupe : un seul calcul, donc pas de
+divergence possible.
+
+⚠️ **Et ma garde de rendu était vacueuse.** Elle asserait la présence de la classe CSS et de
+l'appel de regroupement ; en remplaçant la condition de rendu par `false`, le test restait
+VERT — le JSX était toujours écrit dans le fichier. Un scan prouve qu'on a TAPÉ un jeton, pas
+qu'il s'affiche : l'assertion doit viser la CONDITION. Sept perturbations jouées, celle-là
+trouvée par la sixième.
+

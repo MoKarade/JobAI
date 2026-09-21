@@ -72,7 +72,29 @@ export const FILTRES_VIDES: EtatFiltres = {
  * veut pas d'un trajet quotidien. C'est un confort de lecture, jamais une limite de ce qui
  * entre dans le suivi — le filtre de région, lui, vit dans `lib/ingest/region.ts`.
  */
-export const PALIERS_DISTANCE_KM: readonly number[] = [10, 25, 50];
+const PALIERS_DISTANCE_FIXES: readonly number[] = [10, 25, 50];
+
+/**
+ * Les paliers de distance proposés, RAYON DE MARC COMPRIS.
+ *
+ * ⚠️ POURQUOI UNE FONCTION ET PLUS UNE CONSTANTE (`[UI-FILTRE-KM]`, 2026-09-21). Les trois
+ * repères ci-dessus s'arrêtaient à 50 km alors que le rayon réglé vaut 75 par défaut
+ * (`RAYON_DEFAUT_KM`) et se règle jusqu'à 300 : la seule question que Marc pose vraiment —
+ * « qu'est-ce qui est DANS mon rayon ? » — n'était pas offerte par l'écran. C'est aussi
+ * l'unique seuil qui a un sens métier : les trois autres sont des repères de lecture, celui-ci
+ * est la limite que le barème applique déjà à la note.
+ *
+ * Le rayon n'est PAS recopié : il vient de l'état (`CLE_RAYON`) et traverse jusqu'ici. Une
+ * quatrième valeur écrite en dur aurait dérivé au premier réglage — la classe de défaut que
+ * `PALIERS_NOTE` évite déjà en dérivant du barème.
+ *
+ * Trié et dédoublonné : régler le rayon à 25 ne doit pas afficher deux fois « ≤ 25 km ».
+ */
+export function paliersDistance(rayonMaxKm: number): number[] {
+  return [...new Set([...PALIERS_DISTANCE_FIXES, Math.round(rayonMaxKm)])]
+    .filter((km) => km > 0)
+    .sort((a, b) => a - b);
+}
 
 /**
  * Les paliers de note proposés.
@@ -201,13 +223,48 @@ export function sansNoteCalculee(offres: readonly Offre[], f: EtatFiltres): numb
   }).length;
 }
 
-export function sansDistanceMesuree(offres: readonly Offre[], f: EtatFiltres): number {
-  if (f.distanceMaxKm === null) return 0;
-  return offres.filter((o) => {
-    if (f.historique ? !o.histo : f.activesSeules && o.histo) return false;
-    if (!f.avecPerimees && !f.historique && o.perimeeLe !== null) return false;
-    return o.km === null;
-  }).length;
+/**
+ * Ce que le seuil de distance retient, et ce qu'il met DE CÔTÉ faute de mesure.
+ *
+ * ⚠️ « DE CÔTÉ » N'EST PAS « MASQUÉ », et c'est tout l'objet de `[UI-FILTRE-KM]`. Écarter une
+ * offre dont la distance est INCONNUE revient à affirmer qu'elle est loin — or on n'en sait
+ * rien, et depuis ADR-0019 c'est le cas de la majorité du suivi. Elles sortent donc de la
+ * liste principale (elles ne satisfont pas le seuil) mais restent AFFICHÉES, à part et
+ * nommées, au lieu d'être résumées par un compte au-dessus de la liste.
+ *
+ * ⚠️ TOUS LES AUTRES FILTRES S'APPLIQUENT AUX DEUX GROUPES. C'est ce que l'ancien compte
+ * `sansDistanceMesuree` ne faisait pas : il n'appliquait que `historique`, `activesSeules` et
+ * `avecPerimees`, donc il annonçait « 412 sans distance » alors qu'une recherche textuelle
+ * n'en laissait que trois. Un chiffre juste pour une population que l'écran ne montre pas.
+ *
+ * PURE : c'est `filtrer` appelé une fois sans le seuil, puis partagé.
+ */
+export function separerParDistance(
+  offres: readonly Offre[],
+  f: EtatFiltres,
+  metiers: readonly string[] = [],
+): { retenues: Offre[]; distanceInconnue: Offre[] } {
+  const tous = filtrer(offres, { ...f, distanceMaxKm: null }, metiers);
+  const seuil = f.distanceMaxKm;
+  if (seuil === null) return { retenues: tous, distanceInconnue: [] };
+  return {
+    retenues: tous.filter((o) => o.km !== null && o.km <= seuil),
+    distanceInconnue: tous.filter((o) => o.km === null),
+  };
+}
+
+/**
+ * Combien d'offres le seuil met de côté faute de MESURE.
+ *
+ * DÉRIVÉ de `separerParDistance`, jamais recalculé : le compte affiché et le groupe affiché
+ * doivent être le même ensemble, sinon l'un des deux ment. (Il l'a fait — voir ci-dessus.)
+ */
+export function sansDistanceMesuree(
+  offres: readonly Offre[],
+  f: EtatFiltres,
+  metiers: readonly string[] = [],
+): number {
+  return separerParDistance(offres, f, metiers).distanceInconnue.length;
 }
 
 /**

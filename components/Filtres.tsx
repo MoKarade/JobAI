@@ -13,7 +13,7 @@
 // le rendu et l'état. Deux surfaces, une règle, une barre.
 
 import {
-  PALIERS_DISTANCE_KM,
+  paliersDistance,
   PALIERS_JOURS,
   PALIERS_NOTE,
   type EtatFiltres,
@@ -45,12 +45,22 @@ export function Filtres({
   filtres,
   onChange,
   etiquetteRecherche,
+  rayonMaxKm,
   children,
 }: {
   filtres: EtatFiltres;
   onChange: (f: EtatFiltres) => void;
   /** Ce que la recherche parcourt ici — le dire évite de chercher dans le vide. */
   etiquetteRecherche: string;
+  /**
+   * Le rayon réglé par Marc, en km — il devient un palier de distance proposé.
+   *
+   * ⚠️ REQUIS, et pas « optionnel avec 75 par défaut ». Un défaut ici ferait de l'appelant
+   * qui n'y pense pas celui qui affiche un rayon qui n'est pas celui de Marc, sans que rien
+   * ne rougisse : deux écrans offriraient deux réponses à « mon rayon ». Le compilateur
+   * oblige chaque écran à aller chercher l'état.
+   */
+  rayonMaxKm: number;
   /** Ce qui s'ajoute à droite de la barre (export, bouton de localisation…). */
   children?: React.ReactNode;
 }) {
@@ -115,7 +125,7 @@ export function Filtres({
           on ne cherche pas « 23 ». Un second clic sur le palier actif le retire, comme
           une bascule : sans ça, il n'y aurait aucun moyen de revenir à « toutes ». */}
       <span className="controles__groupe" role="group" aria-label="Distance maximale">
-        {PALIERS_DISTANCE_KM.map((km) => {
+        {paliersDistance(rayonMaxKm).map((km) => {
           const actif = filtres.distanceMaxKm === km;
           return (
             <button
@@ -125,7 +135,7 @@ export function Filtres({
               aria-pressed={actif}
               onClick={() => onChange({ ...filtres, distanceMaxKm: actif ? null : km })}
             >
-              ≤ {km} km
+              ≤ {km} km{km === Math.round(rayonMaxKm) ? " (mon rayon)" : ""}
             </button>
           );
         })}

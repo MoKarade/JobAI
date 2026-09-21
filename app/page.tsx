@@ -11,6 +11,7 @@ import { after } from "next/server";
 import { lireOffres } from "@/lib/donnees";
 import { lireMetiers } from "@/lib/actionsMetiers";
 import { lireEtat } from "@/lib/etat";
+import { CLE_RAYON, RAYON_DEFAUT_KM } from "@/lib/rayon";
 import { CLE_JOURNAL } from "@/lib/veilleComplete";
 import type { JournalVeille } from "@/lib/veille";
 import { fraicheursDuSuivi } from "@/lib/fraicheur";
@@ -68,8 +69,15 @@ export default async function Accueil() {
    */
   let journal: JournalVeille = {};
 
+  /**
+   * Le rayon réglé par Marc, pour que le filtre de distance PROPOSE son rayon
+   * (`[UI-FILTRE-KM]`). Sa lecture ne peut pas emporter l'écran : un rayon illisible rend le
+   * défaut, ce qui offre un palier de trop ou de moins — jamais une page blanche.
+   */
+  let rayonMaxKm = RAYON_DEFAUT_KM;
+
   try {
-    [offres, metiers, journal] = await Promise.all([
+    [offres, metiers, journal, rayonMaxKm] = await Promise.all([
       lireOffres(),
       lireMetiers(),
       // ⚠️ SON ÉCHEC NE DOIT PAS EMPORTER L'ÉCRAN. Le journal sert à NUANCER un affichage,
@@ -80,6 +88,10 @@ export default async function Accueil() {
       lireEtat<JournalVeille>(CLE_JOURNAL, {}).catch((err) => {
         console.error("[page] journal de veille illisible, pastilles omises", err);
         return {} as JournalVeille;
+      }),
+      lireEtat<number>(CLE_RAYON, RAYON_DEFAUT_KM).catch((err) => {
+        console.error("[page] rayon illisible, palier du rayon au défaut", err);
+        return RAYON_DEFAUT_KM;
       }),
     ]);
   } catch (err) {
@@ -219,7 +231,12 @@ export default async function Accueil() {
                 <FormulaireAjout />
               </Depliant>
 
-              <ListeOffres offres={offres} metiers={metiers} fraicheurs={fraicheurs} />
+              <ListeOffres
+                offres={offres}
+                rayonMaxKm={rayonMaxKm}
+                metiers={metiers}
+                fraicheurs={fraicheurs}
+              />
             </>
           );
         })()

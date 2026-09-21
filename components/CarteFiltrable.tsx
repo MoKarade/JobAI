@@ -49,6 +49,7 @@ import { BoutonSituer } from "./BoutonSituer";
 export function CarteFiltrable({
   offres,
   cibles,
+  rayonMaxKm,
   positions,
   ciblesManquantes,
   metiers = [],
@@ -60,6 +61,8 @@ export function CarteFiltrable({
   /** Les métiers du domaine — la catégorie s'en sert, comme la note. */
   metiers?: readonly string[];
   cibles: EntrepriseCible[];
+  /** Le rayon réglé par Marc — il devient un palier de distance proposé (`[UI-FILTRE-KM]`). */
+  rayonMaxKm: number;
   /** Positions déjà géocodées, sérialisées par la page (une `Map` ne traverse pas). */
   positions: [string, PositionEntreprise][];
   /** Ce que le bouton « Situer » peut réellement traiter — les cibles, pas les employeurs. */
@@ -78,7 +81,12 @@ export function CarteFiltrable({
 
   const table = useMemo(() => new Map(positions), [positions]);
   const retenues = useMemo(() => filtrer(offres, filtres, metiers), [offres, filtres, metiers]);
-  const sansDistance = useMemo(() => sansDistanceMesuree(offres, filtres), [offres, filtres]);
+  // `metiers` passé ICI aussi : sans lui, le compte se calculerait sur une population plus
+  // large que celle qu'on affiche dès qu'un filtre de catégorie est posé.
+  const sansDistance = useMemo(
+    () => sansDistanceMesuree(offres, filtres, metiers),
+    [offres, filtres, metiers],
+  );
   const sansNote = useMemo(() => sansNoteCalculee(offres, filtres), [offres, filtres]);
 
   // ⚠️ LES CIBLES SONT TOUJOURS PASSÉES, MAIS ELLES N'AJOUTENT PLUS D'ÉPINGLE.
@@ -154,7 +162,8 @@ export function CarteFiltrable({
         <Filtres
           filtres={filtres}
           onChange={setFiltres}
-          etiquetteRecherche="Filtrer (entreprise, poste, note)…"
+          rayonMaxKm={rayonMaxKm}
+        etiquetteRecherche="Filtrer (entreprise, poste, note)…"
         />
       </Depliant>
 

@@ -1043,6 +1043,31 @@ code {
 }
 
 .liste { display: flex; flex-direction: column; gap: 0.95rem; }
+
+/* ── Le groupe « distance inconnue » (`[UI-FILTRE-KM]`, 2026-09-21) ─────────
+   Il est SOUS la liste et SÉPARÉ d'elle par un trait, pas masqué : une offre
+   dont la distance n'est pas mesurée ne satisfait pas un seuil, mais la faire
+   disparaître affirmerait qu'elle est loin — et depuis ADR-0019 c'est le cas
+   de la majorité du suivi. Le retrait visuel est porté par l'espace et le
+   trait, jamais par une opacité : atténuer les cartes rendrait leur note
+   illisible, or c'est précisément la note qui doit rester lisible ici. */
+.liste-distance-inconnue {
+  margin-top: 1.75rem;
+  padding-top: 1.1rem;
+  border-top: var(--trait-surface);
+}
+
+.liste-distance-inconnue__titre {
+  font-size: var(--t-s);
+  font-weight: 600;
+  margin: 0 0 0.2rem;
+}
+
+.liste-distance-inconnue__note {
+  font-size: var(--t-xs);
+  color: var(--text-soft);
+  margin: 0 0 0.9rem;
+}
 /* Les offres D'UNE ENTREPRISE, dépliées sous sa carte : un peu plus serrées que la liste
    du haut niveau, pour qu'on lise « ce sont les détails d'un même groupe », pas une liste
    sœur. */

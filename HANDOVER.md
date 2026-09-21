@@ -6,6 +6,36 @@
 
 ---
 
+## 2026-09-21 (Lot 4) — le filtre par km existait ; mon rayon et l'honnêteté manquaient
+
+`[UI-FILTRE-KM]`, dernier lot du plan. ⚠️ **Deux de ses trois volets étaient déjà livrés** —
+le filtre par distance depuis le 2026-07-31, le tri par note depuis le 2026-08-21. Troisième
+« déjà fait ? » de la semaine (règle n° 1). Ce qui manquait :
+
+1. **Le rayon de Marc n'était pas un palier.** Les repères s'arrêtaient à 50 km alors que le
+   rayon réglé vaut 75 par défaut et se règle jusqu'à 300 : « qu'est-ce qui est DANS mon
+   rayon ? » — la question pour laquelle tout l'import d'ADR-0019 a été fait — n'était pas
+   offerte. `paliersDistance(rayonMaxKm)` l'ajoute, DÉRIVÉ de l'état (`CLE_RAYON`), trié et
+   dédoublonné ; le bouton porte « (mon rayon) ». Les deux écrans lisent le rayon.
+2. **Les offres sans distance étaient masquées.** Un compte les résumait, elles
+   disparaissaient. Depuis ADR-0019 c'est la majorité du suivi : un seuil posé le matin vidait
+   l'écran et laissait croire qu'il n'y avait rien à moins de 25 km. Elles forment maintenant
+   un GROUPE visible sous la liste, qui dit qu'elles sont hors du seuil **faute de mesure**,
+   pas parce qu'elles sont loin.
+3. Trouvé en chemin : **le compte et le groupe n'étaient pas le même ensemble.**
+   `sansDistanceMesuree` n'appliquait que 3 des 8 filtres — il annonçait une population que
+   l'écran ne montrait pas. Il dérive désormais du groupe.
+
+Sept perturbations jouées, sept rouges — dont une garde de rendu qui était VACUEUSE au premier
+jet : elle cherchait la classe CSS, or remplacer la condition de rendu par `false` la laissait
+verte. Un scan prouve qu'on a TAPÉ un jeton, pas qu'il s'affiche.
+
+⚠️ **À regarder à l'écran** : le groupe « distance inconnue » n'a pas de harnais de rendu dans
+ce dépôt (ni testing-library ni jsdom) — il est vérifié par scan de source. Son apparence
+réelle se juge sur `emploi.hubperso.com`, pas ici.
+
+---
+
 ## 2026-09-21 (Lot 3) — les distances affichées étaient FAUSSES, pas manquantes
 
 Marc : « enchaine les lots ». Lot 3 du plan en quatre lots (`[GEO-BOOTSTRAP]`). Le contenu du

@@ -32,6 +32,8 @@ import { ENTREPRISES_CIBLES } from "@/lib/reference";
 import { classerPanne, type Panne } from "@/lib/panne";
 import { Cadre } from "@/components/Cadre";
 import { domicile } from "@/lib/domicile";
+import { lireEtat } from "@/lib/etat";
+import { CLE_RAYON, RAYON_DEFAUT_KM } from "@/lib/rayon";
 import { CarteFiltrable } from "@/components/CarteFiltrable";
 import { resteDuTravail, type LieuTravail } from "@/lib/travaux";
 import { mesurerDistances, passeGeocodage } from "@/lib/actions";
@@ -67,9 +69,16 @@ export default async function PageCarte() {
   // sans lui elle rend exactement ce qu'elle rendait avant ADR-0016.
   let maison: { lat: number; lon: number } | null = null;
   let durees: [string, { dureeS: number; distanceM: number }][] = [];
+  /**
+   * Le rayon réglé par Marc, pour que le filtre PROPOSE son rayon (`[UI-FILTRE-KM]`). Lu ici
+   * plutôt que passé : la barre de filtres est la MÊME que celle de la liste, et deux écrans
+   * qui offriraient deux « mon rayon » différents seraient pires que pas de palier du tout.
+   */
+  let rayonMaxKm = RAYON_DEFAUT_KM;
 
   try {
     maison = await domicile();
+    rayonMaxKm = await lireEtat<number>(CLE_RAYON, RAYON_DEFAUT_KM);
     offres = await lireOffres();
     if (offres !== null) {
       const lignes = await db.select().from(entreprisesLieux);
@@ -243,6 +252,7 @@ export default async function PageCarte() {
         cibles={[...ENTREPRISES_CIBLES]}
         positions={[...positions.entries()]}
         ciblesManquantes={ciblesManquantes}
+        rayonMaxKm={rayonMaxKm}
         cleGoogle={process.env.NEXT_PUBLIC_GOOGLE_MAPS_CLIENT_KEY?.trim() || null}
         domicile={maison}
         durees={durees}

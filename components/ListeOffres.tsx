@@ -20,9 +20,8 @@ import { useMemo, useState } from "react";
 import type { Offre } from "@/lib/types";
 import {
   FILTRES_VIDES,
-  filtrer,
-  sansDistanceMesuree,
   sansNoteCalculee,
+  separerParDistance,
   type EtatFiltres,
 } from "@/lib/filtres";
 import { grouperParEntreprise } from "@/lib/groupesEntreprise";
@@ -33,10 +32,13 @@ import { CompteFiltre, Filtres } from "./Filtres";
 
 export function ListeOffres({
   offres,
+  rayonMaxKm,
   metiers = [],
   fraicheurs = {},
 }: {
   offres: Offre[];
+  /** Le rayon réglé par Marc — il devient un palier de distance, et le titre du groupe. */
+  rayonMaxKm: number;
   /**
    * Les métiers du domaine, pour que la CATÉGORIE affichée soit celle qui a servi à noter.
    * Défaut vide : un appelant qui ne les passe pas obtient la catégorie déduite du seul
@@ -53,10 +55,19 @@ export function ListeOffres({
   fraicheurs?: Readonly<Record<string, Fraicheur>>;
 }) {
   const [filtres, setFiltres] = useState<EtatFiltres>(FILTRES_VIDES);
-  const visibles = useMemo(() => filtrer(offres, filtres, metiers), [offres, filtres, metiers]);
+  const { retenues: visibles, distanceInconnue } = useMemo(
+    () => separerParDistance(offres, filtres, metiers),
+    [offres, filtres, metiers],
+  );
   const groupes = useMemo(() => grouperParEntreprise(visibles), [visibles]);
+  // Le second groupe est regroupé et trié comme le premier : c'est la même liste, pas une
+  // annexe. Un tri différent ferait croire à une autre nature d'offre.
+  const groupesInconnus = useMemo(
+    () => grouperParEntreprise(distanceInconnue),
+    [distanceInconnue],
+  );
 
-  const sansDistance = useMemo(() => sansDistanceMesuree(offres, filtres), [offres, filtres]);
+  const sansDistance = distanceInconnue.length;
   const sansNote = useMemo(() => sansNoteCalculee(offres, filtres), [offres, filtres]);
 
   return (
@@ -67,6 +78,7 @@ export function ListeOffres({
         filtres={filtres}
         onChange={setFiltres}
         etiquetteRecherche="Filtrer (entreprise, poste, note)…"
+        rayonMaxKm={rayonMaxKm}
       >
         {/* L'export suit les filtres : ce qu'on télécharge est ce qu'on voit. */}
         <BoutonExport offres={visibles} />
@@ -101,6 +113,30 @@ export function ListeOffres({
           ))}
         </div>
       )}
+
+      {/* ⚠️ MONTRÉ, PAS MASQUÉ (`[UI-FILTRE-KM]`). Une offre dont la distance est INCONNUE ne
+          satisfait pas un seuil — on ne peut pas affirmer qu'elle est proche. Mais la faire
+          disparaître affirmerait l'inverse : qu'elle est loin. Depuis ADR-0019 c'est le cas
+          de la majorité du suivi, donc un seuil posé le matin viderait l'écran et laisserait
+          croire qu'il n'y a rien à moins de 25 km. Le groupe est donc à part, sous la liste,
+          et il DIT ce qu'il est. */}
+      {groupesInconnus.length > 0 ? (
+        <section className="liste-distance-inconnue">
+          <h2 className="liste-distance-inconnue__titre">
+            Distance inconnue — {distanceInconnue.length} offre
+            {distanceInconnue.length > 1 ? "s" : ""}
+          </h2>
+          <p className="liste-distance-inconnue__note">
+            Hors du seuil ≤ {filtres.distanceMaxKm} km faute de mesure, pas parce qu&apos;elles
+            sont loin. La mesure se fait toute seule, au fil des passages.
+          </p>
+          <div className="liste">
+            {groupesInconnus.map((g) => (
+              <CarteEntreprise key={g.nom} groupe={g} fraicheurs={fraicheurs} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }
