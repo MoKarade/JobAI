@@ -10,7 +10,7 @@ import {
   validateSummary,
 } from "@mokarade/hub-contract";
 import { GET } from "../app/api/hub/summary/route";
-import { APP, construireSummary } from "../lib/hubSummary";
+import { APP, LIBELLE_HEROS, construireSummary } from "../lib/hubSummary";
 import { resumer } from "../lib/suivi";
 import { SEED } from "../lib/seed";
 import type { ResumeSuivi } from "../lib/types";
@@ -85,10 +85,59 @@ describe("construction du summary", () => {
     expect(() => validateSummary(construireSummary(resume, LE))).not.toThrow();
   });
 
-  it("met la meilleure offre en position 0 — le gros chiffre du widget", () => {
+  it("met l'ARRIVAGE en position 0 — le gros chiffre du widget", () => {
+    // ⚠️ TEST INVERSÉ EN PLACE, il affirmait le contraire (« la meilleure offre en position
+    // 0 », ADR-0001). Décision Marc du 2026-09-21, ADR-0020 : le héros est le nombre de
+    // nouvelles offres. Le supprimer laisserait croire que la position 0 n'a jamais été
+    // décidée — or elle l'a été deux fois, et la seconde fois pour une raison mesurable.
     const s = construireSummary(resume, LE);
-    expect(s.metrics[0]?.value).toBe(92);
-    expect(s.metrics[0]?.label).toContain("IEL");
+    expect(s.metrics[0]?.label).toBe(LIBELLE_HEROS);
+    expect(s.metrics[0]?.value).toBe(resume.nouvelles);
+    expect(s.metrics[0]?.primary).toBe(true);
+
+    // …et la meilleure offre n'a pas disparu : elle passe en métrique SECONDAIRE.
+    const meilleure = s.metrics.find((m) => m.label.startsWith("Meilleure"));
+    expect(meilleure?.value).toBe(92);
+    expect(meilleure?.label).toContain("IEL");
+    expect(meilleure?.primary).toBeUndefined();
+  });
+
+  it("le libellé du héros est FIGÉ à sa valeur exacte — le renommer jette la courbe", () => {
+    // ⚠️ Sans cette assertion, toutes les autres sont AUTO-SATISFAITES : elles comparent à
+    // `LIBELLE_HEROS`, donc renommer la constante les laisse toutes vertes — et pendant ce
+    // temps le hub, qui indexe l'historique par le libellé PUBLIÉ, perdrait la série
+    // accumulée et la carte retomberait sur « pas encore d'historique ».
+    //
+    // Ce n'est pas un golden qu'on re-base : c'est une clé partagée avec un autre dépôt
+    // (`Hubperso/lib/historique.ts`), et la changer se décide — voir ADR-0020.
+    expect(LIBELLE_HEROS).toBe("Nouvelles (7 j)");
+  });
+
+  it("le libellé du héros ne dépend PAS des données — c'est la clé de la courbe", () => {
+    // ⚠️ LA GARDE QUI COMPTE, et la raison d'être du lot. Le hub indexe l'historique d'une
+    // métrique par son LIBELLÉ (`serieMetrique(historique, label)`). L'ancien héros portait
+    // le nom de l'entreprise : il changeait de clé à chaque changement d'offre de tête, donc
+    // sa série repartait de zéro et la carte disait « pas encore d'historique ».
+    //
+    // DISCRIMINANT : sur le code d'avant, ces deux libellés valaient « Meilleure : IEL » et
+    // « Meilleure : Autre entreprise » — le test rougit. Il rougira de nouveau si un lot
+    // futur remet une part variable (entreprise, date, compte) dans le titre de la carte.
+    const a = construireSummary(resume, LE);
+    const b = construireSummary(
+      {
+        ...resume,
+        nouvelles: resume.nouvelles + 7,
+        meilleure: { entreprise: "Autre entreprise", poste: "Autre poste", score: 71 },
+      },
+      "2026-09-21T12:00:00.000Z",
+    );
+    const heros = (x: typeof a) => x.metrics.find((m) => m.primary)!.label;
+    expect(heros(a)).toBe(heros(b));
+    // Anti-vacuité : les deux résumés DIFFÈRENT bien (sinon l'égalité serait triviale).
+    expect(a.metrics.find((m) => m.primary)!.value)
+      .not.toBe(b.metrics.find((m) => m.primary)!.value);
+    expect(a.metrics.find((m) => m.label.startsWith("Meilleure"))?.label)
+      .not.toBe(b.metrics.find((m) => m.label.startsWith("Meilleure"))?.label);
   });
 
   it("respecte les bornes du contrat : 6 métriques au plus, libellés courts", () => {
@@ -110,7 +159,13 @@ describe("construction du summary", () => {
       },
     };
     const s = construireSummary(long, LE);
-    expect(s.metrics[0]!.label.length).toBeLessThanOrEqual(40);
+    // ⚠️ VISÉ PAR LE LIBELLÉ, plus par la position : depuis ADR-0020 la position 0 est
+    // l'arrivage, dont le libellé est une constante de 15 caractères — l'assertion serait
+    // devenue VRAIE sans plus rien mesurer, le pire des verts.
+    const meilleure = s.metrics.find((m) => m.label.startsWith("Meilleure"));
+    expect(meilleure).toBeDefined();
+    expect(meilleure!.label.length).toBeLessThanOrEqual(40);
+    expect(meilleure!.label.endsWith("…")).toBe(true);
     expect(() => validateSummary(s)).not.toThrow();
   });
 
@@ -124,10 +179,11 @@ describe("construction du summary", () => {
   it("n'invente aucune métrique quand le suivi est vide", () => {
     const vide = resumer([], "2026-08-14");
     const s = construireSummary(vide, LE);
-    // Pas de meilleure offre : la position 0 ne doit pas être occupée par un faux héros.
-    // C'est « Nouvelles » qui prend la tête — un compteur à zéro y est une information
-    // VRAIE (« rien n'est arrivé »), pas une métrique inventée.
-    expect(s.metrics[0]?.label).toBe("Nouvelles (7 j)");
+    // « Nouvelles » est le héros dans TOUS les cas depuis ADR-0020 — ici la remarque qui
+    // compte est qu'un compteur à zéro y est une information VRAIE (« rien n'est arrivé
+    // cette semaine »), pas une métrique inventée : il reste publié, et mis en avant.
+    expect(s.metrics[0]?.label).toBe(LIBELLE_HEROS);
+    expect(s.metrics[0]?.primary).toBe(true);
     expect(s.metrics[0]?.value).toBe(0);
     // ⚠️ Et la moyenne, elle, est ABSENTE : sans nouvelle à moyenner, publier un 0
     // annoncerait des offres nulles là où il n'y a pas d'offre (garde-fou n°3).

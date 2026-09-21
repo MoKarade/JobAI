@@ -2311,3 +2311,50 @@ et leur libellé aussi : « lieux refusés » serait devenu faux.
 disparaît avec la décision ; ce qui sert à OBSERVER doit survivre, et sous un nom qui ne ment
 plus. Même famille que la leçon n° 140 (« une garde qui EXCLUT une population la prive aussi
 de ce que ce mécanisme DISAIT »), vue depuis le moment où l'on retire la garde.
+
+---
+
+## 158. Le libellé d'une métrique publiée est une CLÉ chez son consommateur
+
+**2026-09-21, `[HUB-HEROS-ARRIVAGE]` / ADR-0020.** Marc : « la carte jobai je veux que ce soit
+le nombre de nouvelles offres le gros chiffre et le graph ».
+
+La demande ressemblait à une préférence de mise en page. Elle décrivait un défaut.
+
+Le hub choisit le gros chiffre de la carte par `metrics.find(m => m.primary) ?? metrics[0]`,
+puis trace sa courbe avec `serieMetrique(historique, elue.label)` — **l'historique est indexé
+par le LIBELLÉ**. Le héros de JobAI s'appelait `Meilleure : <entreprise>`. À chaque changement
+d'employeur en tête de liste, le libellé changeait, donc la clé changeait, donc la série
+repartait de zéro et la carte affichait « pas encore d'historique ».
+
+**Le seul chiffre mis en avant était structurellement le seul à ne pas pouvoir être tracé.**
+Personne ne pouvait le voir en lisant JobAI : rien n'y est faux. Et personne ne pouvait le voir
+en lisant le hub : il fait exactement ce qu'il annonce. Le défaut vit dans le **contrat entre
+les deux**, et il ne se lit qu'en ouvrant les deux dépôts.
+
+Mesuré avant de décider : `Nouvelles (7 j)` est publié sans condition depuis le **2026-08-14**
+(`c900e39`, `[HUB-01]`) et la rétention du hub est de **90 jours**. La série existait donc
+déjà, complète — elle n'avait jamais été élue. La courbe est apparue avec 38 jours
+d'historique, sans rien attendre.
+
+⚠️ **La conséquence est plus large que le lot** : le libellé cesse d'être un titre. Il devient
+une clé partagée avec un autre dépôt, que le hub n'a aucun moyen de rapprocher de sa
+remplaçante. Le renommer « en mieux » — c'est la tentation, `Nouvelles offres` est plus joli —
+jette la série **sans que rien ne rougisse**. D'où une constante exportée (`LIBELLE_HEROS`) et
+une garde qui fige sa valeur EXACTE.
+
+⚠️ **Et cette garde-là n'est pas un golden de confort : sans elle, toutes les autres sont
+auto-satisfaites.** Les quatre assertions du lot comparent à `LIBELLE_HEROS` — renommer la
+constante les laisse toutes vertes pendant que la production perd sa courbe. Mesuré : le
+renommage fait tomber 3 tests, dont celui-là ; sans lui il n'en tombe que 2, et aucun ne parle
+de la série.
+
+**La règle** : le libellé d'une métrique publiée à un consommateur qu'on ne contrôle pas est
+une CLÉ chez lui, jamais un titre. Avant de le choisir, demander ce que le consommateur en
+FAIT — ce qu'il indexe et ce qu'il dérive. Un libellé qui porte une part variable (une
+entreprise, une date, un compte) ne peut pas avoir d'historique, et ça ne se voit d'aucun des
+deux côtés.
+
+*(Même famille que la leçon jumelle de FinanceAI, `UN-LIBELLE-DE-METRIQUE-EST-UNE-CLE-CHEZ-SON-CONSOMMATEUR`,
+2026-09-17 : là-bas c'était une date dans le libellé qui remettait la série à zéro à chaque
+séance. Deux dépôts, deux formes de part variable, un seul mécanisme.)*

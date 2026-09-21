@@ -8,6 +8,17 @@
 
 ---
 
+## Trouvé en passant (non demandé — feu vert requis)
+
+- [ ] 🔧 **`[DOC-ADR-INDEX]` ADR-0019 n'a pas de ligne dans l'index de `docs/adr/README.md`.**
+  Le fichier existe (`0019-toutes-les-quebecoises-entrent.md`, Accepté le 2026-09-18), la table
+  s'arrête à 0018 puis saute à 0020. Exactement l'oubli déjà réparé pour ADR-0017 le 2026-09-17
+  — donc la deuxième fois, ce qui dit que l'index se tient à la main et se reperd. Une table qui
+  omet une décision acceptée est pire qu'absente : elle se lit comme la liste complète.
+  Repéré en ajoutant ADR-0020 ; **pas corrigé, scope non demandé**.
+
+---
+
 ## Installable sur le téléphone (Marc, 18/09/2026 — Android) ✅
 
 - [x] **`id` et `launch_handler: navigate-existing` au manifeste.** Sans `id`, l'identité de

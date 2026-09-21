@@ -19,7 +19,7 @@ import {
   sectionVeille,
   type VeillePubliee,
 } from "../lib/fraicheurVeille";
-import { construireSummary } from "../lib/hubSummary";
+import { LIBELLE_HEROS, construireSummary } from "../lib/hubSummary";
 import { resumer } from "../lib/suivi";
 import { SEED } from "../lib/seed";
 
@@ -208,17 +208,23 @@ describe("construireSummary avec la fraîcheur (contrat v1.3)", () => {
     expect(s.expectedMaxAgeSec).toBe(AGE_MAX_VEILLE_SEC);
   });
 
-  it("`primary` désigne la meilleure offre, et se REPLIE sur l'arrivage s'il n'y en a pas", () => {
-    // Le contrat autorise zéro `primary`, mais une carte sans chiffre mis en avant est une
-    // carte qu'on ne lit pas. DISCRIMINANT : sans le repli, un suivi sans offre notée
-    // perdrait son titre de carte — l'état le plus fréquent d'un début de recherche.
+  it("`primary` désigne l'ARRIVAGE, avec ou sans meilleure offre", () => {
+    // ⚠️ TEST INVERSÉ EN PLACE (ADR-0020, décision Marc 2026-09-21). Il affirmait
+    // « `primary` désigne la meilleure offre, et se REPLIE sur l'arrivage » — ce repli
+    // existait parce que l'ancien héros DISPARAISSAIT quand rien n'était noté. L'arrivage,
+    // lui, est toujours là, donc il n'y a plus de repli du tout : une seule règle, dans les
+    // deux états. Garder la trace de l'ancienne évite qu'un lot futur la « rétablisse ».
     const avec = construireSummary(resume, LE);
-    expect(avec.metrics.filter((m) => m.primary).map((m) => m.label))
-      .toEqual([avec.metrics[0]!.label]);
-    expect(avec.metrics[0]!.label).toContain("Meilleure");
+    expect(avec.metrics.filter((m) => m.primary).map((m) => m.label)).toEqual([LIBELLE_HEROS]);
+    // …et il est bien en tête : l'ordre et le drapeau doivent dire la même chose, pour un
+    // hub pinné sur un contrat antérieur à v1.3 qui ignore `primary`.
+    expect(avec.metrics[0]!.label).toBe(LIBELLE_HEROS);
+    // Anti-vacuité : ce résumé-là A une meilleure offre — sinon les deux cas sont le même.
+    expect(avec.metrics.some((m) => m.label.startsWith("Meilleure"))).toBe(true);
 
     const vide = construireSummary(resumer([], "2026-08-14"), LE);
-    expect(vide.metrics.filter((m) => m.primary).map((m) => m.label)).toEqual(["Nouvelles (7 j)"]);
+    expect(vide.metrics.filter((m) => m.primary).map((m) => m.label)).toEqual([LIBELLE_HEROS]);
+    expect(vide.metrics.some((m) => m.label.startsWith("Meilleure"))).toBe(false);
   });
 
   it("un seul `primary` — le contrat refuse deux titres de carte", () => {
