@@ -6,6 +6,44 @@
 
 ---
 
+## 2026-09-21 — le rattrapage a démarré, et une régression est apparue ailleurs
+
+Deux faits neufs, de signes opposés.
+
+### 🟢 Les distances se rattrapent, plus vite que prévu
+
+| Mesure | 20/09 | 21/09 |
+|---|---|---|
+| `nonSituees` | 4 291 | **3 671** (−620) |
+| `[trajets]` restantes | 160 | **120** (40/jour, contre 27 la veille) |
+| Budget de la passe | 47 924 ms | **115 709 ms** (×2,41) |
+
+⚠️ **La baisse vient de `mesurées=631`, PAS de `situer`** — et confondre les deux ferait
+croire `[GEO-BOOTSTRAP]` réglé. Ce sont deux étapes distinctes :
+- `mesure` (distance d'un lieu DÉJÀ connu) : **5 → 631 en un jour**. Le budget de la passe a
+  plus que doublé et il reste de la marge sous les 300 s de la fonction.
+- `situer` (attribuer un lieu à une ville que personne ne reconnaît) : **`situées=0/2820`,
+  toujours ZÉRO**, 153 ms de budget. La file descend par d'autres chemins, pas par celui-là.
+
+`[GEO-BOOTSTRAP]` reste entier ; c'est la moitié « mesure » qui se résorbe seule.
+
+**Le compte ferme** : 6 190 + 35 − 39 + 4 = 6 190, exact.
+
+### 🔴 `[BORNES-03]` — cassé par un effet de bord de mon propre lot
+
+`bornes=0/533 (520 en échec)`, contre `0/1` la veille. La cause est dans le journal :
+`grappe de 520 lieu(x) — boîte ~168 km, abandon après 25002 ms : overpass-api.de → HTTP 504`.
+
+Depuis que les offres couvrent tout le Québec, la boîte englobante de la grappe fait ~168 km
+au lieu de quelques dizaines, et Overpass s'étrangle dessus. ⚠️ **Ce n'est pas l'enveloppe qui
+manque** — elle a consommé ses 25 066 ms, toute sa patience. Le remède n'est pas d'attendre
+plus longtemps un service bénévole qui répond déjà 504 : il faut DÉCOUPER la grappe
+géographiquement (leçon n° 149). Signalé, non corrigé — périmètre non demandé.
+
+⚠️ Deux files montent aussi : `registre` 1 122 → 1 643, et le quota de raffinage 1 136 → 1 696.
+
+---
+
 ## 2026-09-20 — le géocodage est noyé, et c'est maintenant écrit dans les journaux
 
 Relevé du cron de 11:31:50. Un seul fait vraiment neuf, mais il est gros.

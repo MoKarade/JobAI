@@ -3067,3 +3067,61 @@ des offres COMPTÉES par le lieu et ENTRÉES quand même. C'est exactement le no
 vu en production. La ligne les nomme : `montreal×2 · chicoutimi · gatineau · granby ·
 longueuil · mont-royal · rouyn-noranda · saint-leonard · trois-rivieres · val-d'or ·
 westmount`.
+
+### `[BORNES-03]` — la grappe Overpass a explosé avec le périmètre des offres 🔴
+
+**Régression NEUVE, causée par `[VEILLE-52]`.** Relevé du 21/09 (cron de 11:31:50) :
+
+```
+[bornes] grappe de 520 lieu(x) non mesurée — boîte ~168 km, abandon après 25002 ms
+         (patience 25000 ms) : overpass-api.de → HTTP 504 · This operation was aborted
+[distances] … bornes=0/533 (520 en échec) …
+```
+
+| Date | Reste à mesurer |
+|---|---|
+| 16/09 | 14 |
+| 17/09 | 21 |
+| 20/09 | **1** |
+| 21/09 | **533** |
+
+⚠️ **Ce n'est PAS l'enveloppe dédiée qui manque** — le contrôle du 20/09 avait justement
+conclu que le câblage était bon, et il l'est toujours : l'étape a consommé ses 25 066 ms,
+soit toute sa patience. La cause est ailleurs et elle est nouvelle : depuis que les offres
+couvrent tout le Québec (Montréal, Sept-Îles, Val-d'Or, Rouyn-Noranda…), la boîte englobante
+de la grappe fait **~168 km** au lieu de quelques dizaines. Overpass répond **504** dessus.
+
+**Le remède n'est donc pas d'allonger la patience** : une boîte de 168 km ne rentrera jamais
+dans un budget raisonnable, et attendre plus longtemps un service bénévole qui dit déjà 504
+n'est ni efficace ni poli. Il faut **découper la grappe géographiquement** — c'est la leçon
+n° 149 du dépôt, mot pour mot : « un garde-fou qui REFUSE un lot entier se transforme en
+panne permanente dès qu'un seul membre est mauvais, et le bon remède n'est jamais de relever
+le seuil, c'est de DÉCOUPER ».
+
+⚠️ Signalé, **non corrigé** : c'est du périmètre non demandé.
+
+### Relevé du 2026-09-21 — le rattrapage des distances a démarré
+
+| Mesure | 20/09 | 21/09 |
+|---|---|---|
+| `suivies` | 6 190 | 6 190 |
+| `perimees` | 698 | 733 |
+| `nonSituees` | 4 291 | **3 671** (−620) |
+| `[trajets]` restantes | 160 | **120** (40/jour) |
+| Budget de la passe | 47 924 ms | **115 709 ms** (×2,41) |
+
+**Le compte ferme** : 6 190 + 35 ingérées − 39 périmées + 4 revenues = 6 190, exact.
+
+⚠️ **La baisse de `nonSituees` vient de `mesurées=631`, PAS de `situer`.** Ce sont deux
+étapes différentes, et les confondre ferait croire `[GEO-BOOTSTRAP]` résolu :
+- `mesure` (calculer la distance d'un lieu DÉJÀ connu) : **5 → 631 en un jour**, parce que le
+  budget de la passe a plus que doublé et qu'il reste de la marge sous les 300 s de la fonction.
+- `situer` (attribuer un lieu à une ville que personne ne reconnaît) : **`situées=0/2820`,
+  toujours ZÉRO**, et 153 ms de budget. La file descend (3 332 → 2 820) par d'autres chemins,
+  pas par celui-là.
+
+`[GEO-BOOTSTRAP]` reste donc entier. Ce qui a changé, c'est que la moitié « mesure » du
+problème se résorbe toute seule, plus vite que prévu.
+
+⚠️ Deux files montent, à surveiller : `registre=0/1643` (contre 0/1122) et
+`precisees=… (+1696 en attente de quota)` (contre +1136).
