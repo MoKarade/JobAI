@@ -2422,3 +2422,59 @@ l'autre). C'est la propriété d'une coupe par la bonne dimension, et elle est b
 
 **La règle** : quand un comparateur a un second critère, une fixture où le premier est
 CONSTANT teste le second. Faire varier toutes les clés du tri, ou la mutation reste verte.
+
+## 2026-09-21 — Je cherchais des distances manquantes, j'ai trouvé des distances fausses
+
+`[GEO-BOOTSTRAP]` disait, de ma main : « la table `villes` existe et n'est pas exploitée pour
+donner un km approché aux offres ». En ouvrant `mesurerDistances` pour le corriger, l'étape
+« 0 bis » (chantier #07, 2026-08-12) fait exactement ça depuis cinq semaines, sans réseau.
+C'est la deuxième fois en deux jours qu'un remède est prescrit depuis un JOURNAL sans ouvrir
+le code qui produit la ligne — la règle n° 159, écrite la veille pour `[BORNES-03]`.
+
+Le vrai défaut était de l'autre signe. Relevé en production (MCP, `scoreMin=65`,
+185 correspondances) : `Coffrages Synergy`, **Lavaltrie**, ~200 km du domicile, affichée à
+**6,1 km**, notée **76** — et ses quinze autres offres avec elle. L'`Université du Québec` à
+**Montréal** : **5,1 km**. La `Société québécoise des infrastructures` à **Montréal** :
+**6,1 km**. Ce ne sont pas des distances absentes, ce sont des distances plausibles et
+fausses, en tête de la liste de Marc, et **sans la réserve « distance à mesurer »** — elle ne
+s'affiche que quand `km` est `null`.
+
+Deux mécanismes, tous deux rendus graves par ADR-0019 (l'ouverture de l'ingestion à tout le
+Québec), tous deux invisibles avant :
+
+1. **Un employeur n'a QU'UNE position.** `entreprises_lieux.nom` est la clé primaire.
+   `villeDe` dérive la ville de la PREMIÈRE offre de cet employeur qui en porte une, et
+   `planifierDistances` applique cette position à TOUTES ses offres. Un organisme dont le
+   siège est à Québec et qui publie à Montréal mesure ses offres montréalaises depuis Québec.
+   Tant que toutes les offres étaient régionales, l'erreur valait quelques dizaines de
+   kilomètres ; depuis, elle vaut la largeur de la province.
+2. **Le lecteur qui remplit `villes` n'exigeait pas que la réponse SOIT une ville.**
+   `lireReponseMunicipalite` filtrait sur la classe Nominatim (`place`/`boundary`) et son
+   commentaire disait pourquoi. `lireReponse`, sur le chemin qui REMPLIT la table, ne
+   vérifiait que les bornes. Or `urlRecherche` demande « <ville>, Québec, Canada », ce qui
+   biaise Nominatim vers la ville de Québec : une rue homonyme y passe pour le CENTRE d'une
+   municipalité lointaine, et ce faux centre contamine ensuite toutes les offres de la ville.
+   `[Probable]` comme cause du cas Lavaltrie — cette session n'a pas accès à Nominatim, le
+   fichier le dit lui-même. `[Certain]` pour l'asymétrie des deux lecteurs.
+
+Et une troisième chose, trouvée en lisant les bornes : `BORNES` valait 45–49 / −75…−68, la
+grande région de Québec. Gatineau (−75,70), Rouyn (−79,0), Sept-Îles (50,2 / −66,4) et Gaspé
+(−64,5) étaient REFUSÉS — leur ville ne pouvait pas entrer dans la table, donc leurs offres ne
+pouvaient JAMAIS recevoir de distance. Rien ne le disait : elles étaient comptées
+« introuvables », exactement comme une ville que Nominatim ne connaît pas. On avait ouvert
+l'ingestion à la province sans ouvrir la géographie.
+
+Livré (ADR-0021) : lecteur strict et `lire` rendu REQUIS dans `geocoderSerie` (le défaut
+permissif était le vrai coupable — la série la moins gardée était celle qu'on obtenait en ne
+choisissant pas), bornes élargies à la boîte du Québec avec le tripwire qui les lie aux CHECK
+de la base, garde de plausibilité position↔ville de l'OFFRE (même constante que
+`deciderPrecision`, troisième consommateur), effacement des km déjà écrits qu'elle refuse,
+re-vérification des centres de l'ancien lecteur (`villes.verifie_le`, jamais un `DELETE` :
+une ligne non confirmée n'est pas prouvée fausse), et priorité des villes par ce qu'elles
+débloquent — huit places par passe, l'ordre d'itération des employeurs n'en est pas une
+politique.
+
+Neuf perturbations jouées, neuf rouges. Et un seuil d'anti-vacuité écrit avant sa mesure
+(`> 10 000` caractères pour un fichier qui en fait 9 557) — le piège se re-commet même en le
+connaissant.
+

@@ -28,8 +28,25 @@
 // doit être la MÊME pour Geocoding, Places et Routes, sinon les trois divergeront.
 import { expliquerRefusGoogle, lireRefusGoogle } from "./erreurGoogle";
 
-/** Bornes larges de la grande région de Québec, alignées sur les CHECK de la table. */
-export const BORNES = { latMin: 45, latMax: 49, lonMin: -75, lonMax: -68 } as const;
+/**
+ * Boîte englobante du QUÉBEC, alignée sur les CHECK des tables `villes` et `entreprises_lieux`.
+ *
+ * ⚠️ ÉLARGIE LE 2026-09-21 (ADR-0021). Elle valait 45–49 / −75…−68 : la grande région de
+ * Québec. C'était juste tant que l'app n'ingérait que des offres régionales — depuis
+ * ADR-0019, elle ingère tout le Québec, et ces bornes REFUSAIENT la moitié de la province :
+ * Gatineau (−75,70), Rouyn-Noranda (−79,0), Sept-Îles (50,2 / −66,4), Gaspé (−64,5). Leur
+ * ville ne pouvait pas entrer dans la table, donc leurs offres ne pouvaient JAMAIS recevoir
+ * de distance — et rien ne le disait : elles étaient comptées « introuvables », exactement
+ * comme une ville que Nominatim ne connaît pas. On avait ouvert l'ingestion à la province
+ * sans ouvrir la géographie.
+ *
+ * ⚠️ CE QU'ELLES GARDENT, ET CE QU'ELLES NE PRÉTENDENT PAS. Leur rôle est inchangé : refuser
+ * un AUTRE PAYS (« Québec » existe en Colombie-Britannique) et une inversion de signe, qui
+ * placerait l'épingle en Asie centrale. Ce sont des bornes de PLAUSIBILITÉ, pas la frontière
+ * du Québec : la boîte porte une marge et déborde sur les provinces voisines. Ce qui garde
+ * une résolution d'ENTREPRISE près de sa ville, lui, est `RAYON_VALIDATION_KM`, pas ceci.
+ */
+export const BORNES = { latMin: 44.5, latMax: 63, lonMin: -80, lonMax: -56.5 } as const;
 
 /** Nominatim exige un intervalle d'au moins une seconde entre deux requêtes. */
 export const DELAI_ENTRE_REQUETES_MS = 1_100;
@@ -272,7 +289,9 @@ export async function geocoderVille(
     throw new Error(`Nominatim a répondu ${reponse.status} pour « ${ville} »`);
   }
 
-  return lireReponse(await reponse.json());
+  // Le MÊME lecteur que `geocoderPlusieurs` : « une ville » est une question, elle n'a pas
+  // deux réponses selon le chemin qui la pose (ADR-0021).
+  return lireReponseVille(await reponse.json());
 }
 
 export interface ResultatPasse {
@@ -293,7 +312,14 @@ export interface ResultatPasse {
  * jette son travail à la première erreur ne finit jamais.
  */
 async function geocoderSerie(
-  requetes: readonly { nom: string; url: string; lire?: (charge: unknown) => Coordonnees | null }[],
+  /**
+   * ⚠️ `lire` est REQUIS depuis ADR-0021, et c'est le verrou. Il était optionnel, avec
+   * `lireReponse` (bornes seules, aucune classe) pour défaut — donc la série la plus
+   * permissive était celle qu'on obtenait en ne choisissant pas. C'est exactement comme ça
+   * que le remplissage de `villes` a accepté des rues homonymes pendant des mois. Le
+   * compilateur oblige désormais chaque nouvelle série à dire ce qu'elle accepte.
+   */
+  requetes: readonly { nom: string; url: string; lire: (charge: unknown) => Coordonnees | null }[],
   outils: OutilsGeocodage,
   budgetMs: number | null = null,
 ): Promise<ResultatPasse> {
@@ -328,7 +354,7 @@ async function geocoderSerie(
       if (!reponse.ok) {
         throw new Error(`Nominatim a répondu ${reponse.status} pour « ${r.nom} »`);
       }
-      const c = (r.lire ?? lireReponse)(await reponse.json());
+      const c = r.lire(await reponse.json());
       if (c) trouvees.push({ nom: r.nom, ...c });
       else introuvables.push(r.nom);
     } catch (err) {
@@ -437,6 +463,27 @@ export function choisirCandidatEntreprise(charge: unknown, nom: string): Coordon
     return c;
   }
   return null;
+}
+
+/**
+ * Lit une réponse Nominatim pour une VILLE : les bornes, PLUS la classe.
+ *
+ * ⚠️ POURQUOI ELLE EXISTE — ADR-0021, 2026-09-21. `lireReponseMunicipalite` filtrait déjà sur
+ * `CLASSES_MUNICIPALITE`, et son commentaire dit pourquoi : « le champ `ville` d'une annonce
+ * contient parfois autre chose qu'une ville ». Le chemin qui REMPLIT la table `villes`
+ * (`urlRecherche` → `geocoderPlusieurs`) n'avait, lui, aucun filtre de classe : il acceptait
+ * n'importe quel objet dans les bornes. Or `urlRecherche` demande « <ville>, Québec, Canada »,
+ * ce qui biaise Nominatim vers la ville de Québec — une RUE homonyme y passait donc pour le
+ * CENTRE d'une municipalité lointaine, et ce faux centre contaminait ensuite toutes les offres
+ * de cette ville (mesuré : les seize offres de Lavaltrie, à ~200 km, affichées à 6,1 km).
+ *
+ * Deux lecteurs, la MÊME règle de classe, une seule liste. L'asymétrie était le défaut.
+ */
+export function lireReponseVille(charge: unknown): Coordonnees | null {
+  if (!Array.isArray(charge) || charge.length === 0) return null;
+  const e = charge[0] as { class?: unknown };
+  if (typeof e?.class !== "string" || !CLASSES_MUNICIPALITE.has(e.class)) return null;
+  return lireElement(charge[0]);
 }
 
 /**
@@ -893,7 +940,10 @@ export async function geocoderPlusieurs(
   budgetMs: number | null = null,
 ): Promise<ResultatPasse> {
   return geocoderSerie(
-    villes.map((nom) => ({ nom, url: urlRecherche(nom) })),
+    // `lire` EXPLICITE : le défaut de `geocoderSerie` est `lireReponse`, qui ne regarde que
+    // les bornes. Une ville doit EN ÊTRE une (ADR-0021) — sans ce lecteur, une rue homonyme
+    // entre dans la table comme centre de municipalité.
+    villes.map((nom) => ({ nom, url: urlRecherche(nom), lire: lireReponseVille })),
     outils,
     budgetMs,
   );

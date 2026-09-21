@@ -11,11 +11,15 @@ import { describe, it, expect } from "vitest";
 import {
   arrondirKm,
   employeursASituer,
+  invaliderDistancesImplausibles,
   invaliderDistancesPrecisees,
   planifierDistances,
+  positionInvraisemblable,
   scoreAvecDistance,
+  villesParUrgence,
   type Position,
 } from "../lib/distances";
+import { RAYON_VALIDATION_KM } from "../lib/geocodage";
 import { SEED } from "../lib/seed";
 import type { Offre } from "../lib/types";
 
@@ -30,10 +34,17 @@ const POS_VILLE: Position = { lat: 46.75, lon: -71.3, precision: "ville" };
 /** Distance simulée : la vraie vient de `distanceKm`, testée ailleurs. */
 const dist = (km: number) => () => km;
 
+/**
+ * « On ne connaît le centre d'aucune ville » — le cas où la garde de plausibilité ne peut
+ * RIEN prouver, donc laisse passer. C'est l'état des tests écrits avant ADR-0021, et le
+ * garder explicite dit ce qu'ils mesurent : la décision de mesurer, pas la plausibilité.
+ */
+const CENTRE_INCONNU = () => null;
+
 describe("ce qui reçoit une distance", () => {
   it("une offre sans distance dont l'employeur est situé", () => {
     const o = offre({ id: "a", entreprise: "Exemple inc." });
-    const majs = planifierDistances([o], new Map([["Exemple inc.", POS_PROCHE]]), dist(12.34));
+    const majs = planifierDistances([o], new Map([["Exemple inc.", POS_PROCHE]]), dist(12.34), CENTRE_INCONNU);
     expect(majs).toHaveLength(1);
     expect(majs[0]!.km).toBe(12.3); // arrondi au dixième
     expect(majs[0]!.precision).toBe("exacte");
@@ -41,7 +52,7 @@ describe("ce qui reçoit une distance", () => {
 
   it("la précision de la position est reportée : une adresse exacte n'est pas un centre-ville", () => {
     const o = offre({ id: "a", entreprise: "X" });
-    const majs = planifierDistances([o], new Map([["X", POS_VILLE]]), dist(20));
+    const majs = planifierDistances([o], new Map([["X", POS_VILLE]]), dist(20), CENTRE_INCONNU);
     expect(majs[0]!.precision).toBe("ville");
   });
 });
@@ -49,26 +60,26 @@ describe("ce qui reçoit une distance", () => {
 describe("ce qu'on ne touche JAMAIS", () => {
   it("une distance déjà connue reste — elle vient d'un relevé de Marc", () => {
     const o = offre({ id: "a", entreprise: "X", km: 33 });
-    expect(planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(12))).toEqual([]);
+    expect(planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(12), CENTRE_INCONNU)).toEqual([]);
   });
 
   it("les candidatures de 2025 n'ont pas de distance à porter", () => {
     const o = offre({ id: "h", entreprise: "X", histo: true });
-    expect(planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(12))).toEqual([]);
+    expect(planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(12), CENTRE_INCONNU)).toEqual([]);
   });
 
   it("un employeur non situé est laissé tel quel, sans distance inventée", () => {
     const o = offre({ id: "a", entreprise: "Inconnue" });
-    expect(planifierDistances([o], new Map(), dist(12))).toEqual([]);
+    expect(planifierDistances([o], new Map(), dist(12), CENTRE_INCONNU)).toEqual([]);
   });
 
   it("une distance ABERRANTE n'est pas écrite", () => {
     // Un homonyme d'un autre continent, ou un signe inversé : un seul chiffre absurde
     // ferait douter de tous les autres.
     const o = offre({ id: "a", entreprise: "X" });
-    expect(planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(4000))).toEqual([]);
-    expect(planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(NaN))).toEqual([]);
-    expect(planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(-3))).toEqual([]);
+    expect(planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(4000), CENTRE_INCONNU)).toEqual([]);
+    expect(planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(NaN), CENTRE_INCONNU)).toEqual([]);
+    expect(planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(-3), CENTRE_INCONNU)).toEqual([]);
   });
 });
 
@@ -193,6 +204,7 @@ describe("un employeur situé sous un AUTRE nom est quand même reconnu", () => 
       [offre({ id: "a", entreprise: "Laserax inc." })],
       new Map([["Laserax", POS_PROCHE]]),
       dist(9.4),
+      CENTRE_INCONNU,
     );
     expect(majs.map((m) => m.id)).toEqual(["a"]);
     expect(majs[0]!.km).toBe(9.4);
@@ -216,5 +228,112 @@ describe("un employeur situé sous un AUTRE nom est quand même reconnu", () => 
       () => "Québec",
     );
     expect(r).toEqual([{ nom: "Employeur Jamais Vu", ville: "Québec" }]);
+  });
+});
+
+// ── ADR-0021 — la ville de l'OFFRE décide, et un centre douteux ne mesure rien ──────────
+//
+// Mesuré en production le 2026-09-21 : `entreprises_lieux.nom` est la clé primaire, donc un
+// employeur n'a QU'UNE position, dérivée de la première de ses offres qui porte une ville.
+// L'Université du Québec et la Société québécoise des infrastructures ont leur siège à
+// Québec et publient à Montréal : leurs offres montréalaises affichaient 5,1 km et 6,1 km,
+// notées 76 et 74, en tête de la liste de Marc. Ce n'était pas une distance manquante,
+// c'était une distance FAUSSE — et sans la réserve « distance à mesurer », qui ne s'affiche
+// que quand `km` est `null`.
+
+const CENTRE: Position = { lat: 46.81, lon: -71.21, precision: "ville" };
+
+/**
+ * Un point à `km` au NORD de `CENTRE`. Un degré de latitude vaut ~111,195 km, et c'est la
+ * seule direction où la conversion ne dépend pas de la latitude — donc la seule où un cas
+ * dérivé d'une constante reste juste si on déplace le centre.
+ */
+function auNord(km: number): { lat: number; lon: number } {
+  return { lat: CENTRE.lat + km / 111.195, lon: CENTRE.lon };
+}
+
+describe("positionInvraisemblable — la garde de plausibilité", () => {
+  it("ne prouve RIEN quand le centre de la ville est inconnu", () => {
+    // Refuser ici retirerait aussi les distances JUSTES des employeurs correctement situés
+    // dans une ville que la table ne connaît pas encore.
+    expect(positionInvraisemblable(auNord(500), null)).toBe(false);
+  });
+
+  it("accepte en deçà du rayon de validation, refuse au-delà", () => {
+    // Cas DÉRIVÉS de `RAYON_VALIDATION_KM` : codés en dur, ils mentiraient au premier
+    // ajustement de la constante — et c'est la même constante que `deciderPrecision`.
+    expect(positionInvraisemblable(auNord(RAYON_VALIDATION_KM - 1), CENTRE)).toBe(false);
+    expect(positionInvraisemblable(auNord(RAYON_VALIDATION_KM + 1), CENTRE)).toBe(true);
+  });
+
+  it("le cas réel : une position de Québec pour une offre de Montréal", () => {
+    const quebec = { lat: 46.81, lon: -71.21 };
+    const montreal = { lat: 45.5, lon: -73.57 };
+    expect(positionInvraisemblable(quebec, montreal)).toBe(true);
+  });
+});
+
+describe("planifierDistances — une position ne mesure pas une offre annoncée ailleurs", () => {
+  it("n'écrit RIEN quand la position est invraisemblable pour la ville de l'offre", () => {
+    const o = offre({ id: "a", entreprise: "X", ville: "Montréal" });
+    const majs = planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(6.1), (v) =>
+      v === "Montréal" ? { lat: 45.5, lon: -73.57 } : null,
+    );
+    expect(majs).toEqual([]);
+  });
+
+  it("écrit quand la position est plausible pour cette ville", () => {
+    const o = offre({ id: "a", entreprise: "X", ville: "Québec" });
+    const majs = planifierDistances([o], new Map([["X", POS_PROCHE]]), dist(6.1), (v) =>
+      v === "Québec" ? { lat: POS_PROCHE.lat, lon: POS_PROCHE.lon } : null,
+    );
+    expect(majs.map((m) => m.km)).toEqual([6.1]);
+  });
+});
+
+describe("invaliderDistancesImplausibles — un km faux déjà en base ne part pas tout seul", () => {
+  const positions = new Map<string, Position>([["X", POS_PROCHE]]);
+  const centreMontreal = (v: string | null) =>
+    v === "Montréal" ? { lat: 45.5, lon: -73.57 } : null;
+
+  it("efface le km d'une offre dont la position ne peut pas être la sienne", () => {
+    const o = offre({ id: "a", entreprise: "X", ville: "Montréal", km: 6.1 });
+    expect(invaliderDistancesImplausibles([o], positions, centreMontreal)[0]!.km).toBeNull();
+  });
+
+  it("garde le km quand rien ne prouve l'invraisemblance", () => {
+    const o = offre({ id: "a", entreprise: "X", ville: "Québec", km: 6.1 });
+    expect(invaliderDistancesImplausibles([o], positions, centreMontreal)[0]!.km).toBe(6.1);
+  });
+
+  it("ne touche ni aux candidatures historiques ni aux employeurs sans position", () => {
+    const h = offre({ id: "h", entreprise: "X", ville: "Montréal", km: 6.1, histo: true });
+    const sansPosition = offre({ id: "s", entreprise: "Inconnue", ville: "Montréal", km: 6.1 });
+    const r = invaliderDistancesImplausibles([h, sansPosition], positions, centreMontreal);
+    expect(r.map((o) => o.km)).toEqual([6.1, 6.1]);
+  });
+});
+
+describe("villesParUrgence — huit places par passe, et l'ordre est la politique", () => {
+  it("les villes qui débloquent le plus d'employeurs d'abord", () => {
+    const r = villesParUrgence([
+      { nom: "a", ville: "Lévis" },
+      { nom: "b", ville: "Québec" },
+      { nom: "c", ville: "Québec" },
+      { nom: "d", ville: "Québec" },
+      { nom: "e", ville: "Lévis" },
+      { nom: "f", ville: "Gaspé" },
+    ]);
+    expect(r).toEqual(["Québec", "Lévis", "Gaspé"]);
+  });
+
+  it("à égalité, le nom départage — sinon deux passes se disputent les mêmes places", () => {
+    // Sans départage stable, l'ordre suivrait celui d'insertion : deux passes successives
+    // pourraient réclamer des villes différentes sans que la file avance.
+    const r = villesParUrgence([
+      { nom: "a", ville: "Sillery" },
+      { nom: "b", ville: "Beauport" },
+    ]);
+    expect(r).toEqual(["Beauport", "Sillery"]);
   });
 });

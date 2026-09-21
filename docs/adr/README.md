@@ -33,3 +33,4 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 | [0017](./0017-le-bareme-cesse-de-buter-sur-un-accent.md) | Le barème cesse de buter sur un accent | Accepté (Marc, 2026-09-17) — ligne d'index ajoutée le 2026-09-17, elle manquait |
 | [0018](./0018-la-bande-postale-tranche-les-lieux-que-personne-ne-nomme.md) | La bande postale tranche les lieux que personne ne sait nommer | Accepté (Marc, 2026-09-17) — calibré sur une passe complète mesurée |
 | [0020](./0020-le-gros-chiffre-de-la-carte-devient-l-arrivage.md) | Le gros chiffre de la carte devient l'arrivage | Accepté (Marc, 2026-09-21) — révise le volet « Widget hub » d'ADR-0001 |
+| [0021](./0021-la-ville-de-l-offre-decide-de-sa-distance.md) | La ville de l'OFFRE décide de sa distance, et un centre de ville doit être une ville | Accepté (Marc, 2026-09-21) — retire des km faux avant d'en ajouter d'approchés ; élargit les bornes ouvertes par ADR-0019 |

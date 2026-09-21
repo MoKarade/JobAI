@@ -471,6 +471,10 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
 160. Devant une garde qui laisse passer ce qu'elle devrait arrêter, se demander si elle ne remplit pas DÉJÀ un autre rôle légitime : c'est alors une SECONDE garde qu'il faut, jamais un seuil plus serré.
 161. Un seuil qui dépend de la DENSITÉ autant que de la surface ne se devine pas : on ÉCOUTE la réponse (couper sur échec, recommencer) plutôt que d'inventer un nombre — avec un plafond, sinon une panne fait doubler le travail à chaque tour.
 162. Quand un comparateur a un SECOND critère, une fixture où le premier est CONSTANT teste le second : faire varier toutes les clés du tri, ou la mutation reste verte.
+163. Deux lecteurs pour la MÊME question et le plus permissif en DÉFAUT : la série la moins gardée est celle qu'on obtient en ne choisissant pas — rendre le choix REQUIS, le compilateur garde mieux que la discipline.
+164. Une garde de plausibilité posée à l'ÉCRITURE doit être re-posée à la LECTURE quand ce n'est pas la même entité qui porte le critère : un employeur a une position, une offre a SA ville.
+165. Élargir ce qu'on INGÈRE sans élargir ce qu'on sait SITUER transforme une garde régionale en plafond invisible — et le refus se compte comme « introuvable », indistinguable de « la source ne sait pas ».
+166. Un identifiant d'ENTITÉ n'est pas l'identifiant du FAIT : une clé primaire par employeur fait hériter une position à des offres qui n'ont rien à voir, et le chiffre qui en sort est plausible.
 
 ## 10. Style et compte-rendu
 

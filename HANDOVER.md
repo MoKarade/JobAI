@@ -6,6 +6,60 @@
 
 ---
 
+## 2026-09-21 (Lot 3) — les distances affichées étaient FAUSSES, pas manquantes
+
+Marc : « enchaine les lots ». Lot 3 du plan en quatre lots (`[GEO-BOOTSTRAP]`). Le contenu du
+lot a changé en cours de mesure, et c'est le fait principal de la session.
+
+⚠️ **`[GEO-BOOTSTRAP]` était mal diagnostiqué, par moi.** Il disait « la table `villes` existe
+et n'est pas exploitée ». L'étape « 0 bis » de `mesurerDistances` l'exploite depuis le
+2026-08-12. Deuxième fois en deux jours (règle n° 159, écrite la veille pour `[BORNES-03]`).
+
+**Mesuré en production** (MCP, `scoreMin=65`, 185 correspondances) :
+
+| Offre | Ville | km affiché | Note |
+|---|---|---|---|
+| Coffrages Synergy — construction project manager | **Lavaltrie** (~200 km) | **6,1** | 76 |
+| Université du Québec — restoration project coordinator | **Montréal** (~233 km) | **5,1** | 76 |
+| Société québécoise des infrastructures — instrumentation technician | **Montréal** | **6,1** | 74 |
+
+Les seize offres de Coffrages Synergy portent le même 6,1 km. Ce ne sont pas des distances
+absentes : ce sont des chiffres plausibles et faux, en tête de liste, **sans la réserve
+« distance à mesurer »** — elle ne s'affiche que quand `km` est `null`. Les 29 autres offres du
+relevé, sans km, notent toutes exactement **70** (le plateau « distance inconnue » du barème).
+
+Deux mécanismes, tous deux inoffensifs avant ADR-0019 et graves depuis :
+1. **Un employeur n'a qu'UNE position** (`entreprises_lieux.nom` est la clé primaire), dérivée
+   de la première de ses offres qui porte une ville, et héritée par toutes les autres.
+2. **Le lecteur qui remplit `villes` n'exigeait pas que la réponse SOIT une ville** —
+   `lireReponseMunicipalite` filtrait sur la classe, `lireReponse` non, et c'est le second qui
+   remplissait la table. `[Probable]` comme cause du cas Lavaltrie (cette session n'a pas accès
+   à Nominatim) ; `[Certain]` pour l'asymétrie.
+
+Et, trouvé en lisant les bornes : `BORNES` couvrait la région de Québec, pas la province.
+**Gatineau, Rouyn-Noranda, Sept-Îles et Gaspé étaient refusés** — leurs offres ne pouvaient
+JAMAIS recevoir de distance, et le refus se comptait « introuvable », comme une ville que
+Nominatim ne connaît pas.
+
+**Livré** ([ADR-0021](./docs/adr/0021-la-ville-de-l-offre-decide-de-sa-distance.md)) : lecteur
+strict `lireReponseVille` + `lire` rendu REQUIS dans `geocoderSerie` ; bornes élargies à la
+boîte du Québec, avec la migration `0024` et un tripwire qui interdit aux trois copies de
+diverger ; garde de plausibilité position↔ville de l'OFFRE (`RAYON_VALIDATION_KM`, la même
+constante que `deciderPrecision`) ; effacement en base des km qu'elle refuse ; re-vérification
+des centres écrits par l'ancien lecteur (`villes.verifie_le`, jamais un `DELETE`) ; priorité
+des villes par ce qu'elles débloquent. Neuf perturbations jouées, neuf rouges.
+
+⚠️ **Des distances vont DISPARAÎTRE avant que d'autres n'arrivent**, et c'est voulu : « à
+mesurer » est vrai, « 6,1 km » ne l'est pas. Le nombre exact se lira au cron suivant, dans les
+compteurs neufs de la ligne `[distances]` : `villesManquantes`, `effacées`, `centresCorrigés`.
+
+⚠️ **Le débit reste de 8 villes par passe** et la re-vérification partage cette file.
+`lib/geocodageCron.ts` interdit d'agrandir la passe : c'est une passe de PLUS qu'il faudrait,
+et c'est une décision à part. `villesManquantes` est le chiffre qui la dimensionnera — il
+n'existait pas avant ce lot.
+
+---
+
 ## 2026-09-21 (suite) — le gros chiffre de la carte hub devient l'arrivage
 
 Marc : « la carte jobai je veux que ce soit le nombre de nouvelles offres le gros chiffre et

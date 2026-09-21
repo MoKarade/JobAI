@@ -12,7 +12,7 @@
 // pire que l'échec — d'où le journal côté serveur.
 
 import { revalidatePath } from "next/cache";
-import { eq, inArray, like } from "drizzle-orm";
+import { eq, inArray, isNull, like } from "drizzle-orm";
 import { db } from "./db";
 import {
   entreprisesLieux,
@@ -45,7 +45,13 @@ import { domicile } from "./domicile";
 import { lireEtat } from "./etat";
 import { CLE_RAYON, RAYON_DEFAUT_KM, profilAvecRayon } from "./rayon";
 import { ENTREPRISES_CIBLES } from "./reference";
-import { employeursASituer, invaliderDistancesPrecisees, planifierDistances } from "./distances";
+import {
+  employeursASituer,
+  invaliderDistancesImplausibles,
+  invaliderDistancesPrecisees,
+  planifierDistances,
+  villesParUrgence,
+} from "./distances";
 import { villesARattraper } from "./ingest/pipeline";
 import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
@@ -166,9 +172,12 @@ export async function passeGeocodage(): Promise<ResultatPasse> {
     const insituables: string[] = [];
 
     // 1. Les villes inconnues des entreprises en attente, dans la limite du budget.
-    const villesRequises = [...new Set(aSituer.map((e) => e.ville))].filter(
-      (v) => !coordVilles.has(v),
-    );
+    // La MÊME règle d'ordre que la passe de mesure (ADR-0021) : « quelles villes d'abord ? »
+    // est une question, elle n'a pas deux réponses selon le chemin qui la pose. Ici la liste
+    // est courte (les entreprises cibles), donc l'effet est petit — mais deux règles écrites
+    // séparément divergent toujours, et c'est la classe de bug que `lib/employeurs.ts`
+    // raconte déjà.
+    const villesRequises = villesParUrgence(aSituer).filter((v) => !coordVilles.has(v));
     if (villesRequises.length > 0) {
       const passeVilles = villesRequises.slice(0, budget);
       const rv = await geocoderPlusieurs(passeVilles, outilsNominatim());
@@ -1323,6 +1332,12 @@ export async function mesurerDistances(
       /** Épinglées AU CENTRE-VILLE, sans requête Nominatim (chantier #07, 2026-08-12). */
       placees: number;
       villesRattrapees: number;
+      /** Villes DISTINCTES encore sans centre — la file qui borne vraiment la convergence. */
+      villesManquantes: number;
+      /** Km retirés parce qu'ils venaient d'une position invraisemblable (ADR-0021). */
+      distancesEffacees: number;
+      /** Centres que la re-vérification a déplacés de plus de `RAYON_VALIDATION_KM`. */
+      centresCorriges: number;
       adressesRattrapees: number;
       /** Repassées de « centre-ville » à leur vraie position ([CARTE-03], 2026-08-12). */
       precisees: number;
@@ -1486,6 +1501,16 @@ export async function mesurerDistances(
       }
     }
 
+    // 1 ter. Re-vérifier les centres écrits par l'ancien lecteur (ADR-0021), avec ce qui
+    //        reste du budget. Après les villes manquantes : celles-ci débloquent des offres
+    //        sans aucune distance, la re-vérification corrige des distances déjà écrites.
+    let centresCorriges = 0;
+    try {
+      centresCorriges = await reverifierCentres(maxSituations, budgetRestant());
+    } catch (err) {
+      console.error("[actions] re-vérification des centres impossible", err);
+    }
+
     jalon("situer");
 
     // 1 bis. Récupérer les adresses manquantes des entreprises déjà situées — sans quoi
@@ -1615,7 +1640,52 @@ export async function mesurerDistances(
     // `invaliderDistancesPrecisees` efface d'abord la distance des offres dont l'employeur
     // vient d'être précisé cette passe (« ville » → « exacte ») : sans ça, `planifierDistances`
     // ne retoucherait jamais un `km` déjà connu, même devenu obsolète. Voir lib/distances.ts.
-    const offresAMesurer = invaliderDistancesPrecisees(offres, raffinage.entreprisesPrecisees);
+    const offresPrecisees = invaliderDistancesPrecisees(offres, raffinage.entreprisesPrecisees);
+
+    // Le centre de la ville d'une OFFRE — relu ICI, après toutes les étapes qui écrivent dans
+    // `villes` : une ville géocodée plus haut dans cette même passe doit servir dès
+    // maintenant, sinon la garde ci-dessous laisserait passer ce qu'elle sait déjà refuser.
+    //
+    // Indexé sur le nom brut ET sur sa forme sans accent ni casse : `villes.nom` vient de
+    // `villeGeocodable`, la ville d'une offre vient de la source, et « Montréal » / « Montreal »
+    // ne doivent pas être deux villes. Ce n'est pas un rapprochement flou — c'est la même
+    // chaîne écrite de deux façons (`apparier` ne décide jamais d'une écriture, cf. employeurs.ts).
+    const sansAccent = (s: string) =>
+      s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
+    const centresIndex = new Map<string, { lat: number; lon: number }>();
+    for (const v of await db.select().from(villes)) {
+      const point = { lat: v.lat, lon: v.lon };
+      centresIndex.set(v.nom, point);
+      if (!centresIndex.has(sansAccent(v.nom))) centresIndex.set(sansAccent(v.nom), point);
+    }
+    const centreDe = (ville: string | null): { lat: number; lon: number } | null => {
+      if (!ville) return null;
+      const nom = villeGeocodable(ville) ?? ville;
+      return centresIndex.get(nom) ?? centresIndex.get(sansAccent(nom)) ?? null;
+    };
+
+    const villesManquantes = villesParUrgence(manquants).filter(
+      (v) => centreDe(v) === null,
+    ).length;
+
+    // Puis les distances écrites depuis la position d'un employeur qui ne peut PAS être celle
+    // d'une offre annoncée dans cette ville-là (ADR-0021) : un km faux déjà en base ne se
+    // corrige pas tout seul, `planifierDistances` ne retouchant jamais un `km` connu.
+    const offresAMesurer = invaliderDistancesImplausibles(offresPrecisees, positions, centreDe);
+    const effacees = offresAMesurer.filter(
+      (o, i) => o.km === null && offresPrecisees[i]?.km !== null,
+    ).length;
+    if (effacees > 0) {
+      await db
+        .update(offers)
+        .set({ km: null, majLe: new Date() })
+        .where(
+          inArray(
+            offers.id,
+            offresAMesurer.filter((o, i) => o.km === null && offresPrecisees[i]?.km !== null).map((o) => o.id),
+          ),
+        );
+    }
     // Le rayon réglé par Marc, appliqué à la NOTE comme il l'est à l'acceptation. Lu ici
     // plutôt que passé en paramètre : `mesurerDistances` est appelée par trois chemins
     // (le cron, la carte, l'accueil), et trois lectures valent mieux qu'un paramètre qu'un
@@ -1625,6 +1695,7 @@ export async function mesurerDistances(
       offresAMesurer,
       positions,
       (p) => distanceKm(chezMoi, p),
+      centreDe,
       profilAvecRayon(rayonMaxKm),
     );
     for (const m of majs) {
@@ -1646,6 +1717,17 @@ export async function mesurerDistances(
     const restant = budgetRestant();
     console.log(
       `[distances] passe terminée — placées=${placees} mesurées=${majs.length} situées=${situees}/${manquants.length} ` +
+        // ⚠️ LA TAILLE RÉELLE DE LA FILE, ET ELLE MANQUAIT. `situées=0/2820` compte des
+        // EMPLOYEURS ; ce qui borne la convergence, c'est le nombre de VILLES distinctes qu'il
+        // reste à géocoder, à huit par passe. Sans ce chiffre, « des mois » et « trois jours »
+        // se ressemblent dans le journal, et le 2026-09-21 j'ai dimensionné le lot d'après le
+        // mauvais des deux.
+        `villesManquantes=${villesManquantes} ` +
+        // Effacées : des km qui existaient et qui étaient FAUX (ADR-0021). Un compte qui monte
+        // ici est une bonne nouvelle ; un compte qui ne redescend jamais dit que la position
+        // de l'employeur, elle, n'a pas été reprise.
+        `${effacees > 0 ? `effacées=${effacees} ` : ""}` +
+        `${centresCorriges > 0 ? `centresCorrigés=${centresCorriges} ` : ""}` +
         `villes=${aRattraper.length} ` +
         `adresses=${adresses.ecrites}/${adresses.candidates}` +
         // Les deux mêmes comptes que côté raffinage, et pour la même raison : un `N/M` seul
@@ -1758,6 +1840,9 @@ export async function mesurerDistances(
       situees,
       placees,
       villesRattrapees: aRattraper.length,
+      villesManquantes,
+      distancesEffacees: effacees,
+      centresCorriges,
       adressesRattrapees: adresses.ecrites,
       precisees: raffinage.precisees,
       bornesMesurees: bornes.mesurees,
@@ -1791,9 +1876,9 @@ async function situerLot(
   const villesConnues = await db.select().from(villes);
   const coordVilles = new Map(villesConnues.map((v) => [v.nom, { lat: v.lat, lon: v.lon }]));
 
-  const villesRequises = [...new Set(aSituer.map((e) => e.ville))].filter(
-    (v) => !coordVilles.has(v),
-  );
+  // Les plus porteuses d'abord : huit places par passe, et l'ordre d'itération des employeurs
+  // n'en est pas une politique (ADR-0021).
+  const villesRequises = villesParUrgence(aSituer).filter((v) => !coordVilles.has(v));
   if (villesRequises.length > 0) {
     const rv = await geocoderPlusieurs(villesRequises.slice(0, max), outilsNominatim(), reste());
     if (rv.trouvees.length > 0) {
@@ -1833,6 +1918,60 @@ async function situerLot(
     await db.insert(entreprisesLieux).values(inscrire).onConflictDoNothing();
   }
   return inscrire.length;
+}
+
+/**
+ * Re-pose à Nominatim la question des centres écrits par l'ANCIEN lecteur (ADR-0021).
+ *
+ * ⚠️ CE QU'ELLE RÉPARE. Jusqu'au 2026-09-21, `geocoderPlusieurs` lisait par `lireReponse`,
+ * qui ne vérifiait QUE les bornes : une rue homonyme pouvait entrer dans `villes` comme le
+ * centre d'une municipalité lointaine, et ce faux centre donnait ensuite un km plausible et
+ * faux à toutes les offres de cette ville. Les lignes déjà écrites portent donc `verifie_le`
+ * à `NULL` : on ne sait pas lesquelles sont fausses, et on ne peut le savoir qu'en
+ * redemandant, sous le lecteur strict.
+ *
+ * ⚠️ ELLE NE SUPPRIME RIEN, et c'est délibéré. Une ligne que le lecteur strict ne confirme
+ * pas n'est pas prouvée fausse — Nominatim peut simplement ne pas répondre ce jour-là. On la
+ * laisse, elle sera re-demandée plus tard ; l'ordre `geocode_le` croissant fait avancer la
+ * file au lieu de rejouer les mêmes huit indéfiniment.
+ *
+ * ⚠️ UNE CORRECTION SE PROPAGE TOUTE SEULE. Quand le point corrigé s'éloigne de l'ancien de
+ * plus de `RAYON_VALIDATION_KM`, les positions d'employeurs posées sur l'ancien centre
+ * deviennent invraisemblables pour leur ville, et `invaliderDistancesImplausibles` efface
+ * leurs km à la même passe. Aucun code de rattrapage à écrire : la garde de `lib/distances.ts`
+ * fait le travail, parce qu'elle juge une position contre le centre COURANT.
+ *
+ * APRÈS les villes manquantes, jamais avant : celles-ci débloquent des offres qui n'ont
+ * aucune distance, la re-vérification corrige des distances qui existent déjà.
+ */
+async function reverifierCentres(max: number, budgetMs: number | null): Promise<number> {
+  if (max <= 0) return 0;
+  const aRevoir = await db
+    .select()
+    .from(villes)
+    .where(isNull(villes.verifieLe))
+    .orderBy(villes.geocodeLe)
+    .limit(max);
+  if (aRevoir.length === 0) return 0;
+
+  const r = await geocoderPlusieurs(
+    aRevoir.map((v) => v.nom),
+    outilsNominatim(),
+    budgetMs,
+  );
+  let corrigees = 0;
+  for (const v of r.trouvees) {
+    const avant = aRevoir.find((a) => a.nom === v.nom);
+    if (!avant) continue;
+    if (distanceKm({ lat: avant.lat, lon: avant.lon }, { lat: v.lat, lon: v.lon }) > RAYON_VALIDATION_KM) {
+      corrigees++;
+    }
+    await db
+      .update(villes)
+      .set({ lat: v.lat, lon: v.lon, verifieLe: new Date() })
+      .where(eq(villes.nom, v.nom));
+  }
+  return corrigees;
 }
 
 /** Les outils réseau de Nominatim — un seul endroit, pour que rien ne diverge. */

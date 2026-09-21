@@ -18,6 +18,7 @@
 // c'est lui qui décide. Fonctions PURES : la décision se teste sans base ni réseau.
 
 import { computeScore, PLAFOND_NOTE_CALCULEE } from "./scoring";
+import { distanceKm, RAYON_VALIDATION_KM } from "./geocodage";
 import { PROFIL_DEFAUT, type Profil } from "./profil";
 import { memeEmployeur, positionDe } from "./employeurs";
 import type { Offre } from "./types";
@@ -74,6 +75,88 @@ export function invaliderDistancesPrecisees(
 }
 
 /**
+ * Le centre d'une municipalité, quand on le connaît. `null` = on ne sait pas.
+ *
+ * Injecté plutôt que lu : `lib/distances.ts` reste PUR, et c'est ce qui permet d'éprouver
+ * la garde ci-dessous sans base ni réseau.
+ */
+export type CentreDe = (ville: string | null) => Position | { lat: number; lon: number } | null;
+
+/**
+ * Cette position peut-elle être celle d'une offre annoncée dans CETTE ville ? PURE.
+ *
+ * ⚠️ POURQUOI CETTE GARDE EXISTE — ADR-0021, mesuré le 2026-09-21 en production.
+ * `entreprises_lieux.nom` est la clé primaire : un employeur n'a QU'UNE position. `villeDe`
+ * (`lib/actions.ts`) la dérive de la PREMIÈRE offre de cet employeur qui porte une ville, et
+ * toutes ses autres offres en héritent. L'Université du Québec et la Société québécoise des
+ * infrastructures ont leur siège à Québec et publient à Montréal : leurs offres montréalaises
+ * affichaient **5,1 km** et **6,1 km**, notées 76 et 74, en tête de la liste de Marc. Avant
+ * ADR-0019 toutes les offres étaient régionales et l'erreur valait quelques dizaines de
+ * kilomètres ; depuis, elle vaut la largeur du Québec.
+ *
+ * ⚠️ ELLE NE REFUSE QUE CE QU'ELLE PEUT PROUVER. Centre de la ville inconnu ⇒ on ne sait pas,
+ * et on laisse passer : refuser ici retirerait aussi les distances JUSTES des employeurs
+ * correctement situés dans une ville que la table ne connaît pas encore. La moitié qui traite
+ * les centres douteux est ailleurs (re-vérification de `villes.verifie_le`) : une fois un
+ * centre corrigé, la position stockée devient invraisemblable ICI et le km tombe.
+ *
+ * Le rayon est `RAYON_VALIDATION_KM`, la constante que `deciderPrecision` emploie déjà pour
+ * la même question posée à l'autre bout du pipeline. Une règle, trois consommateurs.
+ */
+export function positionInvraisemblable(
+  position: { lat: number; lon: number },
+  centre: { lat: number; lon: number } | null,
+): boolean {
+  if (centre === null) return false;
+  return distanceKm(position, centre) > RAYON_VALIDATION_KM;
+}
+
+/**
+ * Efface les distances écrites depuis une position qu'on sait maintenant INVRAISEMBLABLE
+ * pour la ville de l'offre.
+ *
+ * Même nécessité qu'`invaliderDistancesPrecisees`, et pour la même raison mécanique :
+ * `planifierDistances` ne retouche JAMAIS une offre dont le `km` est déjà écrit. Sans cette
+ * passe, les chiffres faux déjà en base y resteraient — la garde ne protégerait que l'avenir,
+ * et Lavaltrie garderait ses 6,1 km.
+ */
+export function invaliderDistancesImplausibles(
+  offres: readonly Offre[],
+  positions: ReadonlyMap<string, Position>,
+  centreDe: CentreDe,
+): Offre[] {
+  return offres.map((o) => {
+    if (o.km === null || o.histo) return o;
+    const pos = positionDe(o.entreprise, positions);
+    if (!pos) return o;
+    return positionInvraisemblable(pos, centreDe(o.ville) ?? null) ? { ...o, km: null } : o;
+  });
+}
+
+/**
+ * Les villes à géocoder, les plus PORTEUSES d'abord. PURE.
+ *
+ * ⚠️ L'ORDRE EST LA POLITIQUE D'ALLOCATION D'UN QUOTA RARE. Nominatim accepte une requête par
+ * seconde et la passe en fait huit (`MAX_VILLES_PAR_PASSE`) : l'ordre décide donc de ce que
+ * Marc voit bouger cette semaine. Il était celui de l'itération sur les employeurs, c'est-à-dire
+ * arbitraire — une ville qui débloque une offre passait avant une ville qui en débloque
+ * quarante. Le nombre d'employeurs en attente est le meilleur proxy disponible ici : c'est
+ * exactement ce que la passe a sous la main, sans requête de plus.
+ *
+ * Départage par NOM à égalité : sans lui l'ordre dépendrait de l'ordre d'insertion, et deux
+ * passes successives pourraient se disputer les mêmes huit places sans converger.
+ */
+export function villesParUrgence(
+  aSituer: readonly { nom: string; ville: string }[],
+): string[] {
+  const compte = new Map<string, number>();
+  for (const e of aSituer) compte.set(e.ville, (compte.get(e.ville) ?? 0) + 1);
+  return [...compte.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "fr"))
+    .map(([ville]) => ville);
+}
+
+/**
  * Quelles offres peuvent recevoir une distance, et laquelle.
  *
  * @param offres     Le suivi actuel.
@@ -85,6 +168,15 @@ export function planifierDistances(
   offres: readonly Offre[],
   positions: ReadonlyMap<string, Position>,
   distance: (p: Position) => number,
+  /**
+   * Le centre de la ville d'une offre, quand il est connu.
+   *
+   * ⚠️ REQUIS, ET PLACÉ AVANT `profil` EXPRÈS. Un paramètre optionnel à défaut permissif
+   * ferait de l'appel le plus court l'appel le moins gardé — c'est ainsi que le remplissage
+   * de `villes` a accepté des rues homonymes pendant des mois (ADR-0021). Le compilateur
+   * oblige chaque appelant à dire ce qu'il sait des villes.
+   */
+  centreDe: CentreDe,
   /**
    * Le barème à appliquer, rayon réglé compris.
    *
@@ -109,6 +201,10 @@ export function planifierDistances(
     // littérale d'avant laissait l'offre sans distance alors que la position existait.
     const pos = positionDe(o.entreprise, positions);
     if (!pos) continue;
+
+    // La position d'un EMPLOYEUR ne mesure pas une offre annoncée ailleurs (ADR-0021).
+    // Mieux vaut « distance à mesurer » que 6,1 km pour un emploi à 200 km.
+    if (positionInvraisemblable(pos, centreDe(o.ville) ?? null)) continue;
 
     const km = arrondirKm(distance(pos));
     // Une distance aberrante trahit une résolution fausse (homonyme, signe inversé) : on

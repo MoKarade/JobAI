@@ -260,13 +260,33 @@ export const villes = pgTable(
 
     /** Quand le géocodage a eu lieu. Permet de re-sonder une entrée douteuse sans tout refaire. */
     geocodeLe: timestamp("geocode_le", { withTimezone: true }).notNull().defaultNow(),
+
+    /**
+     * Quand ce centre a été confirmé par le lecteur STRICT (`lireReponseVille`), ou `NULL`.
+     *
+     * ⚠️ `NULL` N'EST PAS « JAMAIS GÉOCODÉ » — `geocode_le` dit déjà ça, et il est `NOT NULL`.
+     * `NULL` veut dire « écrit par le lecteur d'AVANT ADR-0021 », celui qui n'exigeait pas que
+     * la réponse SOIT une ville et acceptait une rue homonyme dans les bornes régionales. Ces
+     * lignes-là ne sont pas forcément fausses ; elles ne sont pas VÉRIFIÉES, et on ne peut pas
+     * dire lesquelles sont lesquelles sans re-poser la question à Nominatim.
+     *
+     * D'où une colonne plutôt qu'un `DELETE` : effacer la table ferait perdre les centres
+     * JUSTES — l'essentiel — pour retirer les quelques faux, et à huit villes par passe Marc
+     * n'aurait plus aucune distance pendant des semaines. La passe re-vérifie ces lignes en
+     * priorité après les villes manquantes, et corrige celles qui se contredisent.
+     */
+    verifieLe: timestamp("verifie_le", { withTimezone: true }),
   },
   (table) => [
-    // Bornes de la grande région de Québec, larges. Un géocodeur qui rend « Québec,
-    // Colombie-Britannique » ou une erreur de signe placerait une épingle à des milliers
-    // de kilomètres, et la carte aurait l'air cassée sans qu'on sache pourquoi.
-    check("villes_lat_ck", sql`${table.lat} >= 45 AND ${table.lat} <= 49`),
-    check("villes_lon_ck", sql`${table.lon} >= -75 AND ${table.lon} <= -68`),
+    // Boîte englobante du QUÉBEC, avec marge — les mêmes valeurs que `BORNES`
+    // (`lib/geocodage.ts`), et `tests/bornesBase.test.ts` refuse qu'elles divergent. Un
+    // géocodeur qui rend « Québec, Colombie-Britannique » ou une erreur de signe placerait
+    // une épingle à des milliers de kilomètres, et la carte aurait l'air cassée sans qu'on
+    // sache pourquoi. Élargies le 2026-09-21 (ADR-0021) : les bornes régionales d'avant
+    // refusaient Gatineau, Rouyn, Sept-Îles et Gaspé, donc condamnaient leurs offres à
+    // n'avoir jamais de distance.
+    check("villes_lat_ck", sql`${table.lat} >= 44.5 AND ${table.lat} <= 63`),
+    check("villes_lon_ck", sql`${table.lon} >= -80 AND ${table.lon} <= -56.5`),
   ],
 );
 
@@ -387,10 +407,11 @@ export const entreprisesLieux = pgTable(
     geocodeLe: timestamp("geocode_le", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    // Mêmes bornes régionales que `villes` : une résolution aberrante (homonyme d'un autre
-    // continent, signe inversé) est refusée par la base, pas affichée comme une épingle.
-    check("entreprises_lieux_lat_ck", sql`${table.lat} >= 45 AND ${table.lat} <= 49`),
-    check("entreprises_lieux_lon_ck", sql`${table.lon} >= -75 AND ${table.lon} <= -68`),
+    // Mêmes bornes que `villes` : une résolution aberrante (homonyme d'un autre continent,
+    // signe inversé) est refusée par la base, pas affichée comme une épingle. Ce qui garde
+    // une entreprise près de SA ville n'est pas ceci mais `RAYON_VALIDATION_KM`.
+    check("entreprises_lieux_lat_ck", sql`${table.lat} >= 44.5 AND ${table.lat} <= 63`),
+    check("entreprises_lieux_lon_ck", sql`${table.lon} >= -80 AND ${table.lon} <= -56.5`),
     check(
       "entreprises_lieux_precision_ck",
       sql`${table.precision} IN ('exacte', 'ville')`,

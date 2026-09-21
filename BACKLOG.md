@@ -2936,12 +2936,39 @@ rayon du profil, tri par note, et un groupe « distance inconnue » qui n'est PA
 une offre dont la distance est inconnue affirmerait qu'elle est loin). `situation` est en base
 et porte déjà de quoi le dire honnêtement.
 
-### `[GEO-BOOTSTRAP]` — une distance approchée tout de suite ⬜
+### `[GEO-BOOTSTRAP]` — une distance approchée tout de suite 🟦
 
-La table `villes` (centres de municipalités, géocodés une fois) existe et n'est pas exploitée
-pour donner un km approché aux offres. Manque le repli par bande postale pour les 3 748 offres
-dont personne ne nomme la ville. Sans ce lot, le filtre km n'a presque rien à filtrer : le
-géocodage plafonne à 8 villes par passe.
+⚠️ **CE QUI EST ÉCRIT CI-DESSOUS ÉTAIT FAUX, ET C'EST MOI QUI L'AVAIS ÉCRIT** (corrigé le
+2026-09-21) : « la table `villes` existe et n'est pas exploitée ». L'étape « 0 bis » de
+`mesurerDistances` (chantier #07, 2026-08-12) épingle DÉJÀ tout employeur au centre de sa
+ville, sans réseau, dès que ce centre est en base. Deuxième fois en deux jours qu'un remède
+est prescrit depuis un journal sans ouvrir le code qui produit la ligne (règle n° 159).
+
+**Ce que la mesure a trouvé à la place — des distances FAUSSES, pas manquantes.** Relevé du
+2026-09-21 (MCP, `scoreMin=65`, 185 correspondances) : l'offre de **Coffrages Synergy à
+Lavaltrie** (~200 km) affiche **6,1 km** et note **76** — comme ses quinze sœurs ; l'**Université
+du Québec à Montréal** affiche **5,1 km**, la **Société québécoise des infrastructures à
+Montréal** **6,1 km**. Deux mécanismes, tous deux inoffensifs avant ADR-0019 et graves depuis :
+`entreprises_lieux.nom` est la clé primaire (un employeur, UNE position, héritée par toutes ses
+offres quelle que soit leur ville), et le lecteur qui remplit `villes` n'exigeait pas que la
+réponse SOIT une ville.
+
+**Livré le 2026-09-21** ([ADR-0021](./docs/adr/0021-la-ville-de-l-offre-decide-de-sa-distance.md))
+— lecteur strict `lireReponseVille`, bornes élargies au Québec (elles refusaient Gatineau,
+Rouyn, Sept-Îles et Gaspé, donc condamnaient leurs offres à n'avoir jamais de distance), garde
+de plausibilité position↔ville de l'OFFRE, effacement des km invraisemblables déjà en base,
+re-vérification des centres écrits par l'ancien lecteur (`villes.verifie_le`), et priorité des
+villes par ce qu'elles débloquent.
+
+**Ce qui RESTE** ⬜ :
+- Le débit : **8 villes par passe** (`MAX_VILLES_PAR_PASSE`), partagé avec la re-vérification.
+  `lib/geocodageCron.ts` interdit d'agrandir la passe — il faut une passe de plus, et c'est une
+  décision à part. La ligne `[distances]` publie désormais `villesManquantes`, qui est le
+  chiffre qui dimensionne ce choix ; il n'existait pas avant, d'où un lot dimensionné le
+  2026-09-21 sur le mauvais des deux nombres.
+- Le repli par **bande postale** pour les 3 751 offres dont personne ne nomme la ville
+  (`lieu-inconnu` au flux complet du 2026-09-21). Non commencé.
+- La preuve en production : `bornes`, `effacées` et `centresCorrigés` se lisent au cron suivant.
 
 ### `[OBS-01]` — la preuve qu'un cron a tourné n'est lisible NULLE PART ⬜
 

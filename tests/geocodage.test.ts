@@ -22,6 +22,7 @@ import {
   geocoderPlusieurs,
   geocoderVille,
   lireReponse,
+  lireReponseVille,
   lireReponseAutocomplete,
   lireReponseDetails,
   lireReponseEntreprise,
@@ -51,7 +52,14 @@ function faussetFetch(reponses: (unknown | Error)[]) {
   return { recuperer, appels };
 }
 
-const ok = (lat: number, lon: number) => [{ lat: String(lat), lon: String(lon) }];
+// ⚠️ `class: "place"` DEPUIS ADR-0021. Une recherche de VILLE se lit désormais par
+// `lireReponseVille`, qui exige que la réponse SOIT un lieu habité — Nominatim rend bien
+// `place` pour une municipalité. Sans ce champ, ces fixtures décriraient une réponse que
+// Nominatim ne produit pas pour une ville, et les tests de CADENCE et de PANNE ci-dessous
+// mesureraient le filtre de classe au lieu de ce qu'ils annoncent.
+const ok = (lat: number, lon: number) => [
+  { lat: String(lat), lon: String(lon), class: "place" },
+];
 
 /**
  * Un résultat NOMMÉ, comme Nominatim en rend toujours un.
@@ -139,6 +147,35 @@ describe("lecture de la réponse", () => {
     expect(lireReponse(ok(BORNES.latMax, BORNES.lonMax))).not.toBeNull();
     expect(lireReponse(ok(BORNES.latMin - 0.01, BORNES.lonMin))).toBeNull();
     expect(lireReponse(ok(BORNES.latMax + 0.01, BORNES.lonMax))).toBeNull();
+  });
+});
+
+describe("lecture d'une VILLE — la réponse doit EN ÊTRE une (ADR-0021)", () => {
+  const avecClasse = (classe: string) => [
+    { lat: "46.81", lon: "-71.21", class: classe, display_name: "Quelque part" },
+  ];
+
+  it("accepte ce que Nominatim rend pour une municipalité", () => {
+    for (const classe of ["place", "boundary"]) {
+      expect(lireReponseVille(avecClasse(classe)), classe).not.toBeNull();
+    }
+  });
+
+  it("REFUSE une rue homonyme, que l'ancien lecteur acceptait", () => {
+    // Le cas mesuré : `urlRecherche` demande « <ville>, Québec, Canada », ce qui biaise
+    // Nominatim vers la ville de Québec. Une « rue Lavaltrie » y passait pour le CENTRE de
+    // Lavaltrie — à 200 km — et les seize offres de cette ville ont affiché 6,1 km.
+    for (const classe of ["highway", "building", "amenity", "shop"]) {
+      expect(lireReponseVille(avecClasse(classe)), classe).toBeNull();
+    }
+    // Et c'est bien la CLASSE qui tranche : l'ancien lecteur, lui, l'accepte.
+    expect(lireReponse(avecClasse("highway"))).not.toBeNull();
+  });
+
+  it("refuse aussi une réponse sans classe, ou hors des bornes", () => {
+    expect(lireReponseVille([{ lat: "46.81", lon: "-71.21" }])).toBeNull();
+    expect(lireReponseVille([])).toBeNull();
+    expect(lireReponseVille(avecClasse("place").map((e) => ({ ...e, lat: "49.26", lon: "-123.11" })))).toBeNull();
   });
 });
 

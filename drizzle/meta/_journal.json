@@ -169,6 +169,13 @@
       "when": 1789763587769,
       "tag": "0023_situation_du_lieu",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790014139889,
+      "tag": "0024_bornes_du_quebec",
+      "breakpoints": true
     }
   ]
 }
