@@ -20,6 +20,8 @@ import {
   boiteAutour,
   boiteEnglobante,
   grapperPourBornes,
+  scinderGrappe,
+  MAX_SCISSIONS_GRAPPE,
   distanceM,
   libelleBorne,
   libelleDistanceBorne,
@@ -331,6 +333,136 @@ describe("grapperPourBornes — un point aberrant ne gèle plus tout le lot", ()
   });
 });
 
+describe("scinderGrappe — on écoute la réponse au lieu de deviner un seuil", () => {
+  // ⚠️ LA PANNE QUE ÇA RÉPARE (2026-09-21) : `grappe de 520 lieu(x) — boîte ~168 km :
+  // overpass-api.de → HTTP 504`, et `bornes=0/533` contre `0/1` la veille. Le découpage
+  // initial ne pouvait rien y faire — il borne l'ÉTENDUE, et 168 km tient largement sous les
+  // 3° d'`ETENDUE_MAX_DEG`, qui garde contre une position aberrante, pas contre une requête
+  // coûteuse. Et resserrer cette garde aurait été inventer un nombre : le coût dépend de la
+  // DENSITÉ autant que de la surface.
+
+  const g = (pts: { lat: number; lon: number }[]) => {
+    const [a] = grapperPourBornes(pts, 90).grappes;
+    if (a === undefined) throw new Error("fixture vide");
+    return a;
+  };
+
+  it("coupe en deux moitiés qui gardent TOUS les lieux, sans doublon", () => {
+    const pts = [
+      { lat: 46.0, lon: -71.0 },
+      { lat: 46.5, lon: -71.0 },
+      { lat: 47.0, lon: -71.0 },
+      { lat: 47.5, lon: -71.0 },
+    ];
+    const moities = scinderGrappe(g(pts));
+    expect(moities).not.toBeNull();
+    if (moities === null) return;
+    const [basse, haute] = moities;
+    expect(basse.lieux.length + haute.lieux.length).toBe(pts.length);
+    const vus = [...basse.lieux, ...haute.lieux].map((l) => `${l.lat},${l.lon}`).sort();
+    expect(new Set(vus).size).toBe(pts.length);
+  });
+
+  it("⚠️ RÉDUIT l'étendue — c'est la seule propriété qui répare la panne", () => {
+    // Un test qui vérifierait seulement « deux moitiés non vides » serait satisfait par une
+    // coupe qui ne réduit rien : c'est l'étendue de la boîte qui faisait tomber Overpass.
+    const pts = Array.from({ length: 8 }, (_, i) => ({ lat: 46 + i * 0.4, lon: -71 }));
+    const depart = g(pts);
+    const moities = scinderGrappe(depart);
+    if (moities === null) throw new Error("devrait être scindable");
+    const etendue = (b: (typeof depart)["boite"]) => b.latMax - b.latMin;
+    for (const m of moities) {
+      expect(etendue(m.boite)).toBeLessThan(etendue(depart.boite));
+    }
+  });
+
+  it("coupe la dimension la PLUS LONGUE, pas toujours la latitude", () => {
+    // ⚠️ LES LATITUDES SONT ALTERNÉES, ET C'EST TOUTE LA FIXTURE. Mon premier jet posait une
+    // latitude CONSTANTE : le tri par latitude retombait alors sur son second critère — la
+    // longitude — et rendait exactement le même découpage. Le cas restait vert en forçant
+    // `surLaLatitude = true`, donc il ne mesurait rien. Prouvé par mutation, pas supposé.
+    //
+    // Ici, trier par latitude mélange les longitudes : la moitié « basse » contiendrait les
+    // deux extrêmes est ET ouest, et l'étendue coûteuse ne serait pas réduite.
+    const pts = [
+      { lat: 46.0, lon: -73.0 },
+      { lat: 46.5, lon: -72.5 },
+      { lat: 46.1, lon: -72.0 },
+      { lat: 46.6, lon: -71.5 },
+      { lat: 46.2, lon: -71.0 },
+      { lat: 46.7, lon: -70.5 },
+    ];
+    const depart = g(pts);
+    expect(depart.boite.lonMax - depart.boite.lonMin).toBeGreaterThan(
+      depart.boite.latMax - depart.boite.latMin,
+    );
+
+    const moities = scinderGrappe(depart);
+    if (moities === null) throw new Error("devrait être scindable");
+
+    // ⚠️ AUCUN SEUIL INVENTÉ : la propriété d'une coupe par la BONNE dimension est que les
+    // deux moitiés y sont SÉPARÉES — tout ce qui est d'un côté est à l'ouest de l'autre.
+    // Un ratio d'étendue aurait demandé de choisir un nombre ; celle-ci est binaire.
+    const [a1, a2] = moities;
+    const maxLon = (m: typeof a1) => Math.max(...m.lieux.map((l) => l.lon));
+    const minLon = (m: typeof a1) => Math.min(...m.lieux.map((l) => l.lon));
+    expect(maxLon(a1)).toBeLessThanOrEqual(minLon(a2));
+  });
+
+  it("… et coupe la LATITUDE quand c'est elle la plus longue — les deux branches", () => {
+    // Le cas miroir : sans lui, la moitié « on coupe la latitude » du prédicat ne serait
+    // exercée par aucun test, et un `surLaLatitude = false` figé passerait inaperçu.
+    const pts = [
+      { lat: 46.0, lon: -71.0 },
+      { lat: 46.5, lon: -70.8 },
+      { lat: 47.0, lon: -71.2 },
+      { lat: 47.5, lon: -70.9 },
+      { lat: 48.0, lon: -71.1 },
+      { lat: 48.5, lon: -70.7 },
+    ];
+    const depart = g(pts);
+    expect(depart.boite.latMax - depart.boite.latMin).toBeGreaterThan(
+      depart.boite.lonMax - depart.boite.lonMin,
+    );
+
+    const moities = scinderGrappe(depart);
+    if (moities === null) throw new Error("devrait être scindable");
+    const [a1, a2] = moities;
+    const maxLat = (m: typeof a1) => Math.max(...m.lieux.map((l) => l.lat));
+    const minLat = (m: typeof a1) => Math.min(...m.lieux.map((l) => l.lat));
+    expect(maxLat(a1)).toBeLessThanOrEqual(minLat(a2));
+  });
+
+  it("rend null sur un lieu SEUL — un échec à un lieu est un échec pour de bon", () => {
+    // Sans ce cas, l'appelant boucherait : il couperait indéfiniment une grappe d'un lieu.
+    expect(scinderGrappe(g([{ lat: 46.8, lon: -71.2 }]))).toBeNull();
+  });
+
+  it("est DÉTERMINISTE : deux appels donnent les mêmes moitiés", () => {
+    // Même exigence que le découpage initial : sans ça, deux passes ne se ressemblent pas et
+    // un échec ne se reproduit jamais à l'identique — donc ne se diagnostique pas.
+    const pts = [
+      { lat: 46.9, lon: -71.1 },
+      { lat: 46.1, lon: -71.9 },
+      { lat: 46.5, lon: -71.5 },
+      { lat: 46.3, lon: -71.2 },
+      { lat: 46.7, lon: -71.7 },
+    ];
+    const cle = (m: ReturnType<typeof scinderGrappe>) =>
+      m === null ? "null" : m.map((x) => x.lieux.map((l) => l.lat).join("|")).join("//");
+    expect(cle(scinderGrappe(g(pts)))).toBe(cle(scinderGrappe(g(pts))));
+  });
+
+  it("le plafond de coupes est une CONSTANTE partagée, et il en faut une", () => {
+    // Sans plafond, une PANNE d'Overpass — où TOUT échoue — ferait doubler les requêtes à
+    // chaque tour jusqu'à épuiser le budget de la passe.
+    expect(MAX_SCISSIONS_GRAPPE).toBeGreaterThanOrEqual(1);
+    // Dérivé du cas réel : ~168 km divisés par 2^N doivent passer sous les 30 km qui avaient
+    // répondu la veille. Le test tient la RELATION, pas la valeur du jour.
+    expect(168 / 2 ** MAX_SCISSIONS_GRAPPE).toBeLessThan(30);
+  });
+});
+
 describe("la passe des bornes est BRANCHÉE sur le découpage", () => {
   // ⚠️ LE TROU ENTRE DEUX MOITIÉS GARDÉES. `grapperPourBornes` est prouvé juste, le budget
   // est prouvé vérifié — et rien, entre les deux, ne prouve que `mesurerBornes` appelle le
@@ -368,5 +500,27 @@ describe("la passe des bornes est BRANCHÉE sur le découpage", () => {
     // « 1 293 en échec » ne se corrige pas ; un nom et une position, si.
     expect(code).toMatch(/aberrants\.map\(/);
     expect(code).toContain("à re-géocoder");
+  });
+
+  it("⚠️ COUPE une grappe en échec au lieu de renoncer — sur les DEUX chemins d'échec", () => {
+    // Deux chemins mènent à « cette grappe n'est pas mesurée » : la requête qui ÉCHOUE
+    // (504, abandon) et la réponse VIDE sur une grande boîte, refusée parce que l'inscrire
+    // figerait « aucune borne » sur tout le lot. Les deux repassaient à l'identique le
+    // lendemain — vécu : `bornes=0/1` immobile le 20/09, puis `0/533` le 21/09.
+    //
+    // Le compte est ce qui compte : UN seul appel à `scinderGrappe` laisserait l'autre
+    // chemin sans remède, et ce test resterait vert s'il se contentait de `toContain`.
+    expect(code.match(/scinderGrappe\(g\)/g) ?? []).toHaveLength(2);
+    expect(code.match(/file\.unshift\(/g) ?? []).toHaveLength(2);
+  });
+
+  it("borne le nombre de coupes avec la constante PARTAGÉE, pas un nombre écrit sur place", () => {
+    expect(code.match(/aFaire\.scissions < MAX_SCISSIONS_GRAPPE/g) ?? []).toHaveLength(2);
+  });
+
+  it("remet les moitiés en TÊTE de file — sinon la coupe ne sert qu'un jour sur deux", () => {
+    // En queue, le budget s'épuiserait sur d'autres grappes avant d'y revenir : la scission
+    // aurait l'air branchée et ne finirait jamais le travail commencé.
+    expect(code).not.toMatch(/file\.push\(/);
   });
 });

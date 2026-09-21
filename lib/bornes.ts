@@ -387,3 +387,79 @@ export function grapperPourBornes<T extends { lat: number; lon: number }>(
 
   return { grappes, aberrants };
 }
+
+/**
+ * Le nombre de fois qu'une grappe en échec peut être coupée en deux avant qu'on renonce.
+ *
+ * ⚠️ IL FAUT UNE BORNE, ET PAS SEULEMENT POUR LA FORME. Sans elle, une PANNE d'Overpass —
+ * par opposition à une surcharge — ferait doubler le nombre de requêtes à chaque tour : on
+ * brûlerait tout le budget de la passe à découper un lot que rien ne pouvait mesurer, et le
+ * journal montrerait des centaines d'échecs là où il en fallait un seul, nommé.
+ *
+ * Trois, parce que c'est ce que le cas réel demande : la grappe qui a échoué le 2026-09-21
+ * couvrait ~168 km, et trois coupes la ramènent autour de 21 km — sous les 30 km qui avaient
+ * répondu la veille. ⚠️ Ce n'est pas une mesure du seuil d'Overpass : ce seuil dépend de la
+ * DENSITÉ de bornes autant que de la surface (cent kilomètres autour de Montréal ne coûtent
+ * pas cent kilomètres en Gaspésie), et aucune valeur fixe ne pourrait le capturer. C'est
+ * précisément pourquoi le remède est de COUPER jusqu'à ce que ça passe plutôt que de choisir
+ * une étendue « assez petite » — la borne ci-dessous dit seulement quand cesser d'essayer.
+ */
+export const MAX_SCISSIONS_GRAPPE = 3;
+
+/**
+ * Coupe une grappe en deux, par sa dimension la plus longue. PURE.
+ *
+ * ⚠️ POURQUOI COUPER PLUTÔT QUE RESSERRER LA GARDE D'ÉTENDUE. `ETENDUE_MAX_DEG` existe pour
+ * attraper une position ABERRANTE (un homonyme géocodé sur un autre continent) ; elle vaut 3°
+ * et c'est juste pour ça. Le coût d'une requête Overpass, lui, ne dépend pas que de la
+ * surface : il dépend de ce qu'il y a DEDANS. Une même boîte de cent kilomètres coûte un
+ * aller-retour tranquille en Gaspésie et un HTTP 504 sur l'île de Montréal. Aucun seuil
+ * d'étendue ne peut donc être « le bon », et en chercher un reviendrait à inventer un nombre
+ * que la réalité démentirait au premier déplacement du lot.
+ *
+ * Couper sur échec ne suppose rien : la requête qui passe DIT que la grappe était assez
+ * petite, celle qui échoue dit le contraire, et on n'a plus qu'à écouter.
+ *
+ * ⚠️ ET ÇA RÉPARE AUSSI LE VIDE SUSPECT. Une réponse vide sur une boîte plus grande qu'un
+ * quartier est traitée comme un échec — à raison : l'inscrire figerait « aucune borne » sur
+ * toute la grappe. Mais sans scission, cette grappe « repassait » chaque jour à l'identique,
+ * pour échouer pareil. Coupée, elle finit par tenir sous `ETENDUE_VIDE_SUSPECTE_KM`, où un
+ * vide devient crédible et s'inscrit enfin.
+ *
+ * Rend `null` quand il n'y a rien à couper — une grappe d'un seul lieu qui échoue est un
+ * échec pour de bon, et l'appelant doit le NOMMER plutôt que de recommencer.
+ */
+export function scinderGrappe<T extends { lat: number; lon: number }>(
+  grappe: GrappeBornes<T>,
+  margeM = PORTEE_RECHERCHE_M,
+): [GrappeBornes<T>, GrappeBornes<T>] | null {
+  if (grappe.lieux.length < 2) return null;
+
+  // La dimension la plus longue, en DEGRÉS de la boîte réelle — marge comprise, donc la
+  // même grandeur que celle qui a fait échouer la requête. Couper l'autre dimension
+  // laisserait la plus coûteuse intacte.
+  const surLaLatitude =
+    grappe.boite.latMax - grappe.boite.latMin >= grappe.boite.lonMax - grappe.boite.lonMin;
+
+  // Tri déterministe : deux passes identiques donnent les mêmes moitiés, comme pour le
+  // découpage initial. Le second critère départage les points alignés sur le premier.
+  const ordonnes = [...grappe.lieux].sort((a, b) =>
+    surLaLatitude ? a.lat - b.lat || a.lon - b.lon : a.lon - b.lon || a.lat - b.lat,
+  );
+
+  const milieu = Math.floor(ordonnes.length / 2);
+  const basse = ordonnes.slice(0, milieu);
+  const haute = ordonnes.slice(milieu);
+
+  const boiteBasse = boiteEnglobante(basse, margeM);
+  const boiteHaute = boiteEnglobante(haute, margeM);
+  // Les deux moitiés sont non vides par construction (length >= 2), donc les boîtes existent.
+  // On le vérifie quand même : `boiteEnglobante` rend `null` sur une liste vide, et une
+  // affirmation non vérifiée sur un invariant est exactement ce qui se périme en silence.
+  if (boiteBasse === null || boiteHaute === null) return null;
+
+  return [
+    { lieux: basse, boite: boiteBasse },
+    { lieux: haute, boite: boiteHaute },
+  ];
+}

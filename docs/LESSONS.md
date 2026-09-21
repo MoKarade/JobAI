@@ -2358,3 +2358,67 @@ deux côtés.
 *(Même famille que la leçon jumelle de FinanceAI, `UN-LIBELLE-DE-METRIQUE-EST-UNE-CLE-CHEZ-SON-CONSOMMATEUR`,
 2026-09-17 : là-bas c'était une date dans le libellé qui remettait la série à zéro à chaque
 séance. Deux dépôts, deux formes de part variable, un seul mécanisme.)*
+
+
+---
+
+## 2026-09-21 — J'ai prescrit un remède qui était déjà livré, et le vrai manque était plus fin
+
+`[BORNES-03]`. Le journal du 21/09 : `grappe de 520 lieu(x) — boîte ~168 km :
+overpass-api.de → HTTP 504`, et le reste à mesurer qui remonte de 1 à 533. J'ai écrit au
+BACKLOG, le soir même : « il faut découper la grappe géographiquement », en citant la leçon
+n° 149 avec assurance.
+
+**Le découpage existait depuis le 14/09.** `grapperPourBornes` fait exactement ça, et le
+commentaire de `mesurerBornes` le dit en toutes lettres — je l'ai lu le lendemain en ouvrant
+le fichier pour coder mon correctif. C'est la leçon n° 1 du dépôt (« vérifier qu'une tâche
+n'est pas DÉJÀ faite »), mais prise par un bout que je n'avais pas vu : elle vaut pour le
+DIAGNOSTIC autant que pour la tâche. Un remède prescrit depuis un journal, sans ouvrir le
+code, décrit ce qu'on ferait à partir de rien — pas ce qui manque à ce qui existe.
+
+**Et le vrai manque était à un cran de finesse en dessous.** Le découpage borne l'ÉTENDUE ;
+168 km tient largement sous les 3° d'`ETENDUE_MAX_DEG`, qui garde contre une position
+aberrante — un homonyme géocodé sur un autre continent — et pas du tout contre une requête
+coûteuse. Deux rôles dans une constante, et seul le premier était écrit.
+
+Resserrer ce seuil aurait été inventer un nombre, et un faux : **le coût d'une requête
+Overpass dépend de la DENSITÉ autant que de la surface.** Cent kilomètres autour de Montréal
+ne coûtent pas cent kilomètres en Gaspésie. Aucun seuil d'étendue fixe ne peut capturer ça.
+
+Le correctif est donc de ne rien supposer : couper APRÈS un échec, et recommencer. Une
+requête qui passe DIT que la grappe était assez petite ; une qui échoue dit le contraire.
+Borné par `MAX_SCISSIONS_GRAPPE`, sans quoi une PANNE d'Overpass — où tout échoue — ferait
+doubler les requêtes à chaque tour jusqu'à épuiser le budget de la passe.
+
+**La règle** : avant de prescrire un remède depuis un journal, ouvrir le code qui produit la
+ligne. Et devant une garde qui laisse passer ce qu'elle devrait arrêter, se demander si elle
+ne remplit pas DÉJÀ un autre rôle, légitime — auquel cas c'est une seconde garde qu'il faut,
+pas un seuil plus serré.
+
+---
+
+## 2026-09-21 — Une fixture à valeur constante rend le second critère de tri invisible
+
+Même lot. `scinderGrappe` coupe par la dimension la plus longue ; j'écris le test avec six
+points à **latitude constante** étalés en longitude, je vérifie que les moitiés réduisent
+l'étendue, vert.
+
+Mutation : `const surLaLatitude = true` — couper toujours la latitude, quoi qu'il arrive.
+**Le test reste VERT.**
+
+Parce que le tri est `a.lat - b.lat || a.lon - b.lon`. À latitude constante, le premier
+critère rend zéro partout et le second départage : trier « par latitude » rend exactement le
+même ordre que trier par longitude. La fixture ne pouvait pas distinguer les deux branches —
+elle mesurait le second critère du tri, pas le prédicat que je croyais tester.
+
+Corrigé avec des latitudes **alternées**, pour qu'un tri par latitude mélange les longitudes,
+plus un cas miroir où c'est la latitude qui est la plus longue. Les deux mutations
+(`= true` et `= false`) rougissent désormais, chacune sur un cas.
+
+⚠️ Et l'assertion a changé de nature au passage : au lieu d'un ratio d'étendue — qui aurait
+demandé de choisir un seuil, donc d'inventer un nombre —, elle vérifie que les deux moitiés
+sont **séparées** sur la dimension coupée (tout ce qui est d'un côté est à l'ouest de
+l'autre). C'est la propriété d'une coupe par la bonne dimension, et elle est binaire.
+
+**La règle** : quand un comparateur a un second critère, une fixture où le premier est
+CONSTANT teste le second. Faire varier toutes les clés du tri, ou la mutation reste verte.

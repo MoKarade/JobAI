@@ -3102,14 +3102,34 @@ soit toute sa patience. La cause est ailleurs et elle est nouvelle : depuis que 
 couvrent tout le Québec (Montréal, Sept-Îles, Val-d'Or, Rouyn-Noranda…), la boîte englobante
 de la grappe fait **~168 km** au lieu de quelques dizaines. Overpass répond **504** dessus.
 
-**Le remède n'est donc pas d'allonger la patience** : une boîte de 168 km ne rentrera jamais
-dans un budget raisonnable, et attendre plus longtemps un service bénévole qui dit déjà 504
-n'est ni efficace ni poli. Il faut **découper la grappe géographiquement** — c'est la leçon
-n° 149 du dépôt, mot pour mot : « un garde-fou qui REFUSE un lot entier se transforme en
-panne permanente dès qu'un seul membre est mauvais, et le bon remède n'est jamais de relever
-le seuil, c'est de DÉCOUPER ».
+**Le remède n'est pas d'allonger la patience** : attendre plus longtemps un service bénévole
+qui répond déjà 504 n'est ni efficace ni poli.
 
-⚠️ Signalé, **non corrigé** : c'est du périmètre non demandé.
+⚠️ **CORRECTION DU DIAGNOSTIC (2026-09-21, en codant le correctif).** J'avais écrit ici
+« il faut découper la grappe géographiquement ». **C'était déjà fait** : `grapperPourBornes`
+découpe depuis le 14/09, et le commentaire de `mesurerBornes` le dit en toutes lettres. J'ai
+prescrit un remède déjà livré — la leçon n° 1 du dépôt (« vérifier qu'une tâche n'est pas
+DÉJÀ faite »), appliquée au diagnostic plutôt qu'à la tâche.
+
+Ce qui manquait vraiment est plus fin, et c'est ce qui a été livré : **couper APRÈS un
+échec**. Le découpage initial borne l'ÉTENDUE, et 168 km tient largement sous les 3°
+d'`ETENDUE_MAX_DEG` — qui garde contre une position aberrante, pas contre une requête
+coûteuse. Et resserrer cette garde aurait été inventer un nombre : le coût d'une requête
+Overpass dépend de la **densité** autant que de la surface, la même boîte passant en Gaspésie
+là où elle tombe sur l'île de Montréal. **Aucun seuil d'étendue fixe ne peut être juste.**
+
+✅ **Livré le 2026-09-21** : `scinderGrappe` (PURE) coupe une grappe en échec par sa dimension
+la plus longue, et la passe remet les deux moitiés EN TÊTE de file. On écoute la réponse au
+lieu de la deviner — une requête qui passe dit que la grappe était assez petite, une qui
+échoue dit le contraire. Borné par `MAX_SCISSIONS_GRAPPE = 3` : sans plafond, une PANNE
+d'Overpass (où tout échoue) ferait doubler les requêtes à chaque tour jusqu'à épuiser le
+budget.
+
+⚠️ **Le VIDE suspect est réparé par la même coupe**, et c'était l'autre moitié du problème :
+une réponse vide sur une grande boîte est refusée (l'inscrire figerait « aucune borne » sur
+tout le lot) — mais sans scission, la grappe « repassait » à l'identique chaque jour pour
+échouer pareil. Vécu : `bornes=0/1` immobile le 20/09. Coupée, elle finit par tenir sous
+`ETENDUE_VIDE_SUSPECTE_KM`, où un vide redevient crédible et s'inscrit enfin.
 
 ### Relevé du 2026-09-21 — le rattrapage des distances a démarré
 

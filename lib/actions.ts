@@ -49,7 +49,14 @@ import { employeursASituer, invaliderDistancesPrecisees, planifierDistances } fr
 import { villesARattraper } from "./ingest/pipeline";
 import { lireOffres } from "./donnees";
 import { colonnesOffre } from "./persistance";
-import { ETENDUE_VIDE_SUSPECTE_KM, grapperPourBornes, proximiteBorne } from "./bornes";
+import {
+  ETENDUE_VIDE_SUSPECTE_KM,
+  MAX_SCISSIONS_GRAPPE,
+  grapperPourBornes,
+  proximiteBorne,
+  scinderGrappe,
+  type GrappeBornes,
+} from "./bornes";
 import { DELAI_MAX_MS, ETENDUE_MAX_DEG, chercherBornesBoite } from "./overpass";
 import {
   EPOQUE_A_RETENTER,
@@ -1061,6 +1068,28 @@ async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
   // plus grand nombre. Un lot non atteint n'est ni mesuré ni en échec — il repassera.
   const ordre = [...grappes].sort((a, b) => b.lieux.length - a.lieux.length);
 
+  // ⚠️ UNE FILE, PLUS UNE LISTE, PARCE QU'UNE GRAPPE EN ÉCHEC SE COUPE EN DEUX (2026-09-21).
+  //
+  // Le 21/09 : `grappe de 520 lieu(x) — boîte ~168 km : overpass-api.de → HTTP 504`, et
+  // `bornes=0/533` contre `0/1` la veille. La cause est un effet de bord de l'élargissement
+  // de l'ingestion : depuis que les offres couvrent tout le Québec, l'amas « régional » n'en
+  // est plus un, et la boîte qui le couvre est trop chère pour Overpass.
+  //
+  // Le découpage initial ne pouvait pas l'éviter : il borne l'ÉTENDUE, et 168 km tient
+  // largement sous les 3° d'`ETENDUE_MAX_DEG` — qui garde contre une position aberrante, pas
+  // contre une requête coûteuse. Resserrer cette garde aurait été inventer un nombre : le
+  // coût dépend de la DENSITÉ autant que de la surface, et la même boîte passe en Gaspésie
+  // là où elle tombe sur l'île de Montréal.
+  //
+  // On écoute donc la réponse plutôt que de la deviner : une requête qui passe dit que la
+  // grappe était assez petite, une qui échoue dit le contraire, et on coupe. Le nombre de
+  // coupes est borné (`MAX_SCISSIONS_GRAPPE`) — sinon une PANNE d'Overpass, où tout échoue,
+  // ferait doubler les requêtes à chaque tour jusqu'à épuiser le budget.
+  const file: { grappe: GrappeBornes<(typeof lignes)[number]>; scissions: number }[] = ordre.map(
+    (grappe) => ({ grappe, scissions: 0 }),
+  );
+  let scissions = 0;
+
   const debutPasse = Date.now();
   let mesurees = 0;
   let echecs = aberrants.length;
@@ -1073,11 +1102,15 @@ async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
   let avecVitesse = 0;
   let avecTarif = 0;
 
-  for (const g of ordre) {
+  for (;;) {
     // Pas assez de budget pour une requête réseau : on ne la commence pas. Une requête tuée
     // en vol ne rapporte rien et consomme tout ce qui restait. Le reste du lot repassera.
     const reste = budgetMs === null ? null : budgetMs - (Date.now() - debutPasse);
     if (reste !== null && reste < DELAI_MAX_MS) break;
+
+    const aFaire = file.shift();
+    if (aFaire === undefined) break;
+    const g = aFaire.grappe;
 
     interrogees++;
     const debutGrappe = Date.now();
@@ -1093,10 +1126,30 @@ async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
       // opposées (attendre plus / découper plus). Le motif sans son objet ne diagnostique
       // rien, et ce dépôt l'a déjà payé sur « lieu-inconnu=47 ».
       const kmGrappe = (g.boite.latMax - g.boite.latMin) * 111;
+      const moities =
+        aFaire.scissions < MAX_SCISSIONS_GRAPPE ? scinderGrappe(g) : null;
+      if (moities !== null) {
+        // ⚠️ EN TÊTE DE FILE, PAS EN QUEUE. Les moitiés finissent le travail commencé : les
+        // remettre derrière laisserait le budget s'épuiser sur d'autres grappes et rendrait
+        // la scission inutile un jour sur deux, pour une raison d'ordonnancement.
+        file.unshift(
+          { grappe: moities[0], scissions: aFaire.scissions + 1 },
+          { grappe: moities[1], scissions: aFaire.scissions + 1 },
+        );
+        scissions++;
+        console.warn(
+          `[bornes] grappe de ${g.lieux.length} lieu(x) coupée en deux` +
+            ` — boîte ~${kmGrappe.toFixed(0)} km trop chère (${r.raison})`,
+        );
+        continue;
+      }
+
+      // Plus rien à couper — un seul lieu, ou le plafond de coupes atteint. C'est un échec
+      // pour de bon, et il se NOMME : le motif sans son objet ne diagnostique rien.
       console.error(
         `[bornes] grappe de ${g.lieux.length} lieu(x) non mesurée` +
           ` — boîte ~${kmGrappe.toFixed(0)} km, abandon après ${Date.now() - debutGrappe} ms` +
-          ` (patience ${DELAI_MAX_MS} ms) : ${r.raison}`,
+          ` (patience ${DELAI_MAX_MS} ms, ${aFaire.scissions} coupe(s) déjà faite(s)) : ${r.raison}`,
       );
       echecs += g.lieux.length;
       continue;
@@ -1111,9 +1164,29 @@ async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
     // parfaitement crédible et s'inscrit.
     const etendueKm = (g.boite.latMax - g.boite.latMin) * 111;
     if (r.bornes.length === 0 && etendueKm > ETENDUE_VIDE_SUSPECTE_KM) {
+      // ⚠️ ON COUPE ICI AUSSI, ET C'EST CE QUI DÉBLOQUE LE CAS. Sans scission, cette grappe
+      // « repassait » — c'est-à-dire qu'elle revenait à l'identique le lendemain, pour
+      // échouer pareil, indéfiniment (vécu : `bornes=0/1` immobile le 20/09). Coupée, elle
+      // finit par tenir sous `ETENDUE_VIDE_SUSPECTE_KM`, où un vide redevient crédible et
+      // s'inscrit enfin. Le refus d'inscrire un vide sur une grande boîte reste entier : il
+      // change juste de conclusion, de « on renonce » à « on regarde de plus près ».
+      const moities =
+        aFaire.scissions < MAX_SCISSIONS_GRAPPE ? scinderGrappe(g) : null;
+      if (moities !== null) {
+        file.unshift(
+          { grappe: moities[0], scissions: aFaire.scissions + 1 },
+          { grappe: moities[1], scissions: aFaire.scissions + 1 },
+        );
+        scissions++;
+        console.warn(
+          `[bornes] réponse VIDE sur ${etendueKm.toFixed(0)} km — grappe de ${g.lieux.length} ` +
+            `lieu(x) coupée en deux plutôt qu'inscrite « aucune borne »`,
+        );
+        continue;
+      }
       console.error(
         `[bornes] réponse VIDE sur ${etendueKm.toFixed(0)} km — traitée comme un échec, ` +
-          `pas comme « aucune borne » : la grappe repassera`,
+          `pas comme « aucune borne » : plus rien à couper, la grappe repassera`,
       );
       echecs += g.lieux.length;
       continue;
@@ -1140,7 +1213,10 @@ async function mesurerBornes(budgetMs: number | null): Promise<PasseBornes> {
   }
 
   console.log(
-    `[bornes] ${interrogees}/${grappes.length} grappe(s) interrogée(s) · ${bornesVues} borne(s) vue(s) · ` +
+    // ⚠️ `interrogees` PEUT DÉPASSER `grappes.length` depuis les scissions, et le dire évite
+    // de lire « 7/2 grappes » comme un compteur cassé. Le nombre de coupes est donc affiché.
+    `[bornes] ${interrogees} interrogation(s) sur ${grappes.length} grappe(s)` +
+      `${scissions > 0 ? ` (+${scissions} coupe(s))` : ""} · ${bornesVues} borne(s) vue(s) · ` +
       `${mesurees} lieu(x) mesuré(s) · marque=${avecMarque}/${mesurees} vitesse=${avecVitesse}/${mesurees} tarif=${avecTarif}/${mesurees}`,
   );
 
