@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-09-21 (suite) — le gros chiffre de la carte hub devient l'arrivage
+
+Marc : « la carte jobai je veux que ce soit le nombre de nouvelles offres le gros chiffre et
+le graph ». Livré : `primary` **et** la position 0 vont à `Nouvelles (7 j)`, sans condition.
+Décision enregistrée en [ADR-0020](./docs/adr/0020-le-gros-chiffre-de-la-carte-devient-l-arrivage.md),
+qui révise le volet « Widget hub » d'ADR-0001.
+
+⚠️ **Ce n'était pas qu'une préférence de mise en page.** Le hub indexe l'historique d'une
+métrique **par son libellé** (`serieMetrique` dans `Hubperso/lib/historique.ts`). L'ancien
+héros s'appelait `Meilleure : <entreprise>` — il changeait de clé à chaque changement
+d'employeur en tête, donc sa série repartait de zéro et la carte affichait « pas encore
+d'historique ». **Le chiffre mis en avant était le seul à ne pas pouvoir porter de courbe.**
+
+**Mesuré** : `Nouvelles (7 j)` est publié sans condition depuis le **2026-08-14** (`c900e39`,
+`[HUB-01]`), soit 38 jours ; la rétention du hub est de **90 jours**. La série existe déjà —
+la courbe apparaît avec son historique réel, sans attendre.
+
+⚠️ **Le libellé est désormais une CLÉ, pas un titre** (`LIBELLE_HEROS`, exporté). Le renommer,
+même « en mieux », jette la série sans que rien ne rougisse côté hub. Une garde fige la valeur
+exacte : sans elle, toutes les autres assertions sont auto-satisfaites (elles comparent à la
+constante). La meilleure offre, elle, **reste publiée** en métrique secondaire.
+
+Deux perturbations mesurées : héros remis sur la meilleure offre → 3 rouges ; libellé renommé
+→ 3 rouges. Gate complet vert.
+
+🧭 **Trouvé en passant, NON corrigé** : ADR-0019 n'a pas de ligne dans l'index de
+`docs/adr/README.md` — même oubli que celui réparé pour ADR-0017 le 2026-09-17. Porté au
+BACKLOG (`[DOC-ADR-INDEX]`), pas touché : scope non demandé.
+
+---
+
 ## 2026-09-21 — le rattrapage a démarré, et une régression est apparue ailleurs
 
 Deux faits neufs, de signes opposés.

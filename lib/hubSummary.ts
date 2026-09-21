@@ -71,6 +71,16 @@ export function alertesCout(cout: CoutPublie): HubAlert[] {
   return [];
 }
 
+/**
+ * Le libellé du GROS CHIFFRE de la carte — et, chez le hub, la CLÉ de son historique.
+ *
+ * ⚠️ Exporté pour que la garde le vise sans le recopier : deux écritures du même libellé
+ * divergent, et le jour où elles divergent la courbe repart de zéro sans que rien ne rougisse
+ * (le hub n'a aucun moyen de savoir qu'une série et son successeur parlent du même sujet).
+ * Le changer est une décision, pas un ajustement de formulation.
+ */
+export const LIBELLE_HEROS = "Nouvelles (7 j)";
+
 /** Le contrat borne les libellés à 40 caractères ; on tronque proprement plutôt que d'être rejeté. */
 function libelle(texte: string, max = 40): string {
   const t = texte.trim();
@@ -80,10 +90,23 @@ function libelle(texte: string, max = 40): string {
 /**
  * Construit le summary à partir du résumé du suivi.
  *
- * La métrique en position 0 devient le gros chiffre du widget : c'est la MEILLEURE OFFRE
- * du moment (décision Marc, ADR-0001). Le widget répond ainsi à « qu'est-ce qui vaut le
- * coup en ce moment » plutôt qu'à « combien j'en ai » — la seconde question ne bouge
- * presque jamais, et un widget figé cesse d'être regardé.
+ * LE GROS CHIFFRE DE LA CARTE EST L'ARRIVAGE — « Nouvelles (7 j) » (décision Marc,
+ * 2026-09-21 : « la carte jobai je veux que ce soit le nombre de nouvelles offres le gros
+ * chiffre et le graph »). Il REMPLACE la meilleure offre d'ADR-0001, voir ADR-0020.
+ *
+ * ⚠️ CE N'EST PAS QU'UNE PRÉFÉRENCE : L'ANCIEN HÉROS NE POUVAIT PAS AVOIR DE COURBE.
+ * Le hub indexe l'historique d'une métrique PAR SON LIBELLÉ (`serieMetrique(historique,
+ * elue.label)` dans `Hubperso/lib/historique.ts`). Le libellé de la meilleure offre porte
+ * le nom de l'entreprise — il CHANGE dès que l'offre de tête change d'employeur, donc la
+ * série repartait de zéro et la carte affichait « pas encore d'historique ». Le chiffre mis
+ * en avant était structurellement le seul à ne pas pouvoir être tracé.
+ *
+ * ⚠️ CONSÉQUENCE DIRECTE : « Nouvelles (7 j) » EST DÉSORMAIS UNE CLÉ, pas un titre.
+ * Le renommer — même « en mieux » — jette l'historique déjà accumulé côté hub et ramène la
+ * carte à « pas encore d'historique ». Une garde l'interdit (`tests/hubSummary.test.ts`).
+ *
+ * L'ordre ET le drapeau `primary` disent la même chose, et c'est délibéré : un hub pinné sur
+ * un contrat antérieur à v1.3 ignore `primary` et retombe sur la position 0.
  *
  * @param genereLe date de génération, au format ISO. Passée en paramètre : une fonction
  *   qui lit l'horloge ne se teste pas deux fois de la même façon.
@@ -103,41 +126,37 @@ export function construireSummary(
 ): HubSummary {
   const metrics: HubMetric[] = [];
 
-  if (resume.meilleure) {
-    metrics.push({
-      label: libelle(`Meilleure : ${resume.meilleure.entreprise}`),
-      value: resume.meilleure.score,
-      format: "number",
-      // Une offre de palier A mérite d'être remarquée dans la grille du hub.
-      severity: resume.meilleure.score >= 80 ? "ok" : undefined,
-      // `primary` (contrat v1.3) désigne LE chiffre de la carte. C'est la même décision que
-      // l'ordre des métriques ci-dessous, rendue explicite : jusqu'ici le hub devinait par la
-      // position 0, ce qui marchait tant que personne ne réordonnait la liste.
-      primary: true,
-    });
-  }
-
   // ⚠️ LE CONTRAT PLAFONNE À SIX MÉTRIQUES, ET L'ORDRE EST DONC UNE DÉCISION.
   //
   // Ce qui suit est trié par ce que Marc regarde en premier, pas par ancienneté du code :
-  // la meilleure offre, puis l'arrivage du jour (demande de Marc 2026-08-14 — « le nombre de
-  // nouvelles offres et leur note à peu près »), puis le stock, puis l'entonnoir de
-  // candidature. `slice(0, 6)` tranche à la fin : sans cet ordre, c'est lui qui déciderait
-  // en silence, et il ferait tomber précisément ce qui vient d'être demandé.
+  // l'arrivage (le héros, voir l'en-tête), puis la meilleure offre, puis le stock, puis
+  // l'entonnoir de candidature. `slice(0, 6)` tranche à la fin : sans cet ordre, c'est lui
+  // qui déciderait en silence, et il ferait tomber précisément ce qui vient d'être demandé.
   //
   // Pour tenir dans six créneaux, « CV envoyés » et « Réponses » sont FUSIONNÉS en un seul.
   // On n'y perd rien — les deux chiffres restent lisibles côte à côte — et ça libère la
   // place d'une information qui, elle, n'existait pas.
   metrics.push({
-    label: "Nouvelles (7 j)",
+    label: LIBELLE_HEROS,
     value: resume.nouvelles,
     format: "number",
-    // Le titre de carte se REPLIE ici quand aucune offre n'est notée : le contrat autorise
-    // zéro `primary`, mais une carte sans chiffre mis en avant est une carte qu'on ne lit
-    // pas. « Aucune meilleure offre » est un état normal (rien de noté), pas une absence de
-    // sujet — et l'arrivage du jour est ce que Marc regarde ensuite.
-    ...(resume.meilleure ? {} : { primary: true as const }),
+    // ⚠️ INCONDITIONNEL, et c'est ce qui remplace l'ancien repli. `resume.nouvelles` existe
+    // TOUJOURS, et un zéro y est une information VRAIE (« rien n'est arrivé cette semaine »),
+    // pas un chiffre inventé (garde-fou n°3). L'ancien héros, lui, disparaissait dès qu'aucune
+    // offre n'était notée — d'où le repli d'alors, devenu sans objet.
+    primary: true,
   });
+
+  if (resume.meilleure) {
+    metrics.push({
+      label: libelle(`Meilleure : ${resume.meilleure.entreprise}`),
+      value: resume.meilleure.score,
+      format: "number",
+      // Une offre de palier A mérite d'être remarquée dans la grille du hub. Elle reste
+      // publiée — elle passe en métrique secondaire, elle ne disparaît pas de la carte.
+      severity: resume.meilleure.score >= 80 ? "ok" : undefined,
+    });
+  }
 
   // La moyenne ne se publie QUE s'il y a quelque chose à moyenner. Un « 0 » se lirait
   // « ces offres ne valent rien » alors que la vérité est « aucune n'est notée » — et le

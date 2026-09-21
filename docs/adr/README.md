@@ -32,3 +32,4 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 | [0016](./0016-la-carte-google-revient.md) | La carte Google revient, et le domicile avec elle | Propose — ressuscite ADR-0004, revise le garde-fou n1 |
 | [0017](./0017-le-bareme-cesse-de-buter-sur-un-accent.md) | Le barème cesse de buter sur un accent | Accepté (Marc, 2026-09-17) — ligne d'index ajoutée le 2026-09-17, elle manquait |
 | [0018](./0018-la-bande-postale-tranche-les-lieux-que-personne-ne-nomme.md) | La bande postale tranche les lieux que personne ne sait nommer | Accepté (Marc, 2026-09-17) — calibré sur une passe complète mesurée |
+| [0020](./0020-le-gros-chiffre-de-la-carte-devient-l-arrivage.md) | Le gros chiffre de la carte devient l'arrivage | Accepté (Marc, 2026-09-21) — révise le volet « Widget hub » d'ADR-0001 |

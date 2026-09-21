@@ -466,6 +466,7 @@ sans date. C'est pourquoi les renvois `§7` / `§8` figés dans les ADR et le `B
 155. Un champ additif s'écrit `.nullable().optional()`, jamais `.nullable().default(null)` : un `default` Zod rend le champ REQUIS en SORTIE, donc obligatoire sur tout objet construit à la main.
 156. Avant de nommer un champ dans un type déjà large, grep le nom DANS ce type — savoir ce qu'on veut exprimer ne dit rien de ce que le nom porte déjà.
 157. Avant de retirer un filtre, lister ce que son chemin PRODUIT en plus du refus : ce qui sert à DÉCIDER meurt avec la décision, ce qui sert à OBSERVER doit survivre sous un nom qui ne ment plus.
+158. Le LIBELLÉ d'une métrique publiée à un consommateur est une CLÉ chez lui, jamais un titre — le renommer jette l'historique en silence, et un libellé qui porte une part VARIABLE (entreprise, date) ne peut structurellement pas avoir de courbe.
 
 ## 10. Style et compte-rendu
 
