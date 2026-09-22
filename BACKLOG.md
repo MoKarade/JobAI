@@ -3000,6 +3000,52 @@ villes par ce qu'elles débloquent.
   FSA est fournie (fichier ou URL lisible directement, sans passer par un résumé de modèle),
   ce sous-chantier redevient un travail normal.
 - La preuve en production : `bornes`, `effacées` et `centresCorrigés` se lisent au cron suivant.
+  ⚠️ **Faux — corrigé le 2026-09-22 par la routine de veille.** Ces trois chiffres ne sont
+  JAMAIS persistés : `mesurerDistances` (`lib/actions.ts`) les calcule, les journalise
+  (`console.log`) et les rend dans sa réponse HTTP — un cron n'a personne pour lire cette
+  réponse, donc ils n'existent que dans les journaux runtime Vercel, ~17 min de rétention.
+  Exactement la classe de problème qu'`[OBS-01]` a réglée pour le TIMING d'une passe (`majLe`
+  via `etat_synchro`) mais pas pour son CONTENU. Porté sous `[OBS-02]` ci-dessous.
+
+### Relevé du 2026-09-22 (routine de veille, ~12:16 UTC) — le témoin nommé n'a pas bougé
+
+`resume_suivi` : `suivies=6190`, `perimees=733` — **identiques** au relevé du 21/09 (aucune
+entrée ni péremption en 24 h, sur un flux qui en compte habituellement des dizaines ; noté,
+non creusé davantage ce tour-ci). `nonSituees` descend bien : **3671 → 3541** (−130).
+`etat_synchro` confirme `veille-auto` et `distances-auto` réservés aujourd'hui à ~11:31-11:32
+UTC (le cron tourne). `geocodage-auto`, lui, date du 31/07 — **vérifié BÉNIN** : cette clé ne
+gate que la géocodification des `ENTREPRISES_CIBLES` déclenchée par une VISITE de `/carte`
+(`app/carte/page.tsx`), pas le cron quotidien (qui utilise `CLE_DISTANCES`) ; sa liste est
+vraisemblablement déjà entièrement géocodée, d'où son silence depuis des semaines.
+
+**Le témoin nommé (`coffrages-synergy-construction-project-manager`) n'a PAS bougé** :
+`km: 6,1`, note **76**, la réserve générique — toujours pas « distance à mesurer » — alors
+qu'ADR-0021 (livré le 21/09) promettait précisément d'effacer ce genre de chiffre. Lu
+`invaliderDistancesImplausibles` (`lib/distances.ts`) : elle n'efface `km` que si
+`positionDe(entreprise, positions)` retrouve une position ET que celle-ci est jugée
+IMPLAUSIBLE contre le centre retenu pour la VILLE DE L'OFFRE (`Lavaltrie`). Si la position de
+« Coffrages Synergy » a été géocodée par le MÊME défaut que celui qui a rempli `villes`
+(mécanisme n°2 du lot du 21/09 : `lireReponse` acceptait une réponse Nominatim qui n'était pas
+une ville), les deux se trompent de façon COHÉRENTE — la position de l'employeur et le centre
+de « Lavaltrie » tombent alors au même endroit, et le test de plausibilité ne voit rien
+d'anormal. `[Supposition]`, pas confirmée (aucun accès Nominatim depuis cette session) : à
+vérifier en relisant la ligne `villes` de Lavaltrie et la position stockée de l'employeur.
+**Non corrigé** (routine : mesurer, jamais corriger seul).
+
+### `[OBS-02]` — le CONTENU d'une passe de distances n'est lisible NULLE PART ⬜
+
+Même défaut qu'`[OBS-01]`, un cran plus loin. `[OBS-01]` a réglé le TIMING (`majLe` d'une
+réservation, via `etat_synchro`) ; il manque encore le CONTENU du dernier passage :
+`villesManquantes`, `distancesEffacees`, `centresCorriges` (et les compteurs `bornes`/`mesure`/
+`situer`/`budget` de la ligne `[distances]`) ne sont écrits QUE dans la réponse HTTP et les
+journaux `console.log` de `mesurerDistances` (`lib/actions.ts`) — jamais dans `sync_state` ni
+ailleurs de persistant. Un cron n'a personne pour lire sa réponse HTTP, et les journaux
+Vercel expirent en ~17 min : ces chiffres sont donc **structurellement invisibles** en dehors
+de cette fenêtre, ce qui a bloqué la routine de veille du 22/09 sur trois de ses quatre
+témoins temporaires. Remède probable : persister le dernier résumé de passe dans `sync_state`
+(même patron que `CLE_RAPPORT`/`veille-rapport` pour la veille), lu par un nouvel outil MCP ou
+un ajout à `etat_synchro`. Non commencé — découvert en chemin par la routine, hors périmètre
+de sa mission (mesurer, ne pas corriger).
 
 ### `[CARTE-PERF]` — l'assemblage des écrans est quadratique ✅
 

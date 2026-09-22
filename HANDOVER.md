@@ -6,6 +6,29 @@
 
 ---
 
+## 2026-09-22 — Routine de veille : le témoin ADR-0021 n'a pas bougé, `[OBS-02]` ouvert
+
+Routine automatique (post-cron, ~12:16 UTC). Crons vivants (`veille-auto`/`distances-auto`
+réservés aujourd'hui ~11:31-11:32 UTC), `nonSituees` descend (3671 → 3541). Deux points :
+
+- `suivies`/`perimees` identiques au 21/09 (6190/733) — pas d'entrée ni de péremption en 24 h.
+  Noté, pas creusé ce tour-ci.
+- **Le témoin nommé n'a pas bougé** : l'offre Coffrages Synergy (Lavaltrie, ~200 km) affiche
+  toujours `km: 6,1` / note 76, malgré ADR-0021 (livré le 21/09) censé effacer ce genre de
+  chiffre. Piste `[Supposition]` : la position de l'employeur et le centre retenu pour
+  « Lavaltrie » sont probablement faux de façon COHÉRENTE (même défaut Nominatim), donc le
+  test de plausibilité ne voit rien à corriger. Non vérifié (pas d'accès Nominatim ici), non
+  corrigé (la routine mesure, ne corrige pas). Détail complet dans `BACKLOG.md`.
+
+Trois des quatre témoins temporaires de la routine (`effacées`, `centresCorrigés`,
+`villesManquantes`) sont restés **immesurables** : ces chiffres ne sont écrits que dans les
+journaux Vercel (~17 min de rétention) et la réponse HTTP d'un cron que personne ne lit — donc
+structurellement invisibles ici. Nouvel item `[OBS-02]` au BACKLOG.
+
+Vérifications : lecture seule (MCP JobAI), aucun code touché ; gate non applicable (doc).
+
+---
+
 ## 2026-09-21 (Lot 10) — `[EMPLOYEUR-VARIANTE]` livré (ADR-0023 ratifié) + 2 fixes doc
 
 Marc a répondu au batch de questions du lot précédent : ADR-0023 ratifié (code-le), les deux
