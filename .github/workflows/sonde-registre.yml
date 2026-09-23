@@ -73,14 +73,14 @@ jobs:
     env:
       URL: https://www.registreentreprises.gouv.qc.ca/RQAnonymeGR/GR/GR03/GR03A2_22A_PIU_RecupDonnPub_PC/FichierDonneesOuvertes.aspx
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # [CI-PERSIST-CREDS] `actions/checkout` v2+ écrit le GITHUB_TOKEN dans la config git du
           # runner POUR TOUT LE RESTE DU RUN : n'importe quelle étape suivante, y compris une
           # action tierce, peut le lire. Vérifié un par un : aucun workflow de ce dépôt ne fait
           # de `git push` ni d'appel `gh`, donc aucun n'a besoin du jeton persisté.
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
