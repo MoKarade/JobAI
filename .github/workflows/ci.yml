@@ -82,3 +82,63 @@ jobs:
 #     documentation `DATABASE_URL='postgres://…'` de `scripts/charger-seed.ts` — il n'avait
 #     aucune notion d'exemple documenté.
 # Une règle, un endroit. Toute évolution du garde-fou n°1 ou n°5 passe par ce test.
+
+  # ---------------------------------------------------------------------------------------
+  # Portes qualité de l'Atelier (S6, 23/09/2026) — même dispositif que le pilote BatchChef.
+  # Depuis la fusion automatique, une PR verte part en production sans relecture humaine :
+  # ces deux jobs sont ce qui garantit qu'elle ne fait RECULER ni la qualité ni la sécurité.
+  # Cliquet : qualite/seuils.json fige l'état au jour de la mise en place ; rien ne recule.
+  qualite:
+    timeout-minutes: 20
+    name: Qualité (lint · couverture · code mort · architecture)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Dépendances
+        run: npm ci --ignore-scripts
+      - name: Portes qualité (cliquet)
+        run: node qualite/portes.mjs
+      - name: Rapport
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapport-qualite
+          path: qualite/rapport.json
+          if-no-files-found: ignore
+
+  securite:
+    # Secrets dans TOUT l'historique (gitleaks) + analyse statique du code (Semgrep).
+    # Mesuré le 23/09/2026 : gitleaks 1 résultat(s) sur l'historique (389 commits), tous des FAUX secrets de fixtures de test (vérifiés un par un), listés dans .gitleaksignore ;
+    # Semgrep 0 résultat sur le code (.github exclu). Donc bloquant d'emblée (--error).
+    timeout-minutes: 10
+    name: Sécurité (secrets · analyse statique)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks lit l'historique complet, pas seulement le dernier commit
+          persist-credentials: false
+      # Binaire officiel, version et empreinte figées : un outil de sécurité téléchargé sans
+      # vérification serait lui-même une surface d'attaque.
+      - name: Secrets (gitleaks, historique complet)
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSfL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz
+          echo "a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb  gitleaks.tgz" | sha256sum -c -
+          tar xzf gitleaks.tgz gitleaks
+          ./gitleaks git . --no-banner --redact --gitleaks-ignore-path .gitleaksignore
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Analyse statique (Semgrep)
+        run: |
+          # --only-binary : aucune compilation ni script d'installation, seulement des roues publiées.
+          python -m pip install --quiet --only-binary :all: semgrep==1.177.0
+          semgrep scan --metrics off --error --exclude .github \
+            --config p/typescript --config p/react --config p/nextjs \
+            --config p/secrets --config p/owasp-top-ten .

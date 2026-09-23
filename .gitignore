@@ -10,3 +10,9 @@ next-env.d.ts
 .env*.local
 .DS_Store
 *.log
+
+# Portes qualité de l'Atelier (S6) — sorties de mesure, jamais committées
+coverage/
+reports/
+.stryker-tmp/
+qualite/rapport.json
