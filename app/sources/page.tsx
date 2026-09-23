@@ -62,6 +62,9 @@ export default async function Sources() {
   // Instant figé côté SERVEUR et passé au composant : lu dans le composant, le rendu serveur
   // et le rendu client différeraient d'une seconde et React signalerait une erreur
   // d'hydratation à chaque affichage.
+  // Composant SERVEUR, rendu une seule fois par requête : la règle « purity » du React Compiler
+  // (react-hooks 7) vise les rendus client rejoués, pas ce cas — l'instant figé est voulu (ci-dessus).
+  // eslint-disable-next-line react-hooks/purity -- instant figé côté serveur, voulu
   const maintenant = Date.now();
 
   return (

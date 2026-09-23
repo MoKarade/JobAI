@@ -1,11 +1,11 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({ baseDirectory: __dirname });
+// Flat config natif : eslint-config-next 16 exporte enfin ses configurations au format flat
+// (`eslint-config-next/core-web-vitals`, `/typescript`) — plus de FlatCompat ni de
+// @eslint/eslintrc, qui ne savait pas relire la config 16 (plantage « circular structure »,
+// Dependabot #30). Toutes les règles d'avant sont conservées, plus celles du React Compiler
+// apportées par eslint-plugin-react-hooks 7. eslint reste en 9 : eslint-plugin-react, embarqué
+// ici, plante sur eslint 10 (cf. .github/dependabot.yml).
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
 
 const eslintConfig = [
   // `next lint` ignorait ces dossiers implicitement ; l'ESLint CLI, non. Sans cette
@@ -19,7 +19,8 @@ const eslintConfig = [
       "next-env.d.ts",
     ],
   },
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...nextVitals,
+  ...nextTs,
 
   // ⚠️ UN IMPORT INUTILISÉ EST UNE ERREUR, PAS UN AVERTISSEMENT — incident du 2026-08-17.
   //
