@@ -53,6 +53,7 @@ export function BoutonVeille() {
           instant figé côté serveur — même composant, deux sources d'horloge, aucune
           erreur d'hydratation. */}
       {rapport !== null && !enCours ? (
+        // eslint-disable-next-line react-hooks/purity -- horloge lue au rendu client, voulu (commentaire ci-dessus)
         <RapportVeilleVue rapport={rapport} maintenant={Date.now()} titre="Cette passe" />
       ) : null}
 

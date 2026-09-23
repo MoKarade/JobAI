@@ -66,6 +66,7 @@ export function FormulaireAjout() {
   useEffect(() => {
     const texte = champs.entreprise.trim();
     if (texte.length < 3) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vider la liste quand le texte redevient trop court
       setSuggestionsEntreprise([]);
       return;
     }

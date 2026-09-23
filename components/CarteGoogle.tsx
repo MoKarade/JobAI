@@ -107,6 +107,7 @@ function SuivreRedimensionnement({
   // l'observateur à chaque frappe de filtre (qui change `bornes`) tout en lui donnant
   // toujours la valeur COURANTE — une fermeture sur `bornes` figerait celle du montage.
   const bornesRef = useRef(bornes);
+  // eslint-disable-next-line react-hooks/refs -- « dernière valeur » lue par le ResizeObserver, jamais par un rendu
   bornesRef.current = bornes;
 
   useEffect(() => {
