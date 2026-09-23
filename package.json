@@ -28,7 +28,7 @@
     "@vis.gl/react-google-maps": "^1.10.0",
     "drizzle-orm": "^0.45.2",
     "leaflet": "^1.9.4",
-    "next": "^15.5.4",
+    "next": "^16.3.5",
     "next-auth": "^5.0.0-beta.31",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
