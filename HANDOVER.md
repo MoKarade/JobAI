@@ -3472,3 +3472,24 @@ au hub : tout est en place et vérifié par les journaux. La procédure reste da
 4. Les trois pièces de référence de Marc (artifact HTML, squelette `jobtracker`, handover du
    27/07) ne sont **pas** dans le dépôt : elles ont été fournies en pièces jointes de session.
    L'artifact reste la référence pour le portage de l'UI `[V1-06]`.
+
+## Portes qualité de l'Atelier (S6, 23/09/2026)
+
+Contrôles automatiques en CI, jobs **Qualité** et **Sécurité** : la fusion automatique les attend.
+Principe du **cliquet** : `qualite/seuils.json` fige l'état du jour de la mise en place ; rien ne peut
+reculer. `npm run portes` mesure en local, `npm run portes:maj` resserre après une amélioration.
+
+| Porte | Seuil de départ |
+|---|---|
+| Typage (erreurs) | ≤ 0 |
+| Lint (erreurs) | ≤ 0 |
+| Lint (avertissements) | ≤ 0 |
+| Tests en échec | ≤ 0 |
+| Couverture `lib/` (% lignes) | ≥ 78.7 |
+| Couverture globale (% lignes) | ≥ 54.9 |
+| Couverture globale (% branches) | ≥ 92.4 |
+| Code mort (knip) | ≤ 63 |
+| Règles d'architecture (dependency-cruiser) | ≤ 1 |
+
+Sécurité : gitleaks sur tout l'historique + Semgrep (TypeScript, React, Next.js, secrets, OWASP), bloquants.
+Dependabot : mises à jour hebdomadaires (npm + actions), fusion automatique si tout est vert.
