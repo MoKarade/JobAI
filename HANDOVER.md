@@ -3488,6 +3488,11 @@ reculer. `npm run portes` mesure en local, `npm run portes:maj` resserre après 
 | Couverture `lib/` (% lignes) | ≥ 78.7 |
 | Couverture globale (% lignes) | ≥ 54.9 |
 | Couverture globale (% branches) | ≥ 92.4 |
+
+> **24/09/2026 — couverture recalibrée (vitest 3 → 5, décision de Marc).** vitest 4+ mesure la couverture V8
+> autrement (remappage « AST-aware », annoncé par Vitest comme changeant les rapports) : même code,
+> autres chiffres. Nouveaux seuils : `lib/` ≥ 73.8, globale ≥ 57.6 % lignes / ≥ 53.3 % branches. Le détail
+> avant/après est dans `qualite/seuils.json` (clé `historique`).
 | Code mort (knip) | ≤ 63 |
 | Règles d'architecture (dependency-cruiser) | ≤ 1 |
 
