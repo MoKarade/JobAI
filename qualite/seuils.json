@@ -1,6 +1,6 @@
 {
   "_doc": "Seuils du cliquet (portes qualité de l'Atelier, S6). Valeurs mesurées le jour de la mise en place (Linux, Node 24.21) : l'existant est toléré, rien ne peut reculer. `npm run portes:maj` resserre un seuil quand le chiffre s'améliore ; le desserrer demande `--forcer` et une décision de Marc.",
-  "mis_a_jour": "2026-09-23",
+  "mis_a_jour": "2026-09-24",
   "config": {
     "app": "JobAI",
     "lint": "eslint .",
@@ -29,13 +29,13 @@
       "max": 0
     },
     "couverture.lignes_coeur": {
-      "min": 78.7
+      "min": 73.8
     },
     "couverture.lignes_global": {
-      "min": 54.9
+      "min": 57.6
     },
     "couverture.branches_global": {
-      "min": 92.4
+      "min": 53.3
     },
     "code_mort.problemes": {
       "max": 63
@@ -43,5 +43,21 @@
     "architecture.violations": {
       "max": 1
     }
-  }
+  },
+  "historique": [
+    {
+      "date": "2026-09-24",
+      "motif": "vitest 3 -> 5 : remappage V8 « AST-aware » (Vitest 4+), même code, autre mesure — décision de Marc",
+      "couverture_avant": {
+        "couverture.lignes_coeur": 78.7,
+        "couverture.lignes_global": 54.9,
+        "couverture.branches_global": 92.4
+      },
+      "couverture_apres": {
+        "couverture.lignes_coeur": 73.8,
+        "couverture.lignes_global": 57.6,
+        "couverture.branches_global": 53.3
+      }
+    }
+  ]
 }
