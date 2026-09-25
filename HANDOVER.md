@@ -6,6 +6,126 @@
 
 ---
 
+## 2026-09-25 — Rapport complet, sur demande de Marc (« gros rapport de où tu es, document tout »)
+
+Cette session couvre deux choses : un lot de travail le 21/09 (chantiers fermés), puis une
+routine automatique quotidienne (22 → 25/09) qui surveille les invariants du géocodage sans
+coder. Entre les deux, une AUTRE session a fusionné 9 PR (23-24/09) pendant que celle-ci
+tournait en arrière-plan — découvert le 24/09 par un simple `git fetch`, fast-forward propre.
+
+### Où en est le dépôt, là, maintenant
+
+- `HEAD` = `d5fc156` (`origin/main`), arbre propre, aucune divergence.
+- **Gate local rejoué en entier aujourd'hui, VERT** : `npm ci` (dépendances désynchronisées —
+  voir plus bas), `typecheck`, `test` (1791 passent, 1 ignoré), `lint`, `build`, et les
+  **nouvelles portes qualité de l'Atelier** (`npm run portes`) — 9/9 vertes, aucune n'a reculé.
+- **CI GitHub** : verte sur les runs récents (PR `#427`, `[S6-PORTES]` `#425`). Le workflow
+  `ci.yml` tourne désormais sur `pull_request`, plus sur `push` à `main` directement — une
+  page à part, voir « Ce qui a changé sans moi » ci-dessous.
+- ⚠️ **`npm run build` RÉÉCRIT `tsconfig.json` en silence** — Next.js le remet à ses réglages
+  attendus (`"jsx": "preserve"` → `"react-jsx"`, reformatage, `include` élargi). Trouvé en
+  préparant ce rapport, non commité (`git checkout -- tsconfig.json` juste après). C'est
+  dangereux ICI précisément parce que `"jsx": "preserve"` est le réglage DÉLIBÉRÉ dont dépend
+  le fix `oxc` de `vitest.config.ts` (commit `#36`, ci-dessous) — un commit qui inclurait ce
+  fichier après un `build` local annulerait ce fix sans qu'aucun message ne le dise. Réflexe :
+  `git status` après tout `npm run build`, avant tout `git add`.
+
+### Ce qui a changé sans moi (23-24/09, une autre session)
+
+Neuf commits fusionnés (`#23` à `#36`) pendant que la routine de veille tournait ici,
+signés `Claude Opus 5.5`, session `01UfB1Lyndmu2i4UzjQCGyko` :
+
+1. **Node 24 partout** (`#23`) — `.nvmrc` et `engines` relevés. Mon conteneur tournait encore
+   en Node 22 : `npm run typecheck` échouait sur `vitest.config.ts` (option `oxc` inconnue)
+   tant que `npm ci` n'avait pas resynchronisé `node_modules` avec le nouveau
+   `package-lock.json`. Corrigé en relançant `npm ci` avant le gate — pas un bug du dépôt,
+   un environnement local en retard.
+2. **`[S6-PORTES]` — Portes qualité et sécurité de l'Atelier** (`#24`) : même dispositif que
+   BatchChef et FinanceAI. Deux jobs CI bloquants, **Qualité** (typage, lint, tests,
+   couverture `lib/`+globale, code mort via `knip`, architecture via `dependency-cruiser`) et
+   **Sécurité** (gitleaks sur tout l'historique, Semgrep). Principe du **cliquet** :
+   `qualite/seuils.json` fige l'état mesuré, aucune régression ne peut passer. Commandes :
+   `npm run portes` (mesure), `npm run portes:maj` (resserre après une amélioration).
+3. **Dependabot hebdomadaire** (npm + actions), fusion automatique si tout est vert (`#25`
+   à `#27`, `#33` — dont Next 15.5.25 → 16.3.5, zod 3 → 4).
+4. **`[S6-PORTES]` contrat interne** (`#35`) : Dependabot proposait de RÉTROGRADER
+   `@mokarade/hub-contract` (v1.3.1 → v1.3.0, une version sans `dist/` commité — installation
+   cassée sous npm 11, vécu le 23/09 sur BatchChef #114 et JobAI #34). Le contrat est
+   maintenant ignoré en entier par Dependabot ; il se repin à la main.
+5. **vitest 5 + couverture recalibrée** (`#36`, la plus récente) : vitest 5 embarque Vite 8,
+   qui compile via `oxc` et respecte `"jsx": "preserve"` du tsconfig — les tests important des
+   composants JSX échouaient à l'analyse d'import. Fixé par `oxc: { jsx: { runtime:
+   "automatic" } }` dans `vitest.config.ts`, pour les tests seulement. Le nouvel instrument de
+   couverture V8 mesure les branches différemment (remappage « AST-aware ») : le chiffre est
+   tombé de ~92 % à 36-53 % **sans qu'une ligne de code ait bougé** — pas une régression, un
+   changement de règle. Seuils de couverture redescendus en conséquence (décision de Marc,
+   24/09), toutes les autres portes inchangées.
+
+**Le workflow git a aussi changé** : les PR listées ci-dessus passent par des branches et une
+« Fusion automatique » (`fusion-auto.yml`), pas par des commits directs sur `main` — ce qui
+diverge d'ADR-0002 (« développement direct sur `main`, sans branche ni PR »), au moins pour ce
+type de travail (dépendances, infrastructure CI). Cette session continue sur commits directs
+pour la routine de veille et n'a pas cherché à trancher si ADR-0002 est révisée ou coexiste
+avec ce nouveau mode — à clarifier avec Marc si besoin.
+
+### Doc trouvée en dérive, corrigée dans ce commit
+
+`BACKLOG.md` portait DEUX entrées pour le même oubli (ADR-0019 absent de l'index) :
+`[DOC-ADR-INDEX]` (en tête de fichier, jamais cochée) et `[ADR-INDEX-01]` (déjà ✅, fixée le
+22/09). La première n'avait simplement jamais été recroisée avec la seconde. Cochée, avec un
+renvoi vers l'autre — le correctif RÉEL, lui, est en place depuis le 22/09 et a survécu au
+fast-forward du 24/09 (vérifié).
+
+### Récapitulatif de la routine quotidienne (22 → 25/09)
+
+Chantiers fermés le 21/09, avant le début de la routine : `[PERSIST-02]` (liste des chemins
+d'écriture d'offres découverte par scan plutôt qu'écrite à la main), `[OBS-01]` (outil MCP
+`etat_synchro`, expose `majLe`/`ageMs` de `sync_state`), `[EMPLOYEUR-VARIANTE]` (ADR-0023,
+table d'alias `STERIS`/`STERIS Canada` et `Exo-s Saint-Damien`/`Exo-s`), `[GEO-BOOTSTRAP]`
+bande postale (bloqué — aucune source de centroïdes FSA joignable depuis cet environnement,
+laissé ouvert sur décision de Marc), `[ADR-INDEX-01]` et `[BORNES-03]` (deux fixes doc).
+
+| Date | `suivies` | `nonSituees` | Note |
+|---|---|---|---|
+| 21/09 | 6190 | 3671 | Référence (fin du lot de travail) |
+| 22/09 | 6190 | 3541 | ↓ — identique en `suivies`/`perimees`, pas creusé |
+| 23/09 | 6436 | 3671 | +246 `suivies` (grosse ingestion), `nonSituees` remonte (1 jour, sous le seuil de 3) |
+| 24/09 | 6389 | 3408 | ↓ — `perimees` continue de monter (868), churn normal présumé |
+| 25/09 | 6367 | 3359 | ↓ — aucun invariant en défaut |
+
+**Témoin nommé, IMMOBILE depuis 5 jours** : `coffrages-synergy-construction-project-manager`
+(Lavaltrie, ~200 km) affiche toujours `km: 6,1` / note **76**, malgré ADR-0021 (livré le
+21/09) censé effacer ce genre de chiffre. Hypothèse posée le 22/09, jamais vérifiée (pas
+d'accès Nominatim depuis cette session) : la position de l'employeur et le centre retenu pour
+« Lavaltrie » sont probablement faux de façon COHÉRENTE (même défaut de lecture Nominatim),
+donc `invaliderDistancesImplausibles` (`lib/distances.ts`) ne voit rien d'anormal — elle ne
+compare que l'un contre l'autre, pas contre la réalité. **Non corrigé** : la routine mesure,
+ne corrige pas.
+
+**Trois témoins sur quatre restent immesurables** (`effacées`, `centresCorrigés`,
+`villesManquantes`) — `[OBS-02]`, ouvert le 22/09, toujours vrai : ces chiffres n'existent que
+dans la réponse HTTP d'un cron que personne ne lit et les journaux Vercel (~17 min de
+rétention). Aucun outil MCP ne les expose encore.
+
+### BACKLOG — ce qui reste ouvert
+
+- `[GEO-BOOTSTRAP]` bande postale — bloqué dans cet environnement (source de données), pas
+  seulement en retard. Reprend si Marc fournit un fichier/URL de centroïdes FSA lisible
+  directement.
+- `[OBS-02]` — le contenu d'une passe de distances (`villesManquantes`, `effacées`,
+  `centresCorriges`, `bornes`/`mesure`/`situer`/budget) n'est persisté nulle part ; remède
+  probable, même patron que `[OBS-01]` (persister dans `sync_state`, lire via `etat_synchro`
+  ou un nouvel outil). Non commencé.
+- Témoin `coffrages-synergy` (ci-dessus) — hypothèse à vérifier, pas d'accès réseau Nominatim
+  depuis cette session pour le faire.
+- `[CI-CURL-PROTO]`, `[V2-*]`, `[V3-*]`, `[UX-05]`, etc. — items plus anciens, non touchés
+  cette session, toujours dans `BACKLOG.md` tels quels.
+
+Vérifications : gate complet vert (`npm ci` + typecheck + test 1791 + lint + build +
+`npm run portes`, 9/9), aucune régression détectée.
+
+---
+
 ## 2026-09-22 — Routine de veille : le témoin ADR-0021 n'a pas bougé, `[OBS-02]` ouvert
 
 Routine automatique (post-cron, ~12:16 UTC). Crons vivants (`veille-auto`/`distances-auto`

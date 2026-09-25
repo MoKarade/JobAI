@@ -10,12 +10,13 @@
 
 ## Trouvé en passant (non demandé — feu vert requis)
 
-- [ ] 🔧 **`[DOC-ADR-INDEX]` ADR-0019 n'a pas de ligne dans l'index de `docs/adr/README.md`.**
-  Le fichier existe (`0019-toutes-les-quebecoises-entrent.md`, Accepté le 2026-09-18), la table
-  s'arrête à 0018 puis saute à 0020. Exactement l'oubli déjà réparé pour ADR-0017 le 2026-09-17
-  — donc la deuxième fois, ce qui dit que l'index se tient à la main et se reperd. Une table qui
-  omet une décision acceptée est pire qu'absente : elle se lit comme la liste complète.
-  Repéré en ajoutant ADR-0020 ; **pas corrigé, scope non demandé**.
+- [x] 🔧 **`[DOC-ADR-INDEX]` ADR-0019 n'a pas de ligne dans l'index de `docs/adr/README.md`.**
+  ✅ **Corrigé le 2026-09-22, sous l'ID `[ADR-INDEX-01]`** (voir plus bas dans ce fichier) —
+  découvert indépendamment, deux ID pour le même oubli. La ligne d'ADR-0019 est bien dans
+  `docs/adr/README.md` depuis ce commit. Repéré à nouveau ici le 2026-09-25 en documentant
+  l'état du dépôt : entrée laissée non cochée alors que le correctif existait déjà — corrigé
+  pour que ce fichier ne mente plus. Exactement la classe de défaut que `[PERSIST-02]`/
+  `[OBS-01]` ont visée ailleurs : une liste tenue à la main dérive de l'état réel.
 
 ---
 
