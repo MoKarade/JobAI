@@ -25,6 +25,21 @@ préparant l'audit et tranchées par le gérant avant tout code — détail dans
 `lib/scoring.ts` : `ANNEES_EN_LETTRES` + `anneesMinExigees`, essayée seulement si le motif
 chiffré ne matche pas — additif, aucune régression possible sur les cas déjà couverts.
 
+## 2026-09-29 — `GET /api/sante` : santé publique pour la vigie de l'Atelier
+
+Branche `agence/jobai-53/api-sante`, priorité 1 du recentrage de Marc (surveiller la
+production), modèle CarAI (commit `eaab5b4`). `SELECT 1` sur la base, `{"ok": true}` (200)
+ou `{"ok": false, "cause": "base"}` (503, base non configurée ou injoignable). SANS
+authentification, délibérément (comme `/api/hub/summary`) : derrière la garde de session,
+la vigie recevrait un 401 JSON au lieu d'un vrai diagnostic, et ne verrait jamais une panne
+de base. `Cache-Control: no-store` dans les deux cas, aucune donnée d'offre ni message
+d'erreur brut renvoyé.
+
+Fichiers : `app/api/sante/route.ts` (neuf), `lib/db/index.ts` (`baseConfiguree`, neuf),
+`lib/garde.ts` + `tests/routesGardees.test.ts` (exemption documentée), `tests/sante.test.ts`
+(neuf). `middleware.ts` NON touché — le matcher de JobAI est générique, seul
+`estCheminPublic` (pure, déjà testée) décide.
+
 ## 2026-09-29 — Auth asymétrique, phase 1 (« accepter les deux ») — branche non fusionnée
 
 Plan `auth-asym-hubperso` (C:\dev\_pc-local\agence\pages\plans\auth-asym-hubperso.md, relu

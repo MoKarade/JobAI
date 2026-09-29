@@ -33,4 +33,13 @@ export const db = new Proxy({} as NeonHttpDatabase<typeof schema>, {
   },
 });
 
+/**
+ * La base est-elle configurée ? Sans lever, contrairement à `db` (qui lève à l'usage) — pour
+ * les appelants qui doivent répondre honnêtement « pas configurée » plutôt que planter
+ * (`/api/sante`).
+ */
+export function baseConfiguree(env: Partial<NodeJS.ProcessEnv> = process.env): boolean {
+  return Boolean(env.DATABASE_URL?.trim());
+}
+
 export { schema };
