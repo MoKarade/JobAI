@@ -1902,6 +1902,16 @@ RESTE — à observer sur les prochaines passes (rien à coder) :
 
 ## Découvertes et dette (à trier)
 
+- ✅ **`[TEST-CVSURFACE-WIN]` — RÉSOLU le 2026-09-29.** `tests/cvSurface.test.ts` rouge sous
+  Windows, vert en CI (Linux) : `resolve()` rend des `\` sous Windows, et trois comparaisons
+  cherchaient un `/` en dur. ⚠️ Ligne 94 (`!f.endsWith("lib/cv/actions.ts")`, exclusion de la
+  déclaration hors des « appelants ») ne faisait pas qu'échouer discrètement : sous Windows
+  elle laissait `lib/cv/actions.ts` matcher SA PROPRE déclaration comme un appelant, rendant
+  `SANS_APPELANT_ASSUME` inutile — exactement la garde-verte-sur-défaut que ce fichier existe
+  pour empêcher (voir son en-tête, « le test est resté VERT »). Corrigé par un helper
+  `versSlash()` (compare toujours avec des `/`) ; les 5 tests du fichier repassent au vert, y
+  compris celui masqué, sans qu'aucun orphelin réel n'apparaisse (mesuré, pas supposé).
+
 - ✅ **`[SEC-NEXT-RCE]` — RÉSOLU le 2026-09-14.** Cinq avis sur des dépendances de
   **production**, dont une RCE **critique non authentifiée**. Trouvés en passant : le job
   `audit` de CarAI a rougi sur une PR qui ne touchait aucune de ces dépendances, et la
