@@ -1902,6 +1902,15 @@ RESTE — à observer sur les prochaines passes (rien à coder) :
 
 ## Découvertes et dette (à trier)
 
+- 🔧 **`[TEST-CVSURFACE-WIN]` — `tests/cvSurface.test.ts` rouge sous Windows, vert en CI
+  (Linux).** Découvert le 2026-09-29 en vérifiant les portes locales sur
+  `agence/jobai-53/auth-asym-phase1` (sans rapport avec l'auth). `atteignablesDepuisLesEcrans()`
+  construit ses chemins avec `path.resolve` — séparateurs `\` sous Windows — puis teste
+  `.includes("/components/")` avec un `/` en dur : le test ne peut structurellement pas voir
+  `/components/` sur un poste Windows. La CI (runners Linux) reste verte, donc invisible en
+  fusion automatique ; visible seulement en local sur PC Windows. Non corrigé, hors périmètre
+  de cette branche.
+
 - ✅ **`[SEC-NEXT-RCE]` — RÉSOLU le 2026-09-14.** Cinq avis sur des dépendances de
   **production**, dont une RCE **critique non authentifiée**. Trouvés en passant : le job
   `audit` de CarAI a rougi sur une PR qui ne touchait aucune de ces dépendances, et la
