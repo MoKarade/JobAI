@@ -1,0 +1,23 @@
+# Fins de ligne : LF partout dans le dépôt (les tests et les workflows Linux/Windows lisent les mêmes octets), sauf les scripts Windows.
+* text=auto eol=lf
+
+# PowerShell 5.1 lit mal l'UTF-8 sans BOM : les .ps1 gardent leur BOM UTF-8 et des fins de ligne CRLF. (Le BOM ne se règle pas ici :
+# il est conservé tel quel dans les fichiers ; les .json d'agence et de config restent SANS BOM, vérifié par cockpit/tests/test_hygiene.py.)
+*.ps1 text eol=crlf
+*.vbs text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaires : jamais modifiés par la normalisation
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.zip binary
+*.db binary
+*.sqlite binary

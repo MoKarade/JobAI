@@ -9,8 +9,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { deciderGarde } from "@/lib/garde";
 import { estAuthConfiguree } from "@/lib/autorisation";
+import { NOM_COOKIE_SESSION_SIGNEE, estAuthentifieParSessionSignee } from "@/lib/sessionSignee";
 
-export default auth((req) => {
+export default auth(async (req) => {
   // ÉCHEC FERMÉ : sans configuration d'authentification, on ne sert rien. Une variable
   // d'environnement peut disparaître d'un déploiement à l'autre ; ce jour-là, l'app doit
   // se taire, pas s'ouvrir.
@@ -25,8 +26,20 @@ export default auth((req) => {
     );
   }
 
+  // ── PHASE 1 DU PLAN `auth-asym-hubperso` — « ACCEPTER LES DEUX » ────────────────────
+  //
+  // Le NOUVEAU cookie signé (ES256, lib/sessionSignee.ts) est vérifié EN PREMIER ; l'ancien
+  // cookie déchiffré par Auth.js (`req.auth`) reste le repli. Additif à dessein : Hubperso
+  // n'émet pas encore ce cookie (phase 2), donc `estAuthentifieParSessionSignee` rend
+  // `false` pour tout le monde en production aujourd'hui — rien ne change pour Marc. Ce
+  // n'est qu'une fois la variable `HUB_SESSION_PUBLIC_KEYS` posée, et Hubperso passé en
+  // phase 2, que ce chemin devient actif.
+  const authentifieParNouveauCookie = await estAuthentifieParSessionSignee(
+    req.cookies.get(NOM_COOKIE_SESSION_SIGNEE)?.value,
+  );
+
   const decision = deciderGarde({
-    authentifie: Boolean(req.auth),
+    authentifie: authentifieParNouveauCookie || Boolean(req.auth),
     chemin: req.nextUrl.pathname,
     recherche: req.nextUrl.search,
   });
