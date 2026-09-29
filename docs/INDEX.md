@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-41 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+43 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -11,6 +11,8 @@
 - [Leçons — JobAI](LESSONS.md) — `docs/LESSONS.md`
 - [La Routine quotidienne — le seul canal qui produit des offres](ROUTINE-DEPOT.md) — `docs/ROUTINE-DEPOT.md`
 - [Correspondance : ancien « CLAUDE.md §N » vers fichier](correspondance.md) — `docs/correspondance.md`
+- [Coûts CI — JobAI](couts-ci.md) — `docs/couts-ci.md`
+- [Rattachement de JobAI à l'Atelier](rattachement.md) — `docs/rattachement.md`
 - [Prompt de la veille quotidienne — Indeed + ZipRecruiter + Guichet-Emplois](veille-prompt.md) — `docs/veille-prompt.md`
 
 ## docs/adr/

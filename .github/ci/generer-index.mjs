@@ -57,14 +57,31 @@ export function formaterIndex(entrees) {
   return lignes.join("\n");
 }
 
-/** Lignes de données de correspondance.md : `| ancien titre | nouveau chemin |` -> [{ancien, chemin}] ; en-tête, séparateur et modèles `<...>` ignorés. */
+/**
+ * Lignes de données de correspondance.md -> [{ancien, chemin}] ; en-tête, séparateur et
+ * modèles `<...>` ignorés. Deux formes acceptées (le CHEMIN est toujours la dernière
+ * colonne) : `| ancien titre | nouveau chemin |` (2 colonnes) et, forme de JobAI, `| ancien
+ * renvoi | ancien titre | nouveau chemin |` (3 colonnes, la colonne du milieu vient
+ * s'ajouter au libellé « ancien » plutôt que d'être perdue).
+ *
+ * ⚠️ ADAPTÉ le 2026-09-29 (gérant, JobAI) : la version d'origine n'acceptait QUE 2 colonnes
+ * et rejetait donc TOUTES les lignes de `correspondance.md` ici (3 colonnes) — `--verifier`
+ * passait « valide » sans avoir lu une seule ligne. Un contrôle qui passe à vide ne vaut
+ * rien ; corrigé plutôt que le fichier reformaté, pour garder la colonne « ancien titre »,
+ * utile aux lecteurs humains.
+ */
 export function lireCorrespondance(texte) {
   const out = [];
   for (const ligne of String(texte).split(/\r?\n/)) {
     if (!ligne.trim().startsWith("|")) continue;
     const c = ligne.trim().replace(/^\||\|$/g, "").split("|").map((x) => x.trim());
-    if (c.length !== 2 || /^-+$/.test(c[0].replace(/[: ]/g, "")) || /^ancien titre$/i.test(c[0]) || c[1].startsWith("<")) continue;
-    out.push({ ancien: c[0], chemin: c[1].replace(/^`|`$/g, "") });
+    if (c.length !== 2 && c.length !== 3) continue;
+    if (/^-+$/.test(c[0].replace(/[: ]/g, ""))) continue; // ligne de séparation markdown
+    if (/^ancien/i.test(c[0])) continue; // en-tête : « Ancien titre » ou « Ancien renvoi »
+    const chemin = c[c.length - 1];
+    if (chemin.startsWith("<")) continue; // modèle générique, ex. `<chemin>`
+    const ancien = c.length === 3 ? `${c[0]} — ${c[1]}` : c[0];
+    out.push({ ancien, chemin: chemin.replace(/^`|`$/g, "") });
   }
   return out;
 }
