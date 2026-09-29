@@ -24,6 +24,12 @@ const EXEMPTIONS: Readonly<Record<string, string>> = {
   "/api/hub/summary":
     "Gardée AUTREMENT — par le jeton x-hub-token vérifié dans la route. La mettre derrière " +
     "la garde de session renverrait au hub une redirection HTML au lieu du JSON attendu.",
+  "/api/sante":
+    "SANS authentification, délibérément (modèle CarAI) : elle ne rend que " +
+    "{\"ok\": true|false}, jamais une donnée d'offre ni un message d'erreur brut. Derrière " +
+    "la garde de session, la vigie de l'Atelier recevrait un 401 JSON au lieu d'un vrai " +
+    "diagnostic de la base, et ne verrait jamais une panne — exactement le piège que " +
+    "/api/hub/summary évite déjà pour un autre appelant.",
   "/api/auth/[...nextauth]": "Routes d'Auth.js : elles portent le flux de connexion lui-même.",
   "/api/cron/veille":
     "Gardée AUTREMENT — par CRON_SECRET, comparé en temps constant dans la route, avec " +

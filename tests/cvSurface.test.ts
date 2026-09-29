@@ -14,7 +14,18 @@
 
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
+
+/**
+ * `resolve()` rend des `\` sous Windows : un littéral à base de `/` ne matcherait jamais,
+ * silencieusement. `[TEST-CVSURFACE-WIN]`, mesuré le 2026-09-29 — la ligne 94 en particulier
+ * ne se contentait pas d'échouer : elle rendait `SANS_APPELANT_ASSUME` inutile sous Windows en
+ * laissant `lib/cv/actions.ts` matcher SA PROPRE déclaration comme si elle était un appelant,
+ * exactement la fausse garde-verte que ce fichier existe pour empêcher.
+ */
+function versSlash(chemin: string): string {
+  return chemin.split(sep).join("/");
+}
 
 /**
  * Actions sans appelant, ASSUMÉES, avec leur date et leur raison.
@@ -91,7 +102,7 @@ function atteignablesDepuisLesEcrans(): string[] {
 }
 
 const ATTEIGNABLES = atteignablesDepuisLesEcrans();
-const APPELANTS = ATTEIGNABLES.filter((f) => !f.endsWith("lib/cv/actions.ts"))
+const APPELANTS = ATTEIGNABLES.filter((f) => !versSlash(f).endsWith("lib/cv/actions.ts"))
   .map((f) => readFileSync(f, "utf8"))
   .join("\n");
 
@@ -108,8 +119,8 @@ describe("les actions du chantier CV sont ATTEIGNABLES", () => {
     // TOUTES les actions paraîtraient orphelines — bruyant, donc visible. L'inverse est le
     // vrai danger : un ensemble qui gonfle jusqu'à tout contenir redonnerait la garde molle
     // d'origine. On vérifie donc qu'il descend hors d'`app/` SANS avaler tout `lib/`.
-    expect(ATTEIGNABLES.some((f) => f.includes("/components/"))).toBe(true);
-    expect(ATTEIGNABLES.some((f) => f.endsWith("lib/cv/actions.ts"))).toBe(true);
+    expect(ATTEIGNABLES.some((f) => versSlash(f).includes("/components/"))).toBe(true);
+    expect(ATTEIGNABLES.some((f) => versSlash(f).endsWith("lib/cv/actions.ts"))).toBe(true);
     expect(ATTEIGNABLES.length).toBeLessThan(fichiersDe("app").length + fichiersDe("lib").length + fichiersDe("components").length);
   });
 
