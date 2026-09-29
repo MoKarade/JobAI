@@ -6,6 +6,25 @@
 
 ---
 
+## 2026-09-29 — `[SCORE-SENIORITE-LETTRES]` : la séniorité se lit en toutes lettres (ADR-0024)
+
+Branche `agence/jobai-53/score-seniorite-lettres`, sur demande du gérant, protocole §11
+suivi (ADR d'abord, aucune ligne de code avant). Deux questions bloquantes soulevées en
+préparant l'audit et tranchées par le gérant avant tout code — détail dans l'ADR :
+
+- **Borne basse** pour un intervalle en lettres (« trois à cinq » → 3, pas 5), cohérente
+  avec la règle déjà en place pour les intervalles chiffrés. La ligne de `BACKLOG.md`
+  (« au lieu de 9 ») était une glissade, corrigée en « au lieu de 13 ».
+- **Le tableau avant/après du protocole §11 est structurellement impossible sur `SEED`** :
+  aucune offre (seed ou base réelle) ne conserve le texte source de l'annonce
+  (`computeScore` le lit à l'ingestion puis le jette). Audit remplacé par des tests
+  exhaustifs (`un`→`quinze`) + le seul cas réel connu (offre Dracon). Conservation du
+  texte source notée comme idée au `BACKLOG.md` (`[TEXTE-SOURCE-OFFRES]`), non tranchée,
+  pas construite.
+
+`lib/scoring.ts` : `ANNEES_EN_LETTRES` + `anneesMinExigees`, essayée seulement si le motif
+chiffré ne matche pas — additif, aucune régression possible sur les cas déjà couverts.
+
 ## 2026-09-29 — Auth asymétrique, phase 1 (« accepter les deux ») — branche non fusionnée
 
 Plan `auth-asym-hubperso` (C:\dev\_pc-local\agence\pages\plans\auth-asym-hubperso.md, relu
