@@ -1937,12 +1937,28 @@ RESTE — à observer sur les prochaines passes (rien à coder) :
   FinanceAI — un `hono` modéré seulement, pas de Next.
 
 
-- 🔧 **`[SCORE-SENIORITE-LETTRES]` — le barème ne lit pas les années écrites en toutes
-  lettres.** `scoreSeniorite` cherche `(\d+)…ans d'expérience` : « Posséder **trois à cinq
-  années** d'expérience » (offre Dracon, réelle) ne matche pas et retombe sur la valeur
-  neutre 11/15 au lieu de 9. L'offre est donc surnotée de 2 points. Trouvé en notant les
-  offres du repérage du 2026-07-29. ⚠️ C'est une modification de la NOTATION : protocole
-  `CLAUDE.md` §8 (ADR + tableau avant/après sur les offres du jeu) avant toute ligne de code.
+- ✅ **`[SCORE-SENIORITE-LETTRES]` — RÉSOLU le 2026-09-29 (ADR-0024).** `scoreSeniorite`
+  cherchait `(\d+)…ans d'expérience` : « Posséder **trois à cinq années** d'expérience »
+  (offre Dracon, réelle) ne matchait pas et retombait sur la valeur neutre 11/15 **au lieu
+  de 13** (correction de cette ligne : la première version disait « au lieu de 9 », une
+  glissade — voir ADR-0024, la borne BASSE d'un intervalle en lettres suit la même
+  convention qu'un intervalle chiffré, pas une nouvelle). Trouvé en notant les offres du
+  repérage du 2026-07-29. Corrigé par une table `un`→`quinze` (`lib/scoring.ts`), pur
+  regex, aucun coût LLM. Audit allégé (accepté par le gérant, 2026-09-29) : le tableau
+  avant/après du protocole §11 est IMPOSSIBLE sur `SEED` (aucune offre — seed ou base
+  réelle — ne conserve le texte de l'annonce, voir `[TEXTE-SOURCE-OFFRES]` ci-dessous) ;
+  remplacé par des tests exhaustifs (`un` à `quinze`) plus l'offre Dracon comme cas nommé.
+
+- 🧭 **`[TEXTE-SOURCE-OFFRES]` — idée, non tranchée, pas de code.** Aucune offre (seed ou
+  base réelle) ne conserve le texte source de l'annonce : `computeScore` lit
+  `brute.description` à l'ingestion (`lib/ingest/pipeline.ts`) puis ce texte est jeté, seuls
+  `score` et `raisons` (un résumé écrit par Marc, pas l'annonce) survivent. Conséquence
+  directe, mesurée en préparant l'ADR-0024 : le protocole §11 (« rejouer la logique sur
+  toutes les offres du seed ») est structurellement inapplicable à toute future modification
+  de `scoring.ts` — chaque correctif devra, comme celui-ci, se contenter d'un audit allégé
+  (tests exhaustifs + cas réels ponctuels) faute de corpus. Conserver le texte source
+  résoudrait ça, mais soulève ses propres questions (volume en base, garde-fou n°1 sur un
+  texte non maîtrisé, durée de rétention) — à trancher par Marc avant toute ligne de code.
 
 - 🧭 **`[DISTANCE-CALCULEE]` — mesurer les distances au lieu de les écrire à la main.**
   Depuis `[UX-09]`, les entreprises situées ont leurs coordonnées en base

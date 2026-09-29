@@ -121,6 +121,62 @@ describe("séniorité", () => {
   });
 });
 
+describe("séniorité en toutes lettres (ADR-0024)", () => {
+  // ⚠️ AUDIT ALLÉGÉ, ACCEPTÉ PAR LE GÉRANT (2026-09-29) : le protocole §11 demande de
+  // rejouer la logique sur les 53 offres du seed, mais AUCUNE n'a de texte d'annonce à
+  // rejouer (`score`/`raisons` seuls survivent, `description` est jetée à l'ingestion —
+  // conservation du texte source notée comme idée au BACKLOG, hors périmètre ici). La
+  // preuve « sur du réel » est donc : la phrase de l'offre Dracon (le seul cas réel connu)
+  // ci-dessous, plus une couverture EXHAUSTIVE de la table des mots (un → quinze).
+
+  it("« trois à cinq années d'expérience » (offre Dracon, réelle) : borne basse, comme les intervalles chiffrés", () => {
+    // BACKLOG.md disait « 9 au lieu de 11 » — glissade documentaire : la règle déjà en
+    // place pour un intervalle CHIFFRÉ retient le PREMIER nombre (« 5-10 ans » == « 5 ans »,
+    // voir ci-dessus). Un intervalle en LETTRES suit la même convention, pas une nouvelle :
+    // « trois » (3) l'emporte sur « cinq » (5), donc le même score que « 3 ans ».
+    expect(scoreSeniorite("Posséder trois à cinq années d'expérience")).toBe(
+      scoreSeniorite("3 ans d'expérience"),
+    );
+  });
+
+  it("reconnaît chaque mot de un à quinze, seul, sur un intervalle", () => {
+    const MOTS: [string, number][] = [
+      ["un", 1], ["une", 1], ["deux", 2], ["trois", 3], ["quatre", 4], ["cinq", 5],
+      ["six", 6], ["sept", 7], ["huit", 8], ["neuf", 9], ["dix", 10], ["onze", 11],
+      ["douze", 12], ["treize", 13], ["quatorze", 14], ["quinze", 15],
+    ];
+    for (const [mot, valeur] of MOTS) {
+      const attendu = scoreSeniorite(`${valeur} ans d'expérience`);
+      expect(scoreSeniorite(`${mot} ans d'expérience`), mot).toBe(attendu);
+    }
+  });
+
+  it("lit une fourchette en lettres en retenant la borne basse, comme les chiffres", () => {
+    expect(scoreSeniorite("cinq à dix ans d'expérience")).toBe(
+      scoreSeniorite("cinq ans d'expérience"),
+    );
+  });
+
+  it("accepte « an/ans/année/années » et l'apostrophe typographique, en lettres aussi", () => {
+    const base = scoreSeniorite("3 ans d'expérience");
+    expect(scoreSeniorite("trois ans d'expérience")).toBe(base);
+    expect(scoreSeniorite("trois années d'expérience")).toBe(base);
+    expect(scoreSeniorite("trois années d’expérience")).toBe(base); // apostrophe typographique
+  });
+
+  it("ne matche pas un mot de nombre à l'intérieur d'un autre mot", () => {
+    // « sept » ne doit pas matcher dans « septembre », ni « un » dans « unique ».
+    expect(scoreSeniorite("Embauche prévue en septembre, unique poste ouvert.")).toBe(
+      scoreSeniorite(""),
+    );
+  });
+
+  it("le motif chiffré reste essayé en premier — aucune régression sur les cas existants", () => {
+    expect(scoreSeniorite("5 ans d'expérience")).toBe(scoreSeniorite("5 ans d'expérience"));
+    expect(scoreSeniorite("5-10 ans d'expérience")).toBe(scoreSeniorite("5 ans d'expérience"));
+  });
+});
+
 describe("salaire", () => {
   it("croît avec le montant", () => {
     const montants = [50_000, 65_000, 75_000, 85_000, 95_000].map((s) => scoreSalaire(s));

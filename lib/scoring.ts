@@ -112,13 +112,50 @@ export function scoreDistance(km: number | null | undefined, profil: Profil = PR
   return profil.paliersDistanceKm.find((p) => km <= p.max)?.points ?? profil.distancePlancher;
 }
 
+/**
+ * Les années en toutes lettres (`un` à `quinze`) — ADR-0024. `un`/`une` valent 1 : le genre
+ * ne change pas la quantité. Au-delà de quinze, une exigence écrite en lettres est assez
+ * rare pour rester hors périmètre plutôt que d'allonger la table sans cas réel pour la
+ * justifier (le seul cas connu, l'offre Dracon, s'arrête à « cinq »).
+ */
+const ANNEES_EN_LETTRES: Readonly<Record<string, number>> = {
+  un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7,
+  huit: 8, neuf: 9, dix: 10, onze: 11, douze: 12, treize: 13, quatorze: 14, quinze: 15,
+};
+const MOT_ANNEES = Object.keys(ANNEES_EN_LETTRES).join("|");
+/**
+ * Deuxième essai, en toutes lettres, MÊME logique de capture que le motif chiffré : le
+ * PREMIER nombre rencontré est retenu, jamais le second d'un intervalle. C'est la règle déjà
+ * en place pour les intervalles chiffrés (`tests/scoring.test.ts` : « 5-10 ans » égale
+ * « 5 ans ») — un intervalle en lettres suit la même convention, pas une nouvelle.
+ */
+const RE_ANNEES_EN_LETTRES = new RegExp(
+  `\\b(${MOT_ANNEES})\\b\\s*(?:à|-|a)?\\s*(?:\\b(?:${MOT_ANNEES})\\b)?\\s*an(?:s|nées)?\\s+d['’]exp`,
+  "i",
+);
+
+/**
+ * Le minimum d'années exigé, lu dans le texte — chiffres d'abord, lettres ensuite. `null` si
+ * rien de reconnaissable : c'est `scoreSeniorite` qui décide alors du repli neutre, pas cette
+ * fonction (elle ne connaît pas le profil).
+ */
+function anneesMinExigees(description: string): number | null {
+  // « 5 ans d'expérience », « 5-10 ans d'expérience », « 2 à 3 années d'expérience ».
+  const chiffre = description.match(/(\d+)\s*(?:à|-|a)?\s*\d*\s*an(?:s|nées)?\s+d['’]exp/i);
+  if (chiffre) {
+    const min = Number.parseInt(chiffre[1] ?? "", 10);
+    return Number.isFinite(min) ? min : null;
+  }
+  // « trois à cinq années d'expérience » (offre Dracon, réelle, BACKLOG.md 2026-07-29).
+  const lettres = description.match(RE_ANNEES_EN_LETTRES);
+  const mot = lettres?.[1];
+  return mot ? (ANNEES_EN_LETTRES[mot.toLowerCase()] ?? null) : null;
+}
+
 /** 15 pts — l'exigence de séniorité est-elle atteignable avec l'expérience de Marc ? */
 export function scoreSeniorite(description = "", profil: Profil = PROFIL_DEFAUT): number {
-  // « 5 ans d'expérience », « 5-10 ans d'expérience », « 2 à 3 années d'expérience ».
-  const m = description.match(/(\d+)\s*(?:à|-|a)?\s*\d*\s*an(?:s|nées)?\s+d['’]exp/i);
-  if (!m) return profil.senioriteNonPrecisee; // non précisé : l'absence d'exigence n'est pas un obstacle
-  const min = Number.parseInt(m[1] ?? "", 10);
-  if (!Number.isFinite(min)) return profil.senioriteNonPrecisee;
+  const min = anneesMinExigees(description);
+  if (min === null) return profil.senioriteNonPrecisee; // non précisé : l'absence d'exigence n'est pas un obstacle
   return profil.paliersSeniorite.find((p) => min <= p.max)?.points ?? profil.senioritePlancher;
 }
 
