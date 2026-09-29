@@ -1902,14 +1902,15 @@ RESTE — à observer sur les prochaines passes (rien à coder) :
 
 ## Découvertes et dette (à trier)
 
-- 🔧 **`[TEST-CVSURFACE-WIN]` — `tests/cvSurface.test.ts` rouge sous Windows, vert en CI
-  (Linux).** Découvert le 2026-09-29 en vérifiant les portes locales sur
-  `agence/jobai-53/auth-asym-phase1` (sans rapport avec l'auth). `atteignablesDepuisLesEcrans()`
-  construit ses chemins avec `path.resolve` — séparateurs `\` sous Windows — puis teste
-  `.includes("/components/")` avec un `/` en dur : le test ne peut structurellement pas voir
-  `/components/` sur un poste Windows. La CI (runners Linux) reste verte, donc invisible en
-  fusion automatique ; visible seulement en local sur PC Windows. Non corrigé, hors périmètre
-  de cette branche.
+- ✅ **`[TEST-CVSURFACE-WIN]` — RÉSOLU le 2026-09-29.** `tests/cvSurface.test.ts` rouge sous
+  Windows, vert en CI (Linux) : `resolve()` rend des `\` sous Windows, et trois comparaisons
+  cherchaient un `/` en dur. ⚠️ Ligne 94 (`!f.endsWith("lib/cv/actions.ts")`, exclusion de la
+  déclaration hors des « appelants ») ne faisait pas qu'échouer discrètement : sous Windows
+  elle laissait `lib/cv/actions.ts` matcher SA PROPRE déclaration comme un appelant, rendant
+  `SANS_APPELANT_ASSUME` inutile — exactement la garde-verte-sur-défaut que ce fichier existe
+  pour empêcher (voir son en-tête, « le test est resté VERT »). Corrigé par un helper
+  `versSlash()` (compare toujours avec des `/`) ; les 5 tests du fichier repassent au vert, y
+  compris celui masqué, sans qu'aucun orphelin réel n'apparaisse (mesuré, pas supposé).
 
 - ✅ **`[SEC-NEXT-RCE]` — RÉSOLU le 2026-09-14.** Cinq avis sur des dépendances de
   **production**, dont une RCE **critique non authentifiée**. Trouvés en passant : le job
