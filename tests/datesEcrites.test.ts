@@ -2,8 +2,8 @@
 //
 // POURQUOI CE VERROU
 // Vercel tourne en UTC, Marc vit à UTC−4. `new Date().toISOString().slice(0, 10)` date donc
-// du LENDEMAIN toute écriture faite après 20 h locale. La règle est écrite dans le CLAUDE.md
-// depuis longtemps, et deux chemins d'écriture y échappaient encore le 2026-08-19 : la date
+// du LENDEMAIN toute écriture faite après 20 h locale. La règle est écrite dans le CLAUDE.md global
+// (règle des dates : docs/claude/02-conventions.md) depuis longtemps, et deux chemins d'écriture y échappaient encore le 2026-08-19 : la date
 // d'envoi posée par `modifierOffre`, et la date de modification du profil de CV. Les deux
 // ont été trouvés en corrigeant le premier — pas avant, parce que rien ne les signalait.
 //

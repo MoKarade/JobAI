@@ -13,7 +13,7 @@
 // compteur à zéro se lit « recherche à l'arrêt », une absence se lit « pas encore branché »,
 // et une panne se lit « quelque chose ne va pas ». Les trois messages sont différents.
 //
-// RÈGLE DE MAINTENANCE (CLAUDE.md §6 bis) : à chaque phase qui rend une métrique réellement
+// RÈGLE DE MAINTENANCE (docs/claude/07-hub.md) : à chaque phase qui rend une métrique réellement
 // disponible, on la branche ICI. Tant que rien n'est disponible, on renvoie null — jamais
 // un chiffre fabriqué pour faire joli sur le tableau de bord.
 

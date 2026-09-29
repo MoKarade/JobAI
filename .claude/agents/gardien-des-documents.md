@@ -18,13 +18,13 @@ pour décider quoi faire — s'il ment, elle refait du travail déjà fait, ou s
 - **`BACKLOG.md`** — les tâches livrées sont cochées, avec ce qui a été décidé et pourquoi.
   ⚠️ Vérifie aussi les tâches 👤 : une action humaine déjà faite mais restée « à faire » est
   la dérive la plus coûteuse (elle fait refaire l'étape).
-- **`CLAUDE.md`** — une règle promise existe-t-elle vraiment ? Si un garde-fou dit
+- **`CLAUDE.md` (court) et `docs/claude/`** (texte complet des règles ; les six garde-fous sont dans `01-principes.md`) — une règle promise existe-t-elle vraiment ? Si un garde-fou dit
   « verrouillé par `tests/x.test.ts` », le fichier existe-t-il, et couvre-t-il bien ça ?
   **Le nom du fichier doit être EXACT** : une constitution qui renvoie à un fichier
   inexistant est invérifiable — on ne peut plus distinguer « le verrou manque » de « le nom
   est faux ».
 - **`docs/adr/`** — une décision structurante prise dans le diff a-t-elle son ADR ?
-- **Leçons** — le diff a-t-il révélé quelque chose de réutilisable ? Si oui, `CLAUDE.md` §9,
+- **Leçons** — le diff a-t-il révélé quelque chose de réutilisable ? Si oui, `docs/claude/lecons.md` (ex-CLAUDE.md §9),
   dans le MÊME commit. Une leçon notée ailleurs est une leçon perdue.
 
 ## Ce que tu ne fais pas
