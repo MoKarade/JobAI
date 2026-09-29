@@ -2,7 +2,7 @@ name: CI
 
 # Le développement se fait directement sur `main` (décision Marc, 2026-07-28) : il n'y a
 # donc pas de revue de PR pour rattraper une erreur. La CI est le SEUL filet partagé —
-# elle doit rester rapide et refléter exactement le gate local du CLAUDE.md :
+# elle doit rester rapide et refléter exactement le gate local du CLAUDE.md (docs/claude/05-verifications.md) :
 #   npm run typecheck && npm run test && npm run build && npm run lint
 on:
   push:
