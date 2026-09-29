@@ -6,6 +6,27 @@
 
 ---
 
+## 2026-09-29 — `st-jobai` : structure commune allégée (gabarit DriveAI#423) — branche non fusionnée
+
+Branche `agence/jobai-53/st-jobai-1`, sur demande du gérant. JobAI avait déjà son CLAUDE.md
+court + `docs/claude/` (PR #41/#42, même journée) : ce lot comble le reste du gabarit.
+
+- `.github/ci/generer-index.mjs` + `verifier-longueur.mjs` (copies exactes du modèle de
+  l'Atelier), câblés dans le job `gate` de la CI (« Documentation légère »).
+- `docs/INDEX.md` généré (41 documents, réel), `docs/couts-ci.md` (runs GitHub Actions
+  mesurés réellement pour 09/2026, pas estimés), `docs/rattachement.md`.
+- **`ignoreCommand` Vercel NON repris** : JobAI garde `scripts/build-necessaire.sh`, sa
+  propre garde antérieure (post-incident du 2026-08-05) et plus large que le gabarit
+  (exempte aussi `tests/*`). Documenté comme exception dans `docs/couts-ci.md`, pas comme
+  un oubli.
+- ⚠️ `docs/correspondance.md` a 3 colonnes, le gabarit en attend 2 : le contrôle
+  `--verifier` des correspondances passe VACUEUSEMENT (aucune ligne lue, pas d'échec).
+  Documenté, non tranché — voir `docs/couts-ci.md`.
+- Gate local : typecheck/lint/build verts. `test` : 1789/1790 — le seul échec
+  (`tests/cvSurface.test.ts`) est le bug Windows déjà connu, déjà corrigé sur une AUTRE
+  branche (PR ouverte par le gérant), pas encore dans `main` au moment de ce lot.
+- `npm run build` a de nouveau réécrit `tsconfig.json` (piège connu) — annulé avant commit.
+
 ## 2026-09-25 — Rapport complet, sur demande de Marc (« gros rapport de où tu es, document tout »)
 
 Cette session couvre deux choses : un lot de travail le 21/09 (chantiers fermés), puis une
