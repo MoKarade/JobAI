@@ -6,6 +6,8 @@
 //   node modeles/auto-merge/verifier-copies.mjs --ecrire-copies <dossier-du-depot>            écrit COPIES.md (tableau chemin | SHA-256 LF | version du modèle) à la racine du dépôt cible,
 //                                                                                          seulement si ses copies sont fidèles ; à lancer par le lot de CHAQUE dépôt, jamais dans l'Atelier
 //   La comparaison lit aussi le COPIES.md du dépôt : absent, périmé (version) ou qui ne correspond plus aux fichiers → code 1.
+//   node modeles/auto-merge/verifier-copies.mjs --assurer-labels <dossier-du-depot>           crée les labels do-not-merge et validation-marc SEULEMENT s'ils manquent (jamais --force) ; fait aussi partie de --ecrire-copies (resync de chaque dépôt) ;
+//                                                                                          erreur bloquante (code 1) si une création échoue
 //   node modeles/auto-merge/verifier-copies.mjs --ecrire [<dossier-de-l-atelier>]            régénère modeles/manifeste.json (Atelier seulement : la SEULE écriture)
 //
 // Hachage sur le contenu normalisé : fins de ligne CRLF ramenées à LF (un checkout Windows donne les mêmes empreintes qu'un checkout Linux).
@@ -15,6 +17,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { assurerLabels } from "./labels.mjs";
 
 /** Fichiers copiables : source (relative à la racine de l'Atelier) -> destination (relative à la racine de l'app) et rôle. */
 export const COPIABLES = Object.freeze([
@@ -23,6 +26,7 @@ export const COPIABLES = Object.freeze([
   { source: "modeles/auto-merge/chemins-interdits-base.json", destination: "modeles/auto-merge/chemins-interdits-base.json", role: "liste" },
   { source: "modeles/auto-merge/fusionner.mjs", destination: "modeles/auto-merge/fusionner.mjs", role: "executeur" },
   { source: "modeles/auto-merge/armer.mjs", destination: "modeles/auto-merge/armer.mjs", role: "executeur" },
+  { source: "modeles/auto-merge/labels.mjs", destination: "modeles/auto-merge/labels.mjs", role: "executeur" },
   { source: "modeles/auto-merge/codes-raison.mjs", destination: "modeles/auto-merge/codes-raison.mjs", role: "liste" },
   { source: "modeles/auto-merge/verifier-copies.mjs", destination: "modeles/auto-merge/verifier-copies.mjs", role: "outil" },
   { source: "modeles/auto-merge/surblocage.mjs", destination: "modeles/auto-merge/surblocage.mjs", role: "outil" },
@@ -72,7 +76,7 @@ export const GABARITS = Object.freeze([
 export const VERSION_CANEVAS_CLAUDE_MD = "1.0.0";
 
 /** Version du modèle : à incrémenter à chaque changement d'un fichier copiable (elle est écrite dans le manifeste et dans le COPIES.md de chaque dépôt). */
-export const VERSION_MODELE = "1.9.1";
+export const VERSION_MODELE = "1.10.0";
 export const FICHIER_COPIES = "COPIES.md";
 /** Transition : jusqu'à cette date (AAAA-MM-JJ, jour inclus), un COPIES.md ABSENT n'est qu'un avertissement (code 0) ; à partir de là c'est une erreur. Un COPIES.md présent mais faux est TOUJOURS une erreur. */
 export const COPIES_OBLIGATOIRE_DEPUIS = "2026-10-15";
@@ -209,6 +213,24 @@ export function controleVisibilite(profil, gh, racine) {
   return { ok: false, ligne: `Profil : ${profil} — visibilité du dépôt illisible (gh repo view) : profil ${profil} refusé (échec fermé)` };
 }
 
+/** Labels indispensables au dépôt : `do-not-merge` (frein dur) et `validation-marc`. Créés SEULEMENT s'ils manquent (labels.mjs : jamais --force, un label personnalisé n'est pas touché). */
+export const LABELS_DU_DEPOT = Object.freeze(["do-not-merge", "validation-marc"]);
+
+/**
+ * Assure les labels du dépôt vérifié (`gh` lancé DANS le dépôt : il lit son remote). ÉCHEC = erreur affichée et code non nul (jamais silencieux) ; l'appelant s'arrête.
+ * @returns {{ok: boolean}}
+ */
+export function assurerLabelsDuDepot(gh, racine, ecrire = console.log) {
+  try {
+    const { crees, presents } = assurerLabels((args) => gh(args, racine), [], [...LABELS_DU_DEPOT]);
+    ecrire(`Labels : ${presents.length ? `présents ${presents.join(", ")}` : "aucun déjà présent"}${crees.length ? ` ; créés ${crees.join(", ")}` : ""}`);
+    return { ok: true };
+  } catch (e) {
+    ecrire(`ERREUR labels : ${String(e && e.message).slice(0, 200)}`);
+    return { ok: false };
+  }
+}
+
 const LIBELLES = { ok: "OK       ", different: "DIFFÉRENT", absent: "ABSENT   ", retire: "RETIRÉ   ", a_ne_pas_copier: "À NE PAS COPIER" };
 
 /** `--profil <nom>` dans les arguments : nom du profil (défaut `complet`), ou `null` si l'option est mal formée. */
@@ -242,6 +264,8 @@ function ecrireCopies(argv, ici, gh) {
   const vis = controleVisibilite(profil, gh, racine);
   console.log(vis.ligne);
   if (!vis.ok) { console.log("COPIES.md non écrit."); return 1; }
+  // resync de CHAQUE dépôt : les labels manquants sont créés ici (un dépôt déjà installé est rattrapé), erreur BLOQUANTE : COPIES.md n'est pas écrit
+  if (!assurerLabelsDuDepot(gh, racine).ok) { console.log("COPIES.md non écrit : labels indispensables absents et non créés."); return 1; }
   const empreintes = Object.fromEntries(manifeste.fichiers.filter((f) => io.existe(f.destination)).map((f) => [f.destination, empreinte(io.lire(f.destination))]));   // un retrait voulu du profil n'a pas de ligne
   for (const l of res.lignes.filter((x) => x.etat === "retire")) console.log(`${LIBELLES.retire}  ${l.fichier}${detailLigne(l)}`);
   writeFileSync(join(racine, FICHIER_COPIES), formaterCopies(manifeste, empreintes, profil));
@@ -258,6 +282,11 @@ export function main(argv, maintenant = () => new Date(), gh = ghReel) {
     return 0;
   }
   if (argv[0] === "--ecrire-copies") return ecrireCopies(argv, ici, gh);
+  if (argv[0] === "--assurer-labels") {
+    const dossier = argv[1];
+    if (!dossier || dossier.startsWith("--")) { console.log("usage : node verifier-copies.mjs --assurer-labels <dossier-du-depot>"); return 2; }
+    return assurerLabelsDuDepot(gh, resolve(dossier)).ok ? 0 : 1;
+  }
   const depot = argv[0];
   if (!depot || depot.startsWith("--")) { console.log("usage : node verifier-copies.mjs <dossier-du-depot> [--manifeste <chemin>]"); return 2; }
   const i = argv.indexOf("--manifeste");

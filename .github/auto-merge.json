@@ -25,6 +25,15 @@
     "**/*.sql",
     ".env.example"
   ],
+  "chemins_validation_visuelle": [
+    "app/**/page.tsx",
+    "app/layout.tsx",
+    "app/globals.css",
+    "app/icon.svg",
+    "public/*icon*.png",
+    "public/apple-touch-icon.png",
+    "components/**/*.tsx"
+  ],
   "securite_login": "atelier-securite-marc[bot]",
   "securite_user_id": 334232309,
   "carence_dependabot_jours": 3,
