@@ -27,6 +27,53 @@ court + `docs/claude/` (PR #41/#42, même journée) : ce lot comble le reste du 
   branche (PR ouverte par le gérant), pas encore dans `main` au moment de ce lot.
 - `npm run build` a de nouveau réécrit `tsconfig.json` (piège connu) — annulé avant commit.
 
+## 2026-09-29 — `GET /api/sante` : santé publique pour la vigie de l'Atelier
+
+Branche `agence/jobai-53/api-sante`, priorité 1 du recentrage de Marc (surveiller la
+production), modèle CarAI (commit `eaab5b4`). `SELECT 1` sur la base, `{"ok": true}` (200)
+ou `{"ok": false, "cause": "base"}` (503, base non configurée ou injoignable). SANS
+authentification, délibérément (comme `/api/hub/summary`) : derrière la garde de session,
+la vigie recevrait un 401 JSON au lieu d'un vrai diagnostic, et ne verrait jamais une panne
+de base. `Cache-Control: no-store` dans les deux cas, aucune donnée d'offre ni message
+d'erreur brut renvoyé.
+
+Fichiers : `app/api/sante/route.ts` (neuf), `lib/db/index.ts` (`baseConfiguree`, neuf),
+`lib/garde.ts` + `tests/routesGardees.test.ts` (exemption documentée), `tests/sante.test.ts`
+(neuf). `middleware.ts` NON touché — le matcher de JobAI est générique, seul
+`estCheminPublic` (pure, déjà testée) décide.
+
+## 2026-09-29 — Auth asymétrique, phase 1 (« accepter les deux ») — branche non fusionnée
+
+Plan `auth-asym-hubperso` (C:\dev\_pc-local\agence\pages\plans\auth-asym-hubperso.md, relu
+sans réserve par pole-securite), phase 1 sur JobAI seulement. Branche
+`agence/jobai-53/auth-asym-phase1`, PAS de PR avant le 01/10 (minutes GitHub épuisées) —
+commande `git push` seule pour l'instant, sur demande du gérant.
+
+- `@mokarade/hub-contract` épinglé `v1.4.0` (sous-chemin `/session`, `verifierSession`) —
+  vérifié AVANT de l'adopter que `dist/` y est bien commité (le problème qui avait fait
+  redescendre `v1.3.1` à `v1.3.0` par erreur, PR #35 : v1.3.0 n'a PAS de `dist/`). `jose`
+  ajouté en dépendance directe (déjà transitive via `next-auth`).
+- Nouveau `lib/sessionSignee.ts` : lit `HUB_SESSION_PUBLIC_KEYS` (JWKS, jamais une clé en
+  dur), vérifie le nouveau cookie `__Secure-hub.session`, applique la MÊME règle
+  d'autorisation à deux étages que `auth.ts` (`estEmailAutorise` puis `aAccesHub`) — dupliquée
+  volontairement, `auth.ts` n'est PAS touché (consigne : le code ne touche pas à l'ancien
+  chemin avant la phase 3). 20 tests neufs (`tests/sessionSignee.test.ts`), clés ES256
+  générées dans le test, aucune clé inventée.
+- `middleware.ts` : vérifie le nouveau cookie EN PREMIER, retombe sur l'ancien (`req.auth`).
+  Additif — `HUB_SESSION_PUBLIC_KEYS` n'est configurée nulle part en production tant que
+  Hubperso n'a pas fait sa phase 2, donc `false` pour tout le monde aujourd'hui. Rien ne
+  change pour Marc.
+- Gate local rejoué en entier : `typecheck` vert, `lint` vert, `build` vert (jose/ES256
+  compile bien dans le runtime Edge du middleware). `test` : 1809/1810 passent — le seul
+  échec (`tests/cvSurface.test.ts`) est PRÉEXISTANT et SANS RAPPORT (bug de séparateur de
+  chemin Windows vs `/`, invisible en CI qui tourne sous Linux) : voir
+  `[TEST-CVSURFACE-WIN]` dans BACKLOG.md, non corrigé, hors périmètre de cette branche.
+- ⚠️ `npm run build` a de nouveau réécrit `tsconfig.json` en silence (piège déjà noté le
+  25/09 ci-dessous) — annulé avant commit (`git checkout -- tsconfig.json`).
+- Suite : Hubperso fait sa phase 2 (émettre les deux cookies) seulement APRÈS que les
+  satellites (JobAI, CarAI, MemoryAI) soient en production sur leur phase 1 — ordre imposé
+  par le plan §8bis. PR à ouvrir le 01/10 quand GitHub Actions redevient disponible.
+
 ## 2026-09-25 — Rapport complet, sur demande de Marc (« gros rapport de où tu es, document tout »)
 
 Cette session couvre deux choses : un lot de travail le 21/09 (chantiers fermés), puis une

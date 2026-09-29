@@ -45,6 +45,12 @@ export function estCheminPublic(chemin: string): boolean {
   // session Google ; derrière la garde de session il recevrait une redirection HTML au lieu
   // du JSON-RPC attendu, et le connecteur serait muet sans qu'aucune erreur ne le dise.
   if (chemin === "/api/mcp") return true;
+  // Santé publique, pour la vigie de l'Atelier (modèle CarAI). SANS authentification,
+  // délibérément : elle ne rend que `{"ok": true|false}`, jamais une donnée d'offre ni un
+  // message d'erreur brut. Derrière la garde de session, la vigie recevrait un 401 JSON au
+  // lieu d'un vrai diagnostic — et ne verrait JAMAIS une panne de base, exactement le piège
+  // que `/api/hub/summary` évite déjà pour un autre appelant.
+  if (chemin === "/api/sante") return true;
   // La DÉCOUVERTE OAuth et les deux endpoints machine du serveur d'autorisation. claude.ai
   // les appelle sans jeton — c'est justement ce qu'il vient chercher. Ce qui les protège :
   // l'enregistrement ne donne AUCUN accès (il faut ensuite que Marc autorise en personne),
