@@ -1912,6 +1912,16 @@ RESTE — à observer sur les prochaines passes (rien à coder) :
 
 ## Découvertes et dette (à trier)
 
+- ⬜ **`[SEC-ESBUILD-DRIZZLEKIT]` — ouvert, non traité (constaté le 2026-09-30).** Alerte
+  Dependabot n°1, gravité modérée (GHSA-67mh-4wv8-2f99 : le serveur de développement d'esbuild
+  répond aux requêtes de n'importe quel site). Chemin : `drizzle-kit@0.31.11` →
+  `@esbuild-kit/esm-loader@2.6.5` → `@esbuild-kit/core-utils@3.3.2` → `esbuild@0.18.20`
+  (corrigé à partir de 0.25.0). **Dépendance de développement seulement** : `drizzle-kit` sert
+  à `db:generate`, jamais servi en production, et JobAI n'y lance pas le serveur de
+  développement d'esbuild. Pas de correctif amont simple (le paquet `@esbuild-kit` est
+  abandonné) : à trancher entre attendre une version de `drizzle-kit` qui s'en passe, ou un
+  `overrides` ciblé après essai de `db:generate`. Feu vert requis.
+
 - ✅ **`[TEST-CVSURFACE-WIN]` — RÉSOLU le 2026-09-29.** `tests/cvSurface.test.ts` rouge sous
   Windows, vert en CI (Linux) : `resolve()` rend des `\` sous Windows, et trois comparaisons
   cherchaient un `/` en dur. ⚠️ Ligne 94 (`!f.endsWith("lib/cv/actions.ts")`, exclusion de la
