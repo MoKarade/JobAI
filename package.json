@@ -29,7 +29,7 @@
     "drizzle-orm": "^0.45.3",
     "jose": "^6.2.0",
     "leaflet": "^1.9.4",
-    "next": "^16.3.6",
+    "next": "^16.3.8",
     "next-auth": "^5.0.0-beta.31",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

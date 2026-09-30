@@ -18,6 +18,16 @@
   pour que ce fichier ne mente plus. Exactement la classe de défaut que `[PERSIST-02]`/
   `[OBS-01]` ont visée ailleurs : une liste tenue à la main dérive de l'état réel.
 
+- [ ] 🔧 **`[TEST-COURSE-SONDE]` Course entre `tests/piiGuard.test.ts` et `tests/env.test.ts`
+  (test instable, repéré le 2026-09-30).** `piiGuard` écrit puis efface la sonde
+  `lib/_sonde-portee-du-scan.ts` pour vérifier la portée de son scan ; `env.test.ts`
+  (`sourcesLib`) parcourt `lib/` au même moment dans un autre processus de vitest. S'il liste
+  la sonde puis la lit après son effacement : `ENOENT`, test rouge sans rapport avec le code.
+  Constaté en lançant la porte de commit (resynchronisation du kit 1.15.0) : bloqué au premier
+  passage, vert au second. Piste : placer la sonde hors de `lib/` ou dans un dossier temporaire
+  que le scan de `piiGuard` couvre, ou faire ignorer à `sourcesLib` un fichier disparu entre la
+  liste et la lecture (sans avaler d'autre erreur). Feu vert requis.
+
 ---
 
 ## Installable sur le téléphone (Marc, 18/09/2026 — Android) ✅
