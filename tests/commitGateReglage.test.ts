@@ -16,14 +16,20 @@ interface Etape { nom: string; commande: string[] }
 /** Un matcher de hook Claude Code est une expression régulière appliquée au nom ENTIER de l'outil. */
 const couvre = (matcher: string, outil: string): boolean => new RegExp(`^(?:${matcher})$`).test(outil);
 
+/** Commande du réglage de référence (kit 1.15.0) : chemin absolu via $CLAUDE_PROJECT_DIR, quel que soit le dossier courant. */
+const COMMANDE_REFERENCE = 'node "$CLAUDE_PROJECT_DIR/scripts/hooks/commit-gate.mjs"';
+
 describe("porte de commit : branchement et portes", () => {
   const reglage = lireJson(".claude/settings.json") as Reglage;
+  // Tout branchement qui mentionne la porte, quelle que soit la forme de sa commande (une ancienne forme relative compterait).
   const branchements = (reglage.hooks?.PreToolUse ?? []).filter((b) =>
-    (b.hooks ?? []).some((h) => h.command === "node scripts/hooks/commit-gate.mjs"),
+    (b.hooks ?? []).some((h) => (h.command ?? "").includes("commit-gate.mjs")),
   );
 
   it("un seul branchement du hook, sur Bash ET PowerShell, et sur aucun autre outil", () => {
     expect(branchements).toHaveLength(1);
+    const commandes = (branchements[0]?.hooks ?? []).map((h) => h.command);
+    expect(commandes).toEqual([COMMANDE_REFERENCE]);
     const matcher = branchements[0]?.matcher ?? "";
     for (const outil of ["Bash", "PowerShell"]) expect(couvre(matcher, outil)).toBe(true);
     for (const outil of ["Read", "Edit", "Write", "Glob", "Grep", "PowerShellX", "XBash"]) {
