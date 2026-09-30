@@ -5,6 +5,9 @@
 //   node modeles/auto-merge/verifier-copies.mjs <dossier-du-depot> [--manifeste <chemin>]     compare (code 1 si une copie diffère, manque ou n'a rien à faire là)
 //   node modeles/auto-merge/verifier-copies.mjs --ecrire-copies <dossier-du-depot>            écrit COPIES.md (tableau chemin | SHA-256 LF | version du modèle) à la racine du dépôt cible,
 //                                                                                          seulement si ses copies sont fidèles ; à lancer par le lot de CHAQUE dépôt, jamais dans l'Atelier
+//                                                                                          [--hors-lot <chemin>=<raison>]... : écarts hors lot DÉJÀ CONNUS (chemin du manifeste exactement, raison obligatoire, doit être un vrai écart) ;
+//                                                                                          consignés dans COPIES.md, sans jamais rendre la copie « fidèle » (la comparaison des fichiers reste stricte)
+//   Hors de l'Atelier, toujours passer --manifeste C:\dev\atelier\modeles\manifeste.json : le manifeste n'est JAMAIS copié dans un dépôt cible.
 //   La comparaison lit aussi le COPIES.md du dépôt : absent, périmé (version) ou qui ne correspond plus aux fichiers → code 1.
 //   node modeles/auto-merge/verifier-copies.mjs --assurer-labels <dossier-du-depot>           crée les labels do-not-merge et validation-marc SEULEMENT s'ils manquent (jamais --force) ; fait aussi partie de --ecrire-copies (resync de chaque dépôt) ;
 //                                                                                          erreur bloquante (code 1) si une création échoue
@@ -14,8 +17,8 @@
 // Un fichier de la surcouche de l'Atelier (chemins-interdits-atelier.json) ne doit JAMAIS se trouver dans une app : signalé « à ne pas copier ».
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { assurerLabels } from "./labels.mjs";
 
@@ -76,7 +79,7 @@ export const GABARITS = Object.freeze([
 export const VERSION_CANEVAS_CLAUDE_MD = "1.0.0";
 
 /** Version du modèle : à incrémenter à chaque changement d'un fichier copiable (elle est écrite dans le manifeste et dans le COPIES.md de chaque dépôt). */
-export const VERSION_MODELE = "1.10.0";
+export const VERSION_MODELE = "1.13.0";
 export const FICHIER_COPIES = "COPIES.md";
 /** Transition : jusqu'à cette date (AAAA-MM-JJ, jour inclus), un COPIES.md ABSENT n'est qu'un avertissement (code 0) ; à partir de là c'est une erreur. Un COPIES.md présent mais faux est TOUJOURS une erreur. */
 export const COPIES_OBLIGATOIRE_DEPUIS = "2026-10-15";
@@ -115,7 +118,7 @@ export function retraitsDuProfil(manifeste, profil = PROFIL_COMPLET) {
   const voulu = PROFILS[profil];
   if (!voulu) throw new Error(`profil inconnu : ${profil} (profils : ${[PROFIL_COMPLET, ...Object.keys(PROFILS)].join(", ")})`);
   const declare = manifeste && manifeste.profils && manifeste.profils[profil];
-  const dest = (l) => (Array.isArray(l) ? l.map((x) => x && x.destination).sort() : null);
+  const dest = (l) => (Array.isArray(l) ? l.map((x) => x && x.destination).sort(parUnitesDeCode) : null);
   if (!declare || JSON.stringify(dest(declare.retire)) !== JSON.stringify(dest(voulu.retire))) throw new Error(`le manifeste ne déclare pas exactement le retrait du profil ${profil}`);
   const kit = new Set(manifeste.fichiers.map((f) => f.destination));
   for (const r of voulu.retire) if (!kit.has(r.destination)) throw new Error(`${r.destination} : retiré du profil ${profil} mais absent du kit`);
@@ -144,16 +147,55 @@ export function comparer(manifeste, { lire, existe }, profil = PROFIL_COMPLET) {
   return { ok: lignes.every((l) => l.etat === "ok" || l.etat === "retire"), lignes };
 }
 
+export const TITRE_HORS_LOT = "Écarts hors lot connus (NON fidèles au modèle, raison déclarée) :";
+
+/**
+ * Écarts « hors lot » déclarés à l'écriture de COPIES.md (`--hors-lot <chemin>=<raison>`, option répétable). GARDE-FOUS : (a) le chemin doit être EXACTEMENT la destination d'un fichier
+ * DÉJÀ listé dans le manifeste (jamais un chemin arbitraire), et pas déjà un retrait de profil ; (b) une RAISON textuelle est obligatoire pour chaque fichier (3 à 200 caractères, une seule ligne) ;
+ * pas de doublon. Lève une Error au message clair sinon. @returns {Map<string, string>} destination -> raison
+ */
+export function validerHorsLot(manifeste, entrees, retires = new Map()) {
+  const kit = new Set(manifeste.fichiers.map((f) => f.destination));
+  const out = new Map();
+  for (const brut of entrees) {
+    const i = String(brut).indexOf("=");
+    const chemin = i < 0 ? String(brut) : String(brut).slice(0, i);
+    const raison = i < 0 ? "" : String(brut).slice(i + 1).trim();
+    if (!kit.has(chemin)) throw new Error(`--hors-lot : « ${chemin} » n'est pas un fichier du manifeste (chemins acceptés : ceux de modeles/manifeste.json, exactement)`);
+    if (retires.has(chemin)) throw new Error(`--hors-lot : « ${chemin} » est déjà un retrait voulu du profil (sa raison est consignée par le profil)`);
+    if (out.has(chemin)) throw new Error(`--hors-lot : « ${chemin} » est déclaré deux fois`);
+    if (raison.length < 3 || raison.length > 200 || /[\r\n]/.test(raison)) throw new Error(`--hors-lot : « ${chemin} » exige une raison textuelle (3 à 200 caractères, une ligne) : --hors-lot ${chemin}=<raison>`);
+    out.set(chemin, raison);
+  }
+  return out;
+}
+
+/** Écarts hors lot consignés dans un COPIES.md (section TITRE_HORS_LOT) -> Map destination -> raison. Une ligne sans raison n'est pas comptée. */
+export function lireEcartsHorsLot(texte) {
+  const out = new Map();
+  let dedans = false;
+  for (const l of String(texte).replace(/\r\n/g, "\n").split("\n")) {
+    if (l.trim() === TITRE_HORS_LOT) { dedans = true; continue; }
+    if (!dedans) continue;
+    if (l.trim() === "") break;
+    const m = /^- (\S+) : (.{3,})$/.exec(l.trim());
+    if (m) out.set(m[1], m[2]);
+  }
+  return out;
+}
+
 /** COPIES.md d'un dépôt : tableau chemin | SHA-256 normalisé LF | version du modèle (une ligne par fichier copié). */
-export function formaterCopies(manifeste, empreintes, profil = PROFIL_COMPLET) {
+export function formaterCopies(manifeste, empreintes, profil = PROFIL_COMPLET, horsLot = new Map()) {
   const retires = retraitsDuProfil(manifeste, profil);
-  const lignes = manifeste.fichiers.filter((f) => empreintes[f.destination]).map((f) => `| ${f.destination} | ${empreintes[f.destination]} | ${manifeste.version_modele} |`);
+  const lignes = manifeste.fichiers.filter((f) => empreintes[f.destination] && !horsLot.has(f.destination)).map((f) => `| ${f.destination} | ${empreintes[f.destination]} | ${manifeste.version_modele} |`);
   const nonCopies = [...retires].filter(([dest]) => !empreintes[dest]).map(([dest, raison]) => `- ${dest} : ${raison}`);
+  const ecarts = [...horsLot].map(([dest, raison]) => `- ${dest} : ${raison}`);
   return ["# Copies du modèle auto-merge (Atelier)", "", `Profil : ${profil}`, "",
     "Généré par `node modeles/auto-merge/verifier-copies.mjs --ecrire-copies .` : ne pas modifier à la main. Chaque ligne atteste qu'une copie était FIDÈLE au modèle à la version indiquée ;",
     "`node modeles/auto-merge/verifier-copies.mjs .` la revérifie contre le manifeste de l'Atelier.", "",
     "| chemin | sha256 (fins de ligne LF) | version du modèle |", "|---|---|---|", ...lignes, "",
-    ...(nonCopies.length ? ["Fichiers du kit NON copiés (retrait voulu du profil, raison déclarée) :", ...nonCopies, ""] : [])].join("\n");
+    ...(nonCopies.length ? ["Fichiers du kit NON copiés (retrait voulu du profil, raison déclarée) :", ...nonCopies, ""] : []),
+    ...(ecarts.length ? [TITRE_HORS_LOT, ...ecarts, ""] : [])].join("\n");
 }
 
 /** Profil consigné dans un COPIES.md (ligne « Profil : nom ») ; `complet` si la ligne manque (anciens COPIES.md). */
@@ -185,9 +227,11 @@ export function comparerCopies(manifeste, { lire, existe }, profil = PROFIL_COMP
   const profilConsigne = lireProfil(texte);
   if (profilConsigne !== profil) details.push(`profil de COPIES.md (${profilConsigne}) différent du profil vérifié (${profil})`);
   const parChemin = new Map(lignes.map((l) => [l.chemin, l]));
+  const horsLot = lireEcartsHorsLot(texte);                                            // écarts déclarés (avec raison) : pas de ligne attendue, mais la comparaison des FICHIERS reste stricte (comparer)
   for (const f of manifeste.fichiers) {
     const l = parChemin.get(f.destination);
     if (!l && retires.has(f.destination)) continue;                                   // retrait voulu du profil : pas de ligne attendue
+    if (!l && horsLot.has(f.destination)) continue;
     if (!l) { details.push(`${f.destination} : absent de COPIES.md`); continue; }
     if (l.sha256 !== f.sha256) details.push(`${f.destination} : empreinte de COPIES.md différente du modèle`);
     if (l.version !== manifeste.version_modele) details.push(`${f.destination} : version ${l.version} (modèle : ${manifeste.version_modele})`);
@@ -197,8 +241,33 @@ export function comparerCopies(manifeste, { lire, existe }, profil = PROFIL_COMP
   return { etat: details.length ? "copies_ecart" : "copies_ok", details };
 }
 
-/** `gh` réel (sans shell), exécuté DANS le dépôt vérifié : `gh repo view` lit son remote. Injectable pour les tests. */
-export const ghReel = (args, cwd) => execFileSync("gh", args, { encoding: "utf8", cwd, timeout: 30000, stdio: ["ignore", "pipe", "pipe"] });
+/**
+ * Chemin ABSOLU d'un exécutable (Sonar S4036) : cherché dans les seules entrées ABSOLUES du PATH, en ignorant toute entrée relative (« . », « outils ») et le
+ * dossier courant (le dépôt vérifié, qui pourrait contenir un « gh » ou un « git » piégé). Sous Windows, seul `<nom>.exe` est accepté (un .cmd exigerait un shell).
+ * Introuvable = erreur (jamais de repli sur le nom seul, que le système chercherait lui-même, dossier courant compris). `existe`, `env`, `cwd` : injectables (tests).
+ */
+export function resoudreExecutable(nom, { env = process.env, cwd = process.cwd(), existe = estUnFichier } = {}) {
+  if (typeof nom !== "string" || !/^[a-z][a-z0-9-]{0,30}$/i.test(nom)) throw new Error(`nom d'exécutable invalide : ${JSON.stringify(nom)}`);
+  const fichier = process.platform === "win32" ? `${nom}.exe` : nom;
+  const courant = resolve(cwd).toLowerCase();
+  const brut = env.PATH ?? env.Path ?? "";
+  for (const entree of String(brut).split(delimiter)) {
+    if (!entree || !isAbsolute(entree) || resolve(entree).toLowerCase() === courant) continue;
+    const chemin = join(entree, fichier);
+    if (existe(chemin)) return chemin;
+  }
+  throw new Error(`${nom} introuvable dans les entrées absolues du PATH (entrées relatives et dossier courant ignorés)`);
+}
+
+function estUnFichier(chemin) {
+  try { return statSync(chemin).isFile(); } catch { return false; }
+}
+
+/** Tri déterministe, indépendant de la langue (Sonar S2871) : même ordre que le tri par défaut sans fonction (unités de code UTF-16). */
+export const parUnitesDeCode = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+/** `gh` réel (sans shell, chemin absolu résolu), exécuté DANS le dépôt vérifié : `gh repo view` lit son remote. Injectable pour les tests. */
+export const ghReel = (args, cwd) => execFileSync(resoudreExecutable("gh", { cwd }), args, { encoding: "utf8", cwd, timeout: 30000, stdio: ["ignore", "pipe", "pipe"] });
 
 /**
  * Le profil déclaré correspond-il à la VISIBILITÉ réelle du dépôt ? Le profil « prive » n'a de sens que pour un dépôt PRIVÉ (pas d'auto-fusion native) : un dépôt PUBLIC qui le déclarerait
@@ -245,7 +314,7 @@ const detailLigne = (l) => (l.etat === "different" ? `  (attendu ${l.attendu}…
 /** `--ecrire-copies <dépôt> [--manifeste <chemin>]` : écrit COPIES.md dans le dépôt cible, SEULEMENT si toutes ses copies sont fidèles (jamais d'attestation d'une copie modifiée). */
 function ecrireCopies(argv, ici, gh) {
   const depot = argv[1];
-  if (!depot || depot.startsWith("--")) { console.log("usage : node verifier-copies.mjs --ecrire-copies <dossier-du-depot> [--manifeste <chemin>]"); return 2; }
+  if (!depot || depot.startsWith("--")) { console.log("usage : node verifier-copies.mjs --ecrire-copies <dossier-du-depot> [--manifeste <chemin>] [--hors-lot <chemin>=<raison>]..."); return 2; }
   const i = argv.indexOf("--manifeste");
   const chemin = i >= 0 ? argv[i + 1] : join(ici, "..", "manifeste.json");
   let manifeste;
@@ -256,8 +325,20 @@ function ecrireCopies(argv, ici, gh) {
   const io = { lire: (c) => readFileSync(join(racine, c), "utf8"), existe: (c) => existsSync(join(racine, c)) };
   let res;
   try { res = comparer(manifeste, io, profil); } catch (e) { console.log(String(e.message)); return 2; }
-  if (!res.ok) {
-    for (const l of res.lignes.filter((x) => x.etat !== "ok" && x.etat !== "retire")) console.log(`${LIBELLES[l.etat]}  ${l.fichier}`);
+  // écarts « hors lot » déclarés (--hors-lot <chemin>=<raison>, répétable) : chemins du manifeste seulement, raison obligatoire, et chacun doit être un VRAI écart (jamais un drapeau inutile ni silencieux)
+  const entreesHorsLot = [];
+  for (let k = 0; k < argv.length; k++) {
+    if (argv[k] !== "--hors-lot") continue;
+    if (argv[k + 1] === undefined || argv[k + 1].startsWith("--")) { console.log("usage : --hors-lot <chemin>=<raison> (option répétable)"); return 2; }
+    entreesHorsLot.push(argv[k + 1]);
+  }
+  let horsLot;
+  try { horsLot = validerHorsLot(manifeste, entreesHorsLot, retraitsDuProfil(manifeste, profil)); } catch (e) { console.log(String(e.message)); return 2; }
+  const ecartsReels = new Set(res.lignes.filter((x) => x.etat === "different" || x.etat === "absent").map((x) => x.fichier));
+  for (const chemin of horsLot.keys()) if (!ecartsReels.has(chemin)) { console.log(`--hors-lot : « ${chemin} » n'est pas un écart (la copie est fidèle) : ne pas le déclarer`); return 2; }
+  const bloquants = res.lignes.filter((x) => x.etat !== "ok" && x.etat !== "retire" && !horsLot.has(x.fichier));
+  if (bloquants.length) {
+    for (const l of bloquants) console.log(`${LIBELLES[l.etat]}  ${l.fichier}`);
     console.log("COPIES.md non écrit : les copies ne sont pas toutes fidèles au modèle (corriger d'abord).");
     return 1;
   }
@@ -268,7 +349,8 @@ function ecrireCopies(argv, ici, gh) {
   if (!assurerLabelsDuDepot(gh, racine).ok) { console.log("COPIES.md non écrit : labels indispensables absents et non créés."); return 1; }
   const empreintes = Object.fromEntries(manifeste.fichiers.filter((f) => io.existe(f.destination)).map((f) => [f.destination, empreinte(io.lire(f.destination))]));   // un retrait voulu du profil n'a pas de ligne
   for (const l of res.lignes.filter((x) => x.etat === "retire")) console.log(`${LIBELLES.retire}  ${l.fichier}${detailLigne(l)}`);
-  writeFileSync(join(racine, FICHIER_COPIES), formaterCopies(manifeste, empreintes, profil));
+  for (const [chemin, raison] of horsLot) console.log(`HORS LOT   ${chemin}  (${raison})`);
+  writeFileSync(join(racine, FICHIER_COPIES), formaterCopies(manifeste, empreintes, profil, horsLot));
   console.log(`COPIES.md écrit : ${join(racine, FICHIER_COPIES)}`);
   return 0;
 }

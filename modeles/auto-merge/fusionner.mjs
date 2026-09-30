@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
-import { decision, peutArmer, codeRaison } from "./autoMerge.mjs";
+import { decision, peutArmer, codeRaison, rattacherCreateurs } from "./autoMerge.mjs";
 import { assurerLabels, corpsRefus, LABEL_ALERTE, LABELS, raisonLabelDejaPose } from "./labels.mjs";
 
 export { LABEL_ALERTE };
@@ -169,7 +169,13 @@ export async function executer({ gh, config, env, maintenant, ecrire, sortie = (
         const [nom, id] = l.split("\t");
         apps.set(nom, apps.has(nom) && apps.get(nom) !== Number(id) ? "ambigu" : Number(id));
       }
-      const checks = (pr.statusCheckRollup || []).map((c) => (c && c.name && apps.has(c.name) ? { ...c, appId: apps.get(c.name) } : c));
+      let checks = (pr.statusCheckRollup || []).map((c) => (c && c.name && apps.has(c.name) ? { ...c, appId: apps.get(c.name) } : c));
+      // statut du vérificateur local (config `statut_local`) : créateur du dernier statut de commit de ce contexte (id + login + type), lu seulement si configuré
+      if (config.statut_local) {
+        const jq = '.[] | [.context, .state, ((.creator.id // 0) | tostring), (.creator.login // ""), (.creator.type // "")] | @tsv';
+        const brutStatuts = await avecReessais(() => gh(["api", "--paginate", `repos/${repo}/commits/${pr.headRefOid}/statuses`, "--jq", jq]), attente);
+        checks = rattacherCreateurs(checks, brutStatuts, config.statut_local.contexte);
+      }
 
       // revues (attestation de pole-securite) : lues seulement si le dépôt a un compte dédié (`securite_login`), sinon aucune attestation n'est possible
       const reviews = config.securite_login ? await lireRevues(gh, repo, n, attente) : [];

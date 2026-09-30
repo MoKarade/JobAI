@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": ["modeles/auto-merge/**"],
+  "ignore": ["modeles/auto-merge/**", "scripts/hooks/**"],
   "ignoreDependencies": [
     "eslint-config-next"
   ]
