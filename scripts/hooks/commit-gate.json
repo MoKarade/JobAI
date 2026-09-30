@@ -1,0 +1,30 @@
+{
+  "_doc": "Configuration JobAI du commit-gate (modèle : atelier/modeles/qualite/commit-gate.json, 1.13.0). Les 4 portes bloquantes du dépôt (CLAUDE.md : typecheck, test, lint, build), dans l'ordre de la CI. Tests ciblés sur les fichiers stagés + tests-verrous toujours lancés ; suite complète en CI. Fichier SENSIBLE (**/commit-gate*) : toute modification passe par l'attestation de pole-securite.",
+  "sans_effet": ["\\.md$", "^docs/"],
+  "config_globale": [
+    "^(package(-lock)?\\.json|tsconfig[^/]*\\.json|next\\.config\\.[cm]?[jt]s|vitest[^/]*\\.[cm]?[jt]s|drizzle\\.config\\.[cm]?[jt]s|eslint[^/]*|postcss[^/]*|tailwind[^/]*|\\.npmrc|\\.nvmrc)$",
+    "\\.css$"
+  ],
+  "etapes": [
+    { "nom": "typecheck", "commande": ["npm", "run", "typecheck"] },
+    {
+      "nom": "tests (affectés)",
+      "commande": ["npm", "test"],
+      "cible": {
+        "outil": ["node", "node_modules/vitest/vitest.mjs"],
+        "extensions": ["ts", "tsx", "mjs", "js"],
+        "args_related": ["related", "--run", "--passWithNoTests"],
+        "args_run": ["run"],
+        "toujours": [
+          "tests/piiGuard.test.ts",
+          "tests/routesGardees.test.ts",
+          "tests/suivi.test.ts",
+          "tests/hubSummary.test.ts",
+          "tests/fraicheurVeille.test.ts"
+        ]
+      }
+    },
+    { "nom": "lint", "commande": ["npm", "run", "lint"] },
+    { "nom": "build", "commande": ["npm", "run", "build"] }
+  ]
+}

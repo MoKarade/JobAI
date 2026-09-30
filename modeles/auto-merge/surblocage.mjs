@@ -14,6 +14,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { CHEMINS_INTERDITS, correspond, normaliser } from "./autoMerge.mjs";
+import { resoudreExecutable } from "./verifier-copies.mjs";
 
 export const MAX_PAR_DEFAUT = 15;
 
@@ -73,12 +74,12 @@ export function tauxHistorique(prs, motifs) {
   return { prs: prs.length, concernees, jours, parMois: Math.round((concernees / jours) * 30 * 10) / 10, fichiers };
 }
 
-const fichiersSuivis = (racine) => execFileSync("git", ["-C", racine, "ls-files", "-z"], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 }).split("\0").filter(Boolean);
+const fichiersSuivis = (racine) => execFileSync(resoudreExecutable("git", { cwd: racine }), ["-C", racine, "ls-files", "-z"], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 }).split("\0").filter(Boolean);
 
 /** Valeur de l'option `--nom` (argument suivant), ou undefined ; `null` si l'option est présente sans valeur. */
 const option = (argv, nom) => { const i = argv.indexOf(nom); return i < 0 ? undefined : (argv[i + 1] === undefined || argv[i + 1].startsWith("--") ? null : argv[i + 1]); };
 
-const ghReel = (args, cwd) => execFileSync("gh", args, { encoding: "utf8", cwd, timeout: 60000, maxBuffer: 256 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+const ghReel = (args, cwd) => execFileSync(resoudreExecutable("gh", { cwd }), args, { encoding: "utf8", cwd, timeout: 60000, maxBuffer: 256 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
 
 export function main(argv, gh = ghReel) {
   const valeurs = ["--max", "--champ", "--historique", "--max-mois"].map((o) => option(argv, o));
