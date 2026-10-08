@@ -6,6 +6,48 @@
 
 ---
 
+## 2026-10-08 — Routine de veille : `nonSituees` monte 3 jours, le témoin expire sans être corrigé
+
+Deux faits déclenchent la sortie complète de la routine (invariant 3 en défaut + témoin qui
+change d'état).
+
+**`nonSituees` est monté 3 jours de suite** (seuil de l'invariant 3) :
+
+| Date | `suivies` | Δ | `nonSituees` | Δ |
+|---|---|---|---|---|
+| 05/10 | 6323 | — | 3170 | — |
+| 06/10 | 6444 | +121 | 3239 | +69 |
+| 07/10 | 6458 | +14 | 3245 | +6 |
+| 08/10 | 6485 | +27 | 3262 | +17 |
+
+Sur les trois jours, `suivies` a gagné **+162**, `nonSituees` **+92** — la hausse de la file
+suit à peu près le volume d'ingestion (≈57 % des entrées arrivent sans position connue,
+cohérent avec un délai normal de rattrapage du cron). `[Probable]`, pas `[Certain]` : sans
+`[OBS-02]` (le contenu d'une passe `mesure`/`situer`/`bornes` n'est toujours persisté nulle
+part), impossible de confirmer que c'est bien le rattrapage qui tourne et pas un blocage —
+exactement la distinction que l'invariant 5 demande de ne jamais perdre. Les jours précédents
+où `nonSituees` était monté 1 ou 2 jours (23/09, 29-30/09, 02-03/10, 06-07/10) se sont tous
+résorbés ensuite ; aucun épisode de stagnation franche (type `situer=0`, déjà vécu avant
+cette session) n'a été observé.
+
+**Le témoin nommé a changé d'état, mais PAS de la façon attendue.** Après **17 jours**
+immobile (`km: 6,1` / note 76, du 21/09 au 07/10), `coffrages-synergy-construction-project-
+manager` porte maintenant `perimeeLe: "2026-10-08"` : l'offre a expiré avant qu'ADR-0021 ne
+corrige son chiffre. `km` reste à 6,1 (jamais passé à `null`), la réserve générique n'a jamais
+été remplacée par « distance à mesurer ». Le témoin n'a donc PAS atteint la condition de
+retrait fixée le 21/09 (« `km: null` puis sa vraie distance ») — il s'est juste périmé en
+chemin. **Conséquence** : l'hypothèse posée le 22/09 (position de l'employeur et centre de
+« Lavaltrie » probablement faux de façon cohérente, donc invisibles au test de plausibilité)
+n'a jamais été vérifiée ni infirmée — elle reste ouverte, et vaut probablement pour d'autres
+offres de la même entreprise ou de la même ville, pas seulement celle-ci. Non retiré du
+prompt de la routine (ce n'est pas un témoin « accompli ») : à trancher par Marc — soit
+vérifier la position de « Coffrages Synergy »/« Lavaltrie » directement, soit désigner un
+nouveau témoin plus utile.
+
+Gate non applicable (doc seulement, aucun code touché).
+
+---
+
 ## 2026-09-29 — `st-jobai` : structure commune allégée (gabarit DriveAI#423) — branche non fusionnée
 
 Branche `agence/jobai-53/st-jobai-1`, sur demande du gérant. JobAI avait déjà son CLAUDE.md
