@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-10-09 — Routine de veille : `nonSituees` monte un 5ᵉ jour, le témoin ne bouge plus
+
+Suite directe de l'entrée du 08/10 ci-dessous (toujours sur PR #56, pas encore fusionnée au
+moment de ce relevé). L'invariant 3 reste en défaut ; rien de neuf côté témoin.
+
+| Date | `suivies` | Δ | `nonSituees` | Δ |
+|---|---|---|---|---|
+| 05/10 | 6323 | — | 3170 | — |
+| 06/10 | 6444 | +121 | 3239 | +69 |
+| 07/10 | 6458 | +14 | 3245 | +6 |
+| 08/10 | 6485 | +27 | 3262 | +17 |
+| 09/10 | 6541 | +56 | 3290 | +28 |
+
+**Cinquième jour de hausse, pas trois.** L'hypothèse du 08/10 (rattrapage de cron, la hausse
+suivant à peu près le volume d'ingestion) reste `[Probable]`, toujours pas `[Certain]` :
+`[OBS-02]` (le contenu d'une passe `mesure`/`situer`/`bornes`, jamais persisté) manque
+toujours pour trancher entre rattrapage normal et blocage réel. `etat_synchro` confirme
+`veille-auto` et `distances-auto` réservés aujourd'hui vers 11:00-11:03 UTC — les crons
+tournent. `geocodage-auto` reste figé au 31/07 : **déjà vérifié bénin le 22/09** (cette clé ne
+gate que la géocodification à la demande de `/carte`, pas le cron quotidien de distances) —
+non re-signalé, pas une piste.
+
+Le témoin nommé n'a pas changé depuis hier : `coffrages-synergy-construction-project-manager`
+porte toujours `km: 6,1`, `perimeeLe: "2026-10-08"`. Rien de neuf à trancher — la décision
+(vérifier la position de Coffrages Synergy / du centre de Lavaltrie, ou désigner un autre
+témoin) reste entière, posée à Marc le 08/10.
+
+Gate non applicable (doc seulement, aucun code touché).
+
+---
+
 ## 2026-10-08 — Routine de veille : `nonSituees` monte 3 jours, le témoin expire sans être corrigé
 
 Deux faits déclenchent la sortie complète de la routine (invariant 3 en défaut + témoin qui
