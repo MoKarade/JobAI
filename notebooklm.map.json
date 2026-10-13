@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "repo_label": "JobAI",
+  "comment": "Découpage par couche puis par domaine métier (API et accès, MCP, veille, notation et CV, carte, données, suivi, interface, tests et outillage, docs). Le premier motif qui correspond gagne : les fichiers lib/ spécifiques passent avant le lib/** général.",
+  "sources": [
+    {
+      "name": "01_API_Acces_Hub",
+      "title": "Routes API, authentification, accès hub et summary",
+      "include": [
+        "app/api/hub/**",
+        "app/api/auth/**",
+        "app/api/sante/**",
+        "app/api/cron/**",
+        "app/api/diagnostic/**",
+        "app/.well-known/**",
+        "app/oauth/**",
+        "middleware.ts",
+        "auth.ts",
+        "lib/hubSummary.ts",
+        "lib/accesHub.ts",
+        "lib/connexionHub.ts",
+        "lib/session.ts",
+        "lib/sessionPartagee.ts",
+        "lib/sessionSignee.ts",
+        "lib/autorisation.ts",
+        "lib/garde.ts",
+        "lib/cronAuth.ts",
+        "lib/oauthStore.ts",
+        "lib/env.ts",
+        "lib/chargerEnv.ts",
+        "lib/panne.ts"
+      ]
+    },
+    {
+      "name": "02_MCP",
+      "title": "Connecteur MCP pour Claude (serveur, outils, OAuth)",
+      "include": [
+        "app/api/mcp/**",
+        "lib/mcp/**"
+      ]
+    },
+    {
+      "name": "03_Veille_Ingestion",
+      "title": "Veille : ingestion du flux Guichet-Emplois et tri",
+      "include": [
+        "lib/ingest/**",
+        "lib/veille*.ts",
+        "lib/veille-journal.json",
+        "lib/actionsVeille.ts",
+        "lib/synchro.ts",
+        "lib/fraicheur*.ts",
+        "lib/historiqueVeille.ts",
+        "lib/rapportVeille.ts",
+        "lib/diagnostic*.ts",
+        "lib/fermetureAuto.ts",
+        "lib/dureeVie.ts",
+        "lib/travaux.ts"
+      ]
+    },
+    {
+      "name": "04_Notation_Profil_CV",
+      "title": "Notation, profil, CV et coûts LLM",
+      "include": [
+        "lib/cv/**",
+        "lib/scoring.ts",
+        "lib/raisons.ts",
+        "lib/profil*.ts",
+        "lib/metiers*.ts",
+        "lib/actionsMetiers.ts",
+        "lib/nocProfession.ts",
+        "lib/categorie.ts",
+        "lib/couleurNote.ts",
+        "lib/analyse*.ts",
+        "lib/actionsAnalyse.ts",
+        "lib/coutLlm*.ts",
+        "lib/promptSafety.ts",
+        "lib/quota.ts"
+      ]
+    },
+    {
+      "name": "05_Carte_Geocodage_Distances",
+      "title": "Carte, géocodage, distances et trajets",
+      "include": [
+        "lib/geocodage*.ts",
+        "lib/distances.ts",
+        "lib/domicile.ts",
+        "lib/adresse.ts",
+        "lib/carte.ts",
+        "lib/bornes.ts",
+        "lib/overpass.ts",
+        "lib/trajet*.ts",
+        "lib/actionsTrajet.ts",
+        "lib/lienTrajet.ts",
+        "lib/budgetRoutes.ts",
+        "lib/registre.ts",
+        "lib/rayon.ts",
+        "lib/actionsRayon.ts",
+        "lib/densite.ts",
+        "lib/mesureLieux.ts",
+        "lib/employeurs.ts",
+        "lib/groupesEntreprise.ts",
+        "lib/erreurGoogle.ts"
+      ]
+    },
+    {
+      "name": "06_Donnees_Schemas",
+      "title": "Base de données : schéma Drizzle, migrations, types",
+      "include": [
+        "lib/db/**",
+        "drizzle/**",
+        "drizzle.config.ts",
+        "lib/migrations.ts",
+        "lib/types.ts",
+        "lib/seed.ts",
+        "lib/persistance.ts",
+        "lib/donnees.ts",
+        "lib/trackerState.ts"
+      ]
+    },
+    {
+      "name": "07_Suivi_Logique_Metier",
+      "title": "Suivi des candidatures et autre logique métier",
+      "include": [
+        "lib/**"
+      ]
+    },
+    {
+      "name": "08_Interface",
+      "title": "Interface : pages, composants, PWA",
+      "include": [
+        "app/**",
+        "components/**",
+        "public/**"
+      ]
+    },
+    {
+      "name": "09_Tests_CI_Outils",
+      "title": "Tests, CI, portes qualité, scripts et configuration",
+      "include": [
+        "tests/**",
+        "vitest.config.ts",
+        ".github/**",
+        ".claude/**",
+        "qualite/**",
+        "scripts/**",
+        "modeles/**",
+        "package.json",
+        "tsconfig.json",
+        "next.config.mjs",
+        "eslint.config.mjs",
+        "knip.json",
+        "vercel.json",
+        ".dependency-cruiser.cjs",
+        ".env.example",
+        ".gitattributes",
+        ".gitignore",
+        ".gitleaksignore",
+        ".nvmrc"
+      ]
+    },
+    {
+      "name": "10_Docs_Handover",
+      "title": "Documentation, ADR, passation et backlog",
+      "include": [
+        "CLAUDE.md",
+        "HANDOVER.md",
+        "BACKLOG.md",
+        "COPIES.md",
+        "docs/**"
+      ]
+    }
+  ],
+  "fallback": "99_Autres",
+  "master": {
+    "enabled": true,
+    "include": [
+      "lib/types.ts",
+      "lib/db/schema.ts",
+      "lib/ingest/types.ts",
+      "lib/hubSummary.ts",
+      "app/api/hub/summary/route.ts",
+      "app/api/mcp/route.ts",
+      "lib/mcp/serveur.ts",
+      "lib/mcp/vue.ts",
+      "lib/accesHub.ts",
+      "lib/sessionPartagee.ts",
+      "middleware.ts",
+      "lib/coutLlm.ts",
+      "README.md",
+      "lib/mcp/*.spec.ts"
+    ],
+    "exclude": [
+      "docs/**"
+    ]
+  },
+  "limits": {
+    "max_words_per_doc": 400000,
+    "max_chars_per_doc": 900000,
+    "max_json_bytes": 40000
+  }
+}

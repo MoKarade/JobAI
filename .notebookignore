@@ -1,0 +1,10 @@
+# Exclusions propres à JobAI (en plus de la configuration centrale)
+
+# Instantanés Drizzle générés par drizzle-kit : gros JSON redondants avec drizzle/*.sql et lib/db/schema.ts
+drizzle/meta/*_snapshot.json
+
+# Journal des migrations généré par drizzle-kit (aucune information métier)
+drizzle/meta/_journal.json
+
+# Icônes PWA binaires (aucun texte exploitable)
+public/*.png
