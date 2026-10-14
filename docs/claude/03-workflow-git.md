@@ -8,9 +8,16 @@
   `claude/<slug>` + PR draft (#9, #10, et celle-ci). Les deux régimes coexistent — direct sur
   `main` depuis un poste, branche + PR depuis une session distante. Ce qui ne change pas : le
   gate de §5 avant chaque commit, et `git revert` plutôt qu'une réécriture d'historique.
+  ⚠️ **À trancher par Marc (14/10)** : depuis le 28/09, `main` est protégée par un ruleset
+  (« Protection de main (kit auto-merge) », aucun contournement) qui exige les trois contrôles
+  de `.github/auto-merge.json` — un push direct sur `main` est donc refusé, et le dernier commit
+  direct date du 25/09. La fusion se fait par le kit de l'Atelier (`auto-merge.yml` →
+  `modeles/auto-merge/fusionner.mjs`) ; `fusion-auto.yml` (auto-merge natif) est désactivé
+  côté GitHub. ADR-0002 (« direct sur `main` ») n'est pas modifié. Autre écart : « PR draft »
+  ici, alors que la règle de l'Atelier pour les apps en fusion auto est « jamais en brouillon ».
 - **Commits** : préfixés par l'ID de tâche du backlog. Ex. `[V1-03] endpoint hub summary`.
 - **Le gate est en §5**, et il est obligatoire avant chaque commit. Jamais `--no-verify`.
-- **Push** : commits directs sur `main`. **Il n'y a donc AUCUNE revue pour rattraper une
+- **Push** (régime ADR-0002, voir la note « À trancher » ci-dessus : impossible depuis le 28/09) : commits directs sur `main`. **Il n'y a donc AUCUNE revue pour rattraper une
   erreur** — le gate local est obligatoire avant chaque commit, et la CI est le seul filet
   partagé. Un commit poussé est en ligne : dans le doute, on vérifie avant, pas après.
   Retour arrière = `git revert`, jamais de réécriture d'historique sur `main`.

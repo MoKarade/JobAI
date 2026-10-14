@@ -8,7 +8,8 @@ Les quatre sont bloquants, `lint` compris. Jamais `--no-verify`.
 
 La **CI** (`.github/workflows/`) rejoue ce gate. ⚠️ **Sans PR, rien n'affiche un ✗ dans
 l'interface** : une CI rouge peut passer inaperçue sur plusieurs commits d'affilée — vécu 4×.
-Le push n'est donc pas fini tant que le run n'a pas été **consulté**.
+Le push n'est donc pas fini tant que le run n'a pas été **consulté**. *(Au 14/10 : `main`
+n'accepte plus de push direct, les contrôles sont exigés sur la PR — voir `03-workflow-git.md`.)*
 
 **Les migrations ne se lancent pas à la main.** `npm run db:generate` produit le fichier SQL ;
 c'est `lib/migrations.ts` (`assurerMigrations`) qui l'applique **au premier accès aux données**,

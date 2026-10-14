@@ -10,6 +10,16 @@
 
 ## Trouvé en passant (non demandé — feu vert requis)
 
+- [x] 🔧 **`[DOC-ETAT-1410]` Relevé documentaire du 14/10, sur demande de Marc.** ✅ État au 14/10
+  en tête de `HANDOVER.md`, versions (Next 16, hub-contract `v1.4.0`) et mécanisme de fusion réel
+  corrigés dans `CLAUDE.md`, `README.md`, `docs/claude/`, `docs/couts-ci.md`, `docs/rattachement.md`.
+  Doc seulement.
+
+- [ ] 🔧 **`[FUSION-AUTO-MORT]` `.github/workflows/fusion-auto.yml` est présent mais désactivé
+  manuellement côté GitHub (constaté le 14/10)** : le dépôt porte deux mécanismes de fusion, dont un
+  mort, et son en-tête décrit encore la fusion de « chaque PR du dépôt ». Le fichier ne dit pas qu'il
+  est éteint. Non touché (`.github/**` = chemin sensible) — retirer ou documenter, feu vert requis.
+
 - [x] 🔧 **`[DOC-ADR-INDEX]` ADR-0019 n'a pas de ligne dans l'index de `docs/adr/README.md`.**
   ✅ **Corrigé le 2026-09-22, sous l'ID `[ADR-INDEX-01]`** (voir plus bas dans ce fichier) —
   découvert indépendamment, deux ID pour le même oubli. La ligne d'ADR-0019 est bien dans

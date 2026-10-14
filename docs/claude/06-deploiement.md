@@ -12,6 +12,8 @@ Donc, après un commit qui change ce qui est SERVI : vérifier qu'un déploiemen
 bien été créé et qu'il est `READY`, puis **contrôler l'effet sur la réponse réelle** — un en-tête
 se lit dans la réponse, il ne se déduit pas du fichier source. Ici, c'est d'autant plus vrai que
 les commits vont directement sur `main` : il n'y a aucune PR dont l'échec sauterait aux yeux.
+*(Au 14/10 : tout passe désormais par une PR, voir la note « À trancher » de
+`03-workflow-git.md` ; la vérification du déploiement après fusion reste due.)*
 
 Corollaire : un commit qui ne change QUE de la doc n'a pas de déploiement à vérifier. Le dire
 plutôt que de laisser croire qu'on a vérifié.

@@ -6,7 +6,49 @@
 
 ---
 
-## 2026-09-29 — `st-jobai` : structure commune allégée (gabarit DriveAI#423) — branche non fusionnée
+## État au 14/10/2026 (relevé documentaire, aucun code touché)
+
+> Relevé fait sur `main` = `a1c89a6` (fusion de #54, 30/09), contre `git log`, `package.json`,
+> `.github/` et l'API GitHub. **Gel décidé par Marc le 14/10 : aucun nouveau travail sur les
+> apps tant que le plan de réduction du temps des PR est en cours.**
+
+**Ce qui tourne** — dernier commit sur `main` le 30/09 ; rien n'a été fusionné depuis. Versions
+au 14/10 (lues dans `package.json`) : `next` `^16.3.8`, `@mokarade/hub-contract` épinglé sur le
+tag `v1.4.0`, vitest 5. Production (`emploi.hubperso.com`, `GET /api/sante`) : non vérifiée par
+ce relevé — le proxy de la session refuse l'appel `[À vérifier]`.
+
+**Livré depuis la dernière entrée de ce fichier (29/09)**, toutes fusionnées dans `main` :
+- #43 `[AUTH-ASYM-P1]` (29/09) et #46 `[ST-JOBAI-1]` (30/09) — les deux entrées ci-dessous
+  titrées « branche non fusionnée » le sont depuis.
+- #44 `[TEST-CVSURFACE-WIN]`, #45 `[GITATTRIBUTES]`, #47 `[SCORE-SENIORITE-LETTRES]`,
+  #48 `[SEC-GITLEAKS-CVE]`, #49 `[SANTE-01]` (29/09).
+- #51 `[INC-22]` kit auto-merge 1.13.0 + porte de commit (`scripts/hooks/commit-gate.json`),
+  #52 `[KIT-1.15]` kit 1.15.0, #53 `[SEC-NEXT-16-3-8]` next 16.3.6 → 16.3.8,
+  #54 `[SEC-KIT-1-16]` kit 1.16.0 + `fast-uri` 3.1.8 (30/09).
+
+**Mécanisme de fusion réel (au 14/10)** — `main` est protégée par un *ruleset*
+(« Protection de main (kit auto-merge) », créé le 28/09, aucun contournement autorisé) : pas
+de suppression, pas de réécriture, et les trois contrôles de `.github/auto-merge.json`
+obligatoires (Gate, Qualité, Sécurité). La fusion est faite par le kit de l'Atelier
+(`.github/workflows/auto-merge.yml` → `modeles/auto-merge/fusionner.mjs`, armement par
+`armement-auto-merge.yml`). `fusion-auto.yml` (auto-merge natif) est présent mais **désactivé
+manuellement** côté GitHub. Il n'y a pas de `CODEOWNERS`. Conséquence : un push direct sur
+`main` est désormais refusé — voir la note « À trancher » de `docs/claude/03-workflow-git.md`.
+
+**En cours (PR ouvertes au 14/10)** : #61 (doc, versions Next 16 / hub-contract v1.4.0 —
+recoupe en partie ce relevé ; label `validation-marc`), #58 (doc, carte NotebookLM), #56
+(brouillon, routine de veille 08-09/10, touche ce fichier), et Dependabot #50, #57, #59, #60.
+
+**À surveiller**
+- `[TEST-COURSE-SONDE]` (BACKLOG) : course entre `piiGuard.test.ts` et `env.test.ts`, ouverte.
+- `[SEC-ESBUILD-DRIZZLEKIT]` (BACKLOG) : alerte modérée, outil de développement seulement, ouverte.
+- Auth asymétrique : la phase 2 (Hubperso émet le nouveau cookie) n'est pas constatée d'ici ;
+  tant qu'elle ne l'est pas, le chemin de la phase 1 reste inerte `[À vérifier]`.
+- Piège `npm run build` qui réécrit `tsconfig.json` (entrée du 25/09) : toujours d'actualité.
+
+---
+
+## 2026-09-29 — `st-jobai` : structure commune allégée (gabarit DriveAI#423) — fusionnée le 30/09 (#46)
 
 Branche `agence/jobai-53/st-jobai-1`, sur demande du gérant. JobAI avait déjà son CLAUDE.md
 court + `docs/claude/` (PR #41/#42, même journée) : ce lot comble le reste du gabarit.
@@ -61,7 +103,7 @@ Fichiers : `app/api/sante/route.ts` (neuf), `lib/db/index.ts` (`baseConfiguree`,
 (neuf). `middleware.ts` NON touché — le matcher de JobAI est générique, seul
 `estCheminPublic` (pure, déjà testée) décide.
 
-## 2026-09-29 — Auth asymétrique, phase 1 (« accepter les deux ») — branche non fusionnée
+## 2026-09-29 — Auth asymétrique, phase 1 (« accepter les deux ») — fusionnée le 29/09 (#43)
 
 Plan `auth-asym-hubperso` (C:\dev\_pc-local\agence\pages\plans\auth-asym-hubperso.md, relu
 sans réserve par pole-securite), phase 1 sur JobAI seulement. Branche
@@ -92,6 +134,7 @@ commande `git push` seule pour l'instant, sur demande du gérant.
 - Suite : Hubperso fait sa phase 2 (émettre les deux cookies) seulement APRÈS que les
   satellites (JobAI, CarAI, MemoryAI) soient en production sur leur phase 1 — ordre imposé
   par le plan §8bis. PR à ouvrir le 01/10 quand GitHub Actions redevient disponible.
+  *(Historique, relevé du 14/10 : la PR a finalement été ouverte et fusionnée le 29/09, #43.)*
 
 ## 2026-09-25 — Rapport complet, sur demande de Marc (« gros rapport de où tu es, document tout »)
 

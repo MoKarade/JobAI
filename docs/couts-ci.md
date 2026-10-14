@@ -1,6 +1,7 @@
 # Coûts CI — JobAI
 
-**Dépôt PUBLIC** (`gh repo view MoKarade/JobAI` : `isPrivate: false`), branche par défaut **main**, **sans protection de branche** (`gh api .../branches/main/protection` : 404). Mesuré le 29/09/2026.
+**Dépôt PUBLIC** (`gh repo view MoKarade/JobAI` : `isPrivate: false`), branche par défaut **main**. Mesuré le 29/09/2026.
+⚠️ Correction du 14/10 : « sans protection de branche » était faux. L'API de protection classique rend bien 404, mais `main` est protégée par un **ruleset** (`gh api repos/MoKarade/JobAI/rulesets`) créé le 28/09 : pas de suppression, pas de réécriture, trois contrôles obligatoires (ceux de `.github/auto-merge.json`), aucun contournement. Au 14/10, le workflow « Fusion automatique » (`fusion-auto.yml`) est désactivé manuellement côté GitHub ; la fusion passe par `auto-merge.yml`.
 GitHub Actions est **GRATUIT** sur un dépôt public : aucune minute n'est comptée. Modèle : `modeles/couts/couts.md` de l'Atelier. Les coûts LLM de l'app sont dans `docs/claude/07-hub.md` (bloc `usage` publié au hub) ; il n'existe pas de `docs/COUTS.md` distinct ici.
 
 ## Runs GitHub Actions (information)
@@ -18,7 +19,8 @@ Mesure : `node modeles/couts/compter-runs.mjs MoKarade/JobAI 2026-09` (lecture s
 ## Crons
 
 - `/api/cron/veille` (11 h) et `/api/cron/geocodage` (3 h) : crons applicatifs **Vercel** (`vercel.json`), pas GitHub Actions — hors du périmètre de ce document.
-- Aucun cron GitHub Actions dans `ci.yml` ni `auto-merge.yml`.
+- Aucun cron GitHub Actions dans `ci.yml`. `auto-merge.yml` en a un (`23 */6 * * *`, filet de rattrapage, sortie immédiate sans PR ouverte) — corrigé le 14/10, la ligne disait le contraire alors que le tableau ci-dessus compte ses runs `schedule`.
+- `sonde-registre.yml` et `sonde-sources.yml` : déclenchement manuel seulement (`workflow_dispatch`), absents du tableau de 09/2026.
 
 ## Exceptions au gabarit
 

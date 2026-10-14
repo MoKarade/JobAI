@@ -4,7 +4,7 @@
 
 ## Contexte
 - **JobAI** suit la recherche d'emploi de Marc (région de Québec) : offres notées selon son profil, statuts de candidature, réponses de recruteurs, aide IA (analyse d'offres, CV/lettres).
-- Stack : Next.js 15 (App Router, Server Actions) · Neon + Drizzle · Auth.js v5 (`providers: []`, session du hub) · Anthropic SDK · Zod · vitest.
+- Stack : Next.js 16 (App Router, Server Actions) · Neon + Drizzle · Auth.js v5 (`providers: []`, session du hub) · Anthropic SDK · Zod · vitest.
 - Déploiement : Vercel sur `emploi.hubperso.com`. Dépôt **PUBLIC**, branche par défaut `main`. Widget hub : `GET /api/hub/summary`.
 - État : `HANDOVER.md` (à lire en premier) ; plan : `BACKLOG.md` ; décisions : `docs/adr/`. Marc valide, il ne code pas.
 
@@ -23,9 +23,10 @@
 
 ## Git et CI
 - Direct sur `main` depuis un poste ; session distante : `claude/<slug>` + PR draft ; agence : `agence/<session>/<sujet>`. `--base main` explicite. Jamais `--force`, retour arrière = `git revert`.
+- ⚠️ À trancher par Marc (14/10) : ADR-0002 dit « direct sur `main` », mais depuis le 28/09 un ruleset exige les trois contrôles sur `main` (push direct refusé) et la fusion passe par le kit `auto-merge.yml` ; « PR draft » ici vs « jamais en brouillon » de l'Atelier. Détail : `docs/claude/03-workflow-git.md`.
 - Un push n'est fini que quand la CI a été CONSULTÉE ; changement servi : vérifier le déploiement Vercel `READY` (`docs/claude/06-deploiement.md`). Un check requis n'a JAMAIS de `paths:`.
 - Commits, code, docs et UI en français ; commit préfixé par l'ID du backlog (`[V1-03] …`). Pas d'emoji dans l'UI ni les commits.
 
 ## Pour aller plus loin (à lire seulement si nécessaire)
 - Anciens titres -> chemins : `docs/correspondance.md`. Sections : `docs/claude/` (`01-principes`, `02-conventions`, `03-workflow-git`, `04-commandes`, `05-verifications`, `06-deploiement`, `07-hub`, `08-documentation`, `10-style-compte-rendu`, `11-protocole`).
-- Leçons apprises (175 règles durables) : `docs/claude/lecons.md` ; leurs histoires : `docs/LESSONS.md`. Compte-rendu : `docs/COMPTE-RENDU.md`.
+- Leçons apprises (175 règles durables au 14/10) : `docs/claude/lecons.md` ; leurs histoires : `docs/LESSONS.md`. Compte-rendu : `docs/COMPTE-RENDU.md`.

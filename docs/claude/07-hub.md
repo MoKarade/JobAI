@@ -1,8 +1,9 @@
 ## 7. Intégration hub
 
 JobAI expose **un seul** endpoint au hub : `GET /api/hub/summary`, contrat
-`@mokarade/hub-contract` — **pinné sur le tag `v1.3.0`** depuis le 14/09/2026 (il l'était par
-SHA, voir ADR-0001 ; le tag reste un point immuable, le lockfile fige le commit).
+`@mokarade/hub-contract` — **pinné sur le tag `v1.4.0`** depuis le 29/09/2026 (PR #43, sous-chemin `/session` ; avant :
+`v1.3.0` depuis le 14/09, et un SHA avant encore, voir ADR-0001 ; le tag reste un point
+immuable, le lockfile fige le commit).
 
 ⚠️ **Re-pinner N'EST PAS optionnel pour consommer un champ neuf.** Zod STRIPPE les clés
 inconnues : sur un pin antérieur, `validateSummary` retire `dataAsOf`, `expectedMaxAgeSec`,
