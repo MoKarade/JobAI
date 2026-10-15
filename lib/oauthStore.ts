@@ -20,6 +20,9 @@ import { and, eq, gt, isNull, lt } from "drizzle-orm";
 import { db } from "./db";
 import { oauthClients, oauthCodes, oauthJetons } from "./db/schema";
 import { assurerMigrations } from "./migrations";
+import { jetonUtilisable, type JetonValide } from "./oauthJeton";
+
+export type { JetonValide };
 
 /**
  * La base est prête à être interrogée.
@@ -120,11 +123,6 @@ export async function poserJeton(
   await db.insert(oauthJetons).values({ empreinte, genre, clientId, sujet, expireLe });
 }
 
-export interface JetonValide {
-  clientId: string;
-  sujet: string;
-}
-
 /** Un jeton non révoqué et non expiré, ou `null`. Aucune distinction : un refus est un refus. */
 export async function lireJetonValide(
   empreinte: string,
@@ -138,10 +136,7 @@ export async function lireJetonValide(
     .where(and(eq(oauthJetons.empreinte, empreinte), eq(oauthJetons.genre, genre)))
     .limit(1);
 
-  if (j === undefined) return null;
-  if (j.revoqueLe !== null) return null;
-  if (j.expireLe.getTime() <= maintenant.getTime()) return null;
-  return { clientId: j.clientId, sujet: j.sujet };
+  return jetonUtilisable(j, maintenant);
 }
 
 /**
