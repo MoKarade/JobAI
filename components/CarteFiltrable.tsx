@@ -252,8 +252,8 @@ export function CarteFiltrable({
                   l'ancienne ? » n'a pas de réponse à l'écran — et une variable d'env
                   manquante se cherche des heures. */}
               <p className="plan-ecran__repli">
-                Fond Google inactif — la clé <code>NEXT_PUBLIC_GOOGLE_MAPS_CLIENT_KEY</code>{" "}
-                n’est pas configurée. La carte utilise le repli OpenStreetMap.
+                La carte Google n’est pas disponible pour le moment : la carte libre
+                OpenStreetMap la remplace.
               </p>
               <CarteOffres epingles={epingles} cadre={cadre} />
             </>
