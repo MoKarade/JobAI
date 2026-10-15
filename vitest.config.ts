@@ -12,7 +12,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    // `.tsx` inclus : un test qui rend un composant (react-dom/server) était ignoré en silence.
+    include: ["tests/**/*.test.{ts,tsx}"],
     // Couverture (porte qualité de l'Atelier, S6) : calculée seulement avec --coverage (npm run portes).
     coverage: {
       provider: "v8",
