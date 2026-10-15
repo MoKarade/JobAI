@@ -65,20 +65,40 @@ export function ligneTrajet(
 }
 
 /**
+ * Combien de lieux ont une ligne de cache qui TIENT. PURE.
+ *
+ * `cacheTient` est injecté (en production : `cacheValide`). Une ligne présente mais invalide
+ * n'est pas comptée : elle reste à refaire, donc dans le reliquat.
+ */
+export function compterValides<L extends DestinationMatrice, T>(
+  lieux: readonly L[],
+  lignesParNom: ReadonlyMap<string, T>,
+  cacheTient: (ligne: T, lieu: L) => boolean,
+): number {
+  let n = 0;
+  for (const lieu of lieux) {
+    const ligne = lignesParNom.get(lieu.nom);
+    if (ligne !== undefined && cacheTient(ligne, lieu)) n += 1;
+  }
+  return n;
+}
+
+/**
  * La phrase du journal : « N durée(s) remplie(s) · inatteignables : … · M restante(s)… ». PURE.
  *
- * `lieux` = entreprises placées, `lignesExistantes` = lignes de cache déjà là, `remplies` = durées
- * écrites cette passe. Le reliquat n'est dit que s'il est strictement positif.
+ * `lieux` = entreprises placées, `lignesValides` = lignes de cache qui TIENNENT (une ligne présente
+ * mais invalide est à refaire, elle n'est pas comptée), `remplies` = durées écrites cette passe.
+ * Le reliquat n'est dit que s'il est strictement positif.
  */
 export function resumerRemplissage(
   lieux: number,
-  lignesExistantes: number,
+  lignesValides: number,
   remplies: number,
   inatteignables: readonly string[],
 ): string {
   const parts = [`${remplies} durée(s) remplie(s)`];
   if (inatteignables.length > 0) parts.push(`inatteignables : ${inatteignables.join(", ")}`);
-  const restantes = lieux - lignesExistantes - remplies;
+  const restantes = lieux - lignesValides - remplies;
   if (restantes > 0) parts.push(`${restantes} restante(s) pour les passes suivantes`);
   return parts.join(" · ");
 }

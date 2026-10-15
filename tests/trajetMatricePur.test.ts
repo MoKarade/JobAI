@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 import {
   choisirDestinations,
   ligneTrajet,
+  compterValides,
   resumerRemplissage,
 } from "@/lib/trajetMatricePur";
 
@@ -100,6 +101,34 @@ describe("ligneTrajet — la ligne de cache écrite", () => {
   it("n'écrit rien pour un élément qu'on n'a pas demandé", () => {
     expect(ligneTrajet({ nom: "z", dureeS: 1, distanceM: 1 }, dests, maison, quand)).toBeUndefined();
     expect(ligneTrajet({ nom: "a", dureeS: 1, distanceM: 1 }, [], maison, quand)).toBeUndefined();
+  });
+});
+
+describe("compterValides — le reliquat ne compte que le cache qui tient", () => {
+  it("ne compte pas une ligne présente mais invalide", () => {
+    const lieux = [lieu("a"), lieu("b"), lieu("c")];
+    const lignes = new Map([
+      ["a", { ok: true }],
+      ["b", { ok: false }],
+    ]);
+    expect(compterValides(lieux, lignes, (l) => l.ok)).toBe(1);
+  });
+
+  it("rend 0 sans aucune ligne", () => {
+    expect(compterValides([lieu("a")], new Map<string, { ok: boolean }>(), (l) => l.ok)).toBe(0);
+  });
+
+  it("le reliquat compte les lignes invalides non refaites", () => {
+    // 10 lieux, 4 lignes en cache dont 2 invalides : 2 valides, 3 remplies => 5 restantes
+    // (l'ancien calcul, avec 4 lignes présentes, en disait 3).
+    const lieux = Array.from({ length: 10 }, (_, i) => lieu(`l${i}`));
+    const lignes = new Map(
+      ["l0", "l1", "l2", "l3"].map((nom, i) => [nom, { ok: i < 2 }] as const),
+    );
+    const valides = compterValides(lieux, lignes, (l) => l.ok);
+    expect(resumerRemplissage(lieux.length, valides, 3, [])).toBe(
+      "3 durée(s) remplie(s) · 5 restante(s) pour les passes suivantes",
+    );
   });
 });
 
