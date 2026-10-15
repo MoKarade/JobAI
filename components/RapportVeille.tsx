@@ -11,6 +11,7 @@
 // d'hydratation à chaque affichage.
 
 import { LIBELLE_MOTIF, depuis, fraicheurSource, type RapportVeille } from "@/lib/rapportVeille";
+import { nomSource, phraseEchecSources } from "@/lib/libelleSource";
 
 /** Nombre de villes nommées par motif avant de dire « et N autres ». */
 const MAX_VILLES = 8;
@@ -183,7 +184,7 @@ export function RapportVeilleVue({
                 key={s.id}
                 className={`rapport__source${s.ok ? "" : " rapport__source--muette"}`}
               >
-                <span className="rapport__source-nom">{s.id}</span>
+                <span className="rapport__source-nom">{nomSource(s.id)}</span>
                 <span className="rapport__source-n">{s.ok ? s.offres : "en échec"}</span>
                 {/*
                   Ce que la source a refusé. Rendu sous le compte plutôt qu'à côté : c'est
@@ -198,7 +199,7 @@ export function RapportVeilleVue({
         </ul>
         {muettes.length > 0 ? (
           <p className="rapport__alerte">
-            {muettes.map((s) => `${s.id} : ${s.erreur ?? "raison non dite"}`).join(" — ")}
+            {phraseEchecSources(muettes.map((s) => s.id))}
           </p>
         ) : null}
       </div>
