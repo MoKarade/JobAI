@@ -1920,28 +1920,12 @@ a.popup-offre:hover { color: var(--ambre-texte); }
 .carte-liste__trajet { display: inline-block; font-size: var(--t-xs); margin-top: 0.35rem; color: var(--ambre-texte); }
 
 /* ── Formulaire d'ajout manuel ────────────────────────────────────────────
-   Replié par défaut : la liste est consultée à chaque visite, le formulaire
-   quelques fois par semaine. Reprend l'apparence des panneaux pour que
-   l'interface n'ait pas deux vocabulaires visuels pour un même geste (ouvrir). */
+   Le pli (« Ajouter une offre ») est posé par la page, pas par le formulaire. */
 .ajout {
   margin-top: var(--pas-2);
   background: var(--surface);
   border: 1px solid var(--border);
 }
-.ajout__titre {
-  padding: 0.8rem 1rem;
-  font-family: var(--mono);
-  font-size: var(--t-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-soft);
-  cursor: pointer;
-  list-style: none;
-}
-.ajout__titre::-webkit-details-marker { display: none; }
-.ajout__titre::before { content: "+ "; color: var(--ambre); }
-.ajout[open] .ajout__titre::before { content: "− "; }
-.ajout__titre:focus-visible { outline: 2px solid var(--ambre); outline-offset: -2px; }
 
 .ajout__grille {
   display: flex;
