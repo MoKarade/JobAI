@@ -252,8 +252,8 @@ export function CarteFiltrable({
                   l'ancienne ? » n'a pas de réponse à l'écran — et une variable d'env
                   manquante se cherche des heures. */}
               <p className="plan-ecran__repli">
-                Fond Google inactif — la clé <code>NEXT_PUBLIC_GOOGLE_MAPS_CLIENT_KEY</code>{" "}
-                n’est pas configurée. La carte utilise le repli OpenStreetMap.
+                La carte Google n’est pas disponible pour le moment : la carte libre
+                OpenStreetMap la remplace.
               </p>
               <CarteOffres epingles={epingles} cadre={cadre} />
             </>
@@ -270,6 +270,11 @@ export function CarteFiltrable({
                   ? "Les entreprises n’ont pas encore été localisées. Ça se fait tout seul, au fil des passages — le bouton ci-dessus force une passe."
                   : "Aucune offre active à montrer."}
             </p>
+            {filtreActif ? (
+              <button type="button" className="bouton" onClick={() => setFiltres(FILTRES_VIDES)}>
+                Effacer les filtres
+              </button>
+            ) : null}
           </div>
         ) : (
           <ListeCarte epingles={epingles} />

@@ -20,6 +20,7 @@
 // authentifiée.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { kmVirgule } from "@/lib/kmVirgule";
 import {
   APIProvider,
   AdvancedMarker,
@@ -202,7 +203,7 @@ function FicheEpingle({
           ) : (
             <p className="carte-fiche__adresse">Adresse inconnue</p>
           )}
-          {e.km !== null ? <p className="carte-fiche__km">{e.km} km du domicile</p> : null}
+          {e.km !== null ? <p className="carte-fiche__km">{kmVirgule(e.km)} du domicile</p> : null}
           {e.offres.length > 0 ? (
             <ul className="carte-fiche__offres">
               {[...e.offres]
@@ -364,7 +365,7 @@ export function CarteGoogle({
   }, [cadre, domicile]);
 
   if (epingles.length === 0 || !bornes) {
-    return <p className="vide">Aucun lieu à afficher — le géocodage n’est pas encore passé.</p>;
+    return <p className="vide">Aucun lieu à afficher pour le moment.</p>;
   }
 
   return (

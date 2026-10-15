@@ -518,6 +518,8 @@ Lot L2 de l'audit multi-outils du 2026-09-18, livré le même jour.
       · `[UX-13]` ✅ 2026-10-14 : les dates « Repérée le » et « CV envoyé le » de la fiche
       s'écrivent en toutes lettres (« 14 septembre 2026 », `lib/dateLisible.ts`) au lieu de
       AAAA-MM-JJ ; une valeur qui n'est pas une date est rendue telle quelle.
+      · 2026-10-14 : le titre d'onglet de la fiche devient « Poste · Entreprise — JobAI »
+        (`lib/titreOffre.ts`), pour distinguer deux offres d'une même entreprise.
 - [x] 🔧 **`[UX-04]`** **Carte des offres**. ✅ 2026-07-28 — 3ᵉ onglet `/carte`.
       · **On géocode des VILLES, pas des offres** : une douzaine de municipalités pour des
         dizaines d'offres. Géocoder par offre ferait dix fois la même requête pour

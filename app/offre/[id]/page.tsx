@@ -23,6 +23,7 @@ import { CLE_JOURNAL } from "@/lib/veilleComplete";
 import type { JournalVeille } from "@/lib/veille";
 import { Cadre } from "@/components/Cadre";
 import { dateLisible } from "@/lib/dateLisible";
+import { titreOffre } from "@/lib/titreOffre";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const offre = await lireOffre(id);
   // Le titre d'onglet ne doit pas fuir le contenu si la page est inaccessible.
-  return { title: offre ? `${offre.entreprise} — JobAI` : "Offre — JobAI" };
+  return { title: titreOffre(offre) };
 }
 
 export default async function DetailOffre({ params }: { params: Promise<{ id: string }> }) {

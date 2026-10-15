@@ -62,12 +62,12 @@ export function RevueProfil({
             ? { ok: true, texte: `${r.message ?? "Appliqué."} ${r.valeur.resume}` }
             : { ok: false, texte: r.erreur },
         );
-      } catch (e) {
+      } catch {
+        // Phrase simple : le message technique de l'exception ne dit rien à Marc.
         setRetour({
           ok: false,
-          texte: `La validation n'a pas abouti : ${
-            e instanceof Error ? e.message : "erreur inconnue"
-          }. Recharge la page pour voir l'état réel du profil avant de réessayer.`,
+          texte:
+            "La validation n'a pas abouti. Recharge la page pour voir l'état réel du profil avant de réessayer.",
         });
       }
     });
