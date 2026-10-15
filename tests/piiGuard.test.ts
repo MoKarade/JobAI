@@ -20,8 +20,9 @@
 
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 /**
  * Les fichiers qui partent en ligne : ceux que git suit, ET ceux qui ne le sont pas encore.
@@ -37,10 +38,10 @@ import { resolve } from "node:path";
  * ne couvre pas — donc ceux qu'un `git add -A` emporterait. Le garde regarde désormais ce
  * qui EST en ligne et ce qui est sur le point d'y aller.
  */
-function fichiersVersionnes(): string[] {
+function fichiersVersionnes(racine: string = process.cwd()): string[] {
   const lister = (args: string[]): string =>
     execFileSync("git", args, {
-      cwd: process.cwd(),
+      cwd: racine,
       encoding: "utf8",
       maxBuffer: 10 * 1024 * 1024,
     });
@@ -145,12 +146,26 @@ describe("volume du scan", () => {
     // La sonde ne contient AUCUNE donnée sensible — ce qu'on vérifie ici est la PORTÉE du
     // scan, pas sa détection : la faire porter une vraie forme d'adresse ferait échouer les
     // autres tests du fichier pour une raison sans rapport.
-    const sonde = resolve(process.cwd(), "lib/_sonde-portee-du-scan.ts");
+    //
+    // ⚠️ LA SONDE VIT DANS UN DÉPÔT JETABLE, PAS DANS `lib/` (course repérée le 2026-09-30).
+    // Elle était écrite puis effacée dans `lib/` ; `tests/env.test.ts` parcourt `lib/` au même
+    // moment, dans un autre processus de vitest : s'il listait la sonde puis la lisait après
+    // son effacement, ENOENT — un rouge au hasard, sans rapport avec le code. Dans un dossier
+    // temporaire propre à ce test, aucun autre test ne peut la croiser. La portée vérifiée est
+    // la même : un fichier NEUF, jamais commité, doit être vu par le scan.
+    const depot = mkdtempSync(join(tmpdir(), "piiguard-sonde-"));
     try {
-      writeFileSync(sonde, "export const SONDE = 1;\n", "utf8");
-      expect(fichiersVersionnes()).toContain("lib/_sonde-portee-du-scan.ts");
+      execFileSync("git", ["init", "--quiet"], { cwd: depot });
+      mkdirSync(join(depot, "lib"));
+      writeFileSync(join(depot, "lib", "sonde.ts"), "export const SONDE = 1;\n", "utf8");
+      writeFileSync(join(depot, ".gitignore"), "ignore.ts\n", "utf8");
+      writeFileSync(join(depot, "ignore.ts"), "export const IGNORE = 1;\n", "utf8");
+      const vus = fichiersVersionnes(depot);
+      expect(vus).toContain("lib/sonde.ts");
+      // Ce que `.gitignore` couvre reste hors du scan : la sonde mesure la portée, pas un « tout ».
+      expect(vus).not.toContain("ignore.ts");
     } finally {
-      rmSync(sonde, { force: true });
+      rmSync(depot, { recursive: true, force: true });
     }
   });
 
