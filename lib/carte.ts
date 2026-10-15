@@ -32,7 +32,7 @@ import type { EntrepriseCible } from "./reference";
 import type { Offre } from "./types";
 import { villeGeocodable } from "./geocodage";
 import type { ProximiteBorne } from "./bornes";
-import { apparier, cleGroupement, positionDe } from "./employeurs";
+import { apparier, cleGroupement, creerRecherchePosition } from "./employeurs";
 
 // L'appariement des noms d'employeur vit dans `lib/employeurs.ts` : la carte n'est pas
 // seule à s'en servir, et la mesure des distances comparait les noms littéralement — deux
@@ -266,6 +266,7 @@ export function construireVue(
   // liste ses entreprises — dix cercles empilés au centre-ville se masqueraient l'un l'autre.
   const groupesVille = new Map<string, Epingle>();
 
+  const positionDe = creerRecherchePosition(positions);
   for (const entreprise of parEntreprise.values()) {
     // ⚠️ UNE ENTREPRISE SANS OFFRE VIVANTE NE PARAÎT PAS. Demande de Marc, 2026-08-12 :
     // « dans maps je veux jamais voir une boîte et aucune offre active repérée, je veux
@@ -289,7 +290,7 @@ export function construireVue(
     // de la cible OU sous celui que porte une annonce — la mesure des distances géocode
     // `offre.entreprise`, la passe de la carte géocode `cible.nom`. La règle est partagée
     // avec `lib/distances.ts` (`lib/employeurs.ts`), sinon les deux divergent.
-    const position = positionDe(entreprise.nom, positions);
+    const position = positionDe(entreprise.nom);
 
     if (!position) {
       // Sans ville, aucune passe ne pourra la situer : le dire plutôt que de la faire

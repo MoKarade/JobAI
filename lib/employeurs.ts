@@ -207,3 +207,41 @@ export function positionDe<P>(nom: string, positions: ReadonlyMap<string, P>): P
   const premier = candidats[0];
   return premier === undefined ? null : (positions.get(premier) as P);
 }
+
+
+/**
+ * `positionDe`, avec l'index construit UNE fois : la même réponse, en O(1) par recherche.
+ *
+ * ⚠️ POURQUOI ELLE EXISTE (JobAI#122, 2026-10-15). `positionDe` ne trouve pas par clé quand
+ * l'égalité exacte échoue : elle re-normalise TOUTES les clés connues à chaque appel. Une
+ * offre dont l'employeur n'est pas encore situé est le cas courant (plus de 3 000 aujourd'hui),
+ * et la passe de distances l'appelle pour chacune d'elles, à trois endroits : mesuré à 7 s
+ * pour 3 300 offres sur 1 000 positions, par appel de masse — de quoi manger à elle seule le
+ * mur de 60 s de l'accueil, avant même le premier appel réseau.
+ *
+ * Même règle exactement (`memeEmployeur`, jamais `apparier`) : l'égalité exacte d'abord, puis
+ * les noms de même forme canonique, le premier par ordre de nom (`fr-CA`). Les positions sont
+ * lues à l'appel de cette fonction : si la Map change ensuite, reconstruire la recherche.
+ */
+export function creerRecherchePosition<P>(
+  positions: ReadonlyMap<string, P>,
+): (nom: string) => P | null {
+  const parForme = new Map<string, string[]>();
+  for (const connu of positions.keys()) {
+    const forme = normaliserNomEmployeur(connu);
+    if (forme === "") continue; // memeEmployeur n'égale jamais deux chaînes vides
+    const noms = parForme.get(forme);
+    if (noms === undefined) parForme.set(forme, [connu]);
+    else noms.push(connu);
+  }
+  for (const noms of parForme.values()) noms.sort((a, b) => a.localeCompare(b, "fr-CA"));
+
+  return (nom) => {
+    const exacte = positions.get(nom);
+    if (exacte !== undefined) return exacte;
+    const forme = normaliserNomEmployeur(nom);
+    if (forme === "") return null;
+    const premier = parForme.get(forme)?.[0];
+    return premier === undefined ? null : (positions.get(premier) as P);
+  };
+}

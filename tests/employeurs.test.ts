@@ -17,6 +17,7 @@ import {
   LONGUEUR_MIN_APPARIEMENT,
   apparier,
   cleGroupement,
+  creerRecherchePosition,
   memeEmployeur,
   normaliserNomEmployeur,
   positionDe,
@@ -262,5 +263,58 @@ describe("ALIAS_EMPLOYEUR — deux cas RENCONTRÉS, jamais une heuristique (ADR-
     // Volume prouvé : sans lui, une liste vidée ferait passer l'audit à vide.
     expect(SEED.length * ENTREPRISES_CIBLES.length).toBeGreaterThan(1000);
     expect(bascules.sort()).toEqual(["Exo-s Saint-Damien / Exo-s", "STERIS / STERIS Canada"]);
+  });
+});
+
+describe("creerRecherchePosition — la même réponse que positionDe, sans relire toutes les clés (JobAI#122)", () => {
+  // Données FICTIVES : ce dépôt est public.
+  const positions = new Map<string, number>([
+    ["Laserax inc.", 1],
+    ["ZETA Industries", 2],
+    ["Zeta industries ltée", 3],
+    ["Café Étoile", 4],
+    ["STERIS", 5],
+    ["", 6],
+  ]);
+  const noms = [
+    "Laserax", // même forme canonique qu'une clé connue
+    "LASERAX INC",
+    "Laserax inc.", // exacte
+    "Zeta Industries", // ambiguë : deux clés de même forme, le premier par ordre de nom gagne
+    "cafe etoile", // accents et casse
+    "STERIS Canada", // alias fermé (ADR-0023)
+    "Groupe Laserax", // sous-chaîne : JAMAIS rapprochée
+    "Inconnue SA",
+    "", // la chaîne vide n'égale pas la chaîne vide
+    "  ",
+  ];
+
+  it("rend, nom par nom, exactement ce que rend positionDe", () => {
+    const recherche = creerRecherchePosition(positions);
+    for (const nom of noms) {
+      expect(recherche(nom), JSON.stringify(nom)).toBe(positionDe(nom, positions));
+    }
+    // Non-vacuité : l'échantillon contient des trouvés ET des refus.
+    expect(noms.filter((n) => recherche(n) !== null).length).toBeGreaterThanOrEqual(5);
+    expect(noms.filter((n) => recherche(n) === null).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("ne rapproche jamais deux noms vides", () => {
+    expect(creerRecherchePosition(new Map([["inc.", 1]]))("ltée")).toBeNull();
+  });
+
+  it("tient le volume de la passe de distances : 3 300 refus sur 1 000 positions en moins de 2 s", () => {
+    // Avant : ~7 s par appel de masse (positionDe re-normalise chaque clé à chaque refus), et
+    // la passe en faisait trois — c'est ce qui la faisait dépasser les 60 s de l'accueil.
+    const grandes = new Map<string, number>();
+    for (let i = 0; i < 1000; i++) grandes.set(`Entreprise fictive ${i} inc.`, i);
+    const debut = Date.now();
+    const recherche = creerRecherchePosition(grandes);
+    let trouves = 0;
+    for (let i = 0; i < 3300; i++) {
+      if (recherche(`Autre employeur ${i} ltée`) !== null) trouves++;
+    }
+    expect(trouves).toBe(0);
+    expect(Date.now() - debut).toBeLessThan(2_000);
   });
 });
