@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-44 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+45 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -56,3 +56,7 @@
 - [10-style-compte-rendu](claude/10-style-compte-rendu.md) — `docs/claude/10-style-compte-rendu.md`
 - [11-protocole](claude/11-protocole.md) — `docs/claude/11-protocole.md`
 - [lecons](claude/lecons.md) — `docs/claude/lecons.md`
+
+## docs/specs/
+
+- [Versions doc (Next 16, hub-contract v1.4.0)](specs/versions-doc.md) — `docs/specs/versions-doc.md`
