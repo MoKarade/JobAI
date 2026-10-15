@@ -515,6 +515,9 @@ Lot L2 de l'audit multi-outils du 2026-09-18, livré le même jour.
       Une panne de base y donne un message honnête plutôt qu'un 404 trompeur.
       ⚠️ Reste à faire : l'historique des changements de statut (rien ne l'enregistre
       aujourd'hui — il faudrait une table dédiée).
+      · `[UX-13]` ✅ 2026-10-14 : les dates « Repérée le » et « CV envoyé le » de la fiche
+      s'écrivent en toutes lettres (« 14 septembre 2026 », `lib/dateLisible.ts`) au lieu de
+      AAAA-MM-JJ ; une valeur qui n'est pas une date est rendue telle quelle.
 - [x] 🔧 **`[UX-04]`** **Carte des offres**. ✅ 2026-07-28 — 3ᵉ onglet `/carte`.
       · **On géocode des VILLES, pas des offres** : une douzaine de municipalités pour des
         dizaines d'offres. Géocoder par offre ferait dix fois la même requête pour

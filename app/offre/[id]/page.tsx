@@ -22,6 +22,7 @@ import { lireEtat } from "@/lib/etat";
 import { CLE_JOURNAL } from "@/lib/veilleComplete";
 import type { JournalVeille } from "@/lib/veille";
 import { Cadre } from "@/components/Cadre";
+import { dateLisible } from "@/lib/dateLisible";
 
 export const dynamic = "force-dynamic";
 
@@ -155,11 +156,11 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
           </div>
           <div>
             <dt>Repérée le</dt>
-            <dd>{offre.dateReperage}</dd>
+            <dd>{dateLisible(offre.dateReperage)}</dd>
           </div>
           <div>
             <dt>CV envoyé le</dt>
-            <dd>{offre.dateEnvoi || "—"}</dd>
+            <dd>{offre.dateEnvoi ? dateLisible(offre.dateEnvoi) : "—"}</dd>
           </div>
           <div>
             <dt>Note</dt>
