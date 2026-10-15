@@ -5,6 +5,7 @@
 // deux hypothèses opposées qu'on vient justement départager ici.
 
 import type { EntreeHistorique } from "@/lib/historiqueVeille";
+import { declencheurLisible } from "@/lib/declencheurVeille";
 
 /** L'heure locale d'une fin de passe, ou rien si l'horodatage est absent. */
 function heure(fini: string): string {
@@ -50,7 +51,7 @@ export function HistoriqueVeilleVue({ entrees }: { entrees: readonly EntreeHisto
               <th scope="row" className="histo__quand">
                 {e.jour}
                 {heure(e.fini) ? <span className="histo__heure"> {heure(e.fini)}</span> : null}
-                <span className="histo__par"> · {e.declencheur}</span>
+                <span className="histo__par"> · {declencheurLisible(e.declencheur)}</span>
               </th>
               <td className="histo__num">{e.trouvees}</td>
               <td className="histo__num">{e.nouvelles}</td>
