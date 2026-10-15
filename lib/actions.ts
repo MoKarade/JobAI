@@ -87,7 +87,7 @@ import {
 } from "./registre";
 import { BUDGET_PASSE_PAGE_MS } from "./synchro";
 import { creerChrono } from "./jalons";
-import { CLE_RESUME_DISTANCES, construireResume } from "./resumePasse";
+import { CLE_RESUME_DISTANCES, construireResume, resumeVierge } from "./resumePasse";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -1374,6 +1374,32 @@ export async function mesurerDistances(
     // CERTAINE au lieu de plausible — et ils coûtent un `Date.now()` par étape.
     const { jalon, ligne: ligneBudget, releve: releveBudget } = creerChrono();
 
+    // ⚠️ LE RÉSUMÉ DE PASSE S'ÉCRIT PAR ÉTAPES, PAS À LA FIN (`[OBS-02]`, tâche #95).
+    //
+    // Première version : une seule écriture, tout à la fin. Mesuré en production le
+    // 2026-10-15 : la passe lancée par l'accueil a été coupée par le mur de 60 s de Vercel
+    // avant d'arriver à la fin, donc rien n'a été écrit — et un mur ne se rattrape pas par un
+    // `catch`. Chaque étape franchie consigne donc l'état connu à cet instant ; ce qui n'est
+    // pas encore mesuré reste `null` (jamais un faux zéro). Un échec d'écriture ne fait PAS
+    // échouer la passe — le travail est fait, c'est la trace qui manque — mais il se dit.
+    const resume = resumeVierge();
+    const consigner = async (terminee: boolean): Promise<void> => {
+      try {
+        await ecrireEtat(
+          CLE_RESUME_DISTANCES,
+          construireResume({ ...resume, etapes: releveBudget() }, new Date(), terminee),
+        );
+      } catch (err) {
+        console.error("[distances] résumé de passe non enregistré", err);
+      }
+    };
+    /** Ferme l'étape au chrono ET consigne l'avancement : la dernière étape écrite dit où une coupure a eu lieu. */
+    const franchir = async (nom: string): Promise<void> => {
+      jalon(nom);
+      resume.derniereEtape = nom;
+      await consigner(false);
+    };
+
     // 0. RATTRAPER LES VILLES MANQUANTES, avant tout le reste.
     //
     // Les 40 premières offres déposées sont entrées avant que la colonne `ville` soit
@@ -1393,7 +1419,7 @@ export async function mesurerDistances(
       villesEcrites.has(o.id) ? { ...o, ville: villesEcrites.get(o.id) ?? null } : o,
     );
 
-    jalon("villes");
+    await franchir("villes");
 
     const lignes = await db.select().from(entreprisesLieux);
     const positions = new Map(
@@ -1490,7 +1516,7 @@ export async function mesurerDistances(
       }
     }
 
-    jalon("centres");
+    await franchir("centres");
 
     let situees = 0;
     if (manquants.length > 0) {
@@ -1518,7 +1544,11 @@ export async function mesurerDistances(
       console.error("[actions] re-vérification des centres impossible", err);
     }
 
-    jalon("situer");
+    resume.situees = situees;
+    resume.placees = placees;
+    resume.candidatesSituees = manquants.length;
+    resume.centresCorriges = centresCorriges;
+    await franchir("situer");
 
     // 1 bis. Récupérer les adresses manquantes des entreprises déjà situées — sans quoi
     //        la colonne resterait vide pour tout ce qui existait avant elle.
@@ -1538,7 +1568,7 @@ export async function mesurerDistances(
       console.error("[actions] rattrapage des adresses impossible", err);
     }
 
-    jalon("adresses");
+    await franchir("adresses");
 
     // 1 bis-2. LE REGISTRE, pour tout ce qu'OpenStreetMap n'a pas donné.
     //
@@ -1566,7 +1596,7 @@ export async function mesurerDistances(
       console.error("[actions] recherche dans le registre impossible", err);
     }
 
-    jalon("registre");
+    await franchir("registre");
 
     // 1 quater. Retenter de situer VRAIMENT celles qui sont au centre-ville. Sans ça,
     //           l'élargissement de la règle de résolution ne servirait qu'aux entreprises
@@ -1608,7 +1638,7 @@ export async function mesurerDistances(
       console.error("[actions] raffinage des positions impossible", err);
     }
 
-    jalon("raffinage");
+    await franchir("raffinage");
 
     // 1 ter. Les bornes de recharge, pour les entreprises jamais regardées.
     //
@@ -1630,7 +1660,9 @@ export async function mesurerDistances(
       console.error("[actions] mesure des bornes impossible", err);
     }
 
-    jalon("bornes");
+    resume.bornesMesurees = bornes.mesurees;
+    resume.bornesCandidates = bornes.candidates;
+    await franchir("bornes");
 
     // 1 quater. La fiche enrichie (site, téléphone, horaires) — [CARTE-03-PLACES].
     let details: PasseDetails = { candidates: 0, enrichies: 0, echecs: 0 };
@@ -1640,7 +1672,7 @@ export async function mesurerDistances(
       console.error("[actions] enrichissement Places impossible", err);
     }
 
-    jalon("details");
+    await franchir("details");
 
     // 2. Mesurer. Le domicile ne sort pas de cette closure.
     //
@@ -1682,6 +1714,11 @@ export async function mesurerDistances(
     const effacees = offresAMesurer.filter(
       (o, i) => o.km === null && offresPrecisees[i]?.km !== null,
     ).length;
+    // Connus ici, AVANT les écritures de `km` qui suivent : une coupure pendant elles ne doit
+    // pas emporter les deux chiffres que cette tâche existe pour garder.
+    resume.villesManquantes = villesManquantes;
+    resume.distancesEffacees = effacees;
+    await consigner(false);
     if (effacees > 0) {
       await db
         .update(offers)
@@ -1721,6 +1758,7 @@ export async function mesurerDistances(
     // budget. Les comptes sont donnés en X/Y : « 0/0 » dit qu'il n'y avait rien à faire,
     // « 0/6 » dit que six candidates ont été écartées, et ce sont deux situations opposées.
     jalon("mesure");
+    resume.derniereEtape = "mesure";
     const restant = budgetRestant();
     console.log(
       `[distances] passe terminée — placées=${placees} mesurées=${majs.length} situées=${situees}/${manquants.length} ` +
@@ -1839,33 +1877,16 @@ export async function mesurerDistances(
       console.log(`[raffinage] hors rayon — ${echantillon(raffinage.entreprisesHorsRayon)}`);
     }
 
-    // ⚠️ GARDER CE QUE LA PASSE VIENT DE DIRE (`[OBS-02]`, tâche #95). Ces chiffres n'allaient
-    // que dans la réponse HTTP et les journaux (~17 min) ; une ligne de `sync_state` les rend
-    // relisibles par `etat_synchro`. L'échec de cette écriture ne fait PAS échouer la passe —
-    // le travail est fait, c'est la trace qui manque — mais il se dit, il ne se tait pas.
-    try {
-      await ecrireEtat(
-        CLE_RESUME_DISTANCES,
-        construireResume(
-          {
-            mesurees: majs.length,
-            situees,
-            candidatesSituees: manquants.length,
-            placees,
-            villesManquantes,
-            distancesEffacees: effacees,
-            centresCorriges,
-            bornesMesurees: bornes.mesurees,
-            bornesCandidates: bornes.candidates,
-            budgetRestantMs: restant,
-            etapes: releveBudget(),
-          },
-          new Date(),
-        ),
-      );
-    } catch (err) {
-      console.error("[distances] résumé de passe non enregistré", err);
-    }
+    // Écriture finale : tout est connu, la passe est allée au bout (`terminee: true`).
+    resume.mesurees = majs.length;
+    resume.situees = situees;
+    resume.candidatesSituees = manquants.length;
+    resume.placees = placees;
+    resume.centresCorriges = centresCorriges;
+    resume.bornesMesurees = bornes.mesurees;
+    resume.bornesCandidates = bornes.candidates;
+    resume.budgetRestantMs = restant;
+    await consigner(true);
 
     revalidatePath("/");
     revalidatePath("/carte");

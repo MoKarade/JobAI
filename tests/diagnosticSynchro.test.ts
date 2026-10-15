@@ -53,7 +53,9 @@ describe("resumerEtatSynchro", () => {
 
 describe("resumerEtatSynchro — le résumé de passe (`[OBS-02]`)", () => {
   const RESUME = {
-    finiLe: "2026-10-15T07:31:00.000Z",
+    ecritLe: "2026-10-15T07:31:00.000Z",
+    terminee: true,
+    derniereEtape: "mesure",
     mesurees: 1,
     situees: 1,
     candidatesSituees: 1,

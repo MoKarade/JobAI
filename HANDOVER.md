@@ -192,9 +192,9 @@ ne corrige pas.
 **Trois témoins sur quatre restent immesurables** (`effacées`, `centresCorrigés`,
 `villesManquantes`) — `[OBS-02]`, ouvert le 22/09, toujours vrai : ces chiffres n'existent que
 dans la réponse HTTP d'un cron que personne ne lit et les journaux Vercel (~17 min de
-rétention). *(Réglé le 15/10 par la tâche #95 : `etat_synchro` rend désormais `resume` sur la
-ligne `distances-resume`. Les trois témoins se lisent dès la prochaine passe terminée en
-production ; avant elle, la ligne est absente.)*
+rétention). *(Réglé le 15/10 par la tâche #95 : `etat_synchro` rend désormais `resume` sur la ligne
+`distances-resume`, écrite à chaque étape de la passe — une passe coupée par le mur de 60 s
+laisse donc sa trace, avec `terminee: false` et `derniereEtape`.)*
 
 ### BACKLOG — ce qui reste ouvert
 
@@ -202,7 +202,7 @@ production ; avant elle, la ligne est absente.)*
   seulement en retard. Reprend si Marc fournit un fichier/URL de centroïdes FSA lisible
   directement.
 - `[OBS-02]` — fait le 15/10 (tâche #95) : résumé de la dernière passe de distances dans
-  `sync_state["distances-resume"]`, lu via `etat_synchro` (`resume`).
+  `sync_state["distances-resume"]`, écrit par étapes, lu via `etat_synchro` (`resume`).
 - Témoin `coffrages-synergy` (ci-dessus) — hypothèse à vérifier, pas d'accès réseau Nominatim
   depuis cette session pour le faire.
 - `[CI-CURL-PROTO]`, `[V2-*]`, `[V3-*]`, `[UX-05]`, etc. — items plus anciens, non touchés

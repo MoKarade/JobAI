@@ -90,7 +90,9 @@ describe("le câblage dans la passe de distances", () => {
     // Cette liste se met à jour DÉLIBÉRÉMENT : si elle rougit, la bonne question est « la
     // nouvelle étape a-t-elle son jalon ? », pas « comment faire repasser le test ? ».
     const source = readFileSync(resolve(process.cwd(), "lib/actions.ts"), "utf8");
-    const noms = [...source.matchAll(/\bjalon\("([a-z-]+)"\)/g)].map((m) => m[1]);
+    // `franchir` ferme le jalon ET consigne l'avancement dans le résumé de passe (`[OBS-02]`) :
+    // une étape franchie par l'un ou par l'autre porte bien son jalon.
+    const noms = [...source.matchAll(/\b(?:jalon|franchir)\("([a-z-]+)"\)/g)].map((m) => m[1]);
     expect(noms).toEqual([
       "villes",
       "centres",

@@ -3099,14 +3099,20 @@ témoins temporaires. Remède probable : persister le dernier résumé de passe 
 un ajout à `etat_synchro`. Non commencé — découvert en chemin par la routine, hors périmètre
 de sa mission (mesurer, ne pas corriger).
 
-**Fait le 2026-10-15 (tâche #95).** `mesurerDistances` écrit, à la fin de chaque passe qui va
-jusqu'au bout, une ligne `distances-resume` dans `sync_state` (`lib/resumePasse.ts` : compteurs
-seulement, schéma à liste blanche, aucune migration — la table est déjà clé/valeur).
-`etat_synchro` la rend sous `resume` : `finiLe`, `villesManquantes`, `distancesEffacees`,
-`centresCorriges`, `mesurees`, `situees`/`candidatesSituees`, `bornesMesurees`/
-`bornesCandidates`, budget restant et temps par étape. Absente = aucune passe terminée depuis la
-mise en service ; illisible = dite `resumeIllisible`, jamais rendue en zéros. Une passe qui lève
-n'écrit rien : le résumé précédent reste, daté par `finiLe`.
+**Fait le 2026-10-15 (tâche #95).** `mesurerDistances` consigne son avancement dans une ligne
+`distances-resume` de `sync_state` (`lib/resumePasse.ts` : compteurs seulement, schéma à liste
+blanche, aucune migration — la table est déjà clé/valeur), **à chaque étape franchie** et une
+dernière fois à la fin (`terminee: true`). `etat_synchro` la rend sous `resume` : `ecritLe`,
+`terminee`, `derniereEtape`, `villesManquantes`, `distancesEffacees`, `centresCorriges`,
+`mesurees`, `situees`/`candidatesSituees`, `bornesMesurees`/`bornesCandidates`, budget restant et
+temps par étape.
+
+⚠️ **Par étapes, et ce n'est pas un luxe.** La première version n'écrivait qu'à la fin. Mesuré en
+production le 15/10 : la passe lancée par l'accueil a été coupée par le mur de 60 s de Vercel
+avant la fin (« Task timed out after 60 seconds »), donc rien n'a été écrit. Un `null` dans le
+résumé veut dire « pas encore mesuré à cet instant », jamais zéro ; `terminee: false` avec
+`derniereEtape` dit jusqu'où la passe est allée. Absente = aucune passe n'a écrit depuis la mise
+en service ; illisible = dite `resumeIllisible`, jamais rendue en zéros.
 
 ### `[CARTE-PERF]` — l'assemblage des écrans est quadratique ✅
 

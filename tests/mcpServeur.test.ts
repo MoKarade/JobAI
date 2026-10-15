@@ -218,7 +218,9 @@ describe("etat_synchro — la fraîcheur des passes de fond, jamais leur contenu
 
   it("[OBS-02] rend villesManquantes, distancesEffacees et centresCorriges de la dernière passe", async () => {
     const resume = {
-      finiLe: "2026-10-15T07:31:00.000Z",
+      ecritLe: "2026-10-15T07:31:00.000Z",
+      terminee: true,
+      derniereEtape: "mesure",
       mesurees: 12,
       situees: 3,
       candidatesSituees: 9,
