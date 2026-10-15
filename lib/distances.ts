@@ -20,7 +20,7 @@
 import { computeScore, PLAFOND_NOTE_CALCULEE } from "./scoring";
 import { distanceKm, RAYON_VALIDATION_KM } from "./geocodage";
 import { PROFIL_DEFAUT, type Profil } from "./profil";
-import { memeEmployeur, positionDe } from "./employeurs";
+import { creerRecherchePosition, memeEmployeur } from "./employeurs";
 import type { Offre } from "./types";
 
 /** Une position géocodée, avec ce qu'elle vaut vraiment. */
@@ -125,9 +125,10 @@ export function invaliderDistancesImplausibles(
   positions: ReadonlyMap<string, Position>,
   centreDe: CentreDe,
 ): Offre[] {
+  const positionDe = creerRecherchePosition(positions);
   return offres.map((o) => {
     if (o.km === null || o.histo) return o;
-    const pos = positionDe(o.entreprise, positions);
+    const pos = positionDe(o.entreprise);
     if (!pos) return o;
     return positionInvraisemblable(pos, centreDe(o.ville) ?? null) ? { ...o, km: null } : o;
   });
@@ -188,6 +189,7 @@ export function planifierDistances(
   profil: Profil = PROFIL_DEFAUT,
 ): MiseAJourDistance[] {
   const majs: MiseAJourDistance[] = [];
+  const positionDe = creerRecherchePosition(positions);
 
   for (const o of offres) {
     // L'historique n'a pas de distance à porter : ce sont des candidatures de 2025.
@@ -199,7 +201,7 @@ export function planifierDistances(
     // `positionDe` : l'employeur peut être situé sous un autre nom que celui de l'annonce
     // (« Laserax » côté liste de chasse, « Laserax inc. » côté offre). La comparaison
     // littérale d'avant laissait l'offre sans distance alors que la position existait.
-    const pos = positionDe(o.entreprise, positions);
+    const pos = positionDe(o.entreprise);
     if (!pos) continue;
 
     // La position d'un EMPLOYEUR ne mesure pas une offre annoncée ailleurs (ADR-0021).
@@ -258,13 +260,14 @@ export function employeursASituer(
 ): { nom: string; ville: string }[] {
   const vus = new Set<string>();
   const liste: { nom: string; ville: string }[] = [];
+  const positionDe = creerRecherchePosition(positions);
 
   for (const o of offres) {
     if (o.histo || o.km !== null) continue;
     // Même règle que partout : un employeur déjà situé sous un autre nom n'est PAS à
     // situer. Sans ça, on redemande à Nominatim ce qu'on sait déjà — un appel de plus à
     // un service bénévole, et une seconde ligne pour un même lieu.
-    if (positionDe(o.entreprise, positions) !== null || vus.has(o.entreprise)) continue;
+    if (positionDe(o.entreprise) !== null || vus.has(o.entreprise)) continue;
     vus.add(o.entreprise);
 
     const ville = villeConnue(o.entreprise);

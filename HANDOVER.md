@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-10-15 — JobAI#122 : la passe de distances de l'accueil ne dépasse plus 60 s
+
+- **Cause (mesurée en local, à confirmer en production)** : `positionDe` re-normalisait TOUTES
+  les clés de `entreprises_lieux` à chaque refus d'égalité exacte. La passe l'appelle pour
+  chaque offre dont l'employeur n'est pas situé (plus de 3 000), à trois endroits
+  (`employeursASituer`, `invaliderDistancesImplausibles`, `planifierDistances`). Banc local :
+  3 300 refus sur 1 000 positions = 7,2 s par appel de masse. En production, le résumé de
+  passe de 16 h 06 (heure du Québec) donnait `centres` = 20 422 ms pour 0 placée, et la coupure
+  tombait après `details`, donc dans la phase de mesure, qui refait deux de ces balayages.
+- **Correctif** : `creerRecherchePosition` (`lib/employeurs.ts`) construit l'index UNE fois
+  (même règle `memeEmployeur`, même tie-break `fr-CA`) ; utilisée par `lib/distances.ts` et
+  `lib/carte.ts`. `positionDe` reste, pour les appels isolés.
+- **À confirmer après déploiement** : `distances-resume` (outil `etat_synchro`) avec
+  `terminee: true`, et plus de « Task timed out » dans les journaux Vercel.
+
+---
+
 ## 2026-09-29 — `st-jobai` : structure commune allégée (gabarit DriveAI#423) — branche non fusionnée
 
 Branche `agence/jobai-53/st-jobai-1`, sur demande du gérant. JobAI avait déjà son CLAUDE.md
