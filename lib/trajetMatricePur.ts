@@ -26,10 +26,11 @@ export function choisirDestinations<L extends DestinationMatrice, T>(
 ): DestinationMatrice[] {
   const aFaire: DestinationMatrice[] = [];
   for (const lieu of lieux) {
-    if (aFaire.length >= max) break;
     const ligne = lignesParNom.get(lieu.nom);
     if (ligne !== undefined && cacheTient(ligne, lieu)) continue;
     aFaire.push({ nom: lieu.nom, lat: lieu.lat, lon: lieu.lon });
+    // La borne se teste APRÈS l'ajout (comportement d'origine) : même à 0, une destination part.
+    if (aFaire.length >= max) break;
   }
   return aFaire;
 }

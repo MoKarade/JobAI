@@ -47,8 +47,9 @@ describe("choisirDestinations — ce qu'on paie cette nuit", () => {
     expect(choisirDestinations(lieux, new Map(), toutTient, 4)).toHaveLength(4);
   });
 
-  it("une borne nulle ne réserve rien", () => {
-    expect(choisirDestinations([lieu("a")], new Map(), toutTient, 0)).toEqual([]);
+  it("une borne nulle réserve quand même une destination (comportement d'origine)", () => {
+    const lieux = [lieu("a"), lieu("b")];
+    expect(choisirDestinations(lieux, new Map(), toutTient, 0).map((d) => d.nom)).toEqual(["a"]);
   });
 
   it("ne recopie que nom, lat et lon", () => {
