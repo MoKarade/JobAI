@@ -10,6 +10,7 @@
 // serveur et le rendu client différeraient d'une seconde et React signalerait une erreur
 // d'hydratation à chaque affichage.
 
+import { accord } from "@/lib/accord";
 import { LIBELLE_MOTIF, depuis, fraicheurSource, type RapportVeille } from "@/lib/rapportVeille";
 
 /** Nombre de villes nommées par motif avant de dire « et N autres ». */
@@ -68,7 +69,7 @@ export function RapportVeilleVue({
 
       {/* Les quatre chiffres qui répondent à « alors ? ». Le reste est du détail. */}
       <div className="rapport__chiffres">
-        <Chiffre valeur={rapport.nouvelles} libelle="nouvelle(s)" ton={rapport.nouvelles > 0 ? "bon" : "neutre"} />
+        <Chiffre valeur={rapport.nouvelles} libelle={accord(rapport.nouvelles, "nouvelle")} ton={rapport.nouvelles > 0 ? "bon" : "neutre"} />
         <Chiffre
           valeur={rapport.noteMoyenneNouvelles ?? "—"}
           libelle="note moyenne des nouvelles"
@@ -86,19 +87,19 @@ export function RapportVeilleVue({
 
       <div className="rapport__flux">
         <span>
-          <strong>{rapport.trouvees}</strong> trouvée(s) par les sources
+          <strong>{rapport.trouvees}</strong> {accord(rapport.trouvees, "trouvée")} par les sources
         </span>
         <span>
-          <strong>{rapport.nouvelles}</strong> retenue(s)
+          <strong>{rapport.nouvelles}</strong> {accord(rapport.nouvelles, "retenue")}
         </span>
         {rapport.perimees > 0 ? (
           <span>
-            <strong>{rapport.perimees}</strong> périmée(s)
+            <strong>{rapport.perimees}</strong> {accord(rapport.perimees, "périmée")}
           </span>
         ) : null}
         {rapport.revenues > 0 ? (
           <span>
-            <strong>{rapport.revenues}</strong> revenue(s)
+            <strong>{rapport.revenues}</strong> {accord(rapport.revenues, "revenue")}
           </span>
         ) : null}
         {rapport.enSursis > 0 ? (
@@ -123,7 +124,7 @@ export function RapportVeilleVue({
                       .map((v) => `${v.ville} (${v.n})`)
                       .join(" · ")}
                     {r.villes.length > MAX_VILLES
-                      ? ` · et ${r.villes.length - MAX_VILLES} autre(s)`
+                      ? ` · et ${r.villes.length - MAX_VILLES} ${accord(r.villes.length - MAX_VILLES, "autre")}`
                       : ""}
                   </span>
                 ) : null}
@@ -152,7 +153,7 @@ export function RapportVeilleVue({
                       .map((v) => `${v.ville} (${v.n})`)
                       .join(" · ")}
                     {r.villes.length > MAX_VILLES
-                      ? ` · et ${r.villes.length - MAX_VILLES} autre(s)`
+                      ? ` · et ${r.villes.length - MAX_VILLES} ${accord(r.villes.length - MAX_VILLES, "autre")}`
                       : ""}
                   </span>
                 ) : null}
@@ -167,7 +168,7 @@ export function RapportVeilleVue({
           74 offres qui s'évaporaient ainsi. */}
       {rapport.sansMotif !== 0 ? (
         <p className="rapport__alerte">
-          {rapport.sansMotif} offre(s) SANS MOTIF — le compte ne tombe pas juste. Un rejet
+          {rapport.sansMotif} {accord(rapport.sansMotif, "offre")} SANS MOTIF — le compte ne tombe pas juste. Un rejet
           n’est pas nommé quelque part.
         </p>
       ) : null}
@@ -208,13 +209,13 @@ export function RapportVeilleVue({
         <p className="rapport__ligne">{rapport.localisation}</p>
         <p className="rapport__ligne rapport__ligne--douce">
           {rapport.lieux.demandes > 0
-            ? `${rapport.lieux.demandes} lieu(x) inconnu(s) mesuré(s) — ${rapport.lieux.juges} tranché(s), ${rapport.lieux.introuvables} introuvable(s), retentés plus tard.`
+            ? `${rapport.lieux.demandes} ${accord(rapport.lieux.demandes, "lieu inconnu mesuré", "lieux inconnus mesurés")} — ${rapport.lieux.juges} ${accord(rapport.lieux.juges, "tranché")}, ${rapport.lieux.introuvables} ${accord(rapport.lieux.introuvables, "introuvable")}, retentés plus tard.`
             : "Aucun lieu inconnu à mesurer : tous les noms de cette passe étaient déjà tranchés."}
           {rapport.villesCompletees > 0
-            ? ` ${rapport.villesCompletees} ville(s) rattrapée(s) sur des offres déjà suivies.`
+            ? ` ${rapport.villesCompletees} ${accord(rapport.villesCompletees, "ville rattrapée", "villes rattrapées")} sur des offres déjà suivies.`
             : ""}
           {rapport.adressesAnnoncees > 0
-            ? ` ${rapport.adressesAnnoncees} adresse(s) reprise(s) du texte des annonces.`
+            ? ` ${rapport.adressesAnnoncees} ${accord(rapport.adressesAnnoncees, "adresse reprise", "adresses reprises")} du texte des annonces.`
             : ""}
         </p>
       </div>
