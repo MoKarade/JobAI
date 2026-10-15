@@ -25,6 +25,12 @@ import { exigerSession } from "./session";
 import { MiseAJourOffreSchema } from "./types";
 import { NouvelleOffreSchema, aujourdhui, construireOffre, identifiantPour } from "./ajout";
 import {
+  CODE_VIOLATION_UNICITE,
+  codeErreurBase,
+  dateEnvoiAEcrire,
+  premierMessageParChamp,
+} from "./actionsOffrePur";
+import {
   RAYON_VALIDATION_KM,
   chercherEntreprisesGoogle,
   deciderPrecision,
@@ -42,7 +48,7 @@ import {
 // voulait faire pour la réutiliser — aurait publié les coordonnées du domicile de Marc.
 // Elle vit désormais dans un module ordinaire, où aucun `export` ne peut faire ça.
 import { domicile } from "./domicile";
-import { lireEtat } from "./etat";
+import { ecrireEtat, lireEtat } from "./etat";
 import { CLE_RAYON, RAYON_DEFAUT_KM, profilAvecRayon } from "./rayon";
 import { ENTREPRISES_CIBLES } from "./reference";
 import {
@@ -81,6 +87,7 @@ import {
 } from "./registre";
 import { BUDGET_PASSE_PAGE_MS } from "./synchro";
 import { creerChrono } from "./jalons";
+import { CLE_RESUME_DISTANCES, construireResume, resumeVierge } from "./resumePasse";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -1365,7 +1372,33 @@ export async function mesurerDistances(
     // 2026-09-17 j'ai écrit que Nominatim consommait ~17,5 s des 25 s partagés, sans aucune
     // preuve, alors que l'étape non bornée était juste à côté. Ces jalons rendent la réponse
     // CERTAINE au lieu de plausible — et ils coûtent un `Date.now()` par étape.
-    const { jalon, ligne: ligneBudget } = creerChrono();
+    const { jalon, ligne: ligneBudget, releve: releveBudget } = creerChrono();
+
+    // ⚠️ LE RÉSUMÉ DE PASSE S'ÉCRIT PAR ÉTAPES, PAS À LA FIN (`[OBS-02]`, tâche #95).
+    //
+    // Première version : une seule écriture, tout à la fin. Mesuré en production le
+    // 2026-10-15 : la passe lancée par l'accueil a été coupée par le mur de 60 s de Vercel
+    // avant d'arriver à la fin, donc rien n'a été écrit — et un mur ne se rattrape pas par un
+    // `catch`. Chaque étape franchie consigne donc l'état connu à cet instant ; ce qui n'est
+    // pas encore mesuré reste `null` (jamais un faux zéro). Un échec d'écriture ne fait PAS
+    // échouer la passe — le travail est fait, c'est la trace qui manque — mais il se dit.
+    const resume = resumeVierge();
+    const consigner = async (terminee: boolean): Promise<void> => {
+      try {
+        await ecrireEtat(
+          CLE_RESUME_DISTANCES,
+          construireResume({ ...resume, etapes: releveBudget() }, new Date(), terminee),
+        );
+      } catch (err) {
+        console.error("[distances] résumé de passe non enregistré", err);
+      }
+    };
+    /** Ferme l'étape au chrono ET consigne l'avancement : la dernière étape écrite dit où une coupure a eu lieu. */
+    const franchir = async (nom: string): Promise<void> => {
+      jalon(nom);
+      resume.derniereEtape = nom;
+      await consigner(false);
+    };
 
     // 0. RATTRAPER LES VILLES MANQUANTES, avant tout le reste.
     //
@@ -1386,7 +1419,7 @@ export async function mesurerDistances(
       villesEcrites.has(o.id) ? { ...o, ville: villesEcrites.get(o.id) ?? null } : o,
     );
 
-    jalon("villes");
+    await franchir("villes");
 
     const lignes = await db.select().from(entreprisesLieux);
     const positions = new Map(
@@ -1483,7 +1516,7 @@ export async function mesurerDistances(
       }
     }
 
-    jalon("centres");
+    await franchir("centres");
 
     let situees = 0;
     if (manquants.length > 0) {
@@ -1511,7 +1544,11 @@ export async function mesurerDistances(
       console.error("[actions] re-vérification des centres impossible", err);
     }
 
-    jalon("situer");
+    resume.situees = situees;
+    resume.placees = placees;
+    resume.candidatesSituees = manquants.length;
+    resume.centresCorriges = centresCorriges;
+    await franchir("situer");
 
     // 1 bis. Récupérer les adresses manquantes des entreprises déjà situées — sans quoi
     //        la colonne resterait vide pour tout ce qui existait avant elle.
@@ -1531,7 +1568,7 @@ export async function mesurerDistances(
       console.error("[actions] rattrapage des adresses impossible", err);
     }
 
-    jalon("adresses");
+    await franchir("adresses");
 
     // 1 bis-2. LE REGISTRE, pour tout ce qu'OpenStreetMap n'a pas donné.
     //
@@ -1559,7 +1596,7 @@ export async function mesurerDistances(
       console.error("[actions] recherche dans le registre impossible", err);
     }
 
-    jalon("registre");
+    await franchir("registre");
 
     // 1 quater. Retenter de situer VRAIMENT celles qui sont au centre-ville. Sans ça,
     //           l'élargissement de la règle de résolution ne servirait qu'aux entreprises
@@ -1601,7 +1638,7 @@ export async function mesurerDistances(
       console.error("[actions] raffinage des positions impossible", err);
     }
 
-    jalon("raffinage");
+    await franchir("raffinage");
 
     // 1 ter. Les bornes de recharge, pour les entreprises jamais regardées.
     //
@@ -1623,7 +1660,9 @@ export async function mesurerDistances(
       console.error("[actions] mesure des bornes impossible", err);
     }
 
-    jalon("bornes");
+    resume.bornesMesurees = bornes.mesurees;
+    resume.bornesCandidates = bornes.candidates;
+    await franchir("bornes");
 
     // 1 quater. La fiche enrichie (site, téléphone, horaires) — [CARTE-03-PLACES].
     let details: PasseDetails = { candidates: 0, enrichies: 0, echecs: 0 };
@@ -1633,7 +1672,7 @@ export async function mesurerDistances(
       console.error("[actions] enrichissement Places impossible", err);
     }
 
-    jalon("details");
+    await franchir("details");
 
     // 2. Mesurer. Le domicile ne sort pas de cette closure.
     //
@@ -1675,6 +1714,11 @@ export async function mesurerDistances(
     const effacees = offresAMesurer.filter(
       (o, i) => o.km === null && offresPrecisees[i]?.km !== null,
     ).length;
+    // Connus ici, AVANT les écritures de `km` qui suivent : une coupure pendant elles ne doit
+    // pas emporter les deux chiffres que cette tâche existe pour garder.
+    resume.villesManquantes = villesManquantes;
+    resume.distancesEffacees = effacees;
+    await consigner(false);
     if (effacees > 0) {
       await db
         .update(offers)
@@ -1714,6 +1758,7 @@ export async function mesurerDistances(
     // budget. Les comptes sont donnés en X/Y : « 0/0 » dit qu'il n'y avait rien à faire,
     // « 0/6 » dit que six candidates ont été écartées, et ce sont deux situations opposées.
     jalon("mesure");
+    resume.derniereEtape = "mesure";
     const restant = budgetRestant();
     console.log(
       `[distances] passe terminée — placées=${placees} mesurées=${majs.length} situées=${situees}/${manquants.length} ` +
@@ -1831,6 +1876,17 @@ export async function mesurerDistances(
     if (raffinage.entreprisesHorsRayon.length > 0) {
       console.log(`[raffinage] hors rayon — ${echantillon(raffinage.entreprisesHorsRayon)}`);
     }
+
+    // Écriture finale : tout est connu, la passe est allée au bout (`terminee: true`).
+    resume.mesurees = majs.length;
+    resume.situees = situees;
+    resume.candidatesSituees = manquants.length;
+    resume.placees = placees;
+    resume.centresCorriges = centresCorriges;
+    resume.bornesMesurees = bornes.mesurees;
+    resume.bornesCandidates = bornes.candidates;
+    resume.budgetRestantMs = restant;
+    await consigner(true);
 
     revalidatePath("/");
     revalidatePath("/carte");
@@ -2030,12 +2086,8 @@ export async function ajouterOffre(saisie: unknown): Promise<ResultatAjout> {
 
   const parse = NouvelleOffreSchema.safeParse(saisie);
   if (!parse.success) {
-    const champs: Record<string, string> = {};
-    for (const issue of parse.error.issues) {
-      const cle = issue.path[0];
-      // Premier message par champ : au-delà, on empile des reformulations du même problème.
-      if (typeof cle === "string" && !(cle in champs)) champs[cle] = issue.message;
-    }
+    // Premier message par champ : au-delà, on empile des reformulations du même problème.
+    const champs = premierMessageParChamp(parse.error.issues);
     return { ok: false, erreur: "Vérifie les champs signalés.", champs };
   }
 
@@ -2056,9 +2108,7 @@ export async function ajouterOffre(saisie: unknown): Promise<ResultatAjout> {
     console.error("[actions] ajout impossible", err);
     // 23505 = violation d'unicité. Le seul cas réaliste est une double soumission : le
     // dire permet à Marc de vérifier au lieu de re-saisir une offre déjà enregistrée.
-    const code = (err as { cause?: { code?: string }; code?: string })?.cause?.code
-      ?? (err as { code?: string })?.code;
-    if (code === "23505") {
+    if (codeErreurBase(err) === CODE_VIOLATION_UNICITE) {
       return { ok: false, erreur: "Cette offre semble déjà enregistrée. Vérifie la liste." };
     }
     return { ok: false, erreur: "Enregistrement impossible. Réessaie." };
@@ -2147,10 +2197,7 @@ export async function modifierOffre(
     // et Marc vit à UTC−4 : un CV marqué envoyé à 20 h 30 le 19 août était enregistré au
     // 20 août. La règle est déjà écrite (« toute date que l'app ÉCRIT se calcule dans le
     // fuseau de Marc »), et ce chemin d'écriture y échappait encore.
-    const dateEnvoi =
-      champs.statut === "CVenvoye" && !avant.dateEnvoi && !champs.dateEnvoi
-        ? aujourdhui(new Date())
-        : champs.dateEnvoi;
+    const dateEnvoi = dateEnvoiAEcrire(champs, avant.dateEnvoi, aujourdhui(new Date()));
 
     await db
       .update(offers)

@@ -192,17 +192,17 @@ ne corrige pas.
 **Trois témoins sur quatre restent immesurables** (`effacées`, `centresCorrigés`,
 `villesManquantes`) — `[OBS-02]`, ouvert le 22/09, toujours vrai : ces chiffres n'existent que
 dans la réponse HTTP d'un cron que personne ne lit et les journaux Vercel (~17 min de
-rétention). Aucun outil MCP ne les expose encore.
+rétention). *(Réglé le 15/10 par la tâche #95 : `etat_synchro` rend désormais `resume` sur la ligne
+`distances-resume`, écrite à chaque étape de la passe — une passe coupée par le mur de 60 s
+laisse donc sa trace, avec `terminee: false` et `derniereEtape`.)*
 
 ### BACKLOG — ce qui reste ouvert
 
 - `[GEO-BOOTSTRAP]` bande postale — bloqué dans cet environnement (source de données), pas
   seulement en retard. Reprend si Marc fournit un fichier/URL de centroïdes FSA lisible
   directement.
-- `[OBS-02]` — le contenu d'une passe de distances (`villesManquantes`, `effacées`,
-  `centresCorriges`, `bornes`/`mesure`/`situer`/budget) n'est persisté nulle part ; remède
-  probable, même patron que `[OBS-01]` (persister dans `sync_state`, lire via `etat_synchro`
-  ou un nouvel outil). Non commencé.
+- `[OBS-02]` — fait le 15/10 (tâche #95) : résumé de la dernière passe de distances dans
+  `sync_state["distances-resume"]`, écrit par étapes, lu via `etat_synchro` (`resume`).
 - Témoin `coffrages-synergy` (ci-dessus) — hypothèse à vérifier, pas d'accès réseau Nominatim
   depuis cette session pour le faire.
 - `[CI-CURL-PROTO]`, `[V2-*]`, `[V3-*]`, `[UX-05]`, etc. — items plus anciens, non touchés

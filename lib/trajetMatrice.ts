@@ -16,7 +16,12 @@ import {
   rendreBudgetRoutes,
 } from "./budgetRoutes";
 import { appelerMatrice, cacheValide } from "./trajetRoutes";
-import { choisirDestinations, ligneTrajet, resumerRemplissage } from "./trajetMatricePur";
+import {
+  choisirDestinations,
+  compterValides,
+  ligneTrajet,
+  resumerRemplissage,
+} from "./trajetMatricePur";
 
 /**
  * Destinations par passe — TOUT le budget du jour sauf la marge réservée aux clics.
@@ -110,6 +115,8 @@ export async function remplirDureesTrajet(): Promise<BilanMatrice> {
       .onConflictDoUpdate({ target: trajets.destinationNom, set: valeurs });
   }
 
-  const resume = resumerRemplissage(lieux.length, parNom.size, r.elements.length, r.inatteignables);
+  // Les lignes VALIDES seulement : une ligne présente mais invalide reste à refaire.
+  const valides = compterValides(lieux, parNom, (ligne, lieu) => cacheValide(ligne, lieu, maison));
+  const resume = resumerRemplissage(lieux.length, valides, r.elements.length, r.inatteignables);
   return { resume, remplies: r.elements.length };
 }

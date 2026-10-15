@@ -76,3 +76,45 @@ describe("la passe de distances applique la garde de plausibilité", () => {
     expect(code).toContain("villesManquantes=${villesManquantes}");
   });
 });
+
+describe("[OBS-02] le résumé de la passe est écrit PAR ÉTAPES, et lu par l'outil", () => {
+  it("chaque étape franchie consigne l'avancement (une coupure par le mur de 60 s laisse une trace)", () => {
+    // Mesuré le 2026-10-15 : la passe de l'accueil a été coupée avant la fin, et la première
+    // version, qui n'écrivait qu'à la fin, n'a rien laissé. Il n'y a plus de `jalon("…")`
+    // nu : toutes les étapes passent par `franchir`, qui consigne.
+    expect(code).not.toMatch(/^\s*jalon\("(?!mesure")/m);
+    for (const nom of ["villes", "centres", "situer", "adresses", "registre", "raffinage", "bornes", "details"]) {
+      expect(code).toContain(`await franchir("${nom}")`);
+    }
+    expect(code).toMatch(/const franchir = async[\s\S]{0,200}?await consigner\(false\)/);
+  });
+
+  it("les deux chiffres tardifs sont consignés AVANT les écritures de km qui peuvent traîner", () => {
+    const posConsigne = code.indexOf("resume.distancesEffacees = effacees;");
+    const posEcritureKm = code.indexOf(".set({ km: null, majLe: new Date() })");
+    const posPlanif = code.indexOf("planifierDistances(");
+    expect(posConsigne).toBeGreaterThan(-1);
+    expect(posEcritureKm).toBeGreaterThan(posConsigne);
+    expect(posPlanif).toBeGreaterThan(posConsigne);
+    expect(code).toContain("resume.villesManquantes = villesManquantes;");
+  });
+
+  it("l'écriture finale (terminee: true) précède la réponse de la passe", () => {
+    const posFinale = code.indexOf("await consigner(true)");
+    const posRetour = code.indexOf("villesRattrapees: aRattraper.length,");
+    expect(posFinale).toBeGreaterThan(-1);
+    expect(posRetour).toBeGreaterThan(posFinale);
+  });
+
+  it("un échec d'écriture est journalisé, il ne fait pas échouer la passe", () => {
+    expect(code).toContain("résumé de passe non enregistré");
+  });
+
+  it("la route MCP lit la MÊME clé que celle que la passe écrit", () => {
+    const route = sansCommentaires(
+      readFileSync(resolve(process.cwd(), "app/api/mcp/route.ts"), "utf8"),
+    );
+    expect(code).toContain("CLE_RESUME_DISTANCES");
+    expect(route).toMatch(/lireResumeDistances:[\s\S]{0,80}?lireEtatBrut\(CLE_RESUME_DISTANCES\)/);
+  });
+});

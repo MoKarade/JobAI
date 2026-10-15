@@ -22,6 +22,8 @@ import { lireEtat } from "@/lib/etat";
 import { CLE_JOURNAL } from "@/lib/veilleComplete";
 import type { JournalVeille } from "@/lib/veille";
 import { Cadre } from "@/components/Cadre";
+import { dateLisible } from "@/lib/dateLisible";
+import { titreOffre } from "@/lib/titreOffre";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const offre = await lireOffre(id);
   // Le titre d'onglet ne doit pas fuir le contenu si la page est inaccessible.
-  return { title: offre ? `${offre.entreprise} — JobAI` : "Offre — JobAI" };
+  return { title: titreOffre(offre) };
 }
 
 export default async function DetailOffre({ params }: { params: Promise<{ id: string }> }) {
@@ -155,11 +157,11 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
           </div>
           <div>
             <dt>Repérée le</dt>
-            <dd>{offre.dateReperage}</dd>
+            <dd>{dateLisible(offre.dateReperage)}</dd>
           </div>
           <div>
             <dt>CV envoyé le</dt>
-            <dd>{offre.dateEnvoi || "—"}</dd>
+            <dd>{offre.dateEnvoi ? dateLisible(offre.dateEnvoi) : "—"}</dd>
           </div>
           <div>
             <dt>Note</dt>

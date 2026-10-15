@@ -515,6 +515,11 @@ Lot L2 de l'audit multi-outils du 2026-09-18, livré le même jour.
       Une panne de base y donne un message honnête plutôt qu'un 404 trompeur.
       ⚠️ Reste à faire : l'historique des changements de statut (rien ne l'enregistre
       aujourd'hui — il faudrait une table dédiée).
+      · `[UX-13]` ✅ 2026-10-14 : les dates « Repérée le » et « CV envoyé le » de la fiche
+      s'écrivent en toutes lettres (« 14 septembre 2026 », `lib/dateLisible.ts`) au lieu de
+      AAAA-MM-JJ ; une valeur qui n'est pas une date est rendue telle quelle.
+      · 2026-10-14 : le titre d'onglet de la fiche devient « Poste · Entreprise — JobAI »
+        (`lib/titreOffre.ts`), pour distinguer deux offres d'une même entreprise.
 - [x] 🔧 **`[UX-04]`** **Carte des offres**. ✅ 2026-07-28 — 3ᵉ onglet `/carte`.
       · **On géocode des VILLES, pas des offres** : une douzaine de municipalités pour des
         dizaines d'offres. Géocoder par offre ferait dix fois la même requête pour
@@ -3079,7 +3084,7 @@ d'anormal. `[Supposition]`, pas confirmée (aucun accès Nominatim depuis cette 
 vérifier en relisant la ligne `villes` de Lavaltrie et la position stockée de l'employeur.
 **Non corrigé** (routine : mesurer, jamais corriger seul).
 
-### `[OBS-02]` — le CONTENU d'une passe de distances n'est lisible NULLE PART ⬜
+### `[OBS-02]` — le CONTENU d'une passe de distances n'est lisible NULLE PART ✅
 
 Même défaut qu'`[OBS-01]`, un cran plus loin. `[OBS-01]` a réglé le TIMING (`majLe` d'une
 réservation, via `etat_synchro`) ; il manque encore le CONTENU du dernier passage :
@@ -3093,6 +3098,21 @@ témoins temporaires. Remède probable : persister le dernier résumé de passe 
 (même patron que `CLE_RAPPORT`/`veille-rapport` pour la veille), lu par un nouvel outil MCP ou
 un ajout à `etat_synchro`. Non commencé — découvert en chemin par la routine, hors périmètre
 de sa mission (mesurer, ne pas corriger).
+
+**Fait le 2026-10-15 (tâche #95).** `mesurerDistances` consigne son avancement dans une ligne
+`distances-resume` de `sync_state` (`lib/resumePasse.ts` : compteurs seulement, schéma à liste
+blanche, aucune migration — la table est déjà clé/valeur), **à chaque étape franchie** et une
+dernière fois à la fin (`terminee: true`). `etat_synchro` la rend sous `resume` : `ecritLe`,
+`terminee`, `derniereEtape`, `villesManquantes`, `distancesEffacees`, `centresCorriges`,
+`mesurees`, `situees`/`candidatesSituees`, `bornesMesurees`/`bornesCandidates`, budget restant et
+temps par étape.
+
+⚠️ **Par étapes, et ce n'est pas un luxe.** La première version n'écrivait qu'à la fin. Mesuré en
+production le 15/10 : la passe lancée par l'accueil a été coupée par le mur de 60 s de Vercel
+avant la fin (« Task timed out after 60 seconds »), donc rien n'a été écrit. Un `null` dans le
+résumé veut dire « pas encore mesuré à cet instant », jamais zéro ; `terminee: false` avec
+`derniereEtape` dit jusqu'où la passe est allée. Absente = aucune passe n'a écrit depuis la mise
+en service ; illisible = dite `resumeIllisible`, jamais rendue en zéros.
 
 ### `[CARTE-PERF]` — l'assemblage des écrans est quadratique ✅
 

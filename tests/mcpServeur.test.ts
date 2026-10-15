@@ -52,6 +52,7 @@ async function brancher(io: Partial<EntreesSorties> = {}) {
     aujourdhui: () => "2026-08-19",
     lireJournal: async () => ({}),
     lireEtatSynchro: async () => [],
+    lireResumeDistances: async () => ({ brut: null }),
     diagnostiquerFlux: async () => ({
       fin: "flux-termine",
       verdicts: { "dans-la-region": 2 },
@@ -213,6 +214,64 @@ describe("etat_synchro — la fraîcheur des passes de fond, jamais leur contenu
     const lignes = corps(r) as unknown as { cle: string; majLe: string; ageMs: number }[];
     expect(lignes.map((l) => l.cle)).toEqual(["distances-auto", "veille-auto"]);
     expect(Object.keys(lignes[0]!).sort()).toEqual(["ageMs", "cle", "majLe"]);
+  });
+
+  it("[OBS-02] rend villesManquantes, distancesEffacees et centresCorriges de la dernière passe", async () => {
+    const resume = {
+      ecritLe: "2026-10-15T07:31:00.000Z",
+      terminee: true,
+      derniereEtape: "mesure",
+      mesurees: 12,
+      situees: 3,
+      candidatesSituees: 9,
+      placees: 4,
+      villesManquantes: 41,
+      distancesEffacees: 2,
+      centresCorriges: 1,
+      bornesMesurees: 5,
+      bornesCandidates: 8,
+      budgetRestantMs: 6400,
+      etapes: [{ nom: "villes", ms: 20 }],
+    };
+    const { client } = await brancher({
+      lireEtatSynchro: async () => [
+        { cle: "distances-auto", majLe: new Date("2026-10-15T07:30:00.000Z") },
+        { cle: "distances-resume", majLe: new Date("2026-10-15T07:31:00.000Z") },
+      ],
+      lireResumeDistances: async () => ({ brut: JSON.stringify(resume) }),
+    });
+    const r = await client.callTool({ name: "etat_synchro", arguments: {} });
+    const lignes = corps(r) as unknown as { cle: string; resume?: typeof resume }[];
+    const ligne = lignes.find((l) => l.cle === "distances-resume");
+    expect(ligne?.resume?.villesManquantes).toBe(41);
+    expect(ligne?.resume?.distancesEffacees).toBe(2);
+    expect(ligne?.resume?.centresCorriges).toBe(1);
+    // Les autres lignes restent des dates, rien de plus.
+    expect(Object.keys(lignes.find((l) => l.cle === "distances-auto")!).sort()).toEqual([
+      "ageMs",
+      "cle",
+      "majLe",
+    ]);
+  });
+
+  it("[OBS-02] un résumé illisible est DIT illisible, pas rendu en zéros", async () => {
+    const { client } = await brancher({
+      lireEtatSynchro: async () => [
+        { cle: "distances-resume", majLe: new Date("2026-10-15T07:31:00.000Z") },
+      ],
+      lireResumeDistances: async () => ({ brut: "{cassé" }),
+    });
+    const r = await client.callTool({ name: "etat_synchro", arguments: {} });
+    const [ligne] = corps(r) as unknown as Record<string, unknown>[];
+    expect(ligne?.resume).toBeNull();
+    expect(ligne?.resumeIllisible).toBe(true);
+  });
+
+  it("[OBS-02] une base muette sur le résumé est une erreur, pas un résumé absent", async () => {
+    const { client } = await brancher({ lireResumeDistances: async () => null });
+    const r = await client.callTool({ name: "etat_synchro", arguments: {} });
+    expect(r.isError).toBe(true);
+    expect(String(corps(r).erreur)).toContain("pas répondu");
   });
 
   it("rend une ERREUR, pas une liste vide, quand la base n'a pas répondu", async () => {
