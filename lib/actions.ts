@@ -25,6 +25,12 @@ import { exigerSession } from "./session";
 import { MiseAJourOffreSchema } from "./types";
 import { NouvelleOffreSchema, aujourdhui, construireOffre, identifiantPour } from "./ajout";
 import {
+  CODE_VIOLATION_UNICITE,
+  codeErreurBase,
+  dateEnvoiAEcrire,
+  premierMessageParChamp,
+} from "./actionsOffrePur";
+import {
   RAYON_VALIDATION_KM,
   chercherEntreprisesGoogle,
   deciderPrecision,
@@ -2030,12 +2036,8 @@ export async function ajouterOffre(saisie: unknown): Promise<ResultatAjout> {
 
   const parse = NouvelleOffreSchema.safeParse(saisie);
   if (!parse.success) {
-    const champs: Record<string, string> = {};
-    for (const issue of parse.error.issues) {
-      const cle = issue.path[0];
-      // Premier message par champ : au-delà, on empile des reformulations du même problème.
-      if (typeof cle === "string" && !(cle in champs)) champs[cle] = issue.message;
-    }
+    // Premier message par champ : au-delà, on empile des reformulations du même problème.
+    const champs = premierMessageParChamp(parse.error.issues);
     return { ok: false, erreur: "Vérifie les champs signalés.", champs };
   }
 
@@ -2056,9 +2058,7 @@ export async function ajouterOffre(saisie: unknown): Promise<ResultatAjout> {
     console.error("[actions] ajout impossible", err);
     // 23505 = violation d'unicité. Le seul cas réaliste est une double soumission : le
     // dire permet à Marc de vérifier au lieu de re-saisir une offre déjà enregistrée.
-    const code = (err as { cause?: { code?: string }; code?: string })?.cause?.code
-      ?? (err as { code?: string })?.code;
-    if (code === "23505") {
+    if (codeErreurBase(err) === CODE_VIOLATION_UNICITE) {
       return { ok: false, erreur: "Cette offre semble déjà enregistrée. Vérifie la liste." };
     }
     return { ok: false, erreur: "Enregistrement impossible. Réessaie." };
@@ -2147,10 +2147,7 @@ export async function modifierOffre(
     // et Marc vit à UTC−4 : un CV marqué envoyé à 20 h 30 le 19 août était enregistré au
     // 20 août. La règle est déjà écrite (« toute date que l'app ÉCRIT se calcule dans le
     // fuseau de Marc »), et ce chemin d'écriture y échappait encore.
-    const dateEnvoi =
-      champs.statut === "CVenvoye" && !avant.dateEnvoi && !champs.dateEnvoi
-        ? aujourdhui(new Date())
-        : champs.dateEnvoi;
+    const dateEnvoi = dateEnvoiAEcrire(champs, avant.dateEnvoi, aujourdhui(new Date()));
 
     await db
       .update(offers)
