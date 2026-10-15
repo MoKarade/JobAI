@@ -29,5 +29,3 @@
 ## Pour aller plus loin (à lire seulement si nécessaire)
 - Anciens titres -> chemins : `docs/correspondance.md`. Sections : `docs/claude/` (`01-principes`, `02-conventions`, `03-workflow-git`, `04-commandes`, `05-verifications`, `06-deploiement`, `07-hub`, `08-documentation`, `10-style-compte-rendu`, `11-protocole`).
 - Leçons apprises (175 règles durables) : `docs/claude/lecons.md` ; leurs histoires : `docs/LESSONS.md`. Compte-rendu : `docs/COMPTE-RENDU.md`.
-
-@docs/COMPTE-RENDU.md
