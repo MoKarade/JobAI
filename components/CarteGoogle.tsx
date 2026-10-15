@@ -365,7 +365,7 @@ export function CarteGoogle({
   }, [cadre, domicile]);
 
   if (epingles.length === 0 || !bornes) {
-    return <p className="vide">Aucun lieu à afficher — le géocodage n’est pas encore passé.</p>;
+    return <p className="vide">Aucun lieu à afficher pour le moment.</p>;
   }
 
   return (
