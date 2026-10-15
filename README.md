@@ -157,11 +157,9 @@ donc toute modification exige un redéploiement du hub, pas seulement une variab
 
 ### Version du contrat
 
-`@mokarade/hub-contract` est épinglé sur un **SHA de commit**, pas sur un tag : le tag `v1.1.0`
-n'a jamais pu être poussé (le proxy git de l'environnement d'exécution refuse les push de tags,
-403). Les quatre apps du hub épinglent donc le **même** SHA `2d37a61…` — c'est le contenu de
-la v1.1.0 (bloc `usage` additif). Ne pas revenir à `#v1.0.0` : cette version ignore le bloc
-`usage` et une app qui la consomme ne peut pas publier ses coûts le jour où elle en a.
+`@mokarade/hub-contract` est épinglé sur le **tag `v1.4.0`** (`github:MoKarade/hub-contract#v1.4.0`).
+Ne pas revenir à une version plus ancienne : `v1.0.0` ignore le bloc `usage` et une app qui la
+consomme ne peut pas publier ses coûts le jour où elle en a.
 
 ## CORS : rien à faire
 

@@ -44,6 +44,7 @@ export default async function Sources() {
   let dernier: RapportVeille | null = null;
   let historique: EntreeHistorique[] = [];
   let analyse: AnalyseConservee | null = null;
+  let lectureEchouee = false;
   try {
     const [r, h, a] = await Promise.all([
       lireEtat<RapportVeille | null>(CLE_RAPPORT, null),
@@ -57,6 +58,7 @@ export default async function Sources() {
     // Une base injoignable n'est pas une page cassée : on le dit et on rend le bouton, qui
     // est ce pour quoi on vient.
     console.error("[veille] état illisible :", classerPanne(err));
+    lectureEchouee = true;
   }
 
   // Instant figé côté SERVEUR et passé au composant : lu dans le composant, le rendu serveur
@@ -82,10 +84,16 @@ export default async function Sources() {
       ) : (
         <section className="cadre-section">
           <h2 className="cadre-section__titre">Dernière passe</h2>
-          <p className="vide">
-            Aucune passe n’a encore rendu de compte. Le premier apparaîtra ici après la
-            prochaine veille — automatique ou lancée d’ici.
-          </p>
+          {lectureEchouee ? (
+            <p className="vide" role="alert">
+              Compte rendu illisible pour le moment.
+            </p>
+          ) : (
+            <p className="vide">
+              Aucune passe n’a encore rendu de compte. Le premier apparaîtra ici après la
+              prochaine veille — automatique ou lancée d’ici.
+            </p>
+          )}
         </section>
       )}
 

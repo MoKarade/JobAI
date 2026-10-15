@@ -2,9 +2,9 @@
 
 // components/FormulaireAjout.tsx — ajouter une offre repérée à la main.
 //
-// Replié par défaut, dans un `<details>` natif : le formulaire est utile plusieurs fois par
-// semaine, la liste l'est à chaque visite. Un `<details>` s'ouvre au clavier sans JavaScript
-// et annonce son état aux lecteurs d'écran — c'est déjà le choix fait pour les panneaux.
+// Replié par défaut, mais PAR LA PAGE : `app/page.tsx` l'enveloppe dans le dépliant
+// « Ajouter une offre ». Le formulaire ne porte donc aucun pli à lui (un second pli
+// obligeait à deux clics pour voir les champs).
 //
 // Aucune décision ici. L'identifiant, la note, le statut initial et la date sont calculés
 // côté serveur (`lib/ajout.ts`, pur et testé) : ce composant saisit, envoie, et affiche
@@ -126,8 +126,7 @@ export function FormulaireAjout() {
   }
 
   return (
-    <details className="ajout">
-      <summary className="ajout__titre">Ajouter une offre repérée</summary>
+    <div className="ajout">
 
       <form
         className="ajout__grille"
@@ -320,6 +319,6 @@ export function FormulaireAjout() {
           </p>
         ) : null}
       </form>
-    </details>
+    </div>
   );
 }
