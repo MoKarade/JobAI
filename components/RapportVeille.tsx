@@ -33,6 +33,32 @@ function Chiffre({
   );
 }
 
+/** Un motif de rejet par ligne, avec les villes concernées (une seule mise en page pour les deux blocs). */
+function ListeMotifs({ motifs }: { motifs: RapportVeille["refusees"] }) {
+  return (
+    <ul className="rapport__motifs">
+      {motifs.map((r) => {
+        const reste = r.villes.length - MAX_VILLES;
+        return (
+          <li key={r.motif} className="rapport__motif">
+            <span className="rapport__motif-n">{r.n}</span>
+            <span className="rapport__motif-nom">{LIBELLE_MOTIF[r.motif]}</span>
+            {r.villes.length > 0 ? (
+              <span className="rapport__villes">
+                {r.villes
+                  .slice(0, MAX_VILLES)
+                  .map((v) => `${v.ville} (${v.n})`)
+                  .join(" · ")}
+                {reste > 0 ? ` · et ${reste} ${accord(reste, "autre")}` : ""}
+              </span>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function RapportVeilleVue({
   rapport,
   maintenant,
@@ -112,25 +138,7 @@ export function RapportVeilleVue({
       {rapport.refusees.length > 0 ? (
         <div className="rapport__refus">
           <h4 className="rapport__soustitre">Écartées, et pourquoi</h4>
-          <ul className="rapport__motifs">
-            {rapport.refusees.map((r) => (
-              <li key={r.motif} className="rapport__motif">
-                <span className="rapport__motif-n">{r.n}</span>
-                <span className="rapport__motif-nom">{LIBELLE_MOTIF[r.motif]}</span>
-                {r.villes.length > 0 ? (
-                  <span className="rapport__villes">
-                    {r.villes
-                      .slice(0, MAX_VILLES)
-                      .map((v) => `${v.ville} (${v.n})`)
-                      .join(" · ")}
-                    {r.villes.length > MAX_VILLES
-                      ? ` · et ${r.villes.length - MAX_VILLES} ${accord(r.villes.length - MAX_VILLES, "autre")}`
-                      : ""}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <ListeMotifs motifs={rapport.refusees} />
         </div>
       ) : null}
 
@@ -141,25 +149,7 @@ export function RapportVeilleVue({
               lieu tant que leur distance n'est pas mesurée. Les remettre dans le bloc du
               dessus annoncerait « écartées » des offres que la passe vient d'inscrire. */}
           <h4 className="rapport__soustitre">Entrées, mais le lieu reste à trancher</h4>
-          <ul className="rapport__motifs">
-            {rapport.verdictsLieu.map((r) => (
-              <li key={r.motif} className="rapport__motif">
-                <span className="rapport__motif-n">{r.n}</span>
-                <span className="rapport__motif-nom">{LIBELLE_MOTIF[r.motif]}</span>
-                {r.villes.length > 0 ? (
-                  <span className="rapport__villes">
-                    {r.villes
-                      .slice(0, MAX_VILLES)
-                      .map((v) => `${v.ville} (${v.n})`)
-                      .join(" · ")}
-                    {r.villes.length > MAX_VILLES
-                      ? ` · et ${r.villes.length - MAX_VILLES} ${accord(r.villes.length - MAX_VILLES, "autre")}`
-                      : ""}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <ListeMotifs motifs={rapport.verdictsLieu} />
         </div>
       ) : null}
 
