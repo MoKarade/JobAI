@@ -34,16 +34,20 @@ export function ControlesOffre({ offre }: { offre: Offre }) {
   const [noteEnregistree, setNoteEnregistree] = useState(offre.userNote);
   const [perimee, setPerimee] = useState(offre.perimeeLe !== null);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [confirme, setConfirme] = useState(false);
   const [enCours, demarrer] = useTransition();
 
   function enregistrer(patch: Record<string, string>, annuler: () => void) {
     setErreur(null);
+    setConfirme(false);
     demarrer(async () => {
       const r = await modifierOffre(offre.id, patch);
       if (!r.ok) {
         annuler();
         setErreur(r.erreur);
+        return;
       }
+      setConfirme(true);
     });
   }
 
@@ -131,6 +135,7 @@ export function ControlesOffre({ offre }: { offre: Offre }) {
           const precedent = perimee;
           setPerimee(cible);
           setErreur(null);
+          setConfirme(false);
           demarrer(async () => {
             const r = await marquerPerimee(offre.id, cible);
             if (!r.ok) {
@@ -142,6 +147,14 @@ export function ControlesOffre({ offre }: { offre: Offre }) {
       >
         {perimee ? "Rouvrir cette offre" : "Marquer périmée"}
       </button>
+
+      {/* ⚠️ Dit seulement ce que le serveur a CONFIRMÉ (r.ok) : jamais « Enregistré » sur
+          l'affichage optimiste, il mentirait en cas d'échec. */}
+      {confirme && !erreur ? (
+        <p className="controles-offre__ok" role="status">
+          Enregistré ✓
+        </p>
+      ) : null}
 
       {erreur ? (
         <p className="controles-offre__erreur" role="alert">

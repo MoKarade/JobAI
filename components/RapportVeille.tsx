@@ -10,7 +10,9 @@
 // serveur et le rendu client différeraient d'une seconde et React signalerait une erreur
 // d'hydratation à chaque affichage.
 
+import { accord } from "@/lib/accord";
 import { LIBELLE_MOTIF, depuis, fraicheurSource, type RapportVeille } from "@/lib/rapportVeille";
+import { nomSource, phraseEchecSources } from "@/lib/libelleSource";
 
 /** Nombre de villes nommées par motif avant de dire « et N autres ». */
 const MAX_VILLES = 8;
@@ -29,6 +31,32 @@ function Chiffre({
       <span className="rapport__valeur">{valeur}</span>
       <span className="rapport__libelle">{libelle}</span>
     </div>
+  );
+}
+
+/** Un motif de rejet par ligne, avec les villes concernées (une seule mise en page pour les deux blocs). */
+function ListeMotifs({ motifs }: { motifs: RapportVeille["refusees"] }) {
+  return (
+    <ul className="rapport__motifs">
+      {motifs.map((r) => {
+        const reste = r.villes.length - MAX_VILLES;
+        return (
+          <li key={r.motif} className="rapport__motif">
+            <span className="rapport__motif-n">{r.n}</span>
+            <span className="rapport__motif-nom">{LIBELLE_MOTIF[r.motif]}</span>
+            {r.villes.length > 0 ? (
+              <span className="rapport__villes">
+                {r.villes
+                  .slice(0, MAX_VILLES)
+                  .map((v) => `${v.ville} (${v.n})`)
+                  .join(" · ")}
+                {reste > 0 ? ` · et ${reste} ${accord(reste, "autre")}` : ""}
+              </span>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -68,7 +96,7 @@ export function RapportVeilleVue({
 
       {/* Les quatre chiffres qui répondent à « alors ? ». Le reste est du détail. */}
       <div className="rapport__chiffres">
-        <Chiffre valeur={rapport.nouvelles} libelle="nouvelle(s)" ton={rapport.nouvelles > 0 ? "bon" : "neutre"} />
+        <Chiffre valeur={rapport.nouvelles} libelle={accord(rapport.nouvelles, "nouvelle")} ton={rapport.nouvelles > 0 ? "bon" : "neutre"} />
         <Chiffre
           valeur={rapport.noteMoyenneNouvelles ?? "—"}
           libelle="note moyenne des nouvelles"
@@ -86,19 +114,19 @@ export function RapportVeilleVue({
 
       <div className="rapport__flux">
         <span>
-          <strong>{rapport.trouvees}</strong> trouvée(s) par les sources
+          <strong>{rapport.trouvees}</strong> {accord(rapport.trouvees, "trouvée")} par les sources
         </span>
         <span>
-          <strong>{rapport.nouvelles}</strong> retenue(s)
+          <strong>{rapport.nouvelles}</strong> {accord(rapport.nouvelles, "retenue")}
         </span>
         {rapport.perimees > 0 ? (
           <span>
-            <strong>{rapport.perimees}</strong> périmée(s)
+            <strong>{rapport.perimees}</strong> {accord(rapport.perimees, "périmée")}
           </span>
         ) : null}
         {rapport.revenues > 0 ? (
           <span>
-            <strong>{rapport.revenues}</strong> revenue(s)
+            <strong>{rapport.revenues}</strong> {accord(rapport.revenues, "revenue")}
           </span>
         ) : null}
         {rapport.enSursis > 0 ? (
@@ -111,25 +139,7 @@ export function RapportVeilleVue({
       {rapport.refusees.length > 0 ? (
         <div className="rapport__refus">
           <h4 className="rapport__soustitre">Écartées, et pourquoi</h4>
-          <ul className="rapport__motifs">
-            {rapport.refusees.map((r) => (
-              <li key={r.motif} className="rapport__motif">
-                <span className="rapport__motif-n">{r.n}</span>
-                <span className="rapport__motif-nom">{LIBELLE_MOTIF[r.motif]}</span>
-                {r.villes.length > 0 ? (
-                  <span className="rapport__villes">
-                    {r.villes
-                      .slice(0, MAX_VILLES)
-                      .map((v) => `${v.ville} (${v.n})`)
-                      .join(" · ")}
-                    {r.villes.length > MAX_VILLES
-                      ? ` · et ${r.villes.length - MAX_VILLES} autre(s)`
-                      : ""}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <ListeMotifs motifs={rapport.refusees} />
         </div>
       ) : null}
 
@@ -140,25 +150,7 @@ export function RapportVeilleVue({
               lieu tant que leur distance n'est pas mesurée. Les remettre dans le bloc du
               dessus annoncerait « écartées » des offres que la passe vient d'inscrire. */}
           <h4 className="rapport__soustitre">Entrées, mais le lieu reste à trancher</h4>
-          <ul className="rapport__motifs">
-            {rapport.verdictsLieu.map((r) => (
-              <li key={r.motif} className="rapport__motif">
-                <span className="rapport__motif-n">{r.n}</span>
-                <span className="rapport__motif-nom">{LIBELLE_MOTIF[r.motif]}</span>
-                {r.villes.length > 0 ? (
-                  <span className="rapport__villes">
-                    {r.villes
-                      .slice(0, MAX_VILLES)
-                      .map((v) => `${v.ville} (${v.n})`)
-                      .join(" · ")}
-                    {r.villes.length > MAX_VILLES
-                      ? ` · et ${r.villes.length - MAX_VILLES} autre(s)`
-                      : ""}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <ListeMotifs motifs={rapport.verdictsLieu} />
         </div>
       ) : null}
 
@@ -167,7 +159,7 @@ export function RapportVeilleVue({
           74 offres qui s'évaporaient ainsi. */}
       {rapport.sansMotif !== 0 ? (
         <p className="rapport__alerte">
-          {rapport.sansMotif} offre(s) SANS MOTIF — le compte ne tombe pas juste. Un rejet
+          {rapport.sansMotif} {accord(rapport.sansMotif, "offre")} SANS MOTIF — le compte ne tombe pas juste. Un rejet
           n’est pas nommé quelque part.
         </p>
       ) : null}
@@ -183,7 +175,7 @@ export function RapportVeilleVue({
                 key={s.id}
                 className={`rapport__source${s.ok ? "" : " rapport__source--muette"}`}
               >
-                <span className="rapport__source-nom">{s.id}</span>
+                <span className="rapport__source-nom">{nomSource(s.id)}</span>
                 <span className="rapport__source-n">{s.ok ? s.offres : "en échec"}</span>
                 {/*
                   Ce que la source a refusé. Rendu sous le compte plutôt qu'à côté : c'est
@@ -198,7 +190,7 @@ export function RapportVeilleVue({
         </ul>
         {muettes.length > 0 ? (
           <p className="rapport__alerte">
-            {muettes.map((s) => `${s.id} : ${s.erreur ?? "raison non dite"}`).join(" — ")}
+            {phraseEchecSources(muettes.map((s) => s.id))}
           </p>
         ) : null}
       </div>
@@ -208,13 +200,13 @@ export function RapportVeilleVue({
         <p className="rapport__ligne">{rapport.localisation}</p>
         <p className="rapport__ligne rapport__ligne--douce">
           {rapport.lieux.demandes > 0
-            ? `${rapport.lieux.demandes} lieu(x) inconnu(s) mesuré(s) — ${rapport.lieux.juges} tranché(s), ${rapport.lieux.introuvables} introuvable(s), retentés plus tard.`
+            ? `${rapport.lieux.demandes} ${accord(rapport.lieux.demandes, "lieu inconnu mesuré", "lieux inconnus mesurés")} — ${rapport.lieux.juges} ${accord(rapport.lieux.juges, "tranché")}, ${rapport.lieux.introuvables} ${accord(rapport.lieux.introuvables, "introuvable")}, retentés plus tard.`
             : "Aucun lieu inconnu à mesurer : tous les noms de cette passe étaient déjà tranchés."}
           {rapport.villesCompletees > 0
-            ? ` ${rapport.villesCompletees} ville(s) rattrapée(s) sur des offres déjà suivies.`
+            ? ` ${rapport.villesCompletees} ${accord(rapport.villesCompletees, "ville rattrapée", "villes rattrapées")} sur des offres déjà suivies.`
             : ""}
           {rapport.adressesAnnoncees > 0
-            ? ` ${rapport.adressesAnnoncees} adresse(s) reprise(s) du texte des annonces.`
+            ? ` ${rapport.adressesAnnoncees} ${accord(rapport.adressesAnnoncees, "adresse reprise", "adresses reprises")} du texte des annonces.`
             : ""}
         </p>
       </div>
