@@ -1499,6 +1499,11 @@ code {
   font-size: var(--t-xs);
   color: var(--rouge);
 }
+/* Confirmation : couleur de texte normale (le vert clair serait peu lisible sur fond clair). */
+.controles-offre__ok {
+  flex: 1 0 100%;
+  font-size: var(--t-xs);
+}
 
 @media (max-width: 23.75rem) {
   .controles-offre { grid-column: 1 / -1; }
