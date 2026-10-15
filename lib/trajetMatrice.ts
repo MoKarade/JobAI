@@ -15,7 +15,13 @@ import {
   jourBudgetRoutes,
   rendreBudgetRoutes,
 } from "./budgetRoutes";
-import { appelerMatrice, cacheValide, type DestinationMatrice } from "./trajetRoutes";
+import { appelerMatrice, cacheValide } from "./trajetRoutes";
+import {
+  choisirDestinations,
+  compterValides,
+  ligneTrajet,
+  resumerRemplissage,
+} from "./trajetMatricePur";
 
 /**
  * Destinations par passe — TOUT le budget du jour sauf la marge réservée aux clics.
@@ -76,13 +82,12 @@ export async function remplirDureesTrajet(): Promise<BilanMatrice> {
     .where(inArray(trajets.destinationNom, lieux.map((l) => l.nom)));
   const parNom = new Map(lignes.map((l) => [l.destinationNom, l]));
 
-  const aFaire: DestinationMatrice[] = [];
-  for (const lieu of lieux) {
-    const ligne = parNom.get(lieu.nom);
-    if (ligne && cacheValide(ligne, lieu, maison)) continue;
-    aFaire.push({ nom: lieu.nom, lat: lieu.lat, lon: lieu.lon });
-    if (aFaire.length >= MATRICE_MAX_PAR_PASSE) break;
-  }
+  const aFaire = choisirDestinations(
+    lieux,
+    parNom,
+    (ligne, lieu) => cacheValide(ligne, lieu, maison),
+    MATRICE_MAX_PAR_PASSE,
+  );
   if (aFaire.length === 0) return { resume: "à jour : toutes les durées tiennent", remplies: 0 };
 
   // Le budget se réserve à l'ÉLÉMENT — N destinations = N éléments, dans UN appel HTTP.
@@ -100,39 +105,18 @@ export async function remplirDureesTrajet(): Promise<BilanMatrice> {
   }
 
   for (const e of r.elements) {
+    const valeurs = ligneTrajet(e, aFaire, maison, new Date());
+    if (!valeurs) continue;
+    // La ligne était invalide (sinon elle ne serait pas dans aFaire) : son ancien tracé est
+    // faux, `ligneTrajet` le remet à null et il tombe avec elle.
     await db
       .insert(trajets)
-      .values({
-        destinationNom: e.nom,
-        lat: aFaire.find((d) => d.nom === e.nom)!.lat,
-        lon: aFaire.find((d) => d.nom === e.nom)!.lon,
-        origineLat: maison.lat,
-        origineLon: maison.lon,
-        dureeS: e.dureeS,
-        distanceM: e.distanceM,
-        polyline: null,
-        calculeLe: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: trajets.destinationNom,
-        set: {
-          lat: aFaire.find((d) => d.nom === e.nom)!.lat,
-          lon: aFaire.find((d) => d.nom === e.nom)!.lon,
-          origineLat: maison.lat,
-          origineLon: maison.lon,
-          dureeS: e.dureeS,
-          distanceM: e.distanceM,
-          // La ligne était invalide (sinon elle ne serait pas dans aFaire) : son ancien
-          // tracé est faux, il tombe avec elle.
-          polyline: null,
-          calculeLe: new Date(),
-        },
-      });
+      .values(valeurs)
+      .onConflictDoUpdate({ target: trajets.destinationNom, set: valeurs });
   }
 
-  const parts = [`${r.elements.length} durée(s) remplie(s)`];
-  if (r.inatteignables.length > 0) parts.push(`inatteignables : ${r.inatteignables.join(", ")}`);
-  const restantes = lieux.length - parNom.size - r.elements.length;
-  if (restantes > 0) parts.push(`${restantes} restante(s) pour les passes suivantes`);
-  return { resume: parts.join(" · "), remplies: r.elements.length };
+  // Les lignes VALIDES seulement : une ligne présente mais invalide reste à refaire.
+  const valides = compterValides(lieux, parNom, (ligne, lieu) => cacheValide(ligne, lieu, maison));
+  const resume = resumerRemplissage(lieux.length, valides, r.elements.length, r.inatteignables);
+  return { resume, remplies: r.elements.length };
 }
