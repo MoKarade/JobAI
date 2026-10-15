@@ -86,6 +86,8 @@ export default async function Profil() {
     // Un profil illisible ne se contourne pas en silence : les notes seraient calculées
     // avec un barème que personne n'a choisi.
     erreurProfil = (e as Error).message;
+    // Le détail reste dans les journaux du serveur ; l'écran n'affiche qu'une phrase simple.
+    console.error("[profil] profil enregistré illisible :", erreurProfil);
   }
 
   // Le CV le plus récent qui porte une proposition : c'est celui qu'on donne à relire.
@@ -119,8 +121,8 @@ export default async function Profil() {
 
       {erreurProfil ? (
         <p className="revue__retour revue__retour--echec">
-          Profil enregistré illisible : {erreurProfil}. Les notes continuent d’utiliser le
-          barème par défaut du code.
+          Le profil enregistré est illisible pour le moment. Les notes continuent d’utiliser
+          le barème par défaut.
         </p>
       ) : null}
 

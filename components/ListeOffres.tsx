@@ -105,7 +105,12 @@ export function ListeOffres({
       ) : null}
 
       {groupes.length === 0 ? (
-        <p className="vide">Aucune offre ne correspond aux filtres.</p>
+        <div className="vide">
+          <p>Aucune offre ne correspond aux filtres.</p>
+          <button type="button" className="bouton" onClick={() => setFiltres(FILTRES_VIDES)}>
+            Effacer les filtres
+          </button>
+        </div>
       ) : (
         <div className="liste">
           {groupes.map((g) => (
