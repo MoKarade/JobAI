@@ -26,6 +26,7 @@ import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { raisonsAffichables } from "@/lib/raisons";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { lienDeOffre } from "@/lib/lienOffre";
+import { dateLisible } from "@/lib/dateLisible";
 import { MOT_DOUTE, type Fraicheur } from "@/lib/fraicheur";
 import { Fait } from "./Icone";
 import { ControlesOffre } from "./ControlesOffre";
@@ -153,7 +154,7 @@ export function CarteOffre({
             <span className="etiquette etiquette--salaire">{offre.salaireAffiche}</span>
           ) : null}
           <span className="carte__date">
-            {offre.histo ? "envoyée" : "vue"} {offre.dateEnvoi || offre.dateReperage}
+            {offre.histo ? "envoyée" : "vue"} {dateLisible(offre.dateEnvoi || offre.dateReperage)}
           </span>
         </p>
 
