@@ -1,5 +1,7 @@
 # Rattachement de JobAI à l'Atelier
 
+> Caduc depuis le 15/10/2026 : l'Atelier est arrêté. Le travail passe par une PR par tâche et la fusion par Mergify. Gardé comme historique.
+
 - Session dédiée dans l'agence : `jobai-53` (pas de `jobai-chef` distinct à ce jour ; les lots récents sont coordonnés directement avec le gérant).
 - Dernières PR : `[DOC-CLAUDE-COURT]` CLAUDE.md court + `docs/claude/` (#41/#42, 2026-09-29) ; `[AUTH-ASYM-P1]` phase 1 de la connexion signée (branche `agence/jobai-53/auth-asym-phase1`, en attente du 01/10) ; `[TEST-CVSURFACE-WIN]` correctif de garde masquée sous Windows.
 - Ce lot (`st-jobai`) : structure commune allégée — `docs/INDEX.md` généré, `docs/couts-ci.md`, documentation légère en CI. `ignoreCommand` Vercel **non repris** : JobAI garde `scripts/build-necessaire.sh`, sa propre garde antérieure et plus large (voir `docs/couts-ci.md`, table des exceptions).
