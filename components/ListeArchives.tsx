@@ -13,6 +13,7 @@
 
 import Link from "next/link";
 import type { Offre } from "@/lib/types";
+import { dateLisible } from "@/lib/dateLisible";
 import type { Observation } from "@/lib/dureeVie";
 
 /** « 12 jours », « 1 jour », « vue une seule fois » — jamais « 0 jour ». */
@@ -60,7 +61,7 @@ export function ListeArchives({
                 <span className="archives__duree archives__duree--absente">durée non mesurée</span>
               )}
               {o.perimeeLe ? (
-                <span className="archives__date">fermée le {o.perimeeLe.slice(0, 10)}</span>
+                <span className="archives__date">fermée le {dateLisible(o.perimeeLe.slice(0, 10))}</span>
               ) : null}
               {o.score !== null ? <span className="archives__note">{o.score}/100</span> : null}
             </p>

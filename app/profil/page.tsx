@@ -18,6 +18,7 @@ import { TeleversementCv } from "@/components/TeleversementCv";
 import { listerCvs, profilActif, propositionDe } from "@/lib/cv/depot";
 import { calculerEcarts } from "@/lib/cv/proposition";
 import { PROFIL_DEFAUT } from "@/lib/profil";
+import { dateLisible } from "@/lib/dateLisible";
 
 export const metadata = { title: "Profil — JobAI" };
 
@@ -29,7 +30,7 @@ function poids(octets: number): string {
 }
 
 function dateCourte(iso: string): string {
-  return iso.slice(0, 10);
+  return dateLisible(iso.slice(0, 10));
 }
 
 /**
