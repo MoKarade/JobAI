@@ -61,6 +61,7 @@ async function appel(corps: unknown, accept = "application/json, text/event-stre
     aujourdhui: () => "2026-08-19",
     lireJournal: async () => ({}),
     lireEtatSynchro: async () => [],
+    lireResumeDistances: async () => ({ brut: null }),
     diagnostiquerFlux: async () => ({ fin: "flux-termine" }),
   });
   await serveur.connect(t);

@@ -48,7 +48,7 @@ import {
 // voulait faire pour la réutiliser — aurait publié les coordonnées du domicile de Marc.
 // Elle vit désormais dans un module ordinaire, où aucun `export` ne peut faire ça.
 import { domicile } from "./domicile";
-import { lireEtat } from "./etat";
+import { ecrireEtat, lireEtat } from "./etat";
 import { CLE_RAYON, RAYON_DEFAUT_KM, profilAvecRayon } from "./rayon";
 import { ENTREPRISES_CIBLES } from "./reference";
 import {
@@ -87,6 +87,7 @@ import {
 } from "./registre";
 import { BUDGET_PASSE_PAGE_MS } from "./synchro";
 import { creerChrono } from "./jalons";
+import { CLE_RESUME_DISTANCES, construireResume } from "./resumePasse";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -1371,7 +1372,7 @@ export async function mesurerDistances(
     // 2026-09-17 j'ai écrit que Nominatim consommait ~17,5 s des 25 s partagés, sans aucune
     // preuve, alors que l'étape non bornée était juste à côté. Ces jalons rendent la réponse
     // CERTAINE au lieu de plausible — et ils coûtent un `Date.now()` par étape.
-    const { jalon, ligne: ligneBudget } = creerChrono();
+    const { jalon, ligne: ligneBudget, releve: releveBudget } = creerChrono();
 
     // 0. RATTRAPER LES VILLES MANQUANTES, avant tout le reste.
     //
@@ -1836,6 +1837,34 @@ export async function mesurerDistances(
     }
     if (raffinage.entreprisesHorsRayon.length > 0) {
       console.log(`[raffinage] hors rayon — ${echantillon(raffinage.entreprisesHorsRayon)}`);
+    }
+
+    // ⚠️ GARDER CE QUE LA PASSE VIENT DE DIRE (`[OBS-02]`, tâche #95). Ces chiffres n'allaient
+    // que dans la réponse HTTP et les journaux (~17 min) ; une ligne de `sync_state` les rend
+    // relisibles par `etat_synchro`. L'échec de cette écriture ne fait PAS échouer la passe —
+    // le travail est fait, c'est la trace qui manque — mais il se dit, il ne se tait pas.
+    try {
+      await ecrireEtat(
+        CLE_RESUME_DISTANCES,
+        construireResume(
+          {
+            mesurees: majs.length,
+            situees,
+            candidatesSituees: manquants.length,
+            placees,
+            villesManquantes,
+            distancesEffacees: effacees,
+            centresCorriges,
+            bornesMesurees: bornes.mesurees,
+            bornesCandidates: bornes.candidates,
+            budgetRestantMs: restant,
+            etapes: releveBudget(),
+          },
+          new Date(),
+        ),
+      );
+    } catch (err) {
+      console.error("[distances] résumé de passe non enregistré", err);
     }
 
     revalidatePath("/");

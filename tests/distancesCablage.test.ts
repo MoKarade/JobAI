@@ -76,3 +76,30 @@ describe("la passe de distances applique la garde de plausibilité", () => {
     expect(code).toContain("villesManquantes=${villesManquantes}");
   });
 });
+
+describe("[OBS-02] le résumé de la passe est écrit, et lu par l'outil", () => {
+  it("la passe écrit `distances-resume` AVANT de rendre sa réponse", () => {
+    const posEcriture = code.indexOf("ecrireEtat(");
+    const posRetour = code.indexOf("villesRattrapees: aRattraper.length,");
+    expect(code).toContain("CLE_RESUME_DISTANCES");
+    expect(posEcriture).toBeGreaterThan(-1);
+    expect(posRetour).toBeGreaterThan(posEcriture);
+  });
+
+  it("l'écriture reçoit les trois compteurs demandés, pas des copies recalculées", () => {
+    expect(code).toMatch(/construireResume\([\s\S]{0,900}?villesManquantes,/);
+    expect(code).toMatch(/construireResume\([\s\S]{0,900}?distancesEffacees: effacees,/);
+    expect(code).toMatch(/construireResume\([\s\S]{0,900}?centresCorriges,/);
+  });
+
+  it("un échec d'écriture est journalisé, il ne fait pas échouer la passe", () => {
+    expect(code).toContain("résumé de passe non enregistré");
+  });
+
+  it("la route MCP lit la MÊME clé que celle que la passe écrit", () => {
+    const route = sansCommentaires(
+      readFileSync(resolve(process.cwd(), "app/api/mcp/route.ts"), "utf8"),
+    );
+    expect(route).toMatch(/lireResumeDistances:[\s\S]{0,80}?lireEtatBrut\(CLE_RESUME_DISTANCES\)/);
+  });
+});

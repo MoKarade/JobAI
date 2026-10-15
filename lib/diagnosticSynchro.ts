@@ -15,6 +15,14 @@
 // de milliers de caractères — ce diagnostic sert à DATER un passage, jamais à le relire. Le
 // type d'entrée ne porte donc que `cle` et `majLe` : un appelant qui passerait `valeur` ne
 // la ferait pas fuiter par erreur, elle n'a simplement pas de place dans le type.
+//
+// ⚠️ UNE SEULE EXCEPTION, ET ELLE EST FERMÉE (`[OBS-02]`, tâche #95) : le résumé de la
+// dernière passe de distances (`distances-resume`, `lib/resumePasse.ts`). Il ne passe pas par
+// `valeur` : l'appelant le lit à part, le fait valider par un schéma qui ne laisse entrer que
+// des compteurs, et le rend sous `resume`. Une autre clé ne gagne pas ce droit en copiant le
+// patron sans y réfléchir : il faut un schéma à liste blanche, pas un `JSON.parse`.
+
+import { CLE_RESUME_DISTANCES, type LectureResume, type ResumeDistances } from "./resumePasse";
 
 export interface LigneSynchroBrute {
   readonly cle: string;
@@ -25,6 +33,12 @@ export interface EtatSynchro {
   readonly cle: string;
   readonly majLe: string;
   readonly ageMs: number;
+  /**
+   * Seulement sur la ligne `distances-resume` : le contenu de la dernière passe terminée.
+   * `null` = la ligne existe mais n'est pas lisible (dit par `resumeIllisible`).
+   */
+  readonly resume?: ResumeDistances | null;
+  readonly resumeIllisible?: true;
 }
 
 /**
@@ -37,12 +51,22 @@ export interface EtatSynchro {
 export function resumerEtatSynchro(
   lignes: readonly LigneSynchroBrute[],
   maintenant: Date,
+  resumeDistances: LectureResume = { etat: "absent" },
 ): EtatSynchro[] {
   return [...lignes]
     .sort((a, b) => a.cle.localeCompare(b.cle))
-    .map((l) => ({
-      cle: l.cle,
-      majLe: l.majLe.toISOString(),
-      ageMs: maintenant.getTime() - l.majLe.getTime(),
-    }));
+    .map((l) => {
+      const base = {
+        cle: l.cle,
+        majLe: l.majLe.toISOString(),
+        ageMs: maintenant.getTime() - l.majLe.getTime(),
+      };
+      if (l.cle !== CLE_RESUME_DISTANCES) return base;
+      if (resumeDistances.etat === "ok") return { ...base, resume: resumeDistances.resume };
+      // La ligne est là mais ne se lit pas : on le DIT, on ne rend ni zéros ni l'absence.
+      if (resumeDistances.etat === "illisible") {
+        return { ...base, resume: null, resumeIllisible: true as const };
+      }
+      return base;
+    });
 }
