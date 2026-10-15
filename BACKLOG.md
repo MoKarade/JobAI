@@ -3084,7 +3084,7 @@ d'anormal. `[Supposition]`, pas confirmée (aucun accès Nominatim depuis cette 
 vérifier en relisant la ligne `villes` de Lavaltrie et la position stockée de l'employeur.
 **Non corrigé** (routine : mesurer, jamais corriger seul).
 
-### `[OBS-02]` — le CONTENU d'une passe de distances n'est lisible NULLE PART ⬜
+### `[OBS-02]` — le CONTENU d'une passe de distances n'est lisible NULLE PART ✅
 
 Même défaut qu'`[OBS-01]`, un cran plus loin. `[OBS-01]` a réglé le TIMING (`majLe` d'une
 réservation, via `etat_synchro`) ; il manque encore le CONTENU du dernier passage :
@@ -3098,6 +3098,15 @@ témoins temporaires. Remède probable : persister le dernier résumé de passe 
 (même patron que `CLE_RAPPORT`/`veille-rapport` pour la veille), lu par un nouvel outil MCP ou
 un ajout à `etat_synchro`. Non commencé — découvert en chemin par la routine, hors périmètre
 de sa mission (mesurer, ne pas corriger).
+
+**Fait le 2026-10-15 (tâche #95).** `mesurerDistances` écrit, à la fin de chaque passe qui va
+jusqu'au bout, une ligne `distances-resume` dans `sync_state` (`lib/resumePasse.ts` : compteurs
+seulement, schéma à liste blanche, aucune migration — la table est déjà clé/valeur).
+`etat_synchro` la rend sous `resume` : `finiLe`, `villesManquantes`, `distancesEffacees`,
+`centresCorriges`, `mesurees`, `situees`/`candidatesSituees`, `bornesMesurees`/
+`bornesCandidates`, budget restant et temps par étape. Absente = aucune passe terminée depuis la
+mise en service ; illisible = dite `resumeIllisible`, jamais rendue en zéros. Une passe qui lève
+n'écrit rien : le résumé précédent reste, daté par `finiLe`.
 
 ### `[CARTE-PERF]` — l'assemblage des écrans est quadratique ✅
 

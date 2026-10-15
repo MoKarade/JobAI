@@ -23,7 +23,8 @@ import { offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { BUDGET_MS_MCP, diagnostiquerFlux } from "@/lib/ingest/diagnosticFlux";
 import { creerServeur } from "@/lib/mcp/serveur";
-import { lireEtat } from "@/lib/etat";
+import { lireEtat, lireEtatBrut } from "@/lib/etat";
+import { CLE_RESUME_DISTANCES } from "@/lib/resumePasse";
 import { CLE_JOURNAL } from "@/lib/veilleComplete";
 import type { JournalVeille } from "@/lib/veille";
 import { empreinte, estProprietaire } from "@/lib/mcp/oauth";
@@ -162,6 +163,17 @@ export async function POST(requete: Request): Promise<Response> {
           console.error("[api/mcp] lecture de sync_state impossible", err);
           return null;
         }),
+    // ⚠️ LA SEULE VALEUR DE `sync_state` QUI SORT (`[OBS-02]`) : le serveur la fait passer par
+    // `lireResume` (liste blanche de compteurs) avant de la rendre. Une panne de lecture rend
+    // `null` et NON `{ brut: null }` : « la base n'a pas répondu » ≠ « aucune passe terminée ».
+    lireResumeDistances: () =>
+      lireEtatBrut(CLE_RESUME_DISTANCES).then(
+        (brut) => ({ brut }),
+        (err) => {
+          console.error("[api/mcp] lecture du résumé de passe impossible", err);
+          return null;
+        },
+      ),
   });
 
   await serveur.connect(transport);

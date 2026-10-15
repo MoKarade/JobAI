@@ -50,3 +50,59 @@ describe("resumerEtatSynchro", () => {
     expect(r[0]?.ageMs).toBe(-5000);
   });
 });
+
+describe("resumerEtatSynchro — le résumé de passe (`[OBS-02]`)", () => {
+  const RESUME = {
+    finiLe: "2026-10-15T07:31:00.000Z",
+    mesurees: 1,
+    situees: 1,
+    candidatesSituees: 1,
+    placees: 0,
+    villesManquantes: 7,
+    distancesEffacees: 0,
+    centresCorriges: 0,
+    bornesMesurees: 0,
+    bornesCandidates: 0,
+    budgetRestantMs: null,
+    etapes: [],
+  };
+  const lignes = [
+    { cle: "distances-auto", majLe: MAINTENANT },
+    { cle: "distances-resume", majLe: MAINTENANT },
+  ];
+
+  it("n'attache le résumé qu'à la ligne `distances-resume`", () => {
+    const r = resumerEtatSynchro(lignes, MAINTENANT, { etat: "ok", resume: RESUME });
+    expect(r.find((l) => l.cle === "distances-resume")?.resume).toEqual(RESUME);
+    expect(Object.keys(r.find((l) => l.cle === "distances-auto")!).sort()).toEqual([
+      "ageMs",
+      "cle",
+      "majLe",
+    ]);
+  });
+
+  it("sans résumé lu, la ligne reste une simple date", () => {
+    const r = resumerEtatSynchro(lignes, MAINTENANT);
+    expect(Object.keys(r.find((l) => l.cle === "distances-resume")!).sort()).toEqual([
+      "ageMs",
+      "cle",
+      "majLe",
+    ]);
+  });
+
+  it("un résumé illisible est marqué, pas remplacé par des zéros", () => {
+    const l = resumerEtatSynchro(lignes, MAINTENANT, { etat: "illisible" }).find(
+      (x) => x.cle === "distances-resume",
+    );
+    expect(l?.resume).toBeNull();
+    expect(l?.resumeIllisible).toBe(true);
+  });
+
+  it("une autre clé ne reçoit jamais de résumé, même si on en passe un", () => {
+    const r = resumerEtatSynchro([{ cle: "seed", majLe: MAINTENANT }], MAINTENANT, {
+      etat: "ok",
+      resume: RESUME,
+    });
+    expect(Object.keys(r[0]!).sort()).toEqual(["ageMs", "cle", "majLe"]);
+  });
+});

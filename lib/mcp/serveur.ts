@@ -22,6 +22,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { LigneSynchroBrute } from "../diagnosticSynchro";
 import { resumerEtatSynchro } from "../diagnosticSynchro";
+import { lireResume } from "../resumePasse";
 import type { Offre } from "../types";
 import type { SuiviVeille } from "../veille";
 import { FiltresSchema, chercherOffres, lireOffreVue, resumerPourMcp } from "./lecture.spec";
@@ -59,6 +60,11 @@ export interface EntreesSorties {
    * valeur (`[OBS-01]`). `null` si la base n'a pas répondu.
    */
   lireEtatSynchro: () => Promise<readonly LigneSynchroBrute[] | null>;
+  /**
+   * La valeur BRUTE de `distances-resume` (`[OBS-02]`) : `{ brut: null }` = jamais écrite,
+   * `null` = la base n'a pas répondu. Elle ne sort qu'après `lireResume` (schéma à liste blanche).
+   */
+  lireResumeDistances: () => Promise<{ brut: string | null } | null>;
 }
 
 /** Une réponse d'outil : du JSON, dans le seul format que le protocole transporte. */
@@ -207,7 +213,10 @@ export function creerServeur(io: EntreesSorties): McpServer {
       title: "Depuis quand une passe de fond a tourné",
       description:
         "Le nom et la dernière écriture (`majLe`, `ageMs`) de chaque ligne de `sync_state` — " +
-        "jamais son contenu. Sert quand les journaux runtime Vercel ont expiré (~17 min de " +
+        "jamais son contenu — sauf la ligne `distances-resume`, qui porte sous `resume` le " +
+        "résumé de la DERNIÈRE passe de distances terminée (`finiLe`, `villesManquantes`, " +
+        "`distancesEffacees`, `centresCorriges`, `bornesMesurees`, budget par étape) : " +
+        "des compteurs, jamais de texte libre. Sert quand les journaux runtime Vercel ont expiré (~17 min de " +
         "rétention) : les clés `geocodage-auto` et `distances-auto` disent quand le cron de " +
         "géocodage a réservé son tour pour la dernière fois ; `veille-auto`, la passe " +
         "d'ingestion ; `seed`, la dernière synchronisation du jeu de départ. ⚠️ NE PROUVE " +
@@ -221,7 +230,13 @@ export function creerServeur(io: EntreesSorties): McpServer {
       if (lignes === null) {
         return panne("La base n'a pas répondu : impossible de lire l'état des passes de fond.");
       }
-      return json(resumerEtatSynchro(lignes, new Date()));
+      // ⚠️ Une base muette sur le résumé est une PANNE, pas un résumé absent : le « jamais
+      // écrit » se dit `{ brut: null }`, et la différence est tout l'enjeu de `[OBS-02]`.
+      const resume = await io.lireResumeDistances();
+      if (resume === null) {
+        return panne("La base n'a pas répondu : impossible de lire le résumé de la dernière passe de distances.");
+      }
+      return json(resumerEtatSynchro(lignes, new Date(), lireResume(resume.brut)));
     },
   );
 
