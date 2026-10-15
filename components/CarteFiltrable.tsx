@@ -270,6 +270,11 @@ export function CarteFiltrable({
                   ? "Les entreprises n’ont pas encore été localisées. Ça se fait tout seul, au fil des passages — le bouton ci-dessus force une passe."
                   : "Aucune offre active à montrer."}
             </p>
+            {filtreActif ? (
+              <button type="button" className="bouton" onClick={() => setFiltres(FILTRES_VIDES)}>
+                Effacer les filtres
+              </button>
+            ) : null}
           </div>
         ) : (
           <ListeCarte epingles={epingles} />
