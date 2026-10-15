@@ -27,6 +27,7 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import { centreDuCadrage, type Epingle, type EntrepriseSurCarte } from "@/lib/carte";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
+import { lienTelephone } from "@/lib/lienTelephone";
 import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { libelleBorne, libelleDistanceBorne } from "@/lib/bornes";
 import { mentionSource } from "@/lib/adresse";
@@ -134,7 +135,11 @@ function ficheEntreprise(e: EntrepriseSurCarte, approximative: boolean): string 
     );
   }
   if (e.telephone) {
-    morceaux.push(`<span class="popup-telephone">${echapper(e.telephone)}</span>`);
+    const lien = lienTelephone(e.telephone);
+    const texte = echapper(e.telephone);
+    morceaux.push(
+      `<span class="popup-telephone">${lien ? `<a href="${echapper(lien)}">${texte}</a>` : texte}</span>`,
+    );
   }
   if (e.horaires && e.horaires.length > 0) {
     const jours = e.horaires.map((j) => `<li>${echapper(j)}</li>`).join("");
