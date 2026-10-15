@@ -18,6 +18,7 @@
 // décide d'aucun ordre lui-même.
 
 import { useMemo, useState } from "react";
+import { lienTelephone } from "@/lib/lienTelephone";
 import Link from "next/link";
 import {
   aplatirEntreprises,
@@ -101,7 +102,15 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
               {/* Fiche enrichie par Google Places — [CARTE-03-PLACES]. Même contenu que la
                   fenêtre de l'épingle (`CarteOffres.tsx`) : les trois champs sont
                   indépendants, `null` = pas de `placeGoogleId` ou pas encore interrogé. */}
-              {x.telephone ? <p className="carte-liste__telephone">{x.telephone}</p> : null}
+              {x.telephone ? (
+                <p className="carte-liste__telephone">
+                  {lienTelephone(x.telephone) ? (
+                    <a href={lienTelephone(x.telephone) ?? undefined}>{x.telephone}</a>
+                  ) : (
+                    x.telephone
+                  )}
+                </p>
+              ) : null}
               {x.horaires && x.horaires.length > 0 ? (
                 <ul className="carte-liste__horaires">
                   {x.horaires.map((j) => (
