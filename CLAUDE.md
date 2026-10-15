@@ -4,7 +4,7 @@
 
 ## Contexte
 - **JobAI** suit la recherche d'emploi de Marc (région de Québec) : offres notées selon son profil, statuts de candidature, réponses de recruteurs, aide IA (analyse d'offres, CV/lettres).
-- Stack : Next.js 15 (App Router, Server Actions) · Neon + Drizzle · Auth.js v5 (`providers: []`, session du hub) · Anthropic SDK · Zod · vitest.
+- Stack : Next.js 16 (App Router, Server Actions) · Neon + Drizzle · Auth.js v5 (`providers: []`, session du hub) · Anthropic SDK · Zod · vitest.
 - Déploiement : Vercel sur `emploi.hubperso.com`. Dépôt **PUBLIC**, branche par défaut `main`. Widget hub : `GET /api/hub/summary`.
 - État : `HANDOVER.md` (à lire en premier) ; plan : `BACKLOG.md` ; décisions : `docs/adr/`. Marc valide, il ne code pas.
 
@@ -29,3 +29,5 @@
 ## Pour aller plus loin (à lire seulement si nécessaire)
 - Anciens titres -> chemins : `docs/correspondance.md`. Sections : `docs/claude/` (`01-principes`, `02-conventions`, `03-workflow-git`, `04-commandes`, `05-verifications`, `06-deploiement`, `07-hub`, `08-documentation`, `10-style-compte-rendu`, `11-protocole`).
 - Leçons apprises (175 règles durables) : `docs/claude/lecons.md` ; leurs histoires : `docs/LESSONS.md`. Compte-rendu : `docs/COMPTE-RENDU.md`.
+
+@docs/COMPTE-RENDU.md
