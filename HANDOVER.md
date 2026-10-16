@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-10-16 — JobAI#148 : mesurer le barème actuel (étape 0 du plan de note)
+
+- **Fait** : nouvel outil MCP en lecture seule `diagnostic_bareme` (`lib/diagnosticBareme.ts`, pur, branché dans
+  `lib/mcp/serveur.ts` et `app/api/mcp/route.ts`). Il rend, sur les offres ouvertes notées : la répartition des notes
+  enregistrées, la moyenne de points par axe, la couverture des données (code de profession, salaire affiché, distance),
+  le profil actif (version, mots de vocabulaire ajoutés au défaut) et trois recalculs côte à côte : `renotation` (profil
+  actif sans code ni métiers, comme après une validation de CV), `complet` (profil actif avec code et métiers) et
+  `ingestion` (profil par défaut avec code et métiers).
+- **Pourquoi** : les notes ont baissé après la validation d'un CV et plafonnent à 77. Trois causes sont plausibles et aucune
+  n'est mesurée ; changer le barème avant de savoir laisserait le même défaut.
+- **Rien ne change à l'écran ni dans les notes.** L'outil ne lit que ; un profil actif illisible est une erreur nommée,
+  jamais un repli sur le défaut.
+- **À confirmer après déploiement** : appeler `diagnostic_bareme` et commenter la cause sur #148 (chiffres agrégés seulement :
+  le dépôt est public).
+
+---
+
 ## 2026-10-16 — JobAI#108 : brouillon de CV et de lettre ciblés sur une offre
 
 - **Fait** : la fiche d'une offre (`/offre/[id]`) a une section « Candidature » avec un bouton « Préparer un brouillon de
