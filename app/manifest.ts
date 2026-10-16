@@ -39,13 +39,13 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "any",
-    // `--bg` de globals.css, converti depuis son OKLCH. Le manifeste ne connaît pas
+    // `--fond` de globals.css, converti depuis son OKLCH. Le manifeste ne connaît pas
     // `prefers-color-scheme`, mais depuis ADR-0008 (révisé le 2026-08-13) l'app n'a plus
     // qu'un thème : la question ne se pose plus. C'est cette couleur que l'écran de
     // démarrage Android affiche AVANT que le CSS ne charge — une valeur claire ici
     // produirait un flash blanc à chaque ouverture de l'app installée.
-    background_color: "#141209",
-    theme_color: "#141209",
+    background_color: "#090c11",
+    theme_color: "#090c11",
     lang: "fr-CA",
     dir: "ltr",
     categories: ["productivity", "utilities"],
