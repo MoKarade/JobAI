@@ -6,6 +6,19 @@
 
 ---
 
+## 2026-10-16 — JobAI#91 : une passe de géocodage de plus par jour
+
+- **Décision de Marc** (16/10, 8 h 22 heure du Québec) : oui, situer plus de villes par nuit, avec des
+  sources gratuites seulement. Source inchangée : Nominatim (déjà employé), rien de payant.
+- **Changement** : `vercel.json` appelle `/api/cron/geocodage` deux fois par jour, 03:00 et 19:00 UTC
+  (la seconde entrée porte `?passe=apres-midi`, ignoré par la route, pour garder deux chemins
+  distincts). Le plafond de 8 villes par passe ne bouge pas ; le plan hobby accepte 100 crons par
+  projet, une fois par jour chacun (documentation Vercel, lue le 16/10).
+- **Verrou** : `tests/passesGeocodage.test.ts` (au moins deux passes de géocodage, quotidiennes,
+  heures distinctes, écart d'au moins 5 h, filet de reprise de la veille toujours cohérent).
+- **Preuve attendue** : `villesManquantes` (`etat_synchro` → `distances-resume`) baisse trois relevés
+  de suite. Relevés de départ : 467 (03:00 UTC le 16/10) puis 464 (11:01 UTC).
+
 ## 2026-10-16 — JobAI#99 : cinq modules de lib/ que rien ne testait sont exercés
 
 - **Modules** : `mesureLieux.ts`, `adresse.ts`, `ingest/sources.ts`, `ingest/adresseAnnoncee.ts`,

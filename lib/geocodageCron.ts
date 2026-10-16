@@ -1,6 +1,7 @@
 // lib/geocodageCron.ts — le débit d'une passe de géocodage automatique.
 //
-// PARTAGÉ entre les deux crons (`cron/veille`, `cron/geocodage`) : les deux appellent le même
+// PARTAGÉ entre les passes (`cron/veille`, et `cron/geocodage` qui part deux fois par jour — 03:00 et
+// 19:00 UTC, `vercel.json`, JobAI#91) : elles appellent toutes le même
 // `mesurerDistances` avec le même budget, et c'est voulu — deux copies indépendantes de ces
 // deux nombres pourraient diverger sans qu'aucun test ne le remarque (même risque que
 // `lib/cronAuth.ts`).
@@ -18,8 +19,8 @@ import { DELAI_MAX_MS } from "./overpass";
  * 8 depuis onze jours : la preuve qu'une affirmation de commentaire se vérifie, pas qu'elle
  * se lit).
  *
- * ⚠️ Vouloir un débit plus haut = ajouter une PASSE (un second cron, à une autre heure —
- * `vercel.json`), JAMAIS agrandir celle-ci. Voir `BUDGET_GEOCODAGE_CRON_MS` pour le calcul
+ * ⚠️ Vouloir un débit plus haut = ajouter une PASSE (un cron de plus, à une autre heure —
+ * `vercel.json`, verrouillé par `tests/passesGeocodage.test.ts`), JAMAIS agrandir celle-ci. Voir `BUDGET_GEOCODAGE_CRON_MS` pour le calcul
  * qui interdit d'agrandir ce plafond sans re-dériver le pire cas sur les 60 s d'une fonction
  * Vercel.
  */
