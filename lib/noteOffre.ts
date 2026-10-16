@@ -55,7 +55,7 @@ export interface Bareme {
 
 /** Ce que le barème lit d'une offre. Un sous-ensemble de `Offre`, pour que toute offre convienne. */
 export type EntreeNote = Pick<Offre, "poste" | "km"> &
-  Partial<Pick<Offre, "noc" | "typePoste" | "dureeEmploi" | "texteNote" | "notes">>;
+  Partial<Pick<Offre, "noc" | "typePoste" | "dureeEmploi" | "texteNote" | "notes" | "experienceMois">>;
 
 /**
  * Le texte que le barème lit en plus du titre.
@@ -96,6 +96,10 @@ export function noterOffre(
       noc: o.noc ?? null,
       typePoste: o.typePoste ?? null,
       dureeEmploi: o.dureeEmploi ?? null,
+      experienceMois: o.experienceMois ?? null,
+      // ⚠️ `salaireAnnuel` N'EST PAS PASSÉ, ET C'EST VOULU : l'offre le porte (JobAI#150) mais l'axe du
+      // salaire reste inerte jusqu'à JobAI#152, qui l'applique avec un aperçu avant/après. Le brancher
+      // ici déplacerait toutes les notes sans que Marc ait vu l'écart.
     },
     profil,
     metiers,

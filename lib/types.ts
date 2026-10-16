@@ -101,6 +101,13 @@ export const OffreSchema = z.object({
   dureeEmploi: z.string().nullable().optional(),
   texteNote: z.string().nullable().optional(),
   /**
+   * Salaire ANNUEL en dollars lu du texte publié (borne basse d'une fourchette, taux horaire × 2 080 h)
+   * et expérience exigée en MOIS, tous deux issus des champs structurés du flux (ADR-0026). `null` ou
+   * absent = la source n'en donne pas, ou on ne sait pas le lire ; jamais un 0 inventé.
+   */
+  salaireAnnuel: z.number().int().positive().nullable().optional(),
+  experienceMois: z.number().int().min(0).nullable().optional(),
+  /**
    * Ville de l'employeur, telle qu'annoncée par la source. `null` si inconnue.
    * Sert au géocodage : « ISS » seul est une recherche mondiale, « ISS, Québec » non.
    */
