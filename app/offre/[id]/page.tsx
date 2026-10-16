@@ -13,6 +13,7 @@ import { auth } from "@/auth";
 import { lireOffre } from "@/lib/donnees";
 import { palier } from "@/lib/scoring";
 import { ControlesOffre } from "@/components/ControlesOffre";
+import { BrouillonCandidature } from "@/components/BrouillonCandidature";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { lienDeOffre } from "@/lib/lienOffre";
 import { fraicheurOffre } from "@/lib/fraicheur";
@@ -223,6 +224,11 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
         <section className="detail__bloc">
           <h2>Suivi</h2>
           <ControlesOffre offre={offre} />
+        </section>
+
+        <section className="detail__bloc">
+          <h2>Candidature</h2>
+          <BrouillonCandidature idOffre={offre.id} />
         </section>
       </article>
     </Cadre>
