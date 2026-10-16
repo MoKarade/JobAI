@@ -17,9 +17,8 @@
 // lecture ; une mesure automatique n'a pas à les écraser — même si elle est plus précise,
 // c'est lui qui décide. Fonctions PURES : la décision se teste sans base ni réseau.
 
-import { computeScore, PLAFOND_NOTE_CALCULEE } from "./scoring";
+import { noterOffre, type Bareme } from "./noteOffre";
 import { distanceKm, RAYON_VALIDATION_KM } from "./geocodage";
-import { PROFIL_DEFAUT, type Profil } from "./profil";
 import { cleGroupement, creerRecherchePosition, memeEmployeur } from "./employeurs";
 import { estDansLaRegion, normaliserLieu } from "./ingest/region";
 import type { Offre } from "./types";
@@ -248,8 +247,12 @@ export function planifierDistances(
    * une ville entrerait dans la région élargie, mais l'offre garderait une note de distance
    * calculée sur l'ancien rayon — donc zéro dès qu'elle dépasse 75 km, alors qu'elle est
    * désormais dans le rayon voulu. Deux moitiés d'une même décision qui ne se parlent pas.
+   *
+   * ⚠️ `null` = LE BARÈME DE MARC EST ILLISIBLE : les distances s'écrivent (c'est le critère
+   * n°1), les notes NE BOUGENT PAS. Noter avec un autre barème que le sien, c'est le défaut
+   * que JobAI#149 retire.
    */
-  profil: Profil = PROFIL_DEFAUT,
+  bareme: Bareme | null,
 ): MiseAJourDistance[] {
   const majs: MiseAJourDistance[] = [];
   const positionDe = creerRecherchePosition(positions);
@@ -284,7 +287,7 @@ export function planifierDistances(
     majs.push({
       id: o.id,
       km,
-      score: scoreAvecDistance(o, km, profil),
+      score: bareme === null ? null : scoreAvecDistance(o, km, bareme),
       precision: pos.precision,
     });
   }
@@ -299,19 +302,11 @@ export function planifierDistances(
  * la lecture de Marc et fait autorité sur toute note calculée (le barème plafonne d'ailleurs
  * les calculées à 85 pour cette raison même).
  */
-export function scoreAvecDistance(
-  offre: Offre,
-  km: number,
-  profil: Profil = PROFIL_DEFAUT,
-): number | null {
+export function scoreAvecDistance(offre: Offre, km: number | null, bareme: Bareme): number | null {
   if (offre.scoreSource !== "calcule") return null;
-
-  // Le titre et les justifications sont ce dont on dispose ici : la description complète
-  // n'est pas conservée en base (elle ne sert qu'au moment du tri). La note bougera donc
-  // surtout par la composante distance, ce qui est précisément le but.
-  const texte = offre.raisons.map((r) => r.texte).join(" ");
-  const r = computeScore({ titre: offre.poste, description: texte, km }, profil);
-  return Math.min(r.total, PLAFOND_NOTE_CALCULEE);
+  // La même fonction que l'ingestion et la re-notation (ADR-0025) : l'offre est notée avec ce
+  // qui est gardé d'elle, et la distance qu'on vient de mesurer.
+  return noterOffre(offre, bareme.profil, bareme.metiers, km).total;
 }
 
 /**

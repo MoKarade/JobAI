@@ -17,6 +17,7 @@ import { db } from "../db";
 import { offers } from "../db/schema";
 import { exigerSession } from "../session";
 import { lireOffres } from "../donnees";
+import { lireMetiers } from "../actionsMetiers";
 import { extraireTexte, TAILLE_MAX_OCTETS } from "./texte";
 import { extraireFaits } from "./extraction";
 import {
@@ -169,7 +170,16 @@ export async function validerProfil(
   const nouveau = appliquerEcarts(courant, ecarts, ecartsRetenus, aujourdhui());
 
   const offres = (await lireOffres()) ?? [];
-  const plan = planifierRenotation(offres, nouveau);
+  // Le MÊME barème que l'ingestion et la mesure de distance : le profil qu'on va activer ET les
+  // métiers retenus (JobAI#149). Sans les métiers, le domaine ne pèserait rien ici et la note
+  // recalculée ne ressemblerait plus à celle d'une offre fraîche.
+  let metiers: string[];
+  try {
+    metiers = await lireMetiers();
+  } catch (e) {
+    return { ok: false, erreur: `Métiers retenus illisibles : ${(e as Error).message}` };
+  }
+  const plan = planifierRenotation(offres, { profil: nouveau, metiers });
 
   try {
     await activerProfil(cvId, nouveau);

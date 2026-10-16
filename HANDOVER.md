@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-10-16 — JobAI#149 : une seule façon de noter une offre (ADR-0025)
+
+- **Avant** : quatre chemins notaient une offre avec des entrées différentes (profil par défaut ou actif, avec ou sans
+  métiers, code de profession, conditions, texte). Tableau dans l'ADR-0025.
+- **Fait** : `lib/noteOffre.ts` (`noterOffre`, `extraitPourNote`, `Bareme`) ; l'ingestion, la re-notation, la mesure de
+  distance et l'ajout manuel l'appellent avec le profil actif et les métiers retenus. Migration 0025 (colonnes
+  facultatives `type_poste`, `duree_emploi`, `texte_note`), `tests/noteOffre.test.ts` (la même offre rend la même note
+  par chaque chemin, avec un profil qui diffère du défaut).
+- **Décision en attente de Marc** : garder l'extrait d'annonce (2 000 car.) en base. Carte posée dans le fil ; le code
+  suit l'option « garder ». Sans extrait, les chemins se rejoignent quand même (ils lisent tous la note de provenance).
+- **Trouvé** : la mesure de distance relisait les justifications comme du texte d'annonce, ce qui donnait « coordination »
+  et « technique » à toute offre déjà à 70+ (seed : 10 notes sur 30 bougent, jusqu'à −14). Hypothèse pour le 77 de
+  JobAI#148, [À vérifier] en production.
+- **Pas fait, à savoir** : aucune note existante n'est réécrite ; elles se corrigent à la prochaine validation de CV ou
+  mesure de distance. Les offres d'avant l'ADR n'ont pas d'extrait : elles se notent sur leur note de provenance.
+- **À confirmer en production** : la colonne `texte_note` existe, la première passe y écrit, et son volume.
+
 ## 2026-10-16 — JobAI#90 : un employeur à plusieurs sites ne prête plus sa position à une ville inconnue
 
 - **Mesuré en production (MCP, 16/10)** : les offres de Coffrages Synergy annoncées à Lavaltrie (~200 km) affichent encore

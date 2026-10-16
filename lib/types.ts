@@ -92,6 +92,15 @@ export const OffreSchema = z.object({
    */
   noc: z.string().nullable().optional(),
   /**
+   * Type de poste et durée d'emploi publiés par la source (« Temps plein », « Permanent »),
+   * et l'extrait d'annonce que la note a lu (nettoyé des noms de tiers, borné). Gardés pour
+   * que toute re-notation lise ce que l'ingestion a lu (ADR-0025). `null` ou absent = la
+   * source n'en donne pas, et c'est NEUTRE à la note. Facultatifs comme `noc`.
+   */
+  typePoste: z.string().nullable().optional(),
+  dureeEmploi: z.string().nullable().optional(),
+  texteNote: z.string().nullable().optional(),
+  /**
    * Ville de l'employeur, telle qu'annoncée par la source. `null` si inconnue.
    * Sert au géocodage : « ISS » seul est une recherche mondiale, « ISS, Québec » non.
    */

@@ -284,13 +284,13 @@ describe("la re-notation", () => {
       offre({ id: "manuelle", score: 95, scoreSource: "manuel" }),
       offre({ id: "calculee", score: 70, scoreSource: "calcule" }),
     ];
-    const plan = planifierRenotation(offres, large);
+    const plan = planifierRenotation(offres, { profil: large, metiers: [] });
     expect(plan.changements.map((c) => c.id)).not.toContain("manuelle");
     expect(plan.manuellesPreservees).toBe(1);
   });
 
   it("les offres dont la note ne bouge pas sont comptées, pas listées", () => {
-    const plan = planifierRenotation([offre({ id: "a" })], PROFIL_DEFAUT);
+    const plan = planifierRenotation([offre({ id: "a" })], { profil: PROFIL_DEFAUT, metiers: [] });
     expect(plan.changements).toEqual([]);
     expect(plan.inchangees).toBe(1);
   });
@@ -300,7 +300,7 @@ describe("la re-notation", () => {
       offre({ id: "petit", km: 4, score: 78 }),
       offre({ id: "gros", km: 30, score: 78 }),
     ];
-    const plan = planifierRenotation(offres, large);
+    const plan = planifierRenotation(offres, { profil: large, metiers: [] });
     const deltas = plan.changements.map((c) => Math.abs(c.delta));
     expect(deltas).toEqual([...deltas].sort((a, b) => b - a));
   });
@@ -311,14 +311,14 @@ describe("la re-notation", () => {
       offre({ id: "b", scoreSource: "manuel" }),
       offre({ id: "c" }),
     ];
-    const plan = planifierRenotation(offres, large);
+    const plan = planifierRenotation(offres, { profil: large, metiers: [] });
     expect(plan.changements.length + plan.inchangees + plan.manuellesPreservees).toBe(
       offres.length,
     );
   });
 
   it("le résumé dit ce qui a été préservé", () => {
-    const plan = planifierRenotation([offre({ scoreSource: "manuel" })], large);
+    const plan = planifierRenotation([offre({ scoreSource: "manuel" })], { profil: large, metiers: [] });
     expect(resumerPlan(plan)).toMatch(/manuelle préservée/);
   });
 });

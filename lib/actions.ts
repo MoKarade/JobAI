@@ -50,6 +50,9 @@ import {
 import { domicile } from "./domicile";
 import { ecrireEtat, lireEtat } from "./etat";
 import { CLE_RAYON, RAYON_DEFAUT_KM, profilAvecRayon } from "./rayon";
+import type { Bareme } from "./noteOffre";
+import { profilActif } from "./cv/depot";
+import { lireMetiers } from "./actionsMetiers";
 import { ENTREPRISES_CIBLES } from "./reference";
 import {
   employeursASituer,
@@ -1735,12 +1738,23 @@ export async function mesurerDistances(
     // (le cron, la carte, l'accueil), et trois lectures valent mieux qu'un paramètre qu'un
     // seul des trois penserait à fournir.
     const rayonMaxKm = await lireEtat<number>(CLE_RAYON, RAYON_DEFAUT_KM);
+    // ⚠️ LE BARÈME DE MARC, PAS LE DÉFAUT (ADR-0025, JobAI#149) : le profil actif et les métiers
+    // retenus, avec le rayon réglé. S'ils sont illisibles, les distances s'écrivent quand même
+    // (c'est le critère n°1) mais les NOTES ne bougent pas — noter avec un autre barème que le
+    // sien, c'est le défaut que cette tâche retire. La panne est dite, pas avalée.
+    let bareme: Bareme | null = null;
+    try {
+      const [profil, metiers] = await Promise.all([profilActif(), lireMetiers()]);
+      bareme = { profil: profilAvecRayon(rayonMaxKm, profil), metiers };
+    } catch (e) {
+      console.error("[distances] barème illisible : les distances sont écrites, les notes non", e);
+    }
     const majs = planifierDistances(
       offresAMesurer,
       positions,
       (p) => distanceKm(chezMoi, p),
       centreDe,
-      profilAvecRayon(rayonMaxKm),
+      bareme,
     );
     for (const m of majs) {
       const valeurs: { km: number; majLe: Date; score?: number } = { km: m.km, majLe: new Date() };
@@ -2095,9 +2109,13 @@ export async function ajouterOffre(saisie: unknown): Promise<ResultatAjout> {
     // Tous les identifiants, pas seulement ceux qui ressemblent : le suivi fait quelques
     // dizaines de lignes, et un filtre par préfixe raterait une collision après troncature.
     const pris = await db.select({ id: offers.id }).from(offers);
+    // Le barème de Marc, comme l'ingestion et la mesure de distance (ADR-0025) : une offre
+    // ajoutée à la main sans note vaut ce que vaudrait la même offre venue du flux.
+    const [profil, metiers] = await Promise.all([profilActif(), lireMetiers()]);
     const offre = construireOffre(parse.data, {
       id: identifiantPour(parse.data.entreprise, parse.data.poste, new Set(pris.map((l) => l.id))),
       aujourdhui: aujourdhui(new Date()),
+      bareme: { profil, metiers },
     });
 
     await db.insert(offers).values(colonnesOffre(offre));

@@ -16,6 +16,7 @@ import {
 } from "../lib/ajout";
 import { OffreSchema } from "../lib/types";
 import { PLAFOND_NOTE_CALCULEE } from "../lib/scoring";
+import { PROFIL_DEFAUT } from "../lib/profil";
 
 /** La saisie minimale valide, à surcharger cas par cas. */
 function saisie(champs: Record<string, unknown> = {}) {
@@ -167,7 +168,11 @@ describe("la ville saisie à la main", () => {
   // pas géocodable — « ISS » seul est une recherche mondiale — donc sans distance et hors
   // de la carte. Le formulaire ne la demandait pas, et `ville` n'est pas modifiable
   // ensuite : l'offre restait dans ce cul-de-sac à vie.
-  const ctx = { id: "fabrique-nord-coordonnateur", aujourdhui: "2026-07-28" };
+  const ctx = {
+    id: "fabrique-nord-coordonnateur",
+    aujourdhui: "2026-07-28",
+    bareme: { profil: PROFIL_DEFAUT, metiers: [] as string[] },
+  };
 
   it("est conservée telle que Marc l'a écrite", () => {
     expect(construireOffre(saisie({ ville: "Saint-Augustin-de-Desmaures" }), ctx).ville).toBe(
@@ -187,7 +192,11 @@ describe("la ville saisie à la main", () => {
 });
 
 describe("construction de l'offre", () => {
-  const ctx = { id: "fabrique-nord-coordonnateur", aujourdhui: "2026-07-28" };
+  const ctx = {
+    id: "fabrique-nord-coordonnateur",
+    aujourdhui: "2026-07-28",
+    bareme: { profil: PROFIL_DEFAUT, metiers: [] as string[] },
+  };
 
   it("marque l'origine : ajoutée par l'utilisateur, active, jamais envoyée", () => {
     const o = construireOffre(saisie(), ctx);

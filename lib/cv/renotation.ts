@@ -16,8 +16,7 @@
 // des offres, rend un plan de changements. C'est ce qui permet d'éprouver la règle
 // ci-dessus sans monter une base, et de MONTRER le plan avant de l'écrire.
 
-import { computeScore } from "../scoring";
-import type { Profil } from "../profil";
+import { noterOffre, type Bareme } from "../noteOffre";
 import type { Offre } from "../types";
 
 export interface ChangementNote {
@@ -49,7 +48,7 @@ export interface PlanRenotation {
  */
 export function planifierRenotation(
   offres: readonly Offre[],
-  profil: Profil,
+  bareme: Bareme,
 ): PlanRenotation {
   const changements: ChangementNote[] = [];
   let manuellesPreservees = 0;
@@ -61,10 +60,7 @@ export function planifierRenotation(
       continue;
     }
 
-    const r = computeScore(
-      { titre: o.poste, description: o.notes ?? "", km: o.km },
-      profil,
-    );
+    const r = noterOffre(o, bareme.profil, bareme.metiers);
 
     if (r.total === o.score) {
       inchangees++;
