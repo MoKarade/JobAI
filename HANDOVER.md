@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-10-16 — JobAI#115 : seules les branches sans préfixe déploient (préversions coupées)
+
+- **Constat** (liste des déploiements Vercel du 15/10) : seules les branches `claude/*` étaient
+  coupées ; les branches `agence/…` et `dependabot/…` créaient une préversion à chaque poussée,
+  sur un quota partagé entre les six apps.
+- **Changement** : `vercel.json` ajoute la règle `"*/**": false` à `git.deploymentEnabled`. Toute
+  branche à préfixe (`claude/`, `feature/`, `agence/`, `dependabot/`) est coupée ; `main` n'a pas de
+  barre oblique, aucune règle ne peut donc la viser (négation `!(main)` écartée : sa réponse change
+  selon la version de minimatch). Verrou : `tests/previsionsVercel.test.ts`.
+- **Limite connue** : une branche d'un seul segment (`correctif`) déploierait encore ; la convention
+  du dépôt (`claude/…`, `feature/…`) n'en produit pas.
+- **À confirmer après déploiement** : la production se déploie pour le commit de fusion, et la
+  prochaine branche `dependabot/…` ou `feature/…` ne crée aucune préversion.
+
 ## 2026-10-15 — JobAI#122 : la passe de distances de l'accueil ne dépasse plus 60 s
 
 - **Cause (mesurée en local, à confirmer en production)** : `positionDe` re-normalisait TOUTES
