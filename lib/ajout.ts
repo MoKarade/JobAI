@@ -8,7 +8,7 @@
 // Deux choix assumés, écrits ici plutôt que devinés à la lecture :
 //
 //   1. La note est MANUELLE ou CALCULÉE, jamais un mélange. Si Marc entre une note, elle
-//      fait foi (`scoreSource: "manuel"`). S'il n'en entre pas, `computeScore` la déduit des
+//      fait foi (`scoreSource: "manuel"`). S'il n'en entre pas, `noterOffre` (ADR-0025) la déduit des
 //      champs structurés et elle est plafonnée à 85 — une note calculée ne doit jamais
 //      passer devant une offre lue et vérifiée à la main. C'est le premier consommateur
 //      réel de `scoreSource` : jusqu'ici la colonne n'était remplie que par le jeu de départ.
@@ -22,7 +22,7 @@
 //      offre saisie à la main n'est ni avantagée ni pénalisée sur ce critère.
 
 import { z } from "zod";
-import { computeScore } from "./scoring";
+import { noterOffre, type Bareme } from "./noteOffre";
 import { OffreSchema, PrioriteSchema, type Offre } from "./types";
 
 /**
@@ -139,7 +139,7 @@ export type NouvelleOffre = z.infer<typeof NouvelleOffreSchema>;
  */
 export function construireOffre(
   saisie: NouvelleOffre,
-  contexte: { id: string; aujourdhui: string },
+  contexte: { id: string; aujourdhui: string; bareme: Bareme },
 ): Offre {
   const manuelle = saisie.note !== null;
 
@@ -160,7 +160,10 @@ export function construireOffre(
     // choix du formulaire, il est déduit du fait même de l'ajout.
     statut: "Identifiee",
     dateEnvoi: "",
-    score: saisie.note ?? computeScore({ titre: saisie.poste, km: saisie.km }).total,
+    score:
+      saisie.note ??
+      noterOffre({ poste: saisie.poste, km: saisie.km }, contexte.bareme.profil, contexte.bareme.metiers)
+        .total,
     scoreSource: manuelle ? "manuel" : "calcule",
     // Aucune justification : elle viendrait d'une lecture de l'annonce, que personne n'a
     // faite ici. En fabriquer une depuis le barème donnerait à un calcul l'apparence d'une

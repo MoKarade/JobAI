@@ -10,7 +10,8 @@
 //      2026-07-30). Elle est COMPTÉE et son motif est dit : une liste qui rétrécit sans
 //      explication est pire qu'une liste longue.
 
-import { computeScore } from "../scoring";
+import { extraitPourNote, noterOffre } from "../noteOffre";
+import { PROFIL_DEFAUT, type Profil } from "../profil";
 import { normaliserLieu, situer } from "./region";
 import { texteVilleAnnoncee, villeDepuisRaisons } from "../raisons";
 import { aJuger, verdictsFermes, type RegistreLieux } from "./lieux";
@@ -328,6 +329,11 @@ export function trier(
    * tri se comporte exactement comme avant — c'est ce qui rend l'ajout non régressif.
    */
   metiers: readonly string[] = [],
+  /**
+   * Le profil de Marc, celui qui note TOUTES les offres (ADR-0025). Le défaut ne sert qu'aux
+   * appelants qui n'ont pas de profil à donner — les tests ; la passe, elle, le passe.
+   */
+  profil: Profil = PROFIL_DEFAUT,
 ): Tri {
   const retenues: Offre[] = [];
   const vues = new Set<string>();
@@ -379,18 +385,18 @@ export function trier(
 
     // La note vient du barème, avec `km: null` : la distance ne se déduit pas d'un nom de
     // ville, elle se mesure. Le barème sait déjà traiter l'inconnu (10 points sur 20).
-    const note = computeScore(
-      {
-        titre: brute.titre,
-        description: brute.description,
-        km: null,
-        noc: brute.noc,
-        typePoste: brute.typePoste,
-        dureeEmploi: brute.dureeEmploi,
-      },
-      undefined,
-      metiers,
-    );
+    //
+    // ⚠️ L'OFFRE EST NOTÉE AVEC CE QUI SERA ÉCRIT D'ELLE (ADR-0025, JobAI#149) : l'extrait
+    // d'annonce, le code de profession, le type de poste, la durée. Toute re-notation relira
+    // les mêmes champs et rendra la même note ; avant, l'ingestion lisait l'annonce entière
+    // puis la jetait, et chaque recalcul notait une offre amputée.
+    const garde = {
+      noc: brute.noc ?? null,
+      typePoste: brute.typePoste ?? null,
+      dureeEmploi: brute.dureeEmploi ?? null,
+      texteNote: extraitPourNote(brute.description),
+    };
+    const note = noterOffre({ poste: brute.titre, km: null, ...garde }, profil, metiers);
     // ⚠️ LE PLANCHER NE S'APPLIQUE QU'AUX OFFRES SANS CODE DE PROFESSION.
     //
     // Mesuré en production le 2026-08-20 : sur une passe réelle, **1 204 offres régionales
@@ -439,7 +445,7 @@ export function trier(
       scoreSource: "calcule",
       // Le code repart AVEC l'offre : c'est lui qui rend la catégorie affichée cohérente
       // avec la note. Sans lui en base, l'écran re-déduirait la catégorie du titre seul.
-      noc: brute.noc ?? null,
+      ...garde,
       raisons: raisonsAutomatiques(brute, note.total),
       notes: noteDeProvenance(brute, aujourdhui),
       userNote: "",

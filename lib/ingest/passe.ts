@@ -22,6 +22,7 @@ import {
 } from "../veille";
 import { fermeturesAutomatiques, type FermetureAuto } from "../fermetureAuto";
 import type { Offre } from "../types";
+import type { Profil } from "../profil";
 import {
   brutesParIdStocke,
   cleCanonique,
@@ -221,7 +222,7 @@ export async function executerPasse(
    * offres régionales entrent, et le facteur de domaine les range. Ce qu'un filtre aurait
    * retiré reste COMPTÉ et part à l'écran — c'est ce compte qui sert à juger la liste.
    */
-  flux?: { metiers: readonly string[]; recuperer?: typeof fetch },
+  flux?: { metiers: readonly string[]; recuperer?: typeof fetch; profil?: Profil },
 ): Promise<RapportPasse> {
   // ⚠️ LE PRÉ-FILTRE RÉGIONAL DU FLUX VOIT LE REGISTRE D'AVANT LA MESURE, ET C'EST INHÉRENT.
   // Les sources sont interrogées AVANT que la mesure des lieux n'ait tourné (elle apprend
@@ -314,6 +315,7 @@ export async function executerPasse(
     aujourdhui,
     verdictsFermes(mesure.registre),
     flux?.metiers ?? [],
+    flux?.profil,
   );
 
   // Ce que le balayage a VU : les nouvelles retenues, et les offres déjà suivies qu'une

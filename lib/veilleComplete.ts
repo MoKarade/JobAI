@@ -46,6 +46,7 @@ import {
 } from "./historiqueVeille";
 import { CLE_RAYON, RAYON_DEFAUT_KM } from "./rayon";
 import { recuperer } from "./ingest/sources";
+import { profilActif } from "./cv/depot";
 import { lireEtat, ecrireEtat } from "./etat";
 import type { JournalVeille } from "./veille";
 import { remplirDureesTrajet } from "./trajetMatrice";
@@ -126,7 +127,7 @@ export async function executerVeilleComplete(
   }
 
   try {
-    const [connues, journal, curseur, lieux, rayonMaxKm, metiers] = await Promise.all([
+    const [connues, journal, curseur, lieux, rayonMaxKm, metiers, profil] = await Promise.all([
       lireOffres(),
       lireEtat<JournalVeille>(CLE_JOURNAL, {}),
       lireEtat<number>(CLE_CURSEUR, 0),
@@ -138,6 +139,10 @@ export async function executerVeilleComplete(
       // Les métiers retenus pour le flux complet du Guichet. Vide ⇒ la source n'est pas
       // construite du tout : tant que Marc n'a pas choisi, la veille se comporte comme avant.
       lireEtat<string[]>(CLE_METIERS, [...METIERS_DEFAUT]),
+      // Le profil de Marc note les offres à l'ingestion comme partout ailleurs (ADR-0025). Il
+      // LÈVE s'il est illisible, et c'est voulu : retomber sur le défaut ferait noter les
+      // offres du jour avec un autre barème que le reste du suivi, sans que rien le dise.
+      profilActif(),
     ]);
 
     if (connues === null) {
@@ -160,7 +165,7 @@ export async function executerVeilleComplete(
     // compliqué »). Les codes ne filtrent plus l'ingestion : toutes les offres régionales
     // entrent, et c'est la NOTE qui les range. Il n'y a plus de mode à régler, donc plus de
     // mode à se tromper.
-    { metiers: normaliserMetiers(metiers).codes });
+    { metiers: normaliserMetiers(metiers).codes, profil });
 
     // Les nouvelles offres d'abord : si l'écriture du journal échoue ensuite, on aura
     // gagné des offres et rejoué une passe, pas perdu du travail.

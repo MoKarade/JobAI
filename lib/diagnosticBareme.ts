@@ -11,8 +11,9 @@
 // ⚠️ LECTURE SEULE ET PURE. Il reçoit des offres, un profil et des métiers ; il ne lit pas la
 // base et n'écrit rien. La lecture est injectée par la route MCP (lib/mcp/serveur.ts).
 //
-// ⚠️ TROIS RECALCULS, parce que l'app a trois façons de noter la même offre et qu'elles ne
-// s'accordent pas :
+// ⚠️ TROIS RECALCULS. L'app avait trois façons de noter la même offre (depuis l'ADR-0025 elle n'en a
+// plus qu'une, `lib/noteOffre.ts`) ; le diagnostic garde les trois SCÉNARIOS pour mesurer ce que
+// chacun donnait sur les offres en base, dont les notes stockées viennent encore de l'ancien régime :
 //   · `renotation`  — le profil ACTIF, sans code de profession ni métiers : ce que fait la
 //     re-notation après une validation de CV (`lib/cv/renotation.ts`) ;
 //   · `complet`     — le profil ACTIF AVEC code de profession et métiers : ce que donnerait le

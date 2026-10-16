@@ -67,6 +67,19 @@ export const offers = pgTable(
     noc: text("noc"),
 
     /**
+     * Type de poste et durée d'emploi publiés par la source (ADR-0014 D2), et un extrait de
+     * l'annonce — de quoi NOTER l'offre plus tard avec le même résultat qu'à l'ingestion
+     * (ADR-0025, JobAI#149).
+     *
+     * ⚠️ TROIS COLONNES FACULTATIVES, `null` PARTOUT OÙ LA SOURCE N'EN DONNE PAS. L'absence
+     * reste neutre à la note, jamais lue comme un défaut du poste. Aucune offre existante
+     * n'est réécrite : elles gardent la note qu'elles ont.
+     */
+    typePoste: text("type_poste"),
+    dureeEmploi: text("duree_emploi"),
+    texteNote: text("texte_note"),
+
+    /**
      * Ville de l'employeur, telle que la source l'a annoncée.
      *
      * Ajoutée le 2026-07-31 : sans elle, un employeur qui n'est pas dans les entreprises
