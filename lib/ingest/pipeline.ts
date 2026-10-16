@@ -11,6 +11,7 @@
 //      explication est pire qu'une liste longue.
 
 import { extraitPourNote, noterOffre } from "../noteOffre";
+import { lireExperienceMois, lireSalaireAnnuel, salaireAffichable } from "./conditionsFlux";
 import { PROFIL_DEFAUT, type Profil } from "../profil";
 import { normaliserLieu, situer } from "./region";
 import { texteVilleAnnoncee, villeDepuisRaisons } from "../raisons";
@@ -395,6 +396,9 @@ export function trier(
       typePoste: brute.typePoste ?? null,
       dureeEmploi: brute.dureeEmploi ?? null,
       texteNote: extraitPourNote(brute.description),
+      // Le salaire et l'expérience du flux, lus ici une seule fois (ADR-0026, JobAI#150).
+      salaireAnnuel: lireSalaireAnnuel(brute.salaire),
+      experienceMois: lireExperienceMois(brute.experience),
     };
     const note = noterOffre({ poste: brute.titre, km: null, ...garde }, profil, metiers);
     // ⚠️ LE PLANCHER NE S'APPLIQUE QU'AUX OFFRES SANS CODE DE PROFESSION.
@@ -437,7 +441,7 @@ export function trier(
       // Le verdict de `situer`, gardé plutôt que jeté. Il ne décide plus rien ici ; il dit à
       // l'écran ce qu'on SAIT du lieu tant que la distance n'est pas mesurée.
       situation: lieu,
-      salaireAffiche: null,
+      salaireAffiche: salaireAffichable(brute.salaire),
       priorite: "Moyenne",
       statut: "Identifiee",
       dateEnvoi: "",

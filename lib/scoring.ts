@@ -153,8 +153,17 @@ function anneesMinExigees(description: string): number | null {
 }
 
 /** 15 pts — l'exigence de séniorité est-elle atteignable avec l'expérience de Marc ? */
-export function scoreSeniorite(description = "", profil: Profil = PROFIL_DEFAUT): number {
-  const min = anneesMinExigees(description);
+export function scoreSeniorite(
+  description = "",
+  profil: Profil = PROFIL_DEFAUT,
+  /**
+   * L'expérience exigée publiée par la source, en mois (ADR-0026). Quand elle existe, elle PRIME sur
+   * la lecture du texte : un champ structuré ne se trompe pas de phrase. Années entières par le bas
+   * (7 mois → 0 an), comme la borne basse des intervalles (ADR-0024).
+   */
+  experienceMois: number | null = null,
+): number {
+  const min = experienceMois != null ? Math.floor(experienceMois / 12) : anneesMinExigees(description);
   if (min === null) return profil.senioriteNonPrecisee; // non précisé : l'absence d'exigence n'est pas un obstacle
   return profil.paliersSeniorite.find((p) => min <= p.max)?.points ?? profil.senioritePlancher;
 }
@@ -315,6 +324,8 @@ export function computeScore(
     typePoste?: string | null;
     /** Durée d'emploi publiée par la source (« Permanent », « Temporaire »…). */
     dureeEmploi?: string | null;
+    /** Expérience exigée publiée par la source, en mois (ADR-0026). Prime sur le texte. */
+    experienceMois?: number | null;
   },
   profil: Profil = PROFIL_DEFAUT,
   /**
@@ -331,7 +342,7 @@ export function computeScore(
       profil,
     ),
     distance: scoreDistance(input.km, profil),
-    seniorite: scoreSeniorite(input.description, profil),
+    seniorite: scoreSeniorite(input.description, profil, input.experienceMois ?? null),
     salaire: scoreSalaire(input.salaireAnnuel ?? null, profil),
     immigration: scoreImmigration(input.description, profil),
     conditions: scoreConditions(input.typePoste, input.dureeEmploi, profil),

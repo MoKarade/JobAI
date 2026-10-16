@@ -71,6 +71,12 @@ export interface OffreBrute {
    */
   typePoste?: string | null;
   dureeEmploi?: string | null;
+  /**
+   * Salaire et expérience exigée TELS QUE PUBLIÉS par la source (JobAI#150, ADR-0026), non convertis :
+   * la conversion est faite par `trier`, une seule fois, pour que la règle ne vive qu'à un endroit.
+   */
+  salaire?: string | null;
+  experience?: string | null;
 }
 
 /** Ce qu'une passe sur UNE source a donné. Un échec est dit, jamais confondu avec un vide. */

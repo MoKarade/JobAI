@@ -80,6 +80,13 @@ export const offers = pgTable(
     texteNote: text("texte_note"),
 
     /**
+     * Salaire annuel (dollars) et expérience exigée (mois) LUS du flux du Guichet (ADR-0026, JobAI#150).
+     * `null` là où la source n'en publie pas ou qu'on ne sait pas les lire — jamais un 0.
+     */
+    salaireAnnuel: integer("salaire_annuel"),
+    experienceMois: integer("experience_mois"),
+
+    /**
      * Ville de l'employeur, telle que la source l'a annoncée.
      *
      * Ajoutée le 2026-07-31 : sans elle, un employeur qui n'est pas dans les entreprises

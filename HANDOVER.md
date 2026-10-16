@@ -6,6 +6,18 @@
 
 ---
 
+## 2026-10-16 — JobAI#150 : le salaire et l'expérience exigée du flux sont lus (ADR-0026)
+
+- **Avant** : toute offre du flux avait `salaireAffiche: null` ; la séniorité se devinait dans le texte de l'annonce.
+- **Fait** : `lib/ingest/conditionsFlux.ts` (`lireSalaireAnnuel`, `lireExperienceMois`, `salaireAffichable`), branché dans
+  `trier` ; colonnes `salaire_annuel` et `experience_mois` (migration 0026) ; `salaire_affiche` porte le texte publié.
+  La séniorité lit le champ structuré avant le texte. Formats vérifiés sur `diagnostic_flux` (flux du 16/10).
+- **Provisoire, soumis à Marc** : borne BASSE d'une fourchette, 2 080 h par année. Constantes dans `conditionsFlux.ts`.
+- **Pas fait, à savoir** : le salaire n'entre pas dans la note (JobAI#152). Les offres déjà en base n'ont pas ces champs
+  et ne sont pas rattrapées en masse.
+- **À confirmer en production** : taux de remplissage du salaire et de l'expérience sur les offres de la première passe ;
+  les 248 valeurs de salaire « autres » de l'inventaire.
+
 ## 2026-10-16 — JobAI#149 : une seule façon de noter une offre (ADR-0025)
 
 - **Avant** : quatre chemins notaient une offre avec des entrées différentes (profil par défaut ou actif, avec ou sans

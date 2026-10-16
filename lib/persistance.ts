@@ -57,6 +57,8 @@ export function colonnesSeed(o: Offre) {
     typePoste: o.typePoste ?? null,
     dureeEmploi: o.dureeEmploi ?? null,
     texteNote: o.texteNote ?? null,
+    salaireAnnuel: o.salaireAnnuel ?? null,
+    experienceMois: o.experienceMois ?? null,
     ville: o.ville,
     situation: o.situation ?? null,
     salaireAffiche: o.salaireAffiche,

@@ -205,7 +205,10 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
       /** Le code lu pour chaque offre retenue, à rattacher après la lecture (ADR-0013). */
       const codesParRef = new Map<string, string | null>();
       /** Les conditions publiées, rattachées après la lecture comme le code (ADR-0014 D2). */
-      const conditionsParRef = new Map<string, { typePoste: string | null; dureeEmploi: string | null }>();
+      const conditionsParRef = new Map<
+        string,
+        { typePoste: string | null; dureeEmploi: string | null; salaire: string | null; experience: string | null }
+      >();
       let codeIllisible = 0;
       const ecarteesParCode: Record<string, number> = {};
 
@@ -234,6 +237,9 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
             conditionsParRef.set(offre.refSource, {
               typePoste: vide(lireChamp(brut, "jobtype")),
               dureeEmploi: vide(lireChamp(brut, "workterm")),
+              // Texte brut : la conversion et la lecture vivent dans `conditionsFlux`, appelée par `trier`.
+              salaire: vide(lireChamp(brut, "salary")),
+              experience: vide(lireChamp(brut, "experience")),
             });
             const verdict = jugerProfession(code, metiers);
             if (verdict === "code-illisible") {
@@ -304,7 +310,7 @@ export function sourceGuichetFlux(options: OptionsSourceFlux): {
           offres: rapport.retenues.map((o) => ({
             ...o,
             noc: codesParRef.get(o.refSource) ?? null,
-            ...(conditionsParRef.get(o.refSource) ?? { typePoste: null, dureeEmploi: null }),
+            ...(conditionsParRef.get(o.refSource) ?? { typePoste: null, dureeEmploi: null, salaire: null, experience: null }),
           })),
           // La date de construction du flux : c'est CE que la source peut offrir de plus
           // frais. Sans elle, un flux figé depuis trois jours se lirait comme un marché calme.
