@@ -19,19 +19,29 @@ import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { Fait } from "./Icone";
 import { CarteOffre } from "./CarteOffre";
 import type { Fraicheur } from "@/lib/fraicheur";
+import { cleGroupement } from "@/lib/employeurs";
+import type { SignauxEmployeur as Signaux } from "@/lib/signauxEmployeur";
+import { SignauxEmployeur } from "./SignauxEmployeur";
 
 export function CarteEntreprise({
   groupe,
   fraicheurs = {},
+  signaux = {},
 }: {
   groupe: GroupeEntreprise;
   /** Par identifiant d'offre, et seulement pour celles qui ont quelque chose à dire. */
   fraicheurs?: Readonly<Record<string, Fraicheur>>;
+  /** Par `cleGroupement`, calculés sur tout le suivi (jamais sur ce qu'un filtre laisse voir). */
+  signaux?: Readonly<Record<string, Signaux>>;
 }) {
   const [ouverte, setOuverte] = useState(false);
   const idDetail = useId();
   const p = palier(groupe.noteMoyenne);
   const plusieurs = groupe.offres.length > 1;
+  const premiere = groupe.offres[0];
+  const signauxEmployeur = premiere
+    ? signaux[cleGroupement(premiere.entreprise, premiere.id)]
+    : undefined;
 
   return (
     <article className={`carte carte--${p}${ouverte ? " carte--ouverte" : ""}`}>
@@ -78,6 +88,7 @@ export function CarteEntreprise({
       {/* Toujours dans le DOM, masqué par `hidden` — même raison que `CarteOffre` : le
           monter/démonter au clic ferait perdre l'état déplié de chaque offre à l'intérieur. */}
       <div id={idDetail} className="carte__detail" hidden={!ouverte}>
+        {signauxEmployeur ? <SignauxEmployeur signaux={signauxEmployeur} /> : null}
         <div className="liste liste--groupee">
           {groupe.offres.map((o) => (
             <CarteOffre key={o.id} offre={o} fraicheur={fraicheurs[o.id]} />

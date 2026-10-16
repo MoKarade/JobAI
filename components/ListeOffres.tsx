@@ -26,6 +26,7 @@ import {
 } from "@/lib/filtres";
 import { grouperParEntreprise } from "@/lib/groupesEntreprise";
 import { CarteEntreprise } from "./CarteEntreprise";
+import type { SignauxEmployeur } from "@/lib/signauxEmployeur";
 import type { Fraicheur } from "@/lib/fraicheur";
 import { BoutonExport } from "./BoutonExport";
 import { CompteFiltre, Filtres } from "./Filtres";
@@ -35,6 +36,7 @@ export function ListeOffres({
   rayonMaxKm,
   metiers = [],
   fraicheurs = {},
+  signaux = {},
 }: {
   offres: Offre[];
   /** Le rayon réglé par Marc — il devient un palier de distance, et le titre du groupe. */
@@ -53,6 +55,8 @@ export function ListeOffres({
    * pas n'affiche simplement aucune pastille, jamais une pastille fausse.
    */
   fraicheurs?: Readonly<Record<string, Fraicheur>>;
+  /** Les signaux de chaque employeur (`lib/signauxEmployeur.ts`), par clé de regroupement. */
+  signaux?: Readonly<Record<string, SignauxEmployeur>>;
 }) {
   const [filtres, setFiltres] = useState<EtatFiltres>(FILTRES_VIDES);
   const { retenues: visibles, distanceInconnue } = useMemo(
@@ -114,7 +118,7 @@ export function ListeOffres({
       ) : (
         <div className="liste">
           {groupes.map((g) => (
-            <CarteEntreprise key={g.nom} groupe={g} fraicheurs={fraicheurs} />
+            <CarteEntreprise key={g.nom} groupe={g} fraicheurs={fraicheurs} signaux={signaux} />
           ))}
         </div>
       )}
@@ -137,7 +141,7 @@ export function ListeOffres({
           </p>
           <div className="liste">
             {groupesInconnus.map((g) => (
-              <CarteEntreprise key={g.nom} groupe={g} fraicheurs={fraicheurs} />
+              <CarteEntreprise key={g.nom} groupe={g} fraicheurs={fraicheurs} signaux={signaux} />
             ))}
           </div>
         </section>

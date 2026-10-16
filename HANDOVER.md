@@ -14,6 +14,15 @@
 - **À confirmer en production** : déploiement `READY` sur le commit fusionné et `GET https://emploi.hubperso.com/api/hub/summary`
   qui répond 401 sans jeton.
 
+## 2026-10-16 — JobAI#159 : les signaux d'un employeur, depuis le suivi (ADR-0029)
+
+- **Avant** : rien n'indiquait qu'un employeur republie ses postes ou garde des offres ouvertes depuis des mois.
+- **Fait** : `lib/signauxEmployeur.ts` (pur) et `components/SignauxEmployeur.tsx`, en tête du détail de la carte
+  entreprise : offres ouvertes/fermées, plus ancienne ouverte (« depuis au moins N jours »), durée médiane des fermées
+  (dès 3), intitulés repris. Calculés sur tout le suivi, hors historique 2025, avec la clé de regroupement de la liste.
+  Aucune source, aucun appel IA, aucune migration.
+- **À confirmer** : trois employeurs vérifiés à la main.
+
 ## 2026-10-16 — JobAI#156 : la revue du CV coche d'avance ce qui a une preuve (ADR-0028)
 
 - **Avant** : rien n'était coché d'avance (ADR-0009) ; valider un CV demandait un geste par écart.

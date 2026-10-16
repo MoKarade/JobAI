@@ -1411,6 +1411,20 @@ code {
    l'œil sur le rendu et pas par le typage. Toute règle qui donne un `display` à un
    élément susceptible d'être `hidden` doit prévoir ce cas. */
 .carte__detail[hidden] { display: none; }
+
+/* Ce que le suivi sait de l'employeur : texte posé, aucune couleur propre, rien qui ressemble
+   à une note — ce ne sont pas des jugements, ce sont des constats. */
+.signaux { display: grid; gap: 0.3rem; }
+.signaux__titre { font-size: var(--t-s); font-weight: 650; margin: 0; }
+.signaux__liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+  font-size: var(--t-s);
+  color: var(--texte-doux);
+}
 .carte__liens { display: flex; flex-wrap: wrap; gap: 1rem; font-size: var(--t-xs); }
 .carte__liens a { color: var(--texte-doux); }
 .carte__liens a:hover { color: var(--texte); }

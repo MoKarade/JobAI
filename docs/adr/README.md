@@ -42,3 +42,4 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 | [0026](./0026-le-salaire-et-l-experience-du-flux-sont-lus.md) | Le salaire et l'expérience exigée du flux sont lus | Proposé — JobAI#150 ; borne basse et 2 080 h soumises à Marc |
 | [0027](./0027-les-annees-d-experience-se-calculent-depuis-les-dates.md) | Les années d'expérience se calculent depuis les dates du CV | Proposé — JobAI#154 ; année seule en juillet et stages exclus, visibles dans le détail |
 | [0028](./0028-la-revue-du-cv-coche-d-avance-ce-qui-a-une-preuve.md) | La revue du CV coche d'avance ce qui a une preuve | Proposé — JobAI#156 ; amende 0009 : fait établi et sourcé coché, conséquences décochées |
+| [0029](./0029-les-signaux-d-un-employeur-viennent-du-suivi.md) | Les signaux d'un employeur viennent du suivi, rien d'autre | Proposé — JobAI#159 ; ouvertes, plus ancienne ouverte, médiane des fermées dès 3, intitulés repris |
