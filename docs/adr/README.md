@@ -22,7 +22,7 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 | [0006](./0006-variantes-de-raison-sociale.md) | Dédoublonner malgré les variantes de raison sociale | Accepté |
 | [0007](./0007-google-maps-geocoding-repli.md) | Google Maps Geocoding, en repli étroit de Nominatim | Accepté |
 | [0008](./0008-poste-de-nuit.md) | « Poste de nuit » : le sombre en identité, l'épure cesse d'être une soustraction | Accepté — révisé le jour même (thème clair retiré) ; supersède la direction du 2026-08-05 ; ADR-0003 tient sur l'ambre |
-| [0009](./0009-profil-pilote-par-le-cv.md) | Le profil sort du code, et le CV le remplit | Accepté — retire `[V3-00]` (CV via Google Drive) |
+| [0009](./0009-profil-pilote-par-le-cv.md) | Le profil sort du code, et le CV le remplit | Accepté — retire `[V3-00]` (CV via Google Drive) ; amendé par 0028 |
 | [0010](./0010-sources-lues-par-lapp.md) | Lire les offres depuis l'app : sources candidates, mesure d'accès, extraction | Accepté (Marc, 2026-08-19) — sonde livrée ; aucune ingestion ouverte |
 | [0011](./0011-connecteur-mcp-claude-ai.md) | Un connecteur MCP pour claude.ai, avec écriture | Accepté (Marc, 2026-08-19) |
 | [0012](./0012-tri-par-code-de-profession.md) | Trier le flux du Guichet par le code de profession (NOC 2021) | Proposé — décision Marc « go pour le tri par noc2021 » (2026-08-19) ; volet « filtre, pas note » révisé par ADR-0013 |
@@ -41,3 +41,4 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 | [0025](./0025-une-seule-facon-de-noter-une-offre.md) | Une seule façon de noter une offre | Proposé — JobAI#149 ; l'extrait d'annonce gardé en base est soumis à Marc |
 | [0026](./0026-le-salaire-et-l-experience-du-flux-sont-lus.md) | Le salaire et l'expérience exigée du flux sont lus | Proposé — JobAI#150 ; borne basse et 2 080 h soumises à Marc |
 | [0027](./0027-les-annees-d-experience-se-calculent-depuis-les-dates.md) | Les années d'expérience se calculent depuis les dates du CV | Proposé — JobAI#154 ; année seule en juillet et stages exclus, visibles dans le détail |
+| [0028](./0028-la-revue-du-cv-coche-d-avance-ce-qui-a-une-preuve.md) | La revue du CV coche d'avance ce qui a une preuve | Proposé — JobAI#156 ; amende 0009 : fait établi et sourcé coché, conséquences décochées |

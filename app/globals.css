@@ -2762,6 +2762,13 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .ecart__libelle {
   font-weight: 650;
 }
+/* « source citée » : dit POURQUOI la case est cochée d'avance. Discret, sans couleur
+   propre : l'ambre reste réservé à « retenu ». */
+.ecart__preuve {
+  margin-left: auto;
+  font-size: var(--t-s);
+  color: var(--texte-doux);
+}
 .ecart__valeurs {
   margin: 0.45rem 0 0 1.65rem;
   font-family: var(--mono);

@@ -236,7 +236,12 @@ export default async function Profil() {
         <section className="carte-info">
           <h2>À valider</h2>
           {prop.ok ? (
-            <RevueProfil cvId={aRelire.id} ecarts={ecarts} nomFichier={prop.nomFichier} />
+            <RevueProfil
+              key={aRelire.id}
+              cvId={aRelire.id}
+              ecarts={ecarts}
+              nomFichier={prop.nomFichier}
+            />
           ) : (
             <p className="revue__retour revue__retour--echec">
               {prop.raison} Relance l’analyse de ce CV pour en obtenir une nouvelle.

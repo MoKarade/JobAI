@@ -50,8 +50,20 @@ export interface Ecart {
    * un fait sans provenance ne se distingue autrement pas d'un fait vérifié.
    */
   provenance: string;
+  /**
+   * `true` = un FAIT dont la valeur est établie ET dont la source se vérifie (ADR-0028).
+   * C'est le seul critère pour qu'un écart soit coché d'avance à l'écran : une conséquence
+   * est une déduction du code, une provenance vide est une supposition, un « non établi »
+   * proposé efface une valeur — aucun des trois ne se coche à la place de Marc.
+   */
+  preuve: boolean;
   /** La valeur à écrire dans le profil si Marc coche. */
   valeur: unknown;
+}
+
+/** Les écarts que l'écran coche d'avance : ceux qui portent une preuve, et eux seuls. */
+export function retenusParDefaut(ecarts: readonly Ecart[]): string[] {
+  return ecarts.filter((e) => e.preuve && e.nature === "fait").map((e) => e.cle);
 }
 
 function listeEnTexte(xs: readonly string[]): string {
@@ -84,6 +96,8 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
       avant: courant.faits.anneesExperience?.toString() ?? "non établi",
       apres: extraction.anneesExperience?.toString() ?? "non établi",
       provenance: p(extraction.anneesExperienceProvenance),
+      preuve:
+        extraction.anneesExperience !== null && p(extraction.anneesExperienceProvenance) !== "",
       valeur: extraction.anneesExperience,
     });
   }
@@ -112,6 +126,7 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
           : `${courant.faits.parcours.length} poste(s)`,
       apres: extraction.parcours.map((e) => e.titre).join(" · "),
       provenance: "",
+      preuve: false,
       valeur: extraction.parcours,
     });
   }
@@ -140,6 +155,7 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
       avant: listeEnTexte(actuelle),
       apres: listeEnTexte(l.proposees),
       provenance: "",
+      preuve: false,
       valeur: l.proposees,
     });
   }
@@ -162,6 +178,7 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
         avant: rendu(courant.paliersSeniorite),
         apres: rendu(proposes),
         provenance: `Déduit de ${extraction.anneesExperience} ans d'expérience.`,
+        preuve: false,
         valeur: proposes,
       });
     }
@@ -180,6 +197,7 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
       avant: listeEnTexte(courant.recherches),
       apres: listeEnTexte([...courant.recherches, ...nouvelles]),
       provenance: `Ajout de ${nouvelles.length} terme(s) déduits du parcours.`,
+      preuve: false,
       valeur: [...courant.recherches, ...nouvelles],
     });
   }
@@ -198,6 +216,7 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
       avant: listeEnTexte(courant.motsTechnique),
       apres: listeEnTexte([...courant.motsTechnique, ...motsNouveaux]),
       provenance: `Ajout de ${motsNouveaux.length} terme(s) tirés des outils du CV.`,
+      preuve: false,
       valeur: [...courant.motsTechnique, ...motsNouveaux],
     });
   }
@@ -224,6 +243,7 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
       provenance:
         "Ajouts tirés du CV, marqués « (CV) ». Les constats existants sont conservés — " +
         "le jugement reste le tien.",
+      preuve: false,
       valeur: swotPropose,
     });
   }

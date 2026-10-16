@@ -5,6 +5,9 @@
 - **Décideur** : Marc, sur quatre questions de cadrage posées avant toute ligne de code
 - **Remplace** : `[V3-00]` du backlog (« accès au CV dans Google Drive ») — voir
   « Alternatives rejetées »
+- **Amendé le 2026-10-16** par l'[ADR-0028](./0028-la-revue-du-cv-coche-d-avance-ce-qui-a-une-preuve.md), avec l'accord
+  de Marc : ce qui porte une preuve (un fait établi dont la source se lit à l'écran) est coché d'avance ; le reste,
+  conséquences sur le barème comprises, reste décoché. Le texte ci-dessous est conservé tel que décidé en août.
 
 ## Contexte
 
@@ -68,7 +71,9 @@ Les quatre arbitrages, tels que tranchés :
 1. **Le fichier de CV est CONSERVÉ en base.** Il peut donc être ré-analysé sans être
    re-téléversé, et ses versions successives restent comparables.
 2. **Rien ne s'applique sans validation de Marc.** L'extraction ne produit qu'une
-   *proposition*, champ par champ, chacun portant sa provenance.
+   *proposition*, champ par champ, chacun portant sa provenance. *(Amendé par l'ADR-0028 :
+   « rien de coché d'avance » devient « seul ce qui a une preuve est coché d'avance » ;
+   la validation reste le clic sur « Appliquer ».)*
 3. **À la validation, tout est recalculé immédiatement** — pas de second écran d'aperçu.
    La revue du point 2 EST le moment de contrôle ; en ajouter un deuxième reviendrait à
    faire valider deux fois la même décision.

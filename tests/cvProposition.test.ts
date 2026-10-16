@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import { PROFIL_DEFAUT, ProfilSchema, type Profil } from "@/lib/profil";
 import {
+  retenusParDefaut,
   calculerEcarts,
   appliquerEcarts,
   profilCourantOuDefaut,
@@ -69,6 +70,49 @@ describe("les écarts proposés", () => {
     // le dire ; l'effacer ici rendrait les deux cas indiscernables.
     const e = calculerEcarts(PROFIL_DEFAUT, extraction({ anneesExperience: 5 }));
     expect(e.find((x) => x.cle === "faits.anneesExperience")?.provenance).toBe("");
+  });
+
+  it("seul un fait établi ET sourcé est coché d'avance (ADR-0028)", () => {
+    const e = calculerEcarts(
+      PROFIL_DEFAUT,
+      extraction({
+        anneesExperience: 5,
+        anneesExperienceProvenance: "§Expérience, 2021-2026",
+        langues: ["français", "anglais"],
+        outils: ["Excel", "Power BI"],
+        forces: ["Bilingue"],
+        recherchesSuggerees: ["analyste données"],
+      }),
+    );
+    // Les années portent une source : cochées. Tout le reste (listes sans source, et
+    // chaque conséquence sur le barème) attend Marc.
+    expect(retenusParDefaut(e)).toEqual(["faits.anneesExperience"]);
+    expect(e.some((x) => x.nature === "consequence" && x.preuve)).toBe(false);
+  });
+
+  it("des années SANS source ne sont pas cochées d'avance", () => {
+    const e = calculerEcarts(PROFIL_DEFAUT, extraction({ anneesExperience: 5 }));
+    expect(e.find((x) => x.cle === "faits.anneesExperience")?.preuve).toBe(false);
+    expect(retenusParDefaut(e)).toEqual([]);
+  });
+
+  it("un « non établi » proposé n'est jamais coché d'avance : il effacerait une valeur", () => {
+    const courant = {
+      ...PROFIL_DEFAUT,
+      faits: { ...PROFIL_DEFAUT.faits, anneesExperience: 4 },
+    };
+    const e = calculerEcarts(
+      courant,
+      extraction({
+        anneesExperience: null,
+        anneesExperienceProvenance: "Aucun poste daté dans le CV : les années ne sont pas établies.",
+      }),
+    );
+    const annees = e.find((x) => x.cle === "faits.anneesExperience");
+    expect(annees?.apres).toBe("non établi");
+    expect(annees?.provenance).not.toBe("");
+    expect(annees?.preuve).toBe(false);
+    expect(retenusParDefaut(e)).toEqual([]);
   });
 
   it("le barème de séniorité est une CONSÉQUENCE, pas un fait du CV", () => {
