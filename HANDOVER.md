@@ -18,9 +18,10 @@
 - **BACKLOG.md** : réduit à un renvoi vers les issues (14 lignes). L'ancien contenu : `git show 602dd79:BACKLOG.md`.
 - **Lignes encore rouges de la grille, chacune avec sa tâche ouverte** : 8 (préversions, JobAI#115), 9 (Sentry,
   JobAI#117), 12 (socle visuel, JobAI#116). `conformite` reste `bloquant: false` jusqu'à ce qu'elles soient vertes.
-- **À faire par Marc** : poser le secret `HUB_TOKEN` dans les secrets Actions du dépôt (même valeur que dans
-  Vercel), sans quoi le contrôle « summary » de la fumée dira « jeton du hub absent ». Les réglages « scan de
-  secrets » et « protection au push » de GitHub (ligne 6) sont réservés aux administrateurs.
+- **Fumée de production** : sans contrôle « summary » (`chemin-summary` vide dans `fumee.yml`), car il exigeait le
+  secret `HUB_TOKEN` du dépôt, que Vercel ne laisse pas relire (16/10, JobAI#113). Santé et connexion restent
+  sondées. À rétablir le jour où le secret est posé. **À faire par Marc** : rien pour la fumée ; les réglages « scan
+  de secrets » et « protection au push » de GitHub (ligne 6) sont réservés aux administrateurs.
 
 ## 2026-10-16 — JobAI#91 : une passe de géocodage de plus par jour
 
