@@ -6,6 +6,18 @@
 
 ---
 
+## 2026-10-16 — JobAI#154 : les années d'expérience se calculent depuis les dates du CV (ADR-0027)
+
+- **Avant** : le modèle estimait « les années d'expérience pertinente » ; ce nombre réglait la séniorité de toutes les offres
+  et ne se refaisait pas à la main.
+- **Fait** : `lib/cv/anneesExperience.ts` (`calculerAnnees`, `lireDateCv`, pures). Le modèle recopie les dates de chaque poste
+  (et `estStage`) ; `extraireFaits` compte (chevauchements retirés, début et fin inclus) et écrit le détail ligne par ligne
+  dans la provenance de l'écart « Années d'expérience ». Date illisible : poste exclu et dit ; aucun poste comptable : `null`.
+- **Provisoire** : année seule lue en juillet (±6 mois, marquée « année seule ») ; tout le travail hors stages compte
+  (la « pertinence » n'est plus jugée).
+- **À confirmer** : Marc ré-analyse son CV et refait le calcul à la main depuis le détail (les analyses déjà enregistrées
+  gardent l'ancien nombre jusqu'à la ré-analyse).
+
 ## 2026-10-16 — JobAI#150 : le salaire et l'expérience exigée du flux sont lus (ADR-0026)
 
 - **Avant** : toute offre du flux avait `salaireAffiche: null` ; la séniorité se devinait dans le texte de l'annonce.

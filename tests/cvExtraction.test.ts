@@ -35,8 +35,19 @@ const ADRESSE_B = `456 ${"boulevard Laurier"}`;
 
 /** La réponse du modèle, telle qu'un CV mal aplati la produirait. */
 const REPONSE_AVEC_COORDONNEES = {
-  anneesExperience: 5,
+  // Le modèle écrit un nombre ET une provenance : l'un comme l'autre sont IGNORÉS (JobAI#154),
+  // le code compte à partir des dates du parcours ci-dessous.
+  anneesExperience: 59,
   anneesExperienceProvenance: `Section Expérience, 2021-2026, ${COURRIEL}`,
+  parcours: [
+    {
+      titre: `Technicien, ${COURRIEL}`,
+      employeur: "Usine ABC",
+      debut: "Janvier 2021",
+      fin: "Présent",
+      faits: ["Mise en service de lignes"],
+    },
+  ],
   langues: [`Français, ${TEL_A}`, "Anglais"],
   diplomes: [`Master en robotique, ${ADRESSE_A}`],
   outils: ["TIA Portal", `SolidWorks (contact : ${TEL_B})`],
@@ -78,6 +89,9 @@ const { extraireFaits, expurgerCoordonnees } = await import("@/lib/cv/extraction
 /** Un CV assez long pour passer le plancher de `extraireFaits`. */
 const TEXTE_CV = "Coordonnateur de projets techniques. ".repeat(10);
 
+/** « Présent » = juin 2026 dans ces épreuves : janvier 2021 → juin 2026 = 66 mois = 5,5 ans. */
+const AUJOURDHUI = new Date(Date.UTC(2026, 5, 15));
+
 describe("expurgerCoordonnees — les formes reconnues", () => {
   it("courriel, téléphone, code postal, adresse municipale", () => {
     expect(expurgerCoordonnees(`écris à ${COURRIEL}`)).not.toContain("courriel.com");
@@ -99,7 +113,7 @@ describe("ce que l'extraction PERSISTE", () => {
   });
 
   it("aucune coordonnée ne survit dans AUCUN champ", async () => {
-    const r = await extraireFaits(TEXTE_CV);
+    const r = await extraireFaits(TEXTE_CV, { aujourdhui: AUJOURDHUI });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
 
@@ -117,7 +131,7 @@ describe("ce que l'extraction PERSISTE", () => {
 
   it("mais le contenu PROFESSIONNEL, lui, survit", () => {
     // Un expurgeur qui viderait tout « passerait » le test précédent sans rien valoir.
-    return extraireFaits(TEXTE_CV).then((r) => {
+    return extraireFaits(TEXTE_CV, { aujourdhui: AUJOURDHUI }).then((r) => {
       expect(r.ok).toBe(true);
       if (!r.ok) return;
       const persiste = JSON.stringify(r.brut);
@@ -125,23 +139,28 @@ describe("ce que l'extraction PERSISTE", () => {
       expect(persiste).toContain("Anglais");
       expect(persiste).toContain("Coordonnateur technique");
       expect(persiste).toContain("Master en robotique");
-      expect(r.brut.anneesExperience).toBe(5);
+      // Le nombre du CALCUL (66 mois), pas les 59 que le modèle a écrits.
+      expect(r.brut.anneesExperience).toBe(5.5);
+      expect(r.faits.anneesExperience).toBe(5.5);
     });
   });
 
   it("la provenance est expurgée elle aussi", async () => {
-    const r = await extraireFaits(TEXTE_CV);
+    const r = await extraireFaits(TEXTE_CV, { aujourdhui: AUJOURDHUI });
     if (!r.ok) throw new Error("extraction attendue en succès");
     // Elle s'affiche à l'écran de revue sous chaque écart : elle circule autant que le reste.
     expect(r.provenances.anneesExperience).not.toContain(COURRIEL);
-    expect(r.provenances.anneesExperience).toContain("2021-2026");
+    // Et c'est le détail du CALCUL, pas la phrase du modèle.
+    expect(r.provenances.anneesExperience).toContain("janv. 2021");
+    expect(r.provenances.anneesExperience).toContain("66 mois");
+    expect(r.provenances.anneesExperience).not.toContain("2021-2026");
   });
 
   it("`faits` et `brut` portent les MÊMES valeurs nettoyées", () => {
     // Deux objets censés dire la même chose ont fini par diverger une fois : `faits` était
     // nettoyé, `brut` ne l'était pas, et c'est `brut` qui partait en base. Ce test verrouille
     // leur accord.
-    return extraireFaits(TEXTE_CV).then((r) => {
+    return extraireFaits(TEXTE_CV, { aujourdhui: AUJOURDHUI }).then((r) => {
       if (!r.ok) throw new Error("extraction attendue en succès");
       expect(r.faits.langues).toEqual(r.brut.langues);
       expect(r.faits.diplomes).toEqual(r.brut.diplomes);
@@ -213,5 +232,43 @@ describe("la comptabilité de l'appel", () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "");
     await extraireFaits(TEXTE_CV, { cle: undefined });
     expect(comptabilise).not.toHaveBeenCalled();
+  });
+});
+
+describe("les années d'expérience viennent du code, pas du modèle (JobAI#154)", () => {
+  beforeEach(() => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "cle-de-test");
+  });
+
+  it("un CV sans poste daté rend « non établi », jamais le nombre du modèle", async () => {
+    contenuRendu = [
+      {
+        type: "tool_use",
+        name: "rendre_profil",
+        input: { ...REPONSE_AVEC_COORDONNEES, parcours: [] },
+      },
+    ];
+    const r = await extraireFaits(TEXTE_CV, { aujourdhui: AUJOURDHUI });
+    if (!r.ok) throw new Error("extraction attendue en succès");
+    expect(r.brut.anneesExperience).toBeNull();
+    expect(r.provenances.anneesExperience).toMatch(/Aucun poste daté/);
+  });
+
+  it("un nombre absurde écrit quand même par le modèle ne fait pas échouer l'analyse", async () => {
+    contenuRendu = [
+      {
+        type: "tool_use",
+        name: "rendre_profil",
+        input: { ...REPONSE_AVEC_COORDONNEES, anneesExperience: 999, anneesExperienceProvenance: "x".repeat(5000) },
+      },
+    ];
+    const r = await extraireFaits(TEXTE_CV, { aujourdhui: AUJOURDHUI });
+    if (!r.ok) throw new Error("extraction attendue en succès");
+    expect(r.brut.anneesExperience).toBe(5.5);
+  });
+
+  it("le modèle ne reçoit plus la consigne de compter", async () => {
+    const { OUTIL_EXTRACTION } = await import("@/lib/cv/extraction");
+    expect(Object.keys(OUTIL_EXTRACTION.input_schema.properties)).not.toContain("anneesExperience");
   });
 });
