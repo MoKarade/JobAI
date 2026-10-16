@@ -6,6 +6,16 @@
 
 ---
 
+## 2026-10-16 — JobAI#98 : tout `curl` du dépôt refuse un passage en HTTP
+
+- **Constat** : `sonde-registre.yml` téléchargeait avec `curl -sL` ; `-L` suit les redirections, et une
+  redirection peut rétrograder en HTTP même quand l'URL de départ est en https. Le `curl` de gitleaks
+  (`ci.yml`) bornait la première requête (`--proto '=https'`) mais pas les suivantes.
+- **Changement** : les deux `curl` portent `--proto '=https' --proto-redir '=https'`. Verrou :
+  `tests/curlHttps.test.ts` lit `.github/` et `scripts/` et refuse tout `curl` sans les deux drapeaux
+  (vérifié : il rougit sur l'état d'avant). `[CI-CURL-PROTO]` est coché dans BACKLOG.md.
+- **Déploiement** : fichiers sous `.github/` et test seulement, rien de servi ne change.
+
 ## 2026-10-16 — JobAI#115 : seules les branches sans préfixe déploient (préversions coupées)
 
 - **Constat** (liste des déploiements Vercel du 15/10) : seules les branches `claude/*` étaient
@@ -17,8 +27,10 @@
   selon la version de minimatch). Verrou : `tests/previsionsVercel.test.ts`.
 - **Limite connue** : une branche d'un seul segment (`correctif`) déploierait encore ; la convention
   du dépôt (`claude/…`, `feature/…`) n'en produit pas.
-- **À confirmer après déploiement** : la production se déploie pour le commit de fusion, et la
-  prochaine branche `dependabot/…` ou `feature/…` ne crée aucune préversion.
+- **Vérifié** : le déploiement de production du commit de fusion (03a0450) est `READY`
+  (`dpl_62avRkLU96xCeLxDjhox1W1Ven2m`).
+- **À confirmer** : la prochaine branche `dependabot/…`, `agence/…` ou `feature/…` ne crée aucune
+  préversion (preuve programmée sur JobAI#115).
 
 ## 2026-10-15 — JobAI#122 : la passe de distances de l'accueil ne dépasse plus 60 s
 
