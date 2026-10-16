@@ -4,13 +4,22 @@
 //
 // ⚠️ Le message de l'erreur n'est JAMAIS affiché : une erreur de base peut contenir des
 // identifiants. Le détail reste dans les journaux du serveur ; ici, une phrase simple.
+// L'erreur part à Sentry, expurgée (éteint sans DSN : lib/sentryConfig.ts).
+
+import * as Sentry from "@sentry/nextjs";
+import { useEffect } from "react";
 
 export default function Erreur({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <main className="etat" role="alert">
       <h1>Une erreur est survenue</h1>

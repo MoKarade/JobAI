@@ -14,6 +14,16 @@
 - **À confirmer en production** : déploiement `READY` sur le commit fusionné et `GET https://emploi.hubperso.com/api/hub/summary`
   qui répond 401 sans jeton.
 
+## 2026-10-16 — JobAI#117 : les erreurs partent à Sentry, expurgées (ADR-0031)
+
+- **Avant** : les erreurs de production ne remontaient nulle part.
+- **Fait** : `@sentry/nextjs` branché comme app-template#40 (`instrumentation.ts`, `instrumentation-client.ts`,
+  `app/global-error.tsx`, `app/error.tsx`), réglages dans `lib/sentryConfig.ts` : éteint sans `SENTRY_DSN`, pas de fil
+  d'Ariane, requête et utilisateur retirés, messages expurgés (courriel, adresse web, téléphone, code postal, longs
+  nombres) et tronqués à 300 caractères. CSP : `https://*.sentry.io` en `connect-src`. Verrou : `tests/sentryConfig.test.ts`.
+- **À faire par Marc** : poser `SENTRY_DSN` dans Vercel (projet `job-ai`) pour que la production envoie ; aujourd'hui rien
+  ne part. La preuve d'envoi (workflow « Essai Sentry ») vient avec le secret du dépôt.
+
 ## 2026-10-16 — JobAI#160 : une sonde mesure les sources ouvertes sur les employeurs (ADR-0030)
 
 - **Avant** : aucune source sur les employeurs n'était lue, et leur disponibilité depuis l'app n'était pas vérifiée.
@@ -175,7 +185,7 @@
   eslint-config-next, aucun correctif publié) jusqu'au 16/01/2027, comme app-template#73.
 - **BACKLOG.md** : réduit à un renvoi vers les issues (14 lignes). L'ancien contenu : `git show 602dd79:BACKLOG.md`.
 - **Lignes encore rouges de la grille, chacune avec sa tâche ouverte** : 8 (préversions, JobAI#115), 9 (Sentry,
-  JobAI#117), 12 (socle visuel, JobAI#116). `conformite` reste `bloquant: false` jusqu'à ce qu'elles soient vertes.
+  JobAI#117, code livré le 16/10, preuve d'envoi à poser), 12 (socle visuel, JobAI#116). `conformite` reste `bloquant: false` jusqu'à ce qu'elles soient vertes.
 - **Fumée de production** : sans contrôle « summary » (`chemin-summary` vide dans `fumee.yml`), car il exigeait le
   secret `HUB_TOKEN` du dépôt, que Vercel ne laisse pas relire (16/10, JobAI#113). Santé et connexion restent
   sondées. À rétablir le jour où le secret est posé. **À faire par Marc** : rien pour la fumée ; les réglages « scan
