@@ -52,8 +52,8 @@ les décisions dans [`docs/adr/`](./docs/adr/).
   tournaient quand même à chaque passe, et leur zéro se confondait avec un marché calme.
 - **Distance et carte** — domicile géocodé une fois et conservé en base, mesure automatique
   après réponse, bornée à une passe / 5 min. Deux crons de géocodage (`vercel.json`) :
-  `/api/cron/veille` (15:00 UTC, ingestion + géocodage) et `/api/cron/geocodage` (03:00 UTC,
-  géocodage seul — [CARTE-03], `BACKLOG.md`). Le plafond par passe (8 requêtes Nominatim,
+  `/api/cron/veille` (11:00 UTC, ingestion + géocodage) et `/api/cron/geocodage` (03:00 et 19:00 UTC,
+  géocodage seul — [CARTE-03], JobAI#91, `BACKLOG.md`). Le plafond par passe (8 requêtes Nominatim,
   `MAX_VILLES_PAR_PASSE`) est une limite de SÉCURITÉ dérivée du mur de 60 s d'une fonction
   Vercel dans le pire cas — l'augmenter accélérerait le géocodage mais exigerait de
   re-dériver ce calcul ; le second cron double le débit sans y toucher. **Google Maps

@@ -3045,6 +3045,10 @@ villes par ce qu'elles débloquent.
 
 **Ce qui RESTE** ⬜ :
 - Le débit : **8 villes par passe** (`MAX_VILLES_PAR_PASSE`), partagé avec la re-vérification.
+  🟦 **Passe de plus ajoutée le 2026-10-16 (JobAI#91, choix de Marc : oui, sources gratuites
+  seulement).** `vercel.json` appelle maintenant `/api/cron/geocodage` à 03:00 ET 19:00 UTC
+  (verrou : `tests/passesGeocodage.test.ts`). Preuve à lire : `villesManquantes` de la ligne
+  `[distances]` (outil `etat_synchro`, `distances-resume`) baisse trois relevés de suite.
   `lib/geocodageCron.ts` interdit d'agrandir la passe — il faut une passe de plus, et c'est une
   décision à part. La ligne `[distances]` publie désormais `villesManquantes`, qui est le
   chiffre qui dimensionne ce choix ; il n'existait pas avant, d'où un lot dimensionné le

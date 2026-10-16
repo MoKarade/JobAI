@@ -6,7 +6,10 @@
 // fonction Vercel dans le pire cas (voir `lib/geocodageCron.ts`). L'agrandir exigerait de
 // re-dériver ce pire cas ; ce n'est pas fait ici.
 //
-// Le levier qui reste SANS y toucher : une PASSE DE PLUS par jour. Cette route ne fait QUE
+// Le levier qui reste SANS y toucher : une PASSE DE PLUS par jour. Depuis JobAI#91 (Marc,
+// 16/10/2026) cette route est appelée DEUX fois par jour (03:00 et 19:00 UTC ; la seconde entrée
+// de `vercel.json` porte `?passe=apres-midi`, que la route ignore : elle ne sert qu'à garder deux
+// entrées distinctes). Nominatim reste la seule source — gratuite. Cette route ne fait QUE
 // ça — ni ingestion, ni péremption, ni journal de veille — elle appelle exactement le même
 // `mesurerDistances` que le cron de veille et que les pages, avec le même budget partagé
 // (`lib/geocodageCron.ts`, pour que les deux crons ne divergent jamais), à une heure

@@ -14,6 +14,10 @@
     {
       "path": "/api/cron/geocodage",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/geocodage?passe=apres-midi",
+      "schedule": "0 19 * * *"
     }
   ],
   "ignoreCommand": "bash scripts/build-necessaire.sh"
