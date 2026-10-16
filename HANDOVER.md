@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-10-16 — JobAI#99 : cinq modules de lib/ que rien ne testait sont exercés
+
+- **Modules** : `mesureLieux.ts`, `adresse.ts`, `ingest/sources.ts`, `ingest/adresseAnnoncee.ts`,
+  `db/index.ts`. Chacun a son fichier de tests (`tests/mesureLieux.test.ts`, `adresse.test.ts`,
+  `ingestSources.test.ts`, `adresseAnnoncee.test.ts`, `dbParesseuse.test.ts`), 54 cas.
+- **Ce qui est vraiment exécuté** : seul `fetch` est remplacé. `mesurerLieuxInconnus` tourne avec le
+  vrai géocodeur et le vrai domicile (lu de l'environnement, point de référence public), `recuperer`
+  avec son vrai minuteur, `db` avec le vrai proxy (sans connexion réseau).
+- **Piège rencontré** : `tests/piiGuard.test.ts` refuse un numéro civique à trois chiffres ou plus
+  suivi de « rue » (même fictif) et `DATABASE_URL: <8 caractères>` ; les cas utilisent des numéros à
+  deux chiffres et une valeur passée en variable.
+- **Ce qui reste** (BACKLOG, `[ACTIONS-02]`) : les autres modules du recensement du 18/09, à re-mesurer
+  avant d'y toucher (le recensement s'est trompé deux fois sur les formes d'import).
+
 ## 2026-10-16 — JobAI#98 : tout `curl` du dépôt refuse un passage en HTTP
 
 - **Constat** : `sonde-registre.yml` téléchargeait avec `curl -sL` ; `-L` suit les redirections, et une

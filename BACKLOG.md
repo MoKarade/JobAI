@@ -2776,6 +2776,11 @@ vérifier l'état d'une annonce moi-même.
       **Un recenseur ne voit que les formes que son auteur avait sous les yeux** — d'où des
       témoins nommés dans CHAQUE forme avant de se servir de la sortie. Ne pas reprendre la
       liste ci-dessus sans la re-mesurer : elle décrit une population, pas un mécanisme.
+      ✅ 2026-10-16 (JobAI#99) : cinq de ces modules ont maintenant un test qui les EXERCE —
+      `mesureLieux.ts`, `adresse.ts`, `ingest/sources.ts`, `ingest/adresseAnnoncee.ts` et
+      `db/index.ts` (`tests/mesureLieux.test.ts`, `adresse.test.ts`, `ingestSources.test.ts`,
+      `adresseAnnoncee.test.ts`, `dbParesseuse.test.ts`). Seule la frontière réseau (`fetch`) est
+      remplacée ; le domicile vient de l'environnement (centre de Québec, pas un domicile).
 
 - [x] 🔴 **`[REDIR-01]`** ✅ **CORRIGÉ le 2026-09-18, sur feu vert de Marc (« go »).**
       **La garde anti-tremplin de `cheminInterne` se contournait par un
