@@ -92,7 +92,10 @@ jobs:
           # Nominatim et Overpass. C'est la moindre des choses envers un service public.
           # `--max-filesize` protège le runner d'un fichier absurde : mieux vaut un échec
           # net qu'un disque plein sans explication.
-          curl -sL --max-time 900 --max-filesize 4000000000 \
+          # `--proto '=https' --proto-redir '=https'` : `-L` suit les redirections, et une
+          # redirection peut rétrograder en HTTP. L'URL de départ est en https, ce qui ne
+          # dit rien de là où le serveur nous envoie ensuite.
+          curl --proto '=https' --proto-redir '=https' -sL --max-time 900 --max-filesize 4000000000 \
             -A "JobAI/1.0 (recherche d'emploi personnelle; contact via le depot GitHub)" \
             "$URL" -o req.bin \
             -w 'code=%{http_code} taille=%{size_download} type=%{content_type} redirections=%{num_redirects}\n' || true
