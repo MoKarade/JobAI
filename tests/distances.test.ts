@@ -15,6 +15,8 @@ import {
   invaliderDistancesPrecisees,
   planifierDistances,
   positionInvraisemblable,
+  positionNonProuvee,
+  villesParEmployeur,
   scoreAvecDistance,
   villesParUrgence,
   type Position,
@@ -311,6 +313,71 @@ describe("invaliderDistancesImplausibles — un km faux déjà en base ne part p
     const sansPosition = offre({ id: "s", entreprise: "Inconnue", ville: "Montréal", km: 6.1 });
     const r = invaliderDistancesImplausibles([h, sansPosition], positions, centreMontreal);
     expect(r.map((o) => o.km)).toEqual([6.1, 6.1]);
+  });
+});
+
+// JobAI#90 — le cas mesuré en production : un employeur à deux sites (Québec et Lavaltrie), une
+// seule position (Québec), et le centre de Lavaltrie pas encore géocodé. Données FICTIVES.
+describe("un employeur à plusieurs sites : sa position ne prouve rien pour une ville non régionale", () => {
+  const positions = new Map<string, Position>([["Atelier Exemple inc.", POS_PROCHE]]);
+  // Le centre de Québec est connu ; celui de Lavaltrie ne l'est pas.
+  const centreQuebecSeul = (v: string | null) =>
+    v === "Québec" ? { lat: POS_PROCHE.lat, lon: POS_PROCHE.lon } : null;
+
+  const siteQuebec = offre({ id: "q", entreprise: "Atelier Exemple inc.", ville: "Québec", km: 6.1 });
+  const siteLavaltrie = offre({ id: "l", entreprise: "Atelier Exemple inc.", ville: "Lavaltrie", km: 6.1 });
+
+  it("efface le km de l'offre de l'autre site, et garde celui du site de la position", () => {
+    const r = invaliderDistancesImplausibles([siteQuebec, siteLavaltrie], positions, centreQuebecSeul);
+    expect(r.map((o) => [o.id, o.km])).toEqual([
+      ["q", 6.1],
+      ["l", null],
+    ]);
+  });
+
+  it("n'écrit pas de km pour l'offre de l'autre site, même sans km au départ", () => {
+    const sansKm = { ...siteLavaltrie, km: null };
+    const majs = planifierDistances([siteQuebec, sansKm], positions, dist(6.1), centreQuebecSeul);
+    expect(majs.map((m) => m.id)).toEqual([]);
+  });
+
+  it("ne touche pas un employeur qui n'annonce que dans une ville", () => {
+    const seule = [
+      offre({ id: "a", entreprise: "Atelier Exemple inc.", ville: "Lavaltrie", km: 6.1 }),
+      offre({ id: "b", entreprise: "Atelier Exemple inc.", ville: "Lavaltrie, QC", km: 6.1 }),
+    ];
+    const r = invaliderDistancesImplausibles(seule, positions, centreQuebecSeul);
+    expect(r.map((o) => o.km)).toEqual([6.1, 6.1]);
+  });
+
+  it("ne touche pas les offres de villes reconnues comme régionales", () => {
+    const regionales = [
+      offre({ id: "a", entreprise: "Atelier Exemple inc.", ville: "Québec", km: 6.1 }),
+      offre({ id: "b", entreprise: "Atelier Exemple inc.", ville: "Lévis", km: 6.1 }),
+    ];
+    const r = invaliderDistancesImplausibles(regionales, positions, () => null);
+    expect(r.map((o) => o.km)).toEqual([6.1, 6.1]);
+  });
+
+  it("laisse la décision à la garde de plausibilité dès que le centre est connu et plausible", () => {
+    const centreLavaltrieProche = (v: string | null) =>
+      v === "Lavaltrie" || v === "Québec" ? { lat: POS_PROCHE.lat, lon: POS_PROCHE.lon } : null;
+    const r = invaliderDistancesImplausibles([siteQuebec, siteLavaltrie], positions, centreLavaltrieProche);
+    expect(r.map((o) => o.km)).toEqual([6.1, 6.1]);
+  });
+
+  it("ne confond pas deux écritures de la même ville avec deux sites", () => {
+    const villes = villesParEmployeur([
+      offre({ id: "a", entreprise: "Atelier Exemple inc.", ville: "Lavaltrie" }),
+      offre({ id: "b", entreprise: "Atelier Exemple", ville: "Lavaltrie, QC" }),
+    ]);
+    expect([...villes.values()].map((v) => v.size)).toEqual([1]);
+  });
+
+  it("ne dit rien d'une offre sans ville ni d'un employeur inconnu", () => {
+    const sansVille = offre({ id: "x", ville: null });
+    expect(positionNonProuvee(sansVille, null, new Set(["lavaltrie", "quebec"]))).toBe(false);
+    expect(positionNonProuvee(siteLavaltrie, null, undefined)).toBe(false);
   });
 });
 

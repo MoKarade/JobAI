@@ -6,6 +6,27 @@
 
 ---
 
+## 2026-10-16 — JobAI#90 : un employeur à plusieurs sites ne prête plus sa position à une ville inconnue
+
+- **Mesuré en production (MCP, 16/10)** : les offres de Coffrages Synergy annoncées à Lavaltrie (~200 km) affichent encore
+  **6,1 km** (une dizaine d'offres ouvertes), alors que ses offres de Québec, elles, sont justes. Cause lue dans le code, pas
+  celle supposée en septembre : `entreprises_lieux` ne garde qu'UNE position par employeur (celle de Québec), et la garde
+  d'ADR-0021 (`positionInvraisemblable`) ne refuse que ce qu'elle prouve, donc elle laisse passer tant que le centre de
+  Lavaltrie n'est pas géocodé (`villes` se remplit à 8 villes par passe, 445 villes manquantes le 16/10).
+- **Fait** : `positionNonProuvee` (`lib/distances.ts`), branchée dans `planifierDistances` et `invaliderDistancesImplausibles`.
+  Sans centre connu, une offre d'une ville que l'app ne reconnaît pas comme régionale ne reçoit pas la position de
+  l'employeur, ET perd son km déjà écrit, quand ce même employeur annonce aussi dans une autre ville. Un employeur à un seul
+  site et les villes régionales ne sont pas touchés ; dès que le centre est connu, `positionInvraisemblable` décide.
+- **Choix de Marc (15/10)** : « a », vérifier la position réelle plutôt que désigner un témoin. Ici la vérification passe par
+  la preuve disponible (les villes où l'employeur annonce) ; une position exacte par employeur et par site reste un ajout
+  possible, pas fait.
+- **Pas fait, à savoir** : une offre dont le km est effacé garde sa note ancienne (calculée avec 6,1 km) jusqu'à la prochaine
+  re-notation ; la voie unique de notation (JobAI#149) la recalcule.
+- **À confirmer après le passage de la passe de distances** : plus aucune offre de Lavaltrie de cet employeur à moins de
+  20 km dans `chercher_offres` (texte « coffrages synergy »).
+
+---
+
 ## 2026-10-16 — JobAI#148 : mesurer le barème actuel (étape 0 du plan de note)
 
 - **Fait** : nouvel outil MCP en lecture seule `diagnostic_bareme` (`lib/diagnosticBareme.ts`, pur, branché dans

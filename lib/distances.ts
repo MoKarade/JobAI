@@ -20,7 +20,8 @@
 import { computeScore, PLAFOND_NOTE_CALCULEE } from "./scoring";
 import { distanceKm, RAYON_VALIDATION_KM } from "./geocodage";
 import { PROFIL_DEFAUT, type Profil } from "./profil";
-import { creerRecherchePosition, memeEmployeur } from "./employeurs";
+import { cleGroupement, creerRecherchePosition, memeEmployeur } from "./employeurs";
+import { estDansLaRegion, normaliserLieu } from "./ingest/region";
 import type { Offre } from "./types";
 
 /** Une position géocodée, avec ce qu'elle vaut vraiment. */
@@ -111,6 +112,63 @@ export function positionInvraisemblable(
   return distanceKm(position, centre) > RAYON_VALIDATION_KM;
 }
 
+/** La ville d'une offre, ramenée à une forme comparable : « Lavaltrie, QC » = « lavaltrie ». */
+function villeComparable(ville: string): string {
+  return normaliserLieu((ville.split(",")[0] ?? ville).split("(")[0] ?? ville);
+}
+
+/**
+ * Les villes où chaque employeur annonce ses offres (hors candidatures historiques). PURE.
+ *
+ * Clé : `cleGroupement`, la même identité que celle qui rapproche l'employeur de sa position.
+ */
+export function villesParEmployeur(offres: readonly Offre[]): Map<string, Set<string>> {
+  const parEmployeur = new Map<string, Set<string>>();
+  for (const o of offres) {
+    if (o.histo || !o.ville) continue;
+    const cle = cleGroupement(o.entreprise, o.id);
+    const villes = parEmployeur.get(cle) ?? new Set<string>();
+    villes.add(villeComparable(o.ville));
+    parEmployeur.set(cle, villes);
+  }
+  return parEmployeur;
+}
+
+/**
+ * La position de l'employeur est-elle SANS PREUVE pour la ville de CETTE offre ? PURE.
+ *
+ * ⚠️ POURQUOI ELLE S'AJOUTE À `positionInvraisemblable` (JobAI#90, mesuré en production le
+ * 2026-10-16). Cette dernière ne refuse que ce qu'elle PROUVE faux, donc elle laisse passer
+ * quand le centre de la ville de l'offre n'est pas connu. Or `villes` se remplit à huit
+ * villes par passe : les offres de Lavaltrie de Coffrages Synergy, un employeur à deux sites
+ * (Québec et Lavaltrie), affichaient encore 6,1 km — la position de Québec — des semaines
+ * après ADR-0021, parce que le centre de Lavaltrie n'était pas encore géocodé. L'attente du
+ * centre était le trou : tant qu'il dure, un chiffre faux est affiché au sommet de la liste.
+ *
+ * LA RÈGLE, ET CE QU'ELLE NE FAIT PAS. Sans centre connu, la position d'un employeur ne mesure
+ * pas une offre annoncée dans une ville que l'app ne reconnaît pas comme régionale quand ce
+ * même employeur annonce AUSSI ailleurs : un employeur n'a qu'une position, tirée de la ville
+ * d'UNE de ses offres, et rien n'établit qu'elle est celle de cette offre-ci. Mieux vaut
+ * « distance à mesurer » qu'un chiffre de quartier pour un emploi à 200 km.
+ *   · un employeur qui n'annonce que dans une ville n'est PAS touché : sa position vient de
+ *     cette ville, ses distances justes restent ;
+ *   · une offre d'une ville reconnue comme régionale n'est PAS touchée : l'erreur possible y
+ *     reste dans la région, c'est le comportement d'avant ;
+ *   · dès que le centre de la ville est connu, `positionInvraisemblable` reprend la décision.
+ */
+export function positionNonProuvee(
+  offre: Offre,
+  centre: { lat: number; lon: number } | null,
+  villesDeLEmployeur: ReadonlySet<string> | undefined,
+): boolean {
+  if (centre !== null) return false;
+  if (!offre.ville || villesDeLEmployeur === undefined) return false;
+  if (estDansLaRegion(offre.ville)) return false;
+  const ici = villeComparable(offre.ville);
+  for (const autre of villesDeLEmployeur) if (autre !== ici) return true;
+  return false;
+}
+
 /**
  * Efface les distances écrites depuis une position qu'on sait maintenant INVRAISEMBLABLE
  * pour la ville de l'offre.
@@ -126,11 +184,16 @@ export function invaliderDistancesImplausibles(
   centreDe: CentreDe,
 ): Offre[] {
   const positionDe = creerRecherchePosition(positions);
+  const villes = villesParEmployeur(offres);
   return offres.map((o) => {
     if (o.km === null || o.histo) return o;
     const pos = positionDe(o.entreprise);
     if (!pos) return o;
-    return positionInvraisemblable(pos, centreDe(o.ville) ?? null) ? { ...o, km: null } : o;
+    const centre = centreDe(o.ville) ?? null;
+    const faux =
+      positionInvraisemblable(pos, centre) ||
+      positionNonProuvee(o, centre, villes.get(cleGroupement(o.entreprise, o.id)));
+    return faux ? { ...o, km: null } : o;
   });
 }
 
@@ -190,6 +253,7 @@ export function planifierDistances(
 ): MiseAJourDistance[] {
   const majs: MiseAJourDistance[] = [];
   const positionDe = creerRecherchePosition(positions);
+  const villes = villesParEmployeur(offres);
 
   for (const o of offres) {
     // L'historique n'a pas de distance à porter : ce sont des candidatures de 2025.
@@ -206,7 +270,11 @@ export function planifierDistances(
 
     // La position d'un EMPLOYEUR ne mesure pas une offre annoncée ailleurs (ADR-0021).
     // Mieux vaut « distance à mesurer » que 6,1 km pour un emploi à 200 km.
-    if (positionInvraisemblable(pos, centreDe(o.ville) ?? null)) continue;
+    const centre = centreDe(o.ville) ?? null;
+    if (positionInvraisemblable(pos, centre)) continue;
+    // Et quand le centre n'est pas encore connu, un employeur à plusieurs sites ne prouve rien
+    // pour une ville non régionale (JobAI#90).
+    if (positionNonProuvee(o, centre, villes.get(cleGroupement(o.entreprise, o.id)))) continue;
 
     const km = arrondirKm(distance(pos));
     // Une distance aberrante trahit une résolution fausse (homonyme, signe inversé) : on
