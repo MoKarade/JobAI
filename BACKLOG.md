@@ -68,12 +68,14 @@ Lot L2 de l'audit multi-outils du 2026-09-18, livré le même jour.
   Deux des trois comptes équivalents de FinanceAI valaient zéro aussi : les commandes de
   re-mesure valent mieux que les chiffres, comme le dit le §7 du document.
 
-- [ ] 🔧 **`[CI-CURL-PROTO]` `githubactions:S6506` sur `sonde-registre.yml`** (S) — HORS
+- [x] 🔧 **`[CI-CURL-PROTO]` `githubactions:S6506` sur `sonde-registre.yml`** (S) — HORS
   PÉRIMÈTRE du lot L2, signalé et non corrigé. L'`URL` est bien en `https://` (l. 74) : le
   risque n'est pas le protocole de départ mais le `-L` de `curl`, qui suit une redirection
   **pouvant rétrograder en HTTP**. Le correctif tient en un drapeau —
   `--proto '=https' --proto-redir '=https'` — et vaut aussi pour les autres `curl` de ce
   dépôt (Nominatim, Overpass) : à faire en un seul passage plutôt qu'un site à la fois.
+  ✅ 2026-10-16 (JobAI#98) : les deux `curl` du dépôt (`ci.yml`, `sonde-registre.yml`) portent les
+  deux drapeaux ; `tests/curlHttps.test.ts` refuse tout `curl` futur qui n'en porte pas un.
 
 ---
 
@@ -2774,6 +2776,11 @@ vérifier l'état d'une annonce moi-même.
       **Un recenseur ne voit que les formes que son auteur avait sous les yeux** — d'où des
       témoins nommés dans CHAQUE forme avant de se servir de la sortie. Ne pas reprendre la
       liste ci-dessus sans la re-mesurer : elle décrit une population, pas un mécanisme.
+      ✅ 2026-10-16 (JobAI#99) : cinq de ces modules ont maintenant un test qui les EXERCE —
+      `mesureLieux.ts`, `adresse.ts`, `ingest/sources.ts`, `ingest/adresseAnnoncee.ts` et
+      `db/index.ts` (`tests/mesureLieux.test.ts`, `adresse.test.ts`, `ingestSources.test.ts`,
+      `adresseAnnoncee.test.ts`, `dbParesseuse.test.ts`). Seule la frontière réseau (`fetch`) est
+      remplacée ; le domicile vient de l'environnement (centre de Québec, pas un domicile).
 
 - [x] 🔴 **`[REDIR-01]`** ✅ **CORRIGÉ le 2026-09-18, sur feu vert de Marc (« go »).**
       **La garde anti-tremplin de `cheminInterne` se contournait par un
