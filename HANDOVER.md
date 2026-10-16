@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-10-16 — JobAI#116 : socle visuel commun, en sombre seul
+
+- **Décision de Marc** (16/10, « Tes gestes à faire », réponse 5) : sombre seul, l'ADR-0008 reste vrai. Le socle
+  d'app-template est donc appliqué sans thème clair.
+- **Fait** : `app/globals.css` reprend les noms de variables du socle (`--fond`, `--texte`, `--bordure`…, valeurs en
+  hex), les classes du vocabulaire (`.bouton-principal`, `.champ`, `.doux`, `.succes`, `.alerte`, `.erreur`,
+  `.bandeau`…) et n'a plus aucune couleur hors de `:root`. `app/manifest.ts` et `app/layout.tsx` lisent la même valeur de
+  fond (`#090c11`) ; l'ancienne (`#141209`, chaude) était périmée. Verrou : `tests/theme.test.ts` (13 tests).
+- **Effet visible** : captures avant/après de 7 écrans en téléphone et en bureau, comparées pixel à pixel :
+  12 sur 14 identiques ; seuls Profil et Sources changent, parce que le bouton principal (Sources) et les barres du barème (Profil)
+  passent de l'indigo au gris clair du socle (`--accent`). Détail et images : `docs/captures/116/`. Deux effets de bord : le texte secondaire des relances
+  prend enfin sa vraie couleur (la variable citée n'existait pas), et un bouton désactivé est à 50 % d'opacité.
+- **Reste rouge** : la ligne 12 de la grille de conformité cherche `prefers-color-scheme: dark` ou `data-theme` dans
+  `globals.css`, donc elle ne peut pas passer pour une app sombre seule (BatchChef a le même cas). À corriger dans
+  `MoKarade/.github` (`scripts/conformite.mjs` : accepter `color-scheme: dark`), pas ici.
+
+---
+
 ## 2026-10-16 — JobAI#113 : contrôles communs branchés, grille de conformité, BACKLOG réduit
 
 - **Branché** : `ci.yml` appelle `securite.yml` (gitleaks, OSV-Scanner, CodeQL) et `conformite.yml` de
