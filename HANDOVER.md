@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-10-16 — JobAI#145 : contrat hub v1.5.0 (zod 4)
+
+- **Avant** : `@mokarade/hub-contract` épinglé `v1.4.0`, dont zod 3 était installé en double à côté du zod 4 de l'app.
+- **Fait** : `package.json` et le lockfile pointent sur `#v1.5.0` (commit `440a301`) ; un seul zod (4.6.7) dans l'arbre ;
+  `npm audit --omit=dev` : 0 ; README et `docs/specs/versions-doc.md` alignés. Aucun code touché.
+- **À confirmer en production** : déploiement `READY` sur le commit fusionné et `GET https://emploi.hubperso.com/api/hub/summary`
+  qui répond 401 sans jeton.
+
 ## 2026-10-16 — JobAI#154 : les années d'expérience se calculent depuis les dates du CV (ADR-0027)
 
 - **Avant** : le modèle estimait « les années d'expérience pertinente » ; ce nombre réglait la séniorité de toutes les offres

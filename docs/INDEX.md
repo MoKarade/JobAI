@@ -62,4 +62,4 @@
 
 ## docs/specs/
 
-- [Versions doc (Next 16, hub-contract v1.4.0)](specs/versions-doc.md) — `docs/specs/versions-doc.md`
+- [Versions doc (Next 16, hub-contract v1.5.0)](specs/versions-doc.md) — `docs/specs/versions-doc.md`
