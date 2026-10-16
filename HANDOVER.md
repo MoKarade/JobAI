@@ -6,6 +6,30 @@
 
 ---
 
+## 2026-10-16 — JobAI#108 : brouillon de CV et de lettre ciblés sur une offre
+
+- **Fait** : la fiche d'une offre (`/offre/[id]`) a une section « Candidature » avec un bouton « Préparer un brouillon de
+  CV et de lettre ». Un clic = un appel Haiku (`lib/candidatureLlm.ts`, troisième site d'appel du dépôt), jamais au
+  chargement ni par la veille. Le brouillon s'affiche en texte, avec « Copier le CV » et « Copier la lettre ».
+- **Ce que le modèle voit** : le profil validé de Marc (parcours, outils, langues, diplômes ; sans coordonnées) et, de
+  l'offre, le poste, l'employeur, le salaire affiché, les notes de recherche et les raisons de la note. Pas l'annonce
+  complète (l'app ne la garde pas), pas les notes personnelles de Marc.
+- **Garde-fous** : le code, pas le modèle, recopie employeurs, dates, langues et diplômes depuis le profil (le modèle
+  désigne un poste par son numéro) ; un numéro de poste ou une compétence absents du profil sont écartés et dits ; les
+  chiffres du texte rédigé que ni le profil ni l'offre ne portent sont listés « À vérifier avant usage » ; sortie validée
+  par Zod, listes bornées avant validation ; coordonnées retirées ; profil sans parcours = refus avant l'appel (rien
+  n'est facturé) ; clé absente = refus nommé. Le suivi de l'offre (statut, date d'envoi) n'est jamais touché.
+- **Coût** : compté au site d'appel dans le compteur commun, donc publié au hub dans le bloc `usage`. Pas de plafond dur
+  (décision de Marc, 16/10 : « surveiller », JobAI#104 fermée).
+- **Pas conservé** : le brouillon n'est écrit nulle part ; recliquer refait un appel. Garder les brouillons par offre serait
+  un ajout à décider, pas fait.
+- **Limite** : la détection des chiffres ne lit que les chiffres écrits en chiffres ; « huit » en toutes lettres passe. Un
+  brouillon se relit.
+- **Captures** (profil FICTIF, API simulée localement) : `docs/captures/108/`, téléphone et bureau, avant et après le clic.
+- **Verrou** : `tests/candidature.test.ts` (26 tests, faux SDK).
+
+---
+
 ## 2026-10-16 — JobAI#116 : socle visuel commun, en sombre seul
 
 - **Décision de Marc** (16/10, « Tes gestes à faire », réponse 5) : sombre seul, l'ADR-0008 reste vrai. Le socle
