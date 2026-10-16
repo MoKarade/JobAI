@@ -3,7 +3,7 @@
 | Fichier | Contenu |
 |---|---|
 | `HANDOVER.md` | **L'état RÉEL** : ce qui tourne, ce qui reste. À lire en premier — l'état ne se duplique nulle part ailleurs, parce qu'un état recopié se périme dans l'exemplaire le moins relu. |
-| `BACKLOG.md` | Ce qui est décidé mais pas fait. Chaque tâche a un ID, utilisé en préfixe de commit. |
+| `BACKLOG.md` | Un renvoi vers les issues du dépôt, où vit le backlog (depuis le 16/10/2026). L'ancien contenu : `git show 602dd79:BACKLOG.md`. |
 | `docs/adr/` | Les décisions architecturales, `NNNN-slug.md`. Obligatoire avant toute modif de la notation ou du matching (§11). |
 | `docs/LESSONS.md` | Le journal des leçons **et leurs HISTOIRES** (incident, mesure, date) — depuis le 2026-09-17, il porte aussi les 153 récits déménagés de la §9. Leur RÈGLE reste en §9 : une leçon s'écrit des DEUX côtés, dans le même commit. |
 | `docs/DEPLOIEMENT.md` | Déployer, et les variables d'environnement attendues. |

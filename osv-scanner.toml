@@ -1,0 +1,7 @@
+# Risques acceptés pour OSV-Scanner (workflow commun securite.yml). Une exception = un identifiant,
+# une raison, une date de réexamen : passé cette date, l'alerte revient d'elle-même.
+
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+ignoreUntil = 2027-01-16
+reason = "braces 3.0.3, dépendance de développement seulement (eslint-config-next, micromatch) : elle ne part jamais en production. Aucun correctif publié (3.0.3 est la dernière version). Même cas, même décision que MoKarade/app-template#73 (risque toléré par Marc le 16/10/2026) ; reprise ici par JobAI#113, à réexaminer si un correctif sort. Chaîne vérifiée le 16/10/2026 par `npm ls braces` : eslint-config-next, fast-glob, micromatch, braces."

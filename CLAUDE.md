@@ -6,7 +6,7 @@
 - **JobAI** suit la recherche d'emploi de Marc (région de Québec) : offres notées selon son profil, statuts de candidature, réponses de recruteurs, aide IA (analyse d'offres, CV/lettres).
 - Stack : Next.js 16 (App Router, Server Actions) · Neon + Drizzle · Auth.js v5 (`providers: []`, session du hub) · Anthropic SDK · Zod · vitest.
 - Déploiement : Vercel sur `emploi.hubperso.com`. Dépôt **PUBLIC**, branche par défaut `main`. Widget hub : `GET /api/hub/summary`.
-- État : `HANDOVER.md` (à lire en premier) ; plan : `BACKLOG.md` ; décisions : `docs/adr/`. Marc valide, il ne code pas.
+- État : `HANDOVER.md` (à lire en premier) ; tâches : les issues du dépôt (`BACKLOG.md` y renvoie) ; décisions : `docs/adr/`. Marc valide, il ne code pas.
 
 ## Commandes
 - `npm run dev` · `npm run db:generate` (SQL de migration ; application auto par `lib/migrations.ts`) · `/review`.

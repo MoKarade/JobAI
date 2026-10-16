@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-10-16 — JobAI#113 : contrôles communs branchés, grille de conformité, BACKLOG réduit
+
+- **Branché** : `ci.yml` appelle `securite.yml` (gitleaks, OSV-Scanner, CodeQL) et `conformite.yml` de
+  `MoKarade/.github` (en `@main`, voulu) ; un job `audit` lance `npm audit --omit=dev` (0 faille le 16/10) ;
+  `fumee.yml` sonde `https://emploi.hubperso.com` après chaque déploiement de production (santé, summary
+  `/api/hub/summary` refusé sans jeton puis valide avec, page `/connexion`). Toutes les actions sont épinglées
+  par SHA. Le job `securite` historique reste (Mergify l'exige par son nom).
+- **OSV-Scanner** : `osv-scanner.toml` tolère `GHSA-vfj7-8cjw-p6xm` (braces 3.0.3, dépendance de développement via
+  eslint-config-next, aucun correctif publié) jusqu'au 16/01/2027, comme app-template#73.
+- **BACKLOG.md** : réduit à un renvoi vers les issues (14 lignes). L'ancien contenu : `git show 602dd79:BACKLOG.md`.
+- **Lignes encore rouges de la grille, chacune avec sa tâche ouverte** : 8 (préversions, JobAI#115), 9 (Sentry,
+  JobAI#117), 12 (socle visuel, JobAI#116). `conformite` reste `bloquant: false` jusqu'à ce qu'elles soient vertes.
+- **Fumée de production** : sans contrôle « summary » (`chemin-summary` vide dans `fumee.yml`), car il exigeait le
+  secret `HUB_TOKEN` du dépôt, que Vercel ne laisse pas relire (16/10, JobAI#113). Santé et connexion restent
+  sondées. À rétablir le jour où le secret est posé. **À faire par Marc** : rien pour la fumée ; les réglages « scan
+  de secrets » et « protection au push » de GitHub (ligne 6) sont réservés aux administrateurs.
+
 ## 2026-10-16 — JobAI#91 : une passe de géocodage de plus par jour
 
 - **Décision de Marc** (16/10, 8 h 22 heure du Québec) : oui, situer plus de villes par nuit, avec des

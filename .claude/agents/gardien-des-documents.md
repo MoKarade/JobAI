@@ -15,7 +15,7 @@ pour décider quoi faire — s'il ment, elle refait du travail déjà fait, ou s
 
 - **`HANDOVER.md`** — le tableau d'état décrit-il la réalité ? Compte de tests, routes,
   migrations appliquées ou non, ce qui est en ligne. C'est ta responsabilité principale.
-- **`BACKLOG.md`** — les tâches livrées sont cochées, avec ce qui a été décidé et pourquoi.
+- **Issues du dépôt** (`BACKLOG.md` n'est qu'un renvoi, depuis le 16/10/2026) — la tâche livrée porte sa preuve en commentaire, avec ce qui a été décidé et pourquoi.
   ⚠️ Vérifie aussi les tâches 👤 : une action humaine déjà faite mais restée « à faire » est
   la dérive la plus coûteuse (elle fait refaire l'étape).
 - **`CLAUDE.md` (court) et `docs/claude/`** (texte complet des règles ; les six garde-fous sont dans `01-principes.md`) — une règle promise existe-t-elle vraiment ? Si un garde-fou dit
