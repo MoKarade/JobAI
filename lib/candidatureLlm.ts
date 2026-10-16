@@ -116,7 +116,13 @@ export async function redigerCandidature(
   if (!profilSuffisant(faits)) {
     return {
       ok: false,
-      raison: "Ton profil n'a aucun poste : dépose et valide ton CV dans Profil avant de demander un brouillon.",
+      // ⚠️ LE CAS RÉEL (2026-10-16) : un CV déposé AVANT que l'extraction ne lise le parcours (20 août)
+      // a un profil validé sans poste. « Dépose ton CV » l'envoyait refaire ce qu'il avait déjà fait :
+      // le geste est de RELANCER l'analyse du CV existant, puis de valider.
+      raison:
+        "Ton profil validé n'a aucun poste (il date d'avant la lecture du parcours). Dans Profil : " +
+        "« Relancer l'analyse » sur ton CV, vérifie ce qu'elle propose, puis applique. " +
+        "Si tu n'as aucun CV, dépose-en un.",
     };
   }
 

@@ -290,6 +290,8 @@ describe("redigerCandidature — la comptabilité vit au site d'appel", () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.raison).toContain("aucun poste");
+    // Le message dit le GESTE (relancer l'analyse d'un CV déjà déposé), pas seulement le manque.
+    expect(r.raison).toContain("Relancer l'analyse");
     expect(appels).toBe(0);
   });
 
