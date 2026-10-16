@@ -48,6 +48,14 @@ export interface EntreesSorties {
    */
   diagnostiquerFlux: () => Promise<Record<string, unknown>>;
   /**
+   * Mesure les sources OUVERTES sur les employeurs (JobAI#160) : lecture seule, aucun nom ne sort.
+   * `null` si la base n'a pas répondu — les employeurs à chercher en viennent.
+   *
+   * ⚠️ INJECTÉE pour la même raison que `diagnostiquerFlux` : le `fetch` vers ces sources reste
+   * dans `lib/ingest/`, le seul dossier autorisé à contacter une source (garde-fou n°4).
+   */
+  sonderEmployeurs: () => Promise<Record<string, unknown> | null>;
+  /**
    * Le journal de veille : par offre, le jour où un balayage l'a vue pour la dernière fois.
    *
    * ⚠️ SON ABSENCE EST UNE INFORMATION, pas un vide. Une offre qui n'y figure pas n'a jamais
@@ -212,6 +220,29 @@ export function creerServeur(io: EntreesSorties): McpServer {
         exemples: exemples[cle] ?? null,
         professions: r["professions"],
       });
+    },
+  );
+
+  serveur.registerTool(
+    "sonde_employeurs",
+    {
+      title: "Mesurer les sources ouvertes sur les employeurs",
+      description:
+        "Depuis l'app déployée, interroge trois sources publiques et officielles et rend, SANS " +
+        "NOM D'ENTREPRISE, quelles répondent et quelle part des employeurs suivis on y retrouve : " +
+        "le Registre des entreprises du Québec (nom exact, `uniques` / `ambigus`), le registre des " +
+        "entreprises non admissibles aux contrats publics (un compte), et le catalogue de données " +
+        "ouvertes du Canada pour les salaires par code de profession (taux d'offres avec un code). " +
+        "⚠️ Un taux n'est valide que si `fin` vaut « termine » ; un rattachement par nom est un " +
+        "indice, pas une identité. Lit des fichiers publics (~80 Mo pour le registre) : n'appelle " +
+        "pas l'outil pour rien. Ne modifie rien.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    async () => {
+      const r = await io.sonderEmployeurs();
+      if (r === null) return panne(BASE_MUETTE);
+      return json(r);
     },
   );
 

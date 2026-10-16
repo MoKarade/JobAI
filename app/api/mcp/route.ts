@@ -22,6 +22,7 @@ import { db } from "@/lib/db";
 import { offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { BUDGET_MS_MCP, diagnostiquerFlux } from "@/lib/ingest/diagnosticFlux";
+import { sonderEmployeurs } from "@/lib/ingest/sondeEmployeurs";
 import { creerServeur } from "@/lib/mcp/serveur";
 import { lireEtat, lireEtatBrut } from "@/lib/etat";
 import { CLE_RESUME_DISTANCES } from "@/lib/resumePasse";
@@ -146,6 +147,12 @@ export async function POST(requete: Request): Promise<Response> {
     // budget plus long que le mur ne bornerait rien, et l'appel serait coupé par le dehors
     // sans rendre le `fin` qui dit si la lecture était complète.
     diagnostiquerFlux: () => diagnostiquerFlux(fetch, BUDGET_MS_MCP),
+    // ⚠️ MÊME RÈGLE : le `fetch` vers les registres reste dans `lib/ingest/`, et le budget de la
+    // sonde (45 s) tient sous le mur de 60 s de cette route.
+    sonderEmployeurs: async () => {
+      const offres = await lireOffres();
+      return offres === null ? null : { ...(await sonderEmployeurs(offres, fetch)) };
+    },
     // ⚠️ DÉGRADE, NE LÈVE PAS. Le journal sert à NUANCER le résumé ; s'il est illisible, le
     // suivi doit rester lisible — avec un bloc `veille` qui dit zéro confirmée, ce qui est
     // vrai de ce qu'on sait, plutôt qu'une panne sur toute la lecture.

@@ -14,6 +14,15 @@
 - **À confirmer en production** : déploiement `READY` sur le commit fusionné et `GET https://emploi.hubperso.com/api/hub/summary`
   qui répond 401 sans jeton.
 
+## 2026-10-16 — JobAI#160 : une sonde mesure les sources ouvertes sur les employeurs (ADR-0030)
+
+- **Avant** : aucune source sur les employeurs n'était lue, et leur disponibilité depuis l'app n'était pas vérifiée.
+- **Fait** : outil MCP en lecture seule `sonde_employeurs` (`lib/ingest/sondeEmployeurs.ts`) : REQ (`Nom.csv` du ZIP de données
+  ouvertes lu par plages d'octets), RENA (un compte, jamais un nom) et catalogue CKAN des salaires (+ part d'offres avec un
+  code de profession). Rattachement par nom normalisé exact ; ambigus comptés à part ; `fin` ≠ « termine » = pas de taux.
+- **À confirmer** : lire la mesure en production (reconnexion du connecteur peut être nécessaire pour voir le nouvel outil),
+  puis compléter la section « Mesure » de l'ADR-0030.
+
 ## 2026-10-16 — JobAI#159 : les signaux d'un employeur, depuis le suivi (ADR-0029)
 
 - **Avant** : rien n'indiquait qu'un employeur republie ses postes ou garde des offres ouvertes depuis des mois.
