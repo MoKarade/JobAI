@@ -27,6 +27,7 @@ import { z } from "zod";
 import { baliserDonnees, CONSIGNE_DONNEES, sanitizePromptText } from "../promptSafety";
 import { enregistrerUsageLlm } from "../coutLlmStore";
 import { FaitsSchema, type Faits } from "../profil";
+import { calculerAnnees, LONGUEUR_MAX_DETAIL } from "./anneesExperience";
 
 /**
  * Haiku suffit : l'extraction structurée d'un document court est exactement ce qu'il fait
@@ -109,14 +110,26 @@ export const ExperienceSchema = z.object({
   employeur: z.string().max(120).default(""),
   debut: z.string().max(40).default(""),
   fin: z.string().max(40).default(""),
+  /**
+   * Le CV présente-t-il ce poste comme un stage ? Un stage ne compte pas dans les années
+   * d'expérience (JobAI#154). Faux par défaut : l'absence de mention n'est pas un stage.
+   */
+  estStage: z.boolean().default(false),
   /** Ce que le poste a comporté, tel que le CV le formule. */
   faits: z.array(z.string().min(1).max(300)).max(PLAFONDS.faitsParPoste).default([]),
 });
 export type Experience = z.infer<typeof ExperienceSchema>;
 
 export const ReponseExtractionSchema = z.object({
+  /**
+   * ⚠️ CE N'EST PLUS LE MODÈLE QUI LE DIT (JobAI#154). Le modèle recopie les dates du parcours ;
+   * `extraireFaits` calcule le nombre (`calculerAnnees`) et le met ici, avec son détail. Le
+   * champ reste REQUIS ici (une analyse enregistrée doit en porter un, même `null`), alors que
+   * la réponse du modèle est lue par `ReponseModeleSchema`, qui l'ignore.
+   */
   anneesExperience: z.number().finite().min(0).max(60).nullable(),
-  anneesExperienceProvenance: z.string().max(300).default(""),
+  /** Le détail du calcul, ligne par ligne (jusqu'à `LONGUEUR_MAX_DETAIL` caractères). */
+  anneesExperienceProvenance: z.string().max(LONGUEUR_MAX_DETAIL).default(""),
   langues: z.array(z.string().min(1).max(60)).max(PLAFONDS.langues).default([]),
   diplomes: z.array(z.string().min(1).max(200)).max(PLAFONDS.diplomes).default([]),
   outils: z.array(z.string().min(1).max(80)).max(PLAFONDS.outils).default([]),
@@ -137,6 +150,16 @@ export const ReponseExtractionSchema = z.object({
   parcours: z.array(ExperienceSchema).max(PLAFONDS.parcours).default([]),
 });
 export type ReponseExtraction = z.infer<typeof ReponseExtractionSchema>;
+
+/**
+ * Ce que le modèle rend (JobAI#154) : la même chose, sauf les deux champs que le code calcule.
+ * Ils sont acceptés SANS ÊTRE LUS (`unknown`) : un modèle qui s'obstine à écrire « 99 » ne doit
+ * pas faire échouer une analyse dont tout le reste est bon, ni se glisser à la place du calcul.
+ */
+const ReponseModeleSchema = ReponseExtractionSchema.extend({
+  anneesExperience: z.unknown().optional(),
+  anneesExperienceProvenance: z.unknown().optional(),
+});
 
 /** Le résultat d'une extraction : un succès sourcé, ou un échec qui se nomme. */
 export type ResultatExtraction =
@@ -186,16 +209,16 @@ const CONSIGNE = [
   "matrimonial, photo. Ils ne servent pas à évaluer une offre d'emploi et ne doivent pas",
   "sortir de ce document.",
   "",
-  "Pour anneesExperience : compte les années d'expérience professionnelle PERTINENTE,",
-  "stages et études exclus. Si le document ne permet pas de trancher, rends null —",
-  "une estimation plausible est pire qu'une absence, parce qu'elle sera crue.",
-  "Dans anneesExperienceProvenance, cite l'endroit exact du CV qui justifie le nombre",
-  "(intitulé de section et dates). Si tu as supposé, laisse la provenance vide.",
+  "NE CALCULE JAMAIS d'années d'expérience : le code les compte à partir des dates que tu",
+  "recopies dans parcours. Ton travail est de les recopier fidèlement, pas de les additionner.",
   "",
   "parcours : les postes occupés, du plus RÉCENT au plus ancien. Pour chacun, recopie",
   "l'intitulé, l'employeur et les dates TELS QU'ÉCRITS — « Avril 2023 », « Présent ».",
   "Ne convertis pas en dates : le CV ne porte pas toujours le jour, et l'inventer donnerait",
   "une précision fausse. Un champ absent du CV reste une chaîne vide, jamais une supposition.",
+  "Liste TOUS les postes datés, y compris les plus anciens et ceux qui se chevauchent.",
+  "Mets estStage à true seulement quand le CV présente le poste comme un stage ; les études",
+  "ne sont pas des postes et ne vont pas dans parcours.",
   "Dans faits, reprends ce que le poste comportait, dans les termes du CV. N'ajoute rien",
   "que le document ne dit pas, et ne reformule pas en mieux : ces phrases serviront à",
   "préparer une entrevue, où c'est le CV qui fera foi.",
@@ -214,14 +237,6 @@ export const OUTIL_EXTRACTION = {
   input_schema: {
     type: "object" as const,
     properties: {
-      anneesExperience: {
-        type: ["number", "null"],
-        description: "Années d'expérience pertinente, ou null si indéterminable.",
-      },
-      anneesExperienceProvenance: {
-        type: "string",
-        description: "Où ça se lit dans le CV. Vide si tu as supposé.",
-      },
       langues: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.langues },
       diplomes: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.diplomes },
       outils: {
@@ -250,6 +265,10 @@ export const OUTIL_EXTRACTION = {
             employeur: { type: "string", description: "Le nom de l'employeur, ou une chaîne vide." },
             debut: { type: "string", description: "Tel qu'écrit : « Avril 2023 », « 2023 », ou vide." },
             fin: { type: "string", description: "Tel qu'écrit : « Présent », « Février 2025 », ou vide." },
+            estStage: {
+              type: "boolean",
+              description: "Vrai seulement si le CV présente ce poste comme un stage.",
+            },
             faits: {
               type: "array",
               items: { type: "string" },
@@ -263,7 +282,7 @@ export const OUTIL_EXTRACTION = {
       forces: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.forces },
       manques: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.manques },
     },
-    required: ["anneesExperience"],
+    required: ["parcours"],
   },
 };
 
@@ -342,6 +361,8 @@ export async function extraireFaits(
      * base — le module ne connaît toujours aucune I/O de persistance en propre.
      */
     comptabiliser?: (usage: unknown) => Promise<void>;
+    /** L'horloge du calcul (« Présent » = ce mois-ci). Injectée pour rester testable. */
+    aujourdhui?: Date;
   } = {},
 ): Promise<ResultatExtraction> {
   const comptabiliser = options.comptabiliser ?? enregistrerUsageLlm;
@@ -430,7 +451,7 @@ export async function extraireFaits(
     console.warn(`[cv] listes tronquées au plafond : ${tronquees.join(" · ")}`);
   }
 
-  const analyse = ReponseExtractionSchema.safeParse(valeur);
+  const analyse = ReponseModeleSchema.safeParse(valeur);
   if (!analyse.success) {
     // Le schéma a refusé : c'est le filet qui fonctionne, pas un incident à masquer.
     const details = analyse.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join(" · ");
@@ -461,9 +482,26 @@ export async function extraireFaits(
     xs.map((x) => expurgerCoordonnees(sanitizePromptText(x)).trim()).filter((x) => x.length > 0);
   const nettoUn = (s: string) => expurgerCoordonnees(sanitizePromptText(s)).trim();
 
+  const parcoursPropre = brut.parcours
+    .map((e) => ({
+      titre: nettoUn(e.titre).slice(0, 120),
+      employeur: nettoUn(e.employeur).slice(0, 120),
+      debut: nettoUn(e.debut).slice(0, 40),
+      fin: nettoUn(e.fin).slice(0, 40),
+      estStage: e.estStage,
+      faits: netto(e.faits).map((f) => f.slice(0, 300)),
+    }))
+    // Un poste sans titre n'est pas un poste : le garder afficherait une carte vide.
+    .filter((e) => e.titre.length > 0);
+
+  // ⚠️ LE NOMBRE VIENT DU CODE, PAS DU MODÈLE (JobAI#154, ADR-0027). `brut.anneesExperience`
+  // n'est volontairement lu nulle part : un chiffre que le modèle écrirait quand même ne doit
+  // pas se glisser à la place du calcul.
+  const calcul = calculerAnnees(parcoursPropre, options.aujourdhui ?? new Date());
+
   const propre: ReponseExtraction = {
-    anneesExperience: brut.anneesExperience,
-    anneesExperienceProvenance: nettoUn(brut.anneesExperienceProvenance).slice(0, 300),
+    anneesExperience: calcul.annees,
+    anneesExperienceProvenance: calcul.detail,
     langues: netto(brut.langues),
     diplomes: netto(brut.diplomes),
     outils: netto(brut.outils),
@@ -473,16 +511,7 @@ export async function extraireFaits(
     // et des phrases tirées du CV : c'est là que des coordonnées se glissent le plus
     // volontiers. Un objet imbriqué ne dispense pas du traitement, il le rend juste plus
     // facile à oublier.
-    parcours: brut.parcours
-      .map((e) => ({
-        titre: nettoUn(e.titre).slice(0, 120),
-        employeur: nettoUn(e.employeur).slice(0, 120),
-        debut: nettoUn(e.debut).slice(0, 40),
-        fin: nettoUn(e.fin).slice(0, 40),
-        faits: netto(e.faits).map((f) => f.slice(0, 300)),
-      }))
-      // Un poste sans titre n'est pas un poste : le garder afficherait une carte vide.
-      .filter((e) => e.titre.length > 0),
+    parcours: parcoursPropre,
     forces: netto(brut.forces),
     manques: netto(brut.manques),
   };

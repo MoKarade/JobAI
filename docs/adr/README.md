@@ -40,3 +40,4 @@ Méthode de test · Conséquences (positif / négatif / risques acceptés) · Al
 | [0024](./0024-la-seniorite-se-lit-aussi-en-toutes-lettres.md) | La séniorité se lit aussi en toutes lettres | Accepté (gérant, 2026-09-29) — signalé à Marc ; implémenté le jour même |
 | [0025](./0025-une-seule-facon-de-noter-une-offre.md) | Une seule façon de noter une offre | Proposé — JobAI#149 ; l'extrait d'annonce gardé en base est soumis à Marc |
 | [0026](./0026-le-salaire-et-l-experience-du-flux-sont-lus.md) | Le salaire et l'expérience exigée du flux sont lus | Proposé — JobAI#150 ; borne basse et 2 080 h soumises à Marc |
+| [0027](./0027-les-annees-d-experience-se-calculent-depuis-les-dates.md) | Les années d'expérience se calculent depuis les dates du CV | Proposé — JobAI#154 ; année seule en juillet et stages exclus, visibles dans le détail |
