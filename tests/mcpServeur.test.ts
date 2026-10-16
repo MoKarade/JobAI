@@ -15,6 +15,7 @@ import { describe, it, expect } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { creerServeur, type EntreesSorties } from "../lib/mcp/serveur";
+import { PROFIL_DEFAUT } from "../lib/profil";
 import type { Offre } from "../lib/types";
 
 const BASE: Offre = {
@@ -53,6 +54,7 @@ async function brancher(io: Partial<EntreesSorties> = {}) {
     lireJournal: async () => ({}),
     lireEtatSynchro: async () => [],
     lireResumeDistances: async () => ({ brut: null }),
+    lireBareme: async () => ({ profil: PROFIL_DEFAUT, metiers: ["21"] }),
     diagnostiquerFlux: async () => ({
       fin: "flux-termine",
       verdicts: { "dans-la-region": 2 },
@@ -88,6 +90,7 @@ describe("la surface exposée à claude.ai", () => {
     const noms = (await client.listTools()).tools.map((t) => t.name).sort();
     expect(noms).toEqual([
       "chercher_offres",
+      "diagnostic_bareme",
       "diagnostic_flux",
       "etat_synchro",
       "lire_offre",
@@ -106,6 +109,7 @@ describe("la surface exposée à claude.ai", () => {
     expect(parNom.get("resume_suivi")).toBe(true);
     expect(parNom.get("diagnostic_flux")).toBe(true);
     expect(parNom.get("etat_synchro")).toBe(true);
+    expect(parNom.get("diagnostic_bareme")).toBe(true);
     expect(parNom.get("modifier_suivi")).toBe(false);
   });
 });
@@ -367,5 +371,36 @@ describe("l'écriture — l'exception de l'ADR-0011, vue du protocole", () => {
     });
     expect(r.isError).toBe(true);
     expect(enregistrees).toHaveLength(0);
+  });
+});
+
+describe("diagnostic_bareme — mesurer le barème sans le modifier", () => {
+  it("rend la population et les trois recalculs", async () => {
+    const { client, enregistrees } = await brancher();
+    const r = await client.callTool({ name: "diagnostic_bareme", arguments: {} });
+    const c = corps(r) as unknown as {
+      population: { ouvertes: number };
+      renotation: unknown;
+      complet: unknown;
+      ingestion: unknown;
+    };
+    expect(c.population.ouvertes).toBe(1);
+    expect(c.renotation).toBeDefined();
+    expect(c.complet).toBeDefined();
+    expect(c.ingestion).toBeDefined();
+    expect(enregistrees).toHaveLength(0);
+  });
+
+  it("dit une panne plutôt que de mesurer le profil par défaut", async () => {
+    const { client } = await brancher({ lireBareme: async () => null });
+    const r = await client.callTool({ name: "diagnostic_bareme", arguments: {} });
+    expect(r.isError).toBe(true);
+    expect(String(corps(r).erreur)).toContain("autre barème");
+  });
+
+  it("base muette : une erreur, pas un suivi vide", async () => {
+    const { client } = await brancher({ lireOffres: async () => null });
+    const r = await client.callTool({ name: "diagnostic_bareme", arguments: {} });
+    expect(r.isError).toBe(true);
   });
 });

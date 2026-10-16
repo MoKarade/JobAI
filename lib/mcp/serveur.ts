@@ -23,6 +23,8 @@ import { z } from "zod";
 import type { LigneSynchroBrute } from "../diagnosticSynchro";
 import { resumerEtatSynchro } from "../diagnosticSynchro";
 import { lireResume } from "../resumePasse";
+import { diagnostiquerBareme } from "../diagnosticBareme";
+import type { Profil } from "../profil";
 import type { Offre } from "../types";
 import type { SuiviVeille } from "../veille";
 import { FiltresSchema, chercherOffres, lireOffreVue, resumerPourMcp } from "./lecture.spec";
@@ -65,6 +67,12 @@ export interface EntreesSorties {
    * `null` = la base n'a pas répondu. Elle ne sort qu'après `lireResume` (schéma à liste blanche).
    */
   lireResumeDistances: () => Promise<{ brut: string | null } | null>;
+  /**
+   * Le profil ACTIF (celui qui note les offres) et les métiers retenus, ou `null` si la base
+   * n'a pas répondu ou si le profil enregistré est illisible. Jamais le profil par défaut en
+   * repli : un diagnostic du barème qui mesurerait le mauvais barème dirait faux avec aplomb.
+   */
+  lireBareme: () => Promise<{ profil: Profil; metiers: readonly string[] } | null>;
 }
 
 /** Une réponse d'outil : du JSON, dans le seul format que le protocole transporte. */
@@ -237,6 +245,38 @@ export function creerServeur(io: EntreesSorties): McpServer {
         return panne("La base n'a pas répondu : impossible de lire le résumé de la dernière passe de distances.");
       }
       return json(resumerEtatSynchro(lignes, new Date(), lireResume(resume.brut)));
+    },
+  );
+
+  serveur.registerTool(
+    "diagnostic_bareme",
+    {
+      title: "Mesurer le barème de notation",
+      description:
+        "Mesure comment le barème note les offres OUVERTES du suivi, sans rien modifier : " +
+        "répartition des notes enregistrées, moyenne de points par axe (rôle, distance, " +
+        "séniorité, salaire, immigration, conditions), et trois recalculs côte à côte — " +
+        "`renotation` (profil actif sans code de profession, ce que fait la re-notation après " +
+        "un CV), `complet` (profil actif avec code et métiers) et `ingestion` (profil par " +
+        "défaut avec code et métiers). L'écart entre ces trois lignes mesure l'incohérence des " +
+        "chemins de notation. Rend aussi le profil actif (version, mots de vocabulaire ajoutés " +
+        "au défaut), la couverture des données (code de profession, salaire affiché, distance) " +
+        "et les meilleures offres avec leurs parts. Sert à DÉCIDER d'un nouveau barème " +
+        "(JobAI#148) : une note absente d'un recalcul n'est pas une note mauvaise.",
+      inputSchema: { meilleures: z.number().int().min(0).max(40).optional() },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ meilleures }) => {
+      const offres = await io.lireOffres();
+      if (offres === null) return panne(BASE_MUETTE);
+      const bareme = await io.lireBareme();
+      if (bareme === null) {
+        return panne(
+          "Le profil actif ou les métiers retenus n'ont pas pu être lus : le diagnostic " +
+            "mesurerait un autre barème que celui qui note les offres.",
+        );
+      }
+      return json(diagnostiquerBareme(offres, bareme.profil, bareme.metiers, meilleures ?? 30));
     },
   );
 

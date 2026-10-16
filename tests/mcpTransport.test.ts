@@ -62,6 +62,7 @@ async function appel(corps: unknown, accept = "application/json, text/event-stre
     lireJournal: async () => ({}),
     lireEtatSynchro: async () => [],
     lireResumeDistances: async () => ({ brut: null }),
+    lireBareme: async () => null,
     diagnostiquerFlux: async () => ({ fin: "flux-termine" }),
   });
   await serveur.connect(t);
@@ -107,6 +108,7 @@ describe("le transport HTTP répond aux requêtes réelles", () => {
     const corps = (await r.json()) as { result?: { tools?: { name: string }[] } };
     expect((corps.result?.tools ?? []).map((o) => o.name).sort()).toEqual([
       "chercher_offres",
+      "diagnostic_bareme",
       "diagnostic_flux",
       "etat_synchro",
       "lire_offre",

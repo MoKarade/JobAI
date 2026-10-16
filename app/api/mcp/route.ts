@@ -31,6 +31,8 @@ import { empreinte, estProprietaire } from "@/lib/mcp/oauth";
 import { origineDe } from "@/lib/mcp/origine";
 import { lireJetonValide } from "@/lib/oauthStore";
 import { classerPanne } from "@/lib/panne";
+import { profilActif } from "@/lib/cv/depot";
+import { lireMetiers } from "@/lib/actionsMetiers";
 import { aujourdhui } from "@/lib/ajout";
 import { CHAMPS_UTILISATEUR, type Offre } from "@/lib/types";
 
@@ -174,6 +176,18 @@ export async function POST(requete: Request): Promise<Response> {
           return null;
         },
       ),
+    // ⚠️ LE PROFIL ACTIF OU RIEN. `profilActif` lève sur un profil illisible, et un diagnostic
+    // qui retomberait sur le profil par défaut mesurerait un barème que Marc n'a pas : on
+    // rend `null`, le serveur le dit.
+    lireBareme: async () => {
+      try {
+        const [profil, metiers] = await Promise.all([profilActif(), lireMetiers()]);
+        return { profil, metiers };
+      } catch (err) {
+        console.error("[api/mcp] lecture du barème impossible", err);
+        return null;
+      }
+    },
   });
 
   await serveur.connect(transport);
