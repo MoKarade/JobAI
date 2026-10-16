@@ -143,6 +143,21 @@
   (vérifié : il rougit sur l'état d'avant). `[CI-CURL-PROTO]` est coché dans BACKLOG.md.
 - **Déploiement** : fichiers sous `.github/` et test seulement, rien de servi ne change.
 
+## 2026-10-16 — JobAI#115 (reprise) : seule `main` se déploie, même une branche à un seul segment
+
+- **Pourquoi la reprise** : la règle `"*/**": false` laissait déployer une branche d'un seul segment
+  (`test`, `jules-…`) ; Hubperso en a eu la preuve (préversion créée avant sa règle) et la ligne 8 de la grille
+  de conformité restait rouge sur JobAI (« main non explicitement activée »). La « limite connue » ci-dessous
+  n'était donc pas acceptable : Jules et d'autres outils créent des branches sans préfixe.
+- **Changement** : `vercel.json` reprend la forme d'app-template et de Hubperso : `"**": false`, `"*": false`,
+  `"main": true`. `tests/previsionsVercel.test.ts` est réécrit (même fichier, plus de cas) : `main` se déploie,
+  dix formes de branche ne se déploient pas (dont `test` et `jules-correctif`), et le garde discrimine (sans
+  `main: true` la production serait coupée ; sans `**` une branche imbriquée se déploierait). L'ancien test
+  imposait une barre oblique dans chaque règle : c'est précisément la forme remplacée.
+- **Risque assumé** : si la règle visait aussi `main`, la production ne se déploierait plus, sans rien de rouge.
+  Vérification après fusion : déploiement de production `READY` sur le commit de fusion, puis une branche à un
+  seul segment jetable ne crée aucun déploiement.
+
 ## 2026-10-16 — JobAI#115 : seules les branches sans préfixe déploient (préversions coupées)
 
 - **Constat** (liste des déploiements Vercel du 15/10) : seules les branches `claude/*` étaient
