@@ -14,6 +14,14 @@
 - **À confirmer en production** : déploiement `READY` sur le commit fusionné et `GET https://emploi.hubperso.com/api/hub/summary`
   qui répond 401 sans jeton.
 
+## 2026-10-16 — JobAI#156 : la revue du CV coche d'avance ce qui a une preuve (ADR-0028)
+
+- **Avant** : rien n'était coché d'avance (ADR-0009) ; valider un CV demandait un geste par écart.
+- **Fait** : `Ecart.preuve` (fait établi + provenance non vide) et `retenusParDefaut` dans `lib/cv/proposition.ts` ; l'écran
+  de revue part de ces écarts et marque « source citée ». Aujourd'hui seules les années d'expérience y répondent ; listes,
+  parcours et toutes les conséquences sur le barème restent décochés.
+- **À confirmer** : Marc ouvre « À valider » après une analyse : années cochées, reste décoché, un clic sur « Appliquer ».
+
 ## 2026-10-16 — JobAI#154 : les années d'expérience se calculent depuis les dates du CV (ADR-0027)
 
 - **Avant** : le modèle estimait « les années d'expérience pertinente » ; ce nombre réglait la séniorité de toutes les offres

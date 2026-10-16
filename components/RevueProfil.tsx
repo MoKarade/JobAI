@@ -8,8 +8,12 @@
 //
 // TROIS PARTIS PRIS D'INTERFACE, ET CE QU'ILS EMPÊCHENT :
 //
-//   1. **Rien n'est coché d'avance.** Un écran pré-coché se valide d'un clic ; il
-//      transforme la revue en accusé de réception. Marc doit poser un geste PAR écart.
+//   1. **Seul ce qui porte une PREUVE est coché d'avance** (ADR-0028, qui amende l'ADR-0009 :
+//      avant, rien ne l'était). La preuve est décidée par `calculerEcarts` (`Ecart.preuve`),
+//      jamais ici : un fait établi dont la source se lit à l'écran. Une supposition, un
+//      « non établi » qui effacerait une valeur et toute conséquence sur le barème restent
+//      décochés — Marc coche ceux-là lui-même. Un écran où TOUT serait pré-coché serait un
+//      accusé de réception ; celui-ci laisse à Marc ce qui demande un jugement.
 //   2. **La provenance est affichée à côté de la valeur**, et son ABSENCE est dite en
 //      toutes lettres (« le modèle a supposé »). Sans ça, un chiffre deviné et un chiffre
 //      lu dans le document se ressemblent — et c'est précisément le chiffre deviné qui
@@ -19,7 +23,7 @@
 //      ferait valider une modification du classement sous couvert de confirmer une date.
 
 import { useState, useTransition } from "react";
-import type { Ecart } from "@/lib/cv/proposition";
+import { retenusParDefaut, type Ecart } from "@/lib/cv/proposition";
 import { validerProfil } from "@/lib/cv/actions";
 
 export function RevueProfil({
@@ -31,8 +35,10 @@ export function RevueProfil({
   ecarts: readonly Ecart[];
   nomFichier: string;
 }) {
-  // ⚠️ ENSEMBLE VIDE AU DÉPART. Voir le parti pris n°1 ci-dessus : ne pas y toucher.
-  const [retenus, setRetenus] = useState<ReadonlySet<string>>(new Set());
+  // ⚠️ DÉPART = LES ÉCARTS QUI PORTENT UNE PREUVE, et rien d'autre. Voir le parti pris n°1.
+  const [retenus, setRetenus] = useState<ReadonlySet<string>>(
+    () => new Set(retenusParDefaut(ecarts)),
+  );
   const [enCours, demarrer] = useTransition();
   const [retour, setRetour] = useState<{ ok: boolean; texte: string } | null>(null);
 
@@ -85,8 +91,9 @@ export function RevueProfil({
   return (
     <div className="revue">
       <p className="hint">
-        Lu dans <strong>{nomFichier}</strong>. Rien ne s’applique tant que tu n’as pas coché,
-        et une note posée à la main n’est jamais recalculée.
+        Lu dans <strong>{nomFichier}</strong>. Ce qui a une source à vérifier est coché
+        d’avance ; le reste attend ton geste. Rien ne s’applique avant « Appliquer », et une
+        note posée à la main n’est jamais recalculée.
       </p>
 
       {faits.length > 0 ? (
@@ -134,7 +141,7 @@ export function RevueProfil({
         </button>
         <span className="hint">
           {retenus.size === 0
-            ? "Rien de coché : valider ne changera aucune note."
+            ? "Rien de coché : appliquer ne changera aucune note."
             : "Les notes seront recalculées immédiatement."}
         </span>
       </div>
@@ -162,6 +169,7 @@ function LigneEcart({
       <label className="ecart__choix">
         <input type="checkbox" checked={coche} onChange={onBascule} />
         <span className="ecart__libelle">{ecart.libelle}</span>
+        {ecart.preuve ? <span className="ecart__preuve">source citée</span> : null}
       </label>
       <p className="ecart__valeurs">
         <span className="ecart__avant">{ecart.avant}</span>
