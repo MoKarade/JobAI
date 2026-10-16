@@ -23,6 +23,9 @@
   (décision de Marc, 16/10 : « surveiller », JobAI#104 fermée).
 - **Pas conservé** : le brouillon n'est écrit nulle part ; recliquer refait un appel. Garder les brouillons par offre serait
   un ajout à décider, pas fait.
+- **Constaté le 16/10 en production** : le profil validé de Marc date d'avant la lecture du parcours (20 août), donc sans poste ;
+  le bouton refuse avant tout appel. Le message dit désormais le geste (« Relancer l'analyse » du CV déjà déposé dans Profil,
+  vérifier, appliquer), au lieu de « dépose ton CV ».
 - **Limite** : la détection des chiffres ne lit que les chiffres écrits en chiffres ; « huit » en toutes lettres passe. Un
   brouillon se relit.
 - **Captures** (profil FICTIF, API simulée localement) : `docs/captures/108/`, téléphone et bureau, avant et après le clic.
