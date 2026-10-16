@@ -13,6 +13,8 @@
   `fumee.yml` sonde `https://emploi.hubperso.com` après chaque déploiement de production (santé, summary
   `/api/hub/summary` refusé sans jeton puis valide avec, page `/connexion`). Toutes les actions sont épinglées
   par SHA. Le job `securite` historique reste (Mergify l'exige par son nom).
+- **OSV-Scanner** : `osv-scanner.toml` tolère `GHSA-vfj7-8cjw-p6xm` (braces 3.0.3, dépendance de développement via
+  eslint-config-next, aucun correctif publié) jusqu'au 16/01/2027, comme app-template#73.
 - **BACKLOG.md** : réduit à un renvoi vers les issues (14 lignes). L'ancien contenu : `git show 602dd79:BACKLOG.md`.
 - **Lignes encore rouges de la grille, chacune avec sa tâche ouverte** : 8 (préversions, JobAI#115), 9 (Sentry,
   JobAI#117), 12 (socle visuel, JobAI#116). `conformite` reste `bloquant: false` jusqu'à ce qu'elles soient vertes.
