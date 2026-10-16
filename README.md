@@ -159,7 +159,7 @@ donc toute modification exige un redéploiement du hub, pas seulement une variab
 
 ### Version du contrat
 
-`@mokarade/hub-contract` est épinglé sur le **tag `v1.4.0`** (`github:MoKarade/hub-contract#v1.4.0`).
+`@mokarade/hub-contract` est épinglé sur le **tag `v1.5.0`** (`github:MoKarade/hub-contract#v1.5.0`, contrat en zod 4).
 Ne pas revenir à une version plus ancienne : `v1.0.0` ignore le bloc `usage` et une app qui la
 consomme ne peut pas publier ses coûts le jour où elle en a.
 
