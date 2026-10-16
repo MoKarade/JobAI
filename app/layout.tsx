@@ -55,8 +55,8 @@ export const viewport: Viewport = {
   // ⚠️ UNE SEULE VALEUR, SANS MEDIA QUERY (ADR-0008 révisé, 2026-08-13) : l'app n'a plus
   // qu'un thème. Une entrée `(prefers-color-scheme: light)` ferait blanchir la barre
   // système au-dessus d'un écran charbon chez qui règle son OS en clair — un liseré blanc
-  // collé au haut de l'app. C'est `--bg` de globals.css, converti depuis son OKLCH.
-  themeColor: "#141209",
+  // collé au haut de l'app. C'est `--fond` de globals.css, converti depuis son OKLCH.
+  themeColor: "#090c11",
   // Installée, l'app doit occuper l'écran jusque sous l'encoche.
   viewportFit: "cover",
 };

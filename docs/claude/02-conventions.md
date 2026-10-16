@@ -9,6 +9,11 @@
 - **Pas d'emoji** dans l'UI produit ni dans les commits. Tolérés comme marqueurs de statut
   dans `BACKLOG.md` et `HANDOVER.md` uniquement.
 - **Discipline de scope** : on livre par phases (voir `BACKLOG.md`). Ne pas anticiper.
-- **Ne pas imposer le dark mode** : les deux thèmes suivent `prefers-color-scheme`. (Règle de
-  PRODUIT — elle vivait en §10 avant que la §10 ne devienne un renvoi.)
-
+- **Un seul thème, le sombre** (ADR-0008, révision du 13/08/2026 : le clair a été retiré ; c'est une
+  décision de Marc, pas un oubli de `prefers-color-scheme`). Les couleurs vivent en variables dans
+  `app/globals.css` (noms du socle commun : `--fond`, `--surface`, `--surface-douce`, `--bordure`,
+  `--bordure-champ`, `--texte`, `--texte-doux`, `--accent`, `--sur-accent`, `--repere`…) et nulle part
+  ailleurs : ni littéral de couleur dans un composant, ni hors du bloc `:root` du CSS. `--accent` est
+  réservé à l'action principale. Cibles tactiles >= 44 px, champs à 16 px. Verrou : `tests/theme.test.ts`
+  (paires de contraste WCAG comprises). `.carte`, `.pastille` et `.etiquette` gardent leur sens JobAI
+  (offre, statut) ; le second bouton du socle est `.bouton--discret`.

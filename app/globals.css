@@ -48,14 +48,42 @@
      profond, texte plus clair) : sur un téléphone, en plein jour, dans la rue,
      c'est le contraste qui décide de ce qui est lisible. */
   color-scheme: dark;
-  --bg: oklch(15.5% 0.012 255);
-  --surface: oklch(20.5% 0.014 255);
-  /* Creux : survol, offre dépliée, pastilles neutres, fonds de faits. */
-  --creux: oklch(26% 0.016 255);
-  --text: oklch(96% 0.004 255);
-  --text-soft: oklch(74% 0.014 255);
-  --border: oklch(32% 0.018 255);
-  --accent: oklch(66% 0.17 275);
+  /* ── LE SOCLE COMMUN (JobAI#116, 2026-10-16) ─────────────────────────────────────
+     Mêmes NOMS de jetons que app-template et BatchChef, en HEXADÉCIMAL (c'est ce qui
+     les rend mesurables par tests/theme.test.ts). Les VALEURS restent celles de JobAI :
+     les neutres froids (~255°) de la refonte téléphone du 2026-09-13, convertis depuis
+     leur OKLCH — le rendu ne change pas. Sombre seul : aucune variante claire. */
+  --fond: #090c11;
+  --surface: #13181e;
+  /* Surface douce : survol, offre dépliée, pastilles neutres, fonds de faits. */
+  --surface-douce: #1f252c;
+  --bordure: #2d333c;
+  /* Contour de champ, de case et de bouton secondaire : >= 3:1 sur `--surface` (WCAG 1.4.11). */
+  --bordure-champ: #6f7b8e;
+
+  --texte: #f0f2f4;
+  --texte-doux: #a5abb4;
+
+  /* L'accent ne sert QU'À l'action principale (le bouton `.bouton`). Partout ailleurs il
+     mentirait sur ce qui est cliquable. Argent, comme le socle : l'indigo d'avant était
+     celui de l'ancien gabarit. */
+  --accent: #e6eaf2;
+  --accent-fonce: #c3cad8;
+  --sur-accent: #090c11;
+
+  /* Le repère : surtitre, navigation active, catégorie. Jamais un état. C'est l'AMBRE de
+     JobAI, la couleur publiée au hub (voir plus bas) — le rôle que le socle donne à son
+     orange. */
+  --repere: #f1a427;
+  --repere-doux: #352206;
+
+  /* Sémantique — un seul endroit pour « ça va », « attention », « erreur ». */
+  --succes-fond: #0f2a24;
+  --succes-texte: #6ee7b7;
+  --alerte-fond: #2c2410;
+  --alerte-texte: #fbbf24;
+  --erreur-fond: #331618;
+  --erreur-texte: #f87171;
 
   /* Deux voix. Les variables viennent de `next/font` (app/layout.tsx) : les
      fichiers sont servis par notre domaine, jamais par un tiers. */
@@ -99,8 +127,8 @@
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
+  background: var(--fond);
+  color: var(--texte);
   font-family: var(--font);
   font-weight: 500;
   /* 1.55 : l'interligne se resserre d'un cran à la refonte téléphone. Sur une colonne de
@@ -129,10 +157,10 @@ body {
 .card {
   max-width: 34rem;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--bordure);
   border-radius: 18px;
   padding: clamp(1.5rem, 1rem + 3vw, 2.75rem);
-  box-shadow: 0 1px 2px oklch(0% 0 0 / 0.04), 0 12px 32px -16px oklch(0% 0 0 / 0.18);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 32px -16px rgb(0 0 0 / 0.18);
   position: relative;
   overflow: hidden;
 }
@@ -148,7 +176,7 @@ body {
   letter-spacing: 0.16em;
   font-size: var(--t-2xs);
   font-weight: 600;
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 h1 {
   font-size: clamp(1.9rem, 1.4rem + 2vw, 2.6rem);
@@ -157,11 +185,11 @@ h1 {
   margin: 0.25rem 0 0.9rem;
 }
 .lead {
-  color: var(--text);
+  color: var(--texte);
   margin-bottom: 0.9rem;
 }
 .hint {
-  color: var(--text-soft);
+  color: var(--texte-doux);
   font-size: var(--t-s);
 }
 code {
@@ -169,13 +197,14 @@ code {
   font-size: 0.88em;
   /* Teinte CHAUDE (~90°) comme tous les neutres depuis ADR-0008 : un gris bleuté
      posé au milieu du charbon se voit, et se voit comme une erreur. */
-  background: oklch(70% 0.02 90 / 0.14);
+  background: var(--code-fond);
   padding: 0.1em 0.35em;
   border-radius: 5px;
 }
 
-/* Bouton de connexion. L'accent du template reste indigo ; l'ambre de JobAI (#f2a31b)
-   est réservée au widget du hub, où elle identifie l'app parmi les autres. */
+/* Le bouton d'action principale (la connexion, « Analyser », « Valider »…) : l'accent du
+   socle, argent. L'ambre de JobAI (#f2a31b) est réservée au repère et au widget du hub, où
+   elle identifie l'app parmi les autres. */
 .bouton {
   margin-top: 1.25rem;
   display: inline-flex;
@@ -186,7 +215,7 @@ code {
   padding: 0.7rem 1.25rem;
   font: inherit;
   font-weight: 600;
-  color: var(--surface);
+  color: var(--sur-accent);
   background: var(--accent);
   border: 1px solid transparent;
   border-radius: var(--r-champ);
@@ -199,8 +228,92 @@ code {
 
 /* Le focus doit rester visible au clavier : c'est la seule façon de savoir où l'on est. */
 .bouton:focus-visible {
-  outline: 2px solid var(--text);
+  outline: 2px solid var(--texte);
   outline-offset: 2px;
+}
+
+/* ── Le vocabulaire commun du socle (JobAI#116) ─────────────────────────────────
+   Mêmes noms que app-template et BatchChef, pour qu'un composant écrit dans l'une des
+   apps se lise de la même façon dans les autres. Verrouillé par tests/theme.test.ts.
+
+   ⚠️ TROIS NOMS DU SOCLE SONT DÉJÀ PRIS ICI, avec un autre sens, et restent tels quels :
+   `.carte` est la carte d'OFFRE (grille à trois colonnes), `.pastille` la pastille de
+   STATUT d'une candidature, `.etiquette` une étiquette de donnée. Les renommer toucherait
+   chaque écran sans rien changer pour Marc ; la liste est écrite dans le test, avec la
+   raison, pour qu'un fork du socle ne s'y trompe pas. `.bouton--discret` (trait ambre,
+   fond transparent) fait ici le travail de `.bouton-second`. */
+.bouton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.bouton-principal {
+  background: var(--accent);
+  color: var(--sur-accent);
+}
+.bouton-second {
+  background: var(--surface);
+  color: var(--texte);
+  border-color: var(--bordure-champ);
+}
+.bouton-danger {
+  background: transparent;
+  color: var(--erreur-texte);
+  border-color: var(--erreur-texte);
+}
+
+.surtitre {
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--repere);
+}
+.doux {
+  color: var(--texte-doux);
+}
+
+/* Champ de saisie : cible de 44 px au moins, 16 px (en dessous, iOS zoome tout seul). */
+.champ {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--surface);
+  color: var(--texte);
+  border: 1px solid var(--bordure-champ);
+  border-radius: var(--r-champ);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.champ::placeholder {
+  color: var(--texte-doux);
+}
+
+/* États : fond sémantique ET libellé texte, jamais la couleur seule. */
+.succes {
+  background: var(--succes-fond);
+  color: var(--succes-texte);
+}
+.alerte {
+  background: var(--alerte-fond);
+  color: var(--alerte-texte);
+}
+.erreur {
+  background: var(--erreur-fond);
+  color: var(--erreur-texte);
+}
+.texte-succes {
+  color: var(--succes-texte);
+}
+.texte-erreur {
+  color: var(--erreur-texte);
+}
+/* Bandeau d'état : fond sémantique (à combiner avec .succes, .alerte ou .erreur) + contour
+   de la même couleur. */
+.bandeau {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid currentColor;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -218,22 +331,51 @@ code {
   /* ⚠️ C'EST LA COULEUR PUBLIÉE AU HUB (`app.color` = #f2a31b), pas une teinte
      choisie ici. Sur le charbon chaud, elle se pose à sa valeur publiée (#f2a31b
      vaut ~77 %) : c'est là qu'elle est lumineuse. L'assombrir la rendrait brune. */
-  --ambre: oklch(77.5% 0.155 73);
-  --vert: oklch(72% 0.13 155);
-  --bleu: oklch(72% 0.12 250);
-  --rouge: oklch(68% 0.16 25);
-  --violet: oklch(74% 0.13 300);
+  --ambre: #f1a427;
+  --vert: #57bc80;
+  --bleu: #67aaed;
+  --rouge: #ea6a64;
+  --violet: #b897f0;
   /* Variantes pour du TEXTE sur fond de surface. Les teintes d'accent ci-dessus servent
      des bordures et des pastilles (3:1 suffit) ; en TEXTE il faut 4,5:1. Sur le charbon,
      ce sont les teintes CLAIRES qui passent — mesuré : ambre 8,7:1, bleu 7,2:1. */
-  --ambre-texte: oklch(78% 0.14 75);
-  --bleu-texte: oklch(72% 0.12 250);
+  --ambre-texte: #eba941;
+  --bleu-texte: #67aaed;
   /* L'ACIER : les liens secondaires d'une surface dense (la bulle de la carte). Même
-     clarté et même chroma que `--text-soft`, mais en teinte 250 — un gris qui PENCHE vers
+     clarté et même chroma que `--texte-doux`, mais en teinte 250 — un gris qui PENCHE vers
      le bleu, pas un bleu. Volontairement PAS `--bleu-texte` (chroma 0,12) : un lien posé
      au milieu de trois offres, d'une adresse et d'une borne ne doit pas crier plus fort
      que les données qu'il accompagne. Valeur reprise de la maquette « Poste de nuit ». */
-  --acier: oklch(70.7% 0.038 250);
+  --acier: #8fa3b8;
+
+  /* ── Ce que le CSS ne peut pas hériter du thème ──────────────────────────────────
+     La carte Google pose un fond BLANC qu'on ne contrôle pas (fiches, épingles, légende) :
+     son encre est donc FONCÉE, indépendante du sombre de l'app — hériter de `--texte`
+     rendrait du blanc sur blanc. Même raison que le commentaire de `.carte-fiche`.
+     Les bandes de durée de route (épingles) : proche = vert, loin = rouge doux. */
+  --carte-encre: #1d222b;
+  --carte-encre-forte: #12161f;
+  --carte-encre-douce: #505561;
+  --carte-lien: #274387;
+  --carte-ambre-fond: #fde4bb;
+  --carte-ambre-texte: #693c00;
+  --carte-bleu-bord: #0f74c5;
+  --carte-bleu-fond: #f0f6fc;
+  --carte-bleu-texte: #003b75;
+  --carte-gris-fond: #caced4;
+  --carte-gris-texte: #353b45;
+  --bande-1-fond: #98e2a8;
+  --bande-1-texte: #033816;
+  --bande-2-fond: #dbdd97;
+  --bande-2-texte: #3d3e00;
+  --bande-3-fond: #fed7a3;
+  --bande-3-texte: #663d00;
+  --bande-4-fond: #f8bdb3;
+  --bande-4-texte: #6e2920;
+  --carte-voile: #ffffffd9;
+  --code-fond: #a39e9124;
+  --bordure-pointillee: #353b458c;
+  --sur-ambre: #1d140d;
 }
 
 /* Échelle d'espacement UNIQUE (ADR-0003). Avant, chaque bloc choisissait sa marge dans son
@@ -250,8 +392,8 @@ code {
   /* Teintes d'interaction. Très légères : un survol qui se voit trop fatigue, un survol
      qu'on ne voit pas laisse douter que l'élément soit cliquable. Sur fond sombre, un
      noir translucide disparaît : on ÉCLAIRCIT au survol au lieu d'assombrir. */
-  --survol: oklch(100% 0 0 / 0.06);
-  --actif: oklch(78% 0.14 75 / 0.18);
+  --survol: #ffffff0f;
+  --actif: #eba9412e;
 
   /* Rondeur « douce et sobre » (choix de Marc) : pilule sur ce qui se clique.
      ⚠️ Les rayons montent d'un cran à la refonte téléphone : sur un petit écran,
@@ -282,14 +424,14 @@ code {
 
      Un seul trait, très discret, et AUCUNE ombre au repos : on ne réempile pas
      les trois signaux de l'écran d'avant (ombre + rayon + liseré). */
-  --trait-surface: 1px solid var(--border);
+  --trait-surface: 1px solid var(--bordure);
 
   /* ⚠️ PLUS D'OMBRE SUR LES SURFACES. Choix de Marc : la séparation se fait par
      la lumière — une carte blanche sur un fond gris se détache déjà. Ces deux
      valeurs ne servent QUE le relief momentané d'un élément qu'on manipule
      (menu ouvert, champ au focus), jamais l'état au repos. */
-  --ombre-1: 0 1px 2px oklch(0% 0 0 / 0.05);
-  --ombre-2: 0 2px 8px oklch(0% 0 0 / 0.10);
+  --ombre-1: 0 1px 2px rgb(0 0 0 / 0.05);
+  --ombre-2: 0 2px 8px rgb(0 0 0 / 0.1);
 
   /* ESPACEMENT — l'outil n°1 de l'épure. Élargi d'environ un quart : c'est le blanc
      autour d'un élément qui le fait respirer, pas la finesse de sa bordure. */
@@ -518,7 +660,7 @@ code {
   font-size: var(--t-l);
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: var(--text);
+  color: var(--texte);
   text-decoration: none;
   align-self: flex-start;
 }
@@ -560,7 +702,7 @@ code {
   align-items: stretch;
   gap: 0.25rem;
   padding: 0.35rem 0.5rem env(safe-area-inset-bottom, 0px);
-  background: color-mix(in oklab, var(--bg) 88%, transparent);
+  background: color-mix(in oklab, var(--fond) 88%, transparent);
   /* Le flou détache la barre du contenu qui défile dessous SANS poser un bandeau
      opaque : on continue de voir qu'il y a une page, donc qu'il reste à lire. */
   backdrop-filter: blur(14px);
@@ -580,7 +722,7 @@ code {
   font: inherit;
   font-size: var(--t-2xs);
   font-weight: 600;
-  color: var(--text-soft);
+  color: var(--texte-doux);
   text-decoration: none;
   background: none;
   border: 0;
@@ -588,7 +730,7 @@ code {
   cursor: pointer;
   transition: color 120ms ease, background-color 120ms ease;
 }
-.barre__lien:hover { color: var(--text); background: var(--survol); }
+.barre__lien:hover { color: var(--texte); background: var(--survol); }
 .barre__lien--actif {
   color: var(--ambre-texte);
   background: var(--actif);
@@ -673,7 +815,7 @@ code {
     border-radius: var(--r-pill);
   }
   .barre__lien--actif {
-    color: var(--text);
+    color: var(--texte);
     background: var(--surface);
     font-weight: 700;
   }
@@ -700,7 +842,7 @@ code {
 
 .intro-section {
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   max-width: 62ch;
   margin-bottom: var(--pas-2);
 }
@@ -733,7 +875,7 @@ code {
 }
 .bord__l {
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-top: 0.35rem;
   max-width: 8rem;
 }
@@ -758,7 +900,7 @@ code {
 }
 .etage__l {
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   text-align: right;
 }
 .etage__piste { display: flex; align-items: center; min-width: 0; }
@@ -769,16 +911,16 @@ code {
   align-items: center;
   padding: 0 0.65rem;
   border-radius: 7px;
-  background: var(--creux);
-  color: var(--text);
+  background: var(--surface-douce);
+  color: var(--texte);
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--t-s);
 }
 /* Le but de tout l'entonnoir. Il se signale, et il est le seul à le faire. */
 .etage__barre--but {
-  background: color-mix(in oklab, var(--vert) 24%, var(--creux));
-  color: var(--text);
+  background: color-mix(in oklab, var(--vert) 24%, var(--surface-douce));
+  color: var(--texte);
 }
 .stat {
   padding: 0;
@@ -786,9 +928,9 @@ code {
      La hiérarchie passe par la taille du chiffre et l'espace autour. */
 }
 .stat--envoi { border-left-color: var(--vert); }
-.stat--reponse { border-left-color: var(--text); }
+.stat--reponse { border-left-color: var(--texte); }
 .stat--haut { border-left-color: var(--violet); }
-.stat--neutre { border-left-color: var(--border); }
+.stat--neutre { border-left-color: var(--bordure); }
 .stat__n {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
@@ -796,11 +938,11 @@ code {
   font-weight: 400;
   line-height: 1.1;
   letter-spacing: -0.02em;
-  color: var(--text);
+  color: var(--texte);
 }
 .stat__l {
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-top: 0.3rem;
 }
 
@@ -830,7 +972,7 @@ code {
   padding: 0.85rem 1.15rem;
   font: inherit;
   font-size: var(--t-m);
-  color: var(--text);
+  color: var(--texte);
   background: var(--surface);
   border: 0;
   border-radius: var(--r-champ);
@@ -861,7 +1003,7 @@ code {
   font: inherit;
   font-size: var(--t-s);
   font-weight: 600;
-  color: var(--text-soft);
+  color: var(--texte-doux);
   background: var(--surface);
   border: 0;
   border-radius: var(--r-pill);
@@ -872,13 +1014,13 @@ code {
   min-height: var(--touche);
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-.filtre:hover { background: var(--creux); color: var(--text); }
-.filtre--actif:hover { background: var(--text); color: var(--surface); }
+.filtre:hover { background: var(--surface-douce); color: var(--texte); }
+.filtre--actif:hover { background: var(--texte); color: var(--surface); }
 /* L'état actif se porte par le REMPLISSAGE, pas par une bordure colorée : plus lisible
    d'un coup d'œil, et la couleur n'est pas le seul signal (le fond change aussi). */
 .filtre--actif {
   color: var(--surface);
-  background: var(--text);
+  background: var(--texte);
   border-color: transparent;
   font-weight: 700;
 }
@@ -886,14 +1028,14 @@ code {
 .controles__recherche:focus-visible { outline: 2px solid var(--ambre-texte); outline-offset: 2px; }
 .controles__compte {
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin: 1.1rem 0 0.6rem;
 }
 /* La phrase secondaire (« regroupées en N entreprises ») : plus discrète que le compte
    d'offres, qu'elle ne doit jamais concurrencer — c'est lui que Marc a demandé de voir. */
 .controles__compte--secondaire {
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin: -0.3rem 0 0.6rem;
 }
 
@@ -934,12 +1076,12 @@ code {
   font-size: var(--t-xl);
   font-weight: 500;
   line-height: 1.1;
-  color: var(--text);
+  color: var(--texte);
 }
 .resume__case--alerte .resume__n { color: var(--ambre-texte); }
 .resume__l {
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   /* Le libellé ne casse pas la case : il s'efface plutôt que de pousser ses voisines. */
   max-width: 100%;
   overflow: hidden;
@@ -975,7 +1117,7 @@ code {
   flex: 1 1 auto;
   min-width: 0;
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -985,7 +1127,7 @@ code {
   width: 1.15rem;
   height: 1.15rem;
   flex: none;
-  color: var(--text-soft);
+  color: var(--texte-doux);
   transition: transform 160ms ease;
 }
 .depliant[open] .depliant__chevron { transform: rotate(180deg); }
@@ -1065,7 +1207,7 @@ code {
 
 .liste-distance-inconnue__note {
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin: 0 0 0.9rem;
 }
 /* Les offres D'UNE ENTREPRISE, dépliées sous sa carte : un peu plus serrées que la liste
@@ -1096,7 +1238,7 @@ code {
 }
 /* Le survol change la surface au lieu de la soulever : pas d'ombre au repos, donc
    pas d'ombre qui apparaît — le geste reste dans le même registre. */
-.carte:hover { background: var(--creux); }
+.carte:hover { background: var(--surface-douce); }
 /* Les paliers ne se disent plus par un trait à gauche mais par le cercle de la
    note, ci-dessous. Ces classes restent utilisées par le JSX ; elles ne portent
    plus de bordure. */
@@ -1117,13 +1259,13 @@ code {
    La lueur reste faible et sert le sombre, où l'ambre respire ; en clair elle
    est presque invisible, et c'est le contour qui fait le travail. */
 .carte--A {
-  border-color: color-mix(in oklab, var(--ambre) 42%, var(--border));
+  border-color: color-mix(in oklab, var(--ambre) 42%, var(--bordure));
   box-shadow:
     0 0 0 1px color-mix(in oklab, var(--ambre) 14%, transparent),
     0 10px 34px -22px color-mix(in oklab, var(--ambre) 55%, transparent);
 }
 .carte--A:hover {
-  border-color: color-mix(in oklab, var(--ambre) 58%, var(--border));
+  border-color: color-mix(in oklab, var(--ambre) 58%, var(--bordure));
 }
 .carte--histo { opacity: 0.62; }
 .carte--histo:hover { opacity: 0.9; }
@@ -1146,16 +1288,16 @@ code {
   font-weight: 500;
   line-height: 1;
   text-align: center;
-  background: var(--creux);
-  color: var(--text-soft);
+  background: var(--surface-douce);
+  color: var(--texte-doux);
   align-self: start;
 }
 /* Le « /100 » disparaît du cercle : sur trois centimètres, il n'ajoute rien qu'on
    ne sache déjà, et c'est exactement le genre de détail qui chargeait l'écran. */
 .note small { display: none; }
-.note--A { background: var(--ambre); color: oklch(20% 0.02 60); }
-.note--B { background: var(--text); color: var(--surface); }
-.note--C { background: var(--creux); color: var(--text-soft); }
+.note--A { background: var(--ambre); color: var(--sur-ambre); }
+.note--B { background: var(--texte); color: var(--surface); }
+.note--C { background: var(--surface-douce); color: var(--texte-doux); }
 
 /* Trois colonnes : la note, le corps, la distance. Le corps s'empile en une
    colonne — l'entreprise, puis le poste, puis l'unique signal. */
@@ -1185,7 +1327,7 @@ code {
 .carte__entreprise {
   font-weight: 700;
   font-size: var(--t-m);
-  color: var(--text);
+  color: var(--texte);
   text-decoration: none;
 }
 /* Le repère de dépliage : un chevron qui pivote. Discret, mais il dit qu'il y a
@@ -1196,36 +1338,36 @@ code {
   width: 0.42em;
   height: 0.42em;
   margin-left: 0.5em;
-  border-right: 2px solid var(--text-soft);
-  border-bottom: 2px solid var(--text-soft);
+  border-right: 2px solid var(--texte-doux);
+  border-bottom: 2px solid var(--texte-doux);
   transform: translateY(-0.15em) rotate(45deg);
   transition: transform 140ms ease;
 }
 .carte--ouverte .carte__entreprise::after { transform: translateY(0.1em) rotate(-135deg); }
 /* Une offre dépliée MONTE d'un cran de surface (maquette validée) : c'est celle qu'on
-   regarde, elle se détache de la pile. Le survol utilise déjà `--creux` ; ici c'est un
+   regarde, elle se détache de la pile. Le survol utilise déjà `--surface-douce` ; ici c'est un
    état, pas un passage, donc il tient tant que la carte reste ouverte. */
-.carte--ouverte { background: var(--creux); }
-.carte__poste { color: var(--text-soft); font-size: var(--t-s); }
+.carte--ouverte { background: var(--surface-douce); }
+.carte__poste { color: var(--texte-doux); font-size: var(--t-s); }
 /* L'unique signal : le salaire quand il est affiché. En mesure, donc en mono. */
 .carte__tete > .badge-perimee { align-self: flex-start; margin-top: 0.3rem; }
 .carte__signal {
   align-self: flex-start;
   font-family: var(--mono);
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-top: 0.2rem;
 }
 .carte__km {
   font-family: var(--mono);
   font-size: var(--t-s);
   font-variant-numeric: tabular-nums;
-  color: var(--text);
+  color: var(--texte);
   white-space: nowrap;
   text-align: right;
   align-self: start;
 }
-.carte__km--inconnue { color: var(--text-soft); }
+.carte__km--inconnue { color: var(--texte-doux); }
 
 /* ── La jauge de distance ────────────────────────────────────────────────
    Cinq segments, un par palier du barème (`PALIERS_DISTANCE_KM`). Une offre à
@@ -1244,7 +1386,7 @@ code {
   width: 0.7rem;
   height: 0.25rem;
   border-radius: 1px;
-  background: var(--border);
+  background: var(--bordure);
 }
 .jauge-km > .jauge-km__on { background: var(--bleu); }
 
@@ -1260,7 +1402,7 @@ code {
   gap: 0.55rem;
   margin-top: 0.85rem;
   padding-top: 0.85rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--bordure);
 }
 /* ⚠️ SANS CETTE LIGNE, LE DÉPLIAGE NE MASQUE RIEN. L'attribut `hidden` vaut
    `display: none` — mais une règle qui pose `display` sur le même élément l'emporte,
@@ -1270,8 +1412,8 @@ code {
    élément susceptible d'être `hidden` doit prévoir ce cas. */
 .carte__detail[hidden] { display: none; }
 .carte__liens { display: flex; flex-wrap: wrap; gap: 1rem; font-size: var(--t-xs); }
-.carte__liens a { color: var(--text-soft); }
-.carte__liens a:hover { color: var(--text); }
+.carte__liens a { color: var(--texte-doux); }
+.carte__liens a:hover { color: var(--texte); }
 
 .carte__note-perso,
 .carte .pastille { grid-column: 2 / -1; }
@@ -1279,9 +1421,9 @@ code {
 .carte__raisons { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; }
 .raison { font-size: var(--t-s); padding-left: 0.85rem; position: relative; }
 .raison::before { position: absolute; left: 0; font-weight: 700; }
-.raison--atout { color: var(--text); }
+.raison--atout { color: var(--texte); }
 .raison--atout::before { content: "+"; color: var(--vert); }
-.raison--reserve { color: var(--text-soft); }
+.raison--reserve { color: var(--texte-doux); }
 .raison--reserve::before { content: "−"; color: var(--ambre); }
 
 .carte__meta { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: var(--t-xs); }
@@ -1291,14 +1433,14 @@ code {
   gap: 0.3rem;
   padding: 0.2rem 0.7rem;
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   background: var(--survol);
   border-radius: var(--r-pill);
 }
 .etiquette--km { color: var(--ambre); }
 .etiquette--salaire { color: var(--vert); }
-.carte__date { font-family: var(--mono); font-size: var(--t-2xs); color: var(--text-soft); }
-.carte__notes { font-size: var(--t-xs); color: var(--text-soft); }
+.carte__date { font-family: var(--mono); font-size: var(--t-2xs); color: var(--texte-doux); }
+.carte__notes { font-size: var(--t-xs); color: var(--texte-doux); }
 .carte__note-perso {
   font-size: var(--t-s);
   border-left: 2px solid var(--ambre);
@@ -1316,7 +1458,7 @@ code {
   border-radius: var(--r-pill);
   background: var(--survol);
 }
-.pastille--Identifiee { color: var(--text); }
+.pastille--Identifiee { color: var(--texte); }
 .pastille--CVenvoye { color: var(--vert); }
 .pastille--Relance { color: var(--ambre); }
 .pastille--Entrevue { color: var(--violet); }
@@ -1326,12 +1468,12 @@ code {
 .priorite { font-family: var(--mono); font-size: var(--t-2xs); }
 .priorite--Haute { color: var(--ambre); }
 .priorite--Haute::before { content: "▲ "; }
-.priorite--Moyenne { color: var(--text-soft); }
+.priorite--Moyenne { color: var(--texte-doux); }
 .priorite--Moyenne::before { content: "■ "; }
-.priorite--Basse { color: var(--text-soft); opacity: 0.75; }
+.priorite--Basse { color: var(--texte-doux); opacity: 0.75; }
 .priorite--Basse::before { content: "▽ "; }
 
-.vide { color: var(--text-soft); padding: 1.25rem 0; }
+.vide { color: var(--texte-doux); padding: 1.25rem 0; }
 
 /* ── L'épingle de la carte : une pastille qui PORTE son score ──────────────
    Dessinée par `CarteOffres` en `divIcon`, donc stylée ici. Le nombre à
@@ -1353,7 +1495,7 @@ code {
 }
 /* Le pointillé EST le signal « position approximative » : il se voit avant tout clic. */
 .epingle--approx {
-  border: 2px dashed oklch(0.35 0.02 265 / 0.55);
+  border: 2px dashed var(--bordure-pointillee);
   opacity: 0.82;
 }
 
@@ -1371,26 +1513,26 @@ code {
 .fait__icone { width: 1em; height: 1em; flex: none; opacity: 0.75; }
 .fait__valeur { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 /* Une mesure absente recule sans disparaître : « — » reste une réponse. */
-.fait--discret { color: var(--text-soft); }
+.fait--discret { color: var(--texte-doux); }
 .fait--discret .fait__icone { opacity: 0.5; }
 
 /* La couleur du cercle est posée en STYLE par le composant (elle est calculée) :
    ces règles ne portent plus que la forme. */
 .note--A,
 .note--B,
-.note--C { background: var(--creux); }
+.note--C { background: var(--surface-douce); }
 
 /* ── États honnêtes ──────────────────────────────────────────────────────── */
 .etat {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--bordure);
   border-left: 3px solid var(--ambre);
   padding: 1.1rem 1.25rem;
   margin-top: 1.5rem;
 }
 .etat h2 { font-family: var(--mono); font-size: var(--t-m); margin-bottom: 0.5rem; }
-.etat p { color: var(--text-soft); font-size: var(--t-s); margin-bottom: 0.4rem; }
-.etat code { font-family: var(--mono); font-size: var(--t-s); color: var(--text); }
+.etat p { color: var(--texte-doux); font-size: var(--t-s); margin-bottom: 0.4rem; }
+.etat code { font-family: var(--mono); font-size: var(--t-s); color: var(--texte); }
 .etat__aide { font-size: var(--t-s); }
 
 /* ── Mobile ──────────────────────────────────────────────────────────────── */
@@ -1446,7 +1588,7 @@ code {
 .controle--large { flex: 1 1 100%; }
 .controle__l {
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .select,
 .zone-note {
@@ -1456,8 +1598,8 @@ code {
      produit exactement le défilement latéral que cette refonte supprime. Le champ ne
      revient pas au zoom d'origine quand on en sort. */
   font-size: var(--t-m);
-  color: var(--text);
-  background: var(--creux);
+  color: var(--texte);
+  background: var(--surface-douce);
   border: 0;
   border-radius: var(--r-champ);
   padding: 0.6rem 0.75rem;
@@ -1490,7 +1632,7 @@ code {
   min-height: var(--touche);
   padding: 0.5rem 1rem;
   font-size: var(--t-s);
-  color: var(--text);
+  color: var(--texte);
   background: transparent;
   border-color: var(--ambre);
 }
@@ -1516,20 +1658,20 @@ code {
 .afaire {
   margin-top: var(--pas-2);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--bordure);
   border-left: 3px solid var(--ambre);
   padding: 1rem;
 }
-.afaire--vide { border-left-color: var(--border); }
+.afaire--vide { border-left-color: var(--bordure); }
 .afaire__titre {
   font-family: var(--mono);
   font-size: var(--t-xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-bottom: 0.7rem;
 }
-.afaire__rien { font-size: var(--t-s); color: var(--text-soft); }
+.afaire__rien { font-size: var(--t-s); color: var(--texte-doux); }
 .afaire__liste {
   list-style: none;
   display: flex;
@@ -1549,17 +1691,17 @@ code {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.15rem 0.4rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--bordure);
   border-radius: 0.25rem;
   text-align: center;
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .afaire__item--entrevue .afaire__genre { border-color: var(--violet); color: var(--violet); }
 .afaire__item--relancer .afaire__genre { border-color: var(--ambre); color: var(--ambre); }
 .afaire__item--postuler .afaire__genre { border-color: var(--vert); color: var(--vert); }
-.afaire__item--verifier .afaire__genre { border-color: var(--text); color: var(--text); }
+.afaire__item--verifier .afaire__genre { border-color: var(--texte); color: var(--texte); }
 .afaire__lien { font-size: var(--t-m); font-weight: 600; }
-.afaire__motif { font-size: var(--t-xs); color: var(--text-soft); }
+.afaire__motif { font-size: var(--t-xs); color: var(--texte-doux); }
 
 @media (max-width: 30rem) {
   /* Sous 30 rem, deux colonnes écrasent le titre : l'étiquette repasse au-dessus. */
@@ -1663,7 +1805,7 @@ code {
 }
 .carte-liste__tri-etiquette {
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 
 /* ── Carte des offres ─────────────────────────────────────────────────────
@@ -1721,12 +1863,12 @@ code {
    Tout passe donc par les jetons, ce qui règle les DEUX thèmes d'un coup :
    c'est la même règle qui donne une bulle claire en clair et sombre en sombre,
    sans jamais coder une couleur en dur. */
-.leaflet-container { background: var(--creux); font-family: inherit; }
+.leaflet-container { background: var(--surface-douce); font-family: inherit; }
 
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
   background: var(--surface);
-  color: var(--text);
+  color: var(--texte);
   /* Plus portée et plus dense que celle des cartes : la bulle DÉCOLLE du plan, elle ne
      repose pas dessus. Valeur de la maquette. */
   box-shadow: 0 12px 34px -12px rgb(0 0 0 / 0.7);
@@ -1746,50 +1888,50 @@ code {
 /* L'acier, pas le bleu franc — voir le jeton. Les offres, elles, gardent l'encre du texte :
    ce sont des DONNÉES d'abord, cliquables ensuite (leur règle est plus bas). */
 .leaflet-popup-content a { color: var(--acier); }
-.leaflet-popup-close-button { color: var(--text-soft) !important; }
-.leaflet-popup-close-button:hover { color: var(--text) !important; }
+.leaflet-popup-close-button { color: var(--texte-doux) !important; }
+.leaflet-popup-close-button:hover { color: var(--texte) !important; }
 
 /* Boutons de zoom et attribution : mêmes surfaces que le reste de l'app. */
 .leaflet-bar a,
 .leaflet-bar a:hover {
   background: var(--surface);
-  color: var(--text);
-  border-bottom-color: var(--border);
+  color: var(--texte);
+  border-bottom-color: var(--bordure);
 }
-.leaflet-bar a:hover { background: var(--creux); }
+.leaflet-bar a:hover { background: var(--surface-douce); }
 .leaflet-bar { border: var(--trait-surface); }
 .leaflet-control-attribution {
   background: color-mix(in oklab, var(--surface) 82%, transparent);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .leaflet-control-attribution a { color: var(--bleu-texte); }
 .carte__compte {
   font-family: var(--mono);
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-bottom: var(--pas);
 }
 .carte__echec { font-size: var(--t-s); color: var(--rouge); margin-top: var(--pas); }
 .carte__manquants {
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-top: var(--pas-2);
   padding-top: var(--pas);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--bordure);
 }
 .geocodage { margin-bottom: var(--pas-2); }
 .geocodage__message { font-size: var(--t-s); margin-top: 0.4rem; }
-.geocodage__note { font-size: var(--t-xs); color: var(--text-soft); margin-top: 0.35rem; max-width: 62ch; }
+.geocodage__note { font-size: var(--t-xs); color: var(--texte-doux); margin-top: 0.35rem; max-width: 62ch; }
 /* Repliée par défaut (voir le composant) : le `<summary>` seul, sur une ligne, prend la
    même petite taille discrète que la note qu'il révèle. */
 .geocodage__details { margin-top: 0.4rem; }
 .geocodage__details summary {
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   cursor: pointer;
   width: fit-content;
 }
-.geocodage__details summary:hover { color: var(--text); }
+.geocodage__details summary:hover { color: var(--texte); }
 .geocodage__details summary:focus-visible { outline: 2px solid var(--ambre-texte); outline-offset: 2px; }
 
 .carte-legende {
@@ -1798,7 +1940,7 @@ code {
   gap: 0.3rem 1rem;
   font-family: var(--mono);
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-bottom: var(--pas);
 }
 /* La pastille « approximative » de la légende reprend le trait de l'épingle du plan :
@@ -1806,7 +1948,7 @@ code {
    deux fois. */
 .carte-legende__pastille--approx {
   background: transparent;
-  border: 2px dashed var(--text-soft);
+  border: 2px dashed var(--texte-doux);
 }
 .carte-legende__pastille {
   display: inline-block;
@@ -1833,7 +1975,7 @@ code {
   letter-spacing: 0.06em;
   margin-bottom: 0.4rem;
 }
-.carte-liste__n { color: var(--text-soft); font-weight: 400; }
+.carte-liste__n { color: var(--texte-doux); font-weight: 400; }
 .carte-liste__ville ul { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
 /* La pastille de score dans la colonne : la même que partout ailleurs, en plus petit. */
 .carte-liste__note {
@@ -1860,13 +2002,13 @@ code {
 .carte-liste__offre--A,
 .carte-liste__offre--B,
 .carte-liste__offre--C { border-left: 0; }
-.carte-liste__offre a { flex: 1 1 auto; min-width: 0; color: var(--text); }
+.carte-liste__offre a { flex: 1 1 auto; min-width: 0; color: var(--texte); }
 .carte-liste__offre a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .carte-liste__faits {
   display: block;
   font-family: var(--mono);
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 /* ── Le contenu de la bulle ────────────────────────────────────────────────
    Leaflet injecte ce HTML hors de React : c'est ici, et nulle part ailleurs,
@@ -1886,13 +2028,13 @@ code {
 .popup-faits {
   display: block;
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-bottom: 0.45rem;
 }
 .popup-lecture {
   display: block;
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin: 0.35rem 0;
 }
 .popup-offres { margin-top: 0.5rem; }
@@ -1907,7 +2049,7 @@ code {
   padding: 0.28rem 0;
   border-top: var(--trait-surface);
   font-size: var(--t-s);
-  color: var(--text);
+  color: var(--texte);
   text-decoration: none;
 }
 .popup-offre b {
@@ -1916,7 +2058,7 @@ code {
   font-variant-numeric: tabular-nums;
 }
 a.popup-offre:hover { color: var(--ambre-texte); }
-.popup-offre--reste { color: var(--text-soft); font-size: var(--t-xs); }
+.popup-offre--reste { color: var(--texte-doux); font-size: var(--t-xs); }
 .popup-trajet { display: inline-flex; align-items: center; gap: 0.25rem; font-size: var(--t-xs); margin-top: 0.45rem; }
 /* La flèche « ouvre ailleurs », dessinée : le caractère ↗ dépend d'une police qui peut ne
    pas le porter, et le glyphe de secours arrive plus gros et mal aligné. */
@@ -1929,7 +2071,7 @@ a.popup-offre:hover { color: var(--ambre-texte); }
 .ajout {
   margin-top: var(--pas-2);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--bordure);
 }
 
 .ajout__grille {
@@ -1948,7 +2090,7 @@ a.popup-offre:hover { color: var(--ambre-texte); }
 .ajout__aide {
   flex: 1 0 100%;
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   line-height: 1.45;
 }
 .ajout__actions { flex: 1 0 100%; }
@@ -1960,7 +2102,7 @@ a.popup-offre:hover { color: var(--ambre-texte); }
 .panneaux { display: flex; flex-direction: column; gap: var(--pas); }
 .panneau {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--bordure);
 }
 .panneau > summary {
   padding: 0.8rem 1rem;
@@ -1968,7 +2110,7 @@ a.popup-offre:hover { color: var(--ambre-texte); }
   font-size: var(--t-xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-soft);
+  color: var(--texte-doux);
   cursor: pointer;
   list-style: none;
 }
@@ -1980,10 +2122,10 @@ a.popup-offre:hover { color: var(--ambre-texte); }
 .panneau__intro { font-size: var(--t-s); margin-bottom: 0.8rem; }
 .panneau__note {
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-top: 0.8rem;
   padding-top: 0.6rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--bordure);
 }
 
 .bareme__ligne { margin-bottom: 0.6rem; }
@@ -1994,21 +2136,21 @@ a.popup-offre:hover { color: var(--ambre-texte); }
   color: var(--ambre);
   font-weight: 400;
 }
-.bareme dd { font-size: var(--t-s); color: var(--text-soft); margin-left: 0; }
+.bareme dd { font-size: var(--t-s); color: var(--texte-doux); margin-left: 0; }
 
 .grille-entreprises {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
   gap: 0.5rem;
 }
-.fiche { border: 1px solid var(--border); padding: 0.7rem 0.85rem; }
+.fiche { border: 1px solid var(--bordure); padding: 0.7rem 0.85rem; }
 .fiche h3 { font-size: var(--t-s); font-weight: 600; }
-.fiche__lieu { font-size: var(--t-xs); color: var(--text-soft); }
+.fiche__lieu { font-size: var(--t-xs); color: var(--texte-doux); }
 .fiche__km { font-family: var(--mono); font-size: var(--t-xs); color: var(--ambre); margin: 0.25rem 0; }
 .fiche__km--hors { color: var(--rouge); }
 /* Distance non relevée : volontairement en retrait, pour ne pas se lire comme un chiffre. */
-.fiche__km--inconnue { color: var(--text-soft); font-style: italic; }
-.fiche__lecture { font-size: var(--t-xs); color: var(--text-soft); }
+.fiche__km--inconnue { color: var(--texte-doux); font-style: italic; }
+.fiche__lecture { font-size: var(--t-xs); color: var(--texte-doux); }
 
 /* Un tableau large défile dans SON conteneur : la page, elle, ne défile jamais
    horizontalement. */
@@ -2020,23 +2162,23 @@ a.popup-offre:hover { color: var(--ambre-texte); }
   font-size: var(--t-2xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-soft);
+  color: var(--texte-doux);
   padding: 0.5rem 0.6rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--bordure);
 }
-.table-marche td { padding: 0.5rem 0.6rem; font-size: var(--t-s); border-bottom: 1px solid var(--border); }
+.table-marche td { padding: 0.5rem 0.6rem; font-size: var(--t-s); border-bottom: 1px solid var(--bordure); }
 .table-marche tr:last-child td { border-bottom: none; }
 .table-marche__v { font-family: var(--mono); color: var(--ambre); white-space: nowrap; }
-.table-marche__s { color: var(--text-soft); font-size: var(--t-xs); }
+.table-marche__s { color: var(--texte-doux); font-size: var(--t-xs); }
 
 .grille-swot {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: 0.5rem;
 }
-.quadrant { border: 1px solid var(--border); border-top: 3px solid var(--border); padding: 0.7rem 0.85rem; }
+.quadrant { border: 1px solid var(--bordure); border-top: 3px solid var(--bordure); padding: 0.7rem 0.85rem; }
 .quadrant h3 { font-family: var(--mono); font-size: var(--t-xs); margin-bottom: 0.5rem; }
-.quadrant ul { padding-left: 1rem; font-size: var(--t-s); color: var(--text-soft); }
+.quadrant ul { padding-left: 1rem; font-size: var(--t-s); color: var(--texte-doux); }
 .quadrant li { margin-bottom: 0.25rem; }
 .quadrant--forces { border-top-color: var(--vert); }
 .quadrant--forces h3 { color: var(--vert); }
@@ -2053,15 +2195,15 @@ a.popup-offre:hover { color: var(--ambre-texte); }
 
 /* ── Diagnostic de configuration (page de connexion, après un échec) ─────── */
 .diagnostic { margin-top: 1rem; font-size: var(--t-s); }
-.diagnostic > summary { cursor: pointer; color: var(--text-soft); }
+.diagnostic > summary { cursor: pointer; color: var(--texte-doux); }
 .diagnostic > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .diagnostic ul { list-style: none; margin-top: 0.6rem; }
 .diagnostic li { padding: 0.2rem 0; font-family: var(--mono); font-size: var(--t-xs); }
 .diagnostic li.ok::before { content: "✓ "; color: var(--vert); }
 .diagnostic li.absente::before { content: "✕ "; color: var(--rouge); }
 .diagnostic li.absente { color: var(--rouge); }
-.diagnostic__role { font-family: var(--font); color: var(--text-soft); }
-.diagnostic__note { margin-top: 0.6rem; color: var(--text-soft); font-size: var(--t-xs); }
+.diagnostic__role { font-family: var(--font); color: var(--texte-doux); }
+.diagnostic__note { margin-top: 0.6rem; color: var(--texte-doux); font-size: var(--t-xs); }
 
 /* ── Vue détail d'une offre ──────────────────────────────────────────────── */
 .retour {
@@ -2069,7 +2211,7 @@ a.popup-offre:hover { color: var(--ambre-texte); }
   margin-bottom: 1rem;
   font-family: var(--mono);
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   text-decoration: none;
 }
 .retour:hover { color: var(--ambre); }
@@ -2082,18 +2224,18 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 
 .detail {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
+  border: 1px solid var(--bordure);
+  border-left: 3px solid var(--bordure);
   padding: 1.25rem;
 }
 .detail--A { border-left-color: var(--vert); }
 .detail--B { border-left-color: var(--ambre); }
-.detail--C { border-left-color: var(--text-soft); }
+.detail--C { border-left-color: var(--texte-doux); }
 
 .detail__tete { display: flex; gap: 1rem; align-items: flex-start; }
 .detail__tete h1 { font-size: var(--t-l); line-height: 1.2; }
-.detail__poste { color: var(--text-soft); margin-top: 0.15rem; }
-.detail__lien { display: inline-block; margin-top: 0.5rem; color: var(--text); font-size: var(--t-s); }
+.detail__poste { color: var(--texte-doux); margin-top: 0.15rem; }
+.detail__lien { display: inline-block; margin-top: 0.5rem; color: var(--texte); font-size: var(--t-s); }
 /* Deux liens côte à côte : l'annonce et le trajet. L'espacement les distingue, la couleur
    ambre marque le trajet — accompagnée du libellé, jamais seule (WCAG 1.4.1). */
 .detail__lien--trajet { margin-left: 1rem; color: var(--ambre-texte); }
@@ -2110,7 +2252,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .detail__sans-lien {
   margin-top: 0.5rem;
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   font-style: italic;
 }
 
@@ -2120,15 +2262,15 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   gap: 0.75rem;
   margin: 1.25rem 0;
   padding: 0.9rem 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--bordure);
+  border-bottom: 1px solid var(--bordure);
 }
 .detail__faits dt {
   font-family: var(--mono);
   font-size: var(--t-2xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .detail__faits dd { font-size: var(--t-s); margin-top: 0.15rem; }
 
@@ -2138,7 +2280,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   font-size: var(--t-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-bottom: 0.5rem;
 }
 .detail__texte { font-size: var(--t-s); line-height: 1.55; }
@@ -2156,7 +2298,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
    n'est pas une offre illisible : c'est son ÉTAT qui est terne, pas son texte.
    Le badge rouge et le nom grisé suffisent à la faire reculer. */
 .carte--perimee .carte__entreprise,
-.carte--perimee .carte__poste { color: var(--text-soft); }
+.carte--perimee .carte__poste { color: var(--texte-doux); }
 .badge-perimee {
   font-family: var(--mono);
   font-size: var(--t-2xs);
@@ -2205,7 +2347,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .carte-liste__adresse {
   margin: 2px 0 6px;
   font-size: var(--t-s);
-  color: var(--text);
+  color: var(--texte);
 }
 .popup-adresse {
   display: block;
@@ -2248,7 +2390,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 }
 /* ⚠️ TROIS JETONS QUI N'EXISTENT PAS ONT ÉTÉ CORRIGÉS ICI (refonte 2026-09-13, défaut
    PRÉEXISTANT). Ce bloc écrivait `var(--bordure)` et `var(--texte-doux)` — les jetons de
-   l'app s'appellent `--border` et `--text-soft`. Une variable CSS inconnue ne lève rien et
+   l'app s'appellent `--bordure` et `--texte-doux`. Une variable CSS inconnue ne lève rien et
    n'apparaît dans aucun test : la bordure tombait sur `currentColor` et le motif de relance
    s'affichait à la couleur du texte courant au lieu de reculer. C'est la même famille que
    les couleurs écrites en dur — ça ne casse pas, ça devient faux en silence. */
@@ -2256,7 +2398,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   display: grid;
   gap: 2px;
   padding-left: 10px;
-  border-left: 2px solid var(--border);
+  border-left: 2px solid var(--bordure);
 }
 /* Le silence prolongé se distingue de la relance due : ce ne sont pas les mêmes gestes. */
 .relances__item--sans-suite {
@@ -2273,7 +2415,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 }
 .relances__motif {
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .relances__reste {
   margin-top: 10px;
@@ -2309,7 +2451,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   top: 0;
   z-index: 1100;
   padding: var(--pas) 0;
-  background: var(--bg);
+  background: var(--fond);
 }
 
 /* LA SOURCE D'UNE ADRESSE — discrète, mais jamais absente. Elle ne doit pas concurrencer
@@ -2319,7 +2461,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .carte-liste__source,
 .popup-adresse small {
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 
 /* Les bornes de recharge : une ligne de fait, au même niveau que la distance. Discrète —
@@ -2329,7 +2471,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   display: block;
   margin-top: 2px;
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 
 /* La fiche enrichie par Google Places [CARTE-03-PLACES] : même registre que l'adresse et
@@ -2347,14 +2489,14 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   display: block;
   margin-top: 2px;
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .carte-liste__horaires,
 .popup-horaires {
   margin: 2px 0 0;
   padding: 0 0 0 1.1em;
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 
 /* LARGEUR DE LECTURE — l'épure la plus efficace, et la moins visible.
@@ -2396,7 +2538,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
    Toute la page est un écran de DÉCISION, pas de consultation : la hiérarchie
    sert à distinguer ce qui se vérifie (un fait lu dans le document) de ce qui
    se déduit (une conséquence sur le barème). Le charbon reste le fond ; c'est
-   le relief `--creux` qui porte les blocs, comme partout ailleurs (ADR-0008).
+   le relief `--surface-douce` qui porte les blocs, comme partout ailleurs (ADR-0008).
    ══════════════════════════════════════════════════════════════════════════ */
 
 .carte-info {
@@ -2420,7 +2562,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 }
 .profil__faits dt {
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
@@ -2436,7 +2578,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 
 .profil__vide {
   margin: 0;
-  color: var(--text-soft);
+  color: var(--texte-doux);
   line-height: 1.55;
 }
 
@@ -2459,13 +2601,13 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 }
 .profil__cle-nom {
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 
 .profil__groupe { margin: 0 0 1.2rem; }
 .profil__groupe-titre {
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   margin: 0 0 0.5rem;
@@ -2482,7 +2624,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 
 .profil__aide {
   margin: 0 0 1.1rem;
-  color: var(--text-soft);
+  color: var(--texte-doux);
   font-size: var(--t-s);
   line-height: 1.5;
 }
@@ -2511,7 +2653,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 }
 .profil__poids-pts {
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -2522,7 +2664,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   padding-top: 0.9rem;
   border-top: var(--trait-surface);
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 
 @media (max-width: 40rem) {
@@ -2541,12 +2683,12 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   flex-direction: column;
   gap: 0.4rem;
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .depot-cv__champ input[type="file"] {
   font: inherit;
-  color: var(--text);
-  background: var(--creux);
+  color: var(--texte);
+  background: var(--surface-douce);
   border: var(--trait-surface);
   border-radius: 10px;
   padding: 0.6rem 0.8rem;
@@ -2581,20 +2723,20 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin: 0;
   padding: 0.7rem 0.95rem;
   border-radius: 10px;
-  background: color-mix(in oklab, var(--vert) 14%, var(--creux));
-  border: 1px solid color-mix(in oklab, var(--vert) 32%, var(--border));
+  background: color-mix(in oklab, var(--vert) 14%, var(--surface-douce));
+  border: 1px solid color-mix(in oklab, var(--vert) 32%, var(--bordure));
   font-size: var(--t-s);
 }
 .revue__retour--echec {
-  background: color-mix(in oklab, var(--rouge) 14%, var(--creux));
-  border-color: color-mix(in oklab, var(--rouge) 34%, var(--border));
+  background: color-mix(in oklab, var(--rouge) 14%, var(--surface-douce));
+  border-color: color-mix(in oklab, var(--rouge) 34%, var(--bordure));
 }
 
 /* ── Un écart ──────────────────────────────────────────────────────────── */
 .ecart {
-  background: var(--creux);
+  background: var(--surface-douce);
   border: var(--trait-surface);
-  border-left: 3px solid var(--border);
+  border-left: 3px solid var(--bordure);
   border-radius: 10px;
   padding: 0.8rem 1rem;
 }
@@ -2602,7 +2744,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
    apparaît partout ne signale plus rien. */
 .ecart--retenu {
   border-left-color: var(--ambre);
-  background: color-mix(in oklab, var(--ambre) 8%, var(--creux));
+  background: color-mix(in oklab, var(--ambre) 8%, var(--surface-douce));
 }
 .ecart__choix {
   display: flex;
@@ -2627,12 +2769,12 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   line-height: 1.6;
 }
 .ecart__avant {
-  color: var(--text-soft);
+  color: var(--texte-doux);
   text-decoration: line-through;
-  text-decoration-color: color-mix(in oklab, var(--text-soft) 55%, transparent);
+  text-decoration-color: color-mix(in oklab, var(--texte-doux) 55%, transparent);
 }
 .ecart__fleche {
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .ecart__apres {
   color: var(--ambre-texte);
@@ -2642,7 +2784,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .ecart__source {
   margin: 0.4rem 0 0 1.65rem;
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .ecart__source--suppose {
   color: var(--ambre-texte);
@@ -2661,7 +2803,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  background: var(--creux);
+  background: var(--surface-douce);
   border: var(--trait-surface);
   border-radius: 10px;
   padding: 0.7rem 0.95rem;
@@ -2671,7 +2813,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 }
 .cv__meta {
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .cv__erreur {
   font-size: var(--t-s);
@@ -2702,7 +2844,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .sources__etat {
   font-family: var(--mono);
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   justify-self: end;
   white-space: nowrap;
 }
@@ -2712,7 +2854,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .sources__note {
   grid-column: 1 / -1;
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   max-width: 68ch;
 }
 
@@ -2734,7 +2876,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   gap: 0.35rem 0.6rem;
   padding: 0.4rem 0.6rem;
   border-radius: var(--r-champ);
-  background: var(--creux);
+  background: var(--surface-douce);
 }
 
 .sources__entreprise,
@@ -2744,17 +2886,17 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .decouverte__famille {
   font-family: var(--mono);
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 
 .sources__verdict,
-.decouverte__verdict { font-size: var(--t-xs); color: var(--text-soft); }
+.decouverte__verdict { font-size: var(--t-xs); color: var(--texte-doux); }
 
 .sources__date {
   margin-left: auto;
   font-family: var(--mono);
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 
 /* La ligne d'une trouvaille se distingue : c'est le seul résultat qui change quelque
@@ -2784,14 +2926,14 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   height: 0.55rem;
   border: none;
   border-radius: var(--r-pill);
-  background: var(--creux);
+  background: var(--surface-douce);
   accent-color: var(--ambre);
 }
 
 .decouverte__chiffres {
   font-family: var(--mono);
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2801,7 +2943,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .decouverte__lignes { list-style: none; padding: 0; display: grid; gap: 0.3rem; }
 .decouverte__note {
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-top: 0.75rem;
   max-width: 68ch;
 }
@@ -2824,7 +2966,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   gap: 0.2rem;
   padding: 0.5rem 0.7rem;
   border-radius: var(--r-champ);
-  background: var(--creux);
+  background: var(--surface-douce);
 }
 
 /* Une adresse qui rend VRAIMENT des offres — le seul résultat qui change quelque chose. */
@@ -2843,13 +2985,13 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .sonde__apercu {
   font-family: var(--mono);
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   overflow-wrap: anywhere;
 }
 
 .sonde__note {
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-top: 0.6rem;
   max-width: 68ch;
 }
@@ -2860,7 +3002,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .veille__message { font-size: var(--t-s); margin-top: 0.5rem; min-height: 1.2em; }
 .veille__note {
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-top: 0.4rem;
   max-width: 68ch;
 }
@@ -2872,7 +3014,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
    n'est écrite en dur ici, `tests/styles.test.ts` le refuserait. */
 .rapport {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--bordure);
   border-radius: 10px;
   padding: var(--pas-2);
   margin-bottom: var(--pas-2);
@@ -2886,7 +3028,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin-bottom: var(--pas-2);
 }
 .rapport__titre { font-size: var(--t-m); font-weight: 600; }
-.rapport__meta { font-size: var(--t-xs); color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.rapport__meta { font-size: var(--t-xs); color: var(--texte-doux); font-variant-numeric: tabular-nums; }
 
 /* Les quatre chiffres de tête. `auto-fit` plutôt qu'un nombre de colonnes figé : sur
    téléphone ils s'empilent sans média-requête, et la carte ne déborde jamais. */
@@ -2897,8 +3039,8 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin-bottom: var(--pas-2);
 }
 .rapport__chiffre {
-  background: var(--creux);
-  border-left: 3px solid var(--border);
+  background: var(--surface-douce);
+  border-left: 3px solid var(--bordure);
   border-radius: 6px;
   padding: 0.7rem 0.85rem;
   display: flex;
@@ -2913,7 +3055,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
-.rapport__libelle { font-size: var(--t-2xs); color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+.rapport__libelle { font-size: var(--t-2xs); color: var(--texte-doux); text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* La fraîcheur du dépôt. Un liseré porteur de sens, pas une décoration : « vieillissant »
    se remarque, « rompu » se lit avant les chiffres qu'il disqualifie. Aucun hex ici — les
@@ -2923,23 +3065,23 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   line-height: 1.45;
   padding: 0.55rem 0.75rem;
   border-radius: 6px;
-  background: var(--creux);
-  border-left: 3px solid var(--border);
+  background: var(--surface-douce);
+  border-left: 3px solid var(--bordure);
   margin-bottom: var(--pas-2);
 }
 .rapport__fraicheur--vieillissant {
   border-left-color: var(--ambre);
-  color: var(--text);
+  color: var(--texte);
 }
 .rapport__fraicheur--rompu {
   border-left-color: var(--rouge);
-  color: var(--text);
+  color: var(--texte);
 }
 
 .rapport__meilleure {
   font-size: var(--t-s);
   padding: 0.5rem 0.7rem;
-  background: var(--creux);
+  background: var(--surface-douce);
   border-radius: 6px;
   margin-bottom: var(--pas-2);
 }
@@ -2954,18 +3096,18 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   flex-wrap: wrap;
   gap: 0.4rem 1.1rem;
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   padding-bottom: var(--pas-2);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--bordure);
   margin-bottom: var(--pas-2);
 }
-.rapport__flux strong { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.rapport__flux strong { color: var(--texte); font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 .rapport__soustitre {
   font-size: var(--t-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-soft);
+  color: var(--texte-doux);
   margin-bottom: 0.5rem;
 }
 .rapport__refus, .rapport__detail { margin-bottom: var(--pas-2); }
@@ -2978,18 +3120,18 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   font-size: var(--t-s);
 }
 .rapport__motif-n { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
-.rapport__motif-nom { color: var(--text); }
-.rapport__villes { font-size: var(--t-xs); color: var(--text-soft); overflow-wrap: anywhere; }
+.rapport__motif-nom { color: var(--texte); }
+.rapport__villes { font-size: var(--t-xs); color: var(--texte-doux); overflow-wrap: anywhere; }
 
 .rapport__source { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.15rem 1rem; font-size: var(--t-s); }
 .rapport__source-nom { font-family: var(--mono); overflow-wrap: anywhere; }
-.rapport__source-n { font-family: var(--mono); color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.rapport__source-n { font-family: var(--mono); color: var(--texte-doux); font-variant-numeric: tabular-nums; }
 .rapport__source--muette .rapport__source-n { color: var(--rouge); }
 /* Ce que la source a refusé : une phrase, donc sa propre ligne sous le compte. */
-.rapport__source-note { flex-basis: 100%; font-size: var(--t-xs); color: var(--text-soft); overflow-wrap: anywhere; }
+.rapport__source-note { flex-basis: 100%; font-size: var(--t-xs); color: var(--texte-doux); overflow-wrap: anywhere; }
 
 .rapport__ligne { font-size: var(--t-s); }
-.rapport__ligne--douce { color: var(--text-soft); font-size: var(--t-xs); margin-top: 0.25rem; }
+.rapport__ligne--douce { color: var(--texte-doux); font-size: var(--t-xs); margin-top: 0.25rem; }
 .rapport__alerte {
   font-size: var(--t-s);
   color: var(--rouge);
@@ -3003,23 +3145,23 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   font-size: var(--t-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .rayon__ligne { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .rayon__champ {
   width: 6rem;
   padding: 0.45rem 0.6rem;
-  background: var(--creux);
-  border: 1px solid var(--border);
+  background: var(--surface-douce);
+  border: 1px solid var(--bordure);
   border-radius: 6px;
-  color: var(--text);
+  color: var(--texte);
   font-family: var(--mono);
   font-size: var(--t-m);
   font-variant-numeric: tabular-nums;
 }
 .rayon__champ:focus-visible { outline: 2px solid var(--ambre); outline-offset: 2px; }
-.rayon__unite { font-family: var(--mono); color: var(--text-soft); margin-right: 0.4rem; }
-.rayon__aide { font-size: var(--t-xs); color: var(--text-soft); max-width: 68ch; }
+.rayon__unite { font-family: var(--mono); color: var(--texte-doux); margin-right: 0.4rem; }
+.rayon__aide { font-size: var(--t-xs); color: var(--texte-doux); max-width: 68ch; }
 .rayon__message { font-size: var(--t-s); min-height: 1.2em; }
 
 /* Réglage des métiers retenus dans le flux complet du Guichet. Reprend les jetons du
@@ -3030,9 +3172,9 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   font-size: var(--t-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
-.metiers__aide { font-size: var(--t-xs); color: var(--text-soft); max-width: 68ch; }
+.metiers__aide { font-size: var(--t-xs); color: var(--texte-doux); max-width: 68ch; }
 .metiers__alerte { font-size: var(--t-xs); color: var(--ambre); max-width: 68ch; }
 .metiers__actuels { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
 .metiers__valeur { font-family: var(--mono); font-size: var(--t-s); overflow-wrap: anywhere; }
@@ -3044,7 +3186,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--bordure);
   border-radius: 0.5rem;
   padding: 0.75rem 0.9rem;
   margin: 0 0 0.9rem;
@@ -3058,13 +3200,13 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   cursor: pointer;
 }
 .metiers__mode-choix input { margin-top: 0.25rem; flex: none; }
-.metiers__mode-choix strong { color: var(--text); }
+.metiers__mode-choix strong { color: var(--texte); }
 .metiers__champ {
   padding: 0.45rem 0.6rem;
-  background: var(--creux);
-  border: 1px solid var(--border);
+  background: var(--surface-douce);
+  border: 1px solid var(--bordure);
   border-radius: 6px;
-  color: var(--text);
+  color: var(--texte);
   font-family: var(--mono);
   font-size: var(--t-m);
   font-variant-numeric: tabular-nums;
@@ -3080,7 +3222,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   padding: 0;
   max-height: 22rem;
   overflow-y: auto;
-  border: 1px solid var(--border);
+  border: 1px solid var(--bordure);
   border-radius: 6px;
 }
 .metiers__ligne {
@@ -3089,7 +3231,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   align-items: baseline;
   gap: 0.6rem;
   padding: 0.35rem 0.6rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--bordure);
   font-size: var(--t-xs);
 }
 .metiers__ligne:last-child { border-bottom: none; }
@@ -3097,11 +3239,11 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .metiers__code { font-family: var(--mono); font-size: var(--t-s); }
 .metiers__n {
   font-family: var(--mono);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
-.metiers__titres { color: var(--text-soft); overflow-wrap: anywhere; }
+.metiers__titres { color: var(--texte-doux); overflow-wrap: anywhere; }
 .metiers__message { font-size: var(--t-s); min-height: 1.2em; }
 
 @media (max-width: 32rem) {
@@ -3123,19 +3265,19 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .histo__table th,
 .histo__table td {
   padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--bordure);
   text-align: left;
 }
 .histo__table thead th {
-  color: var(--text-soft);
+  color: var(--texte-doux);
   font-weight: 500;
   white-space: nowrap;
 }
 .histo__num { text-align: right; }
 .histo__quand { font-weight: 500; white-space: nowrap; }
-.histo__heure { color: var(--text-soft); font-weight: 400; }
-.histo__par { color: var(--text-soft); font-weight: 400; font-size: var(--t-xs); }
-.veille__auto { color: var(--text-soft); font-size: var(--t-s); margin-top: 0.6rem; }
+.histo__heure { color: var(--texte-doux); font-weight: 400; }
+.histo__par { color: var(--texte-doux); font-weight: 400; font-size: var(--t-xs); }
+.veille__auto { color: var(--texte-doux); font-size: var(--t-s); margin-top: 0.6rem; }
 
 /* Le bloc de l'analyse de marché. Une règle même minimale : le test de styles refuse une
    classe du JSX sans règle, et il a raison — une classe orpheline est un style qu'on croit
@@ -3150,20 +3292,20 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   gap: 0.75rem;
   margin: 1rem 0;
 }
-.marche__chiffres dt { color: var(--text-soft); font-size: var(--t-xs); }
+.marche__chiffres dt { color: var(--texte-doux); font-size: var(--t-xs); }
 .marche__chiffres dd {
   margin: 0.15rem 0 0;
   font-size: var(--t-m);
   font-variant-numeric: tabular-nums;
 }
-.marche__ref { color: var(--text-soft); font-size: var(--t-xs); }
+.marche__ref { color: var(--texte-doux); font-size: var(--t-xs); }
 .marche__texte {
   margin: 1rem 0 0;
   padding-left: 0.9rem;
-  border-left: 2px solid var(--border);
+  border-left: 2px solid var(--bordure);
   line-height: 1.55;
 }
-.marche__note { color: var(--text-soft); font-size: var(--t-xs); margin-top: 0.6rem; }
+.marche__note { color: var(--texte-doux); font-size: var(--t-xs); margin-top: 0.6rem; }
 /* L'échec se DIT en rouge, jamais en gris à côté du reste : « pas de clé API » et
    « le marché est calme » ne doivent pas se lire pareil. */
 .marche__erreur { color: var(--rouge); margin-top: 0.6rem; }
@@ -3174,7 +3316,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .parcours { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.5rem; }
 .parcours__poste {
   padding-left: 1rem;
-  border-left: 2px solid var(--border);
+  border-left: 2px solid var(--bordure);
 }
 .parcours__tete {
   display: flex;
@@ -3186,12 +3328,12 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .parcours__periode {
   font-family: var(--mono);
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .parcours__employeur {
   margin: 0.15rem 0 0;
   font-size: var(--t-s);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .parcours__faits {
   margin: 0.6rem 0 0;
@@ -3201,19 +3343,19 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   font-size: var(--t-s);
   line-height: 1.5;
 }
-.parcours__vide { margin: 0; color: var(--text-soft); line-height: 1.55; }
+.parcours__vide { margin: 0; color: var(--texte-doux); line-height: 1.55; }
 
 /* ── La carte Google (ADR-0016, lot A) ──────────────────────────────────────
    La fiche d'une épingle vit dans une InfoWindow Google, qui pose un fond BLANC
    qu'on ne contrôle pas : l'encre est donc FONCÉE en dur ici, indépendante du
-   thème sombre de l'app — hériter de var(--text) rendrait du blanc sur blanc. */
-.carte-fiche { color: oklch(0.25 0.02 265); font-size: 0.85rem; line-height: 1.45; max-width: 320px; }
+   thème sombre de l'app — hériter de var(--texte) rendrait du blanc sur blanc. */
+.carte-fiche { color: var(--carte-encre); font-size: 0.85rem; line-height: 1.45; max-width: 320px; }
 .carte-fiche__entreprise { margin-bottom: 0.6rem; }
-.carte-fiche__nom { margin: 0 0 0.2rem; font-size: 0.95rem; color: oklch(0.2 0.02 265); }
-.carte-fiche__adresse { margin: 0; color: oklch(0.45 0.02 265); }
-.carte-fiche__km { margin: 0.1rem 0 0; font-variant-numeric: tabular-nums; color: oklch(0.45 0.02 265); }
+.carte-fiche__nom { margin: 0 0 0.2rem; font-size: 0.95rem; color: var(--carte-encre-forte); }
+.carte-fiche__adresse { margin: 0; color: var(--carte-encre-douce); }
+.carte-fiche__km { margin: 0.1rem 0 0; font-variant-numeric: tabular-nums; color: var(--carte-encre-douce); }
 .carte-fiche__offres { margin: 0.45rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.3rem; }
-.carte-fiche__offres a { color: oklch(0.4 0.12 265); }
+.carte-fiche__offres a { color: var(--carte-lien); }
 .carte-fiche__note {
   display: inline-block;
   min-width: 2em;
@@ -3224,15 +3366,15 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   font-weight: 600;
 }
 .carte-fiche__liens { margin: 0.5rem 0 0; }
-.carte-fiche__liens a { color: oklch(0.4 0.12 265); }
+.carte-fiche__liens a { color: var(--carte-lien); }
 /* L'approximation se dit en PREMIER et en ambre : une épingle au centre-ville prise
    pour l'usine est exactement l'erreur que cette ligne empêche. */
 .carte-fiche__approx {
   margin: 0 0 0.5rem;
   padding: 0.3rem 0.5rem;
   border-radius: 0.35rem;
-  background: oklch(0.93 0.06 80);
-  color: oklch(0.4 0.1 70);
+  background: var(--carte-ambre-fond);
+  color: var(--carte-ambre-texte);
 }
 
 /* Le repli Leaflet SE DIT : une variable d'env manquante se cherche des heures quand
@@ -3240,7 +3382,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .plan-ecran__repli {
   margin: 0 0 0.6rem;
   font-size: var(--t-xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 .plan-ecran__repli code { font-family: var(--mono); }
 
@@ -3249,10 +3391,10 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .carte-fiche__trajet { margin: 0.45rem 0 0; font-weight: 600; }
 .carte-fiche__bouton-trajet {
   padding: 0.3rem 0.7rem;
-  border: 1px solid oklch(0.55 0.15 250);
+  border: 1px solid var(--carte-bleu-bord);
   border-radius: 0.4rem;
-  background: oklch(0.97 0.01 250);
-  color: oklch(0.35 0.12 250);
+  background: var(--carte-bleu-fond);
+  color: var(--carte-bleu-texte);
   cursor: pointer;
   font: inherit;
 }
@@ -3263,8 +3405,8 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin: 0.35rem 0 0;
   padding: 0.3rem 0.5rem;
   border-radius: 0.35rem;
-  background: oklch(0.93 0.06 80);
-  color: oklch(0.4 0.1 70);
+  background: var(--carte-ambre-fond);
+  color: var(--carte-ambre-texte);
 }
 
 /* ── Les épingles maison (ADR-0016, lot E) ──────────────────────────────────
@@ -3280,18 +3422,18 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   height: 1.9rem;
   padding: 0 0.3rem;
   border-radius: 999px;
-  border: 2px solid oklch(0.25 0.02 265);
+  border: 2px solid var(--carte-encre);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 1px 4px oklch(0 0 0 / 0.35);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
 }
 /* L'approximative ne RESSEMBLE pas à une exacte : plus petite, grise, bord pointillé. */
 .epingle__pastille--approx {
   min-width: 1.5rem;
   height: 1.5rem;
   border-style: dashed;
-  background: oklch(0.85 0.01 265);
-  color: oklch(0.35 0.02 265);
+  background: var(--carte-gris-fond);
+  color: var(--carte-gris-texte);
 }
 .epingle__duree {
   padding: 0.05rem 0.35rem;
@@ -3299,14 +3441,14 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   font-size: 0.68rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 1px 3px oklch(0 0 0 / 0.3);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
 }
 /* Les bandes : proche = vert, loin = rouge doux. Les seuils viennent de BANDES_DUREE_MIN
    (lib/trajetRoutes.ts) — la légende les affiche depuis la constante, jamais recopiés. */
-.epingle__duree--b1 { background: oklch(0.85 0.11 150); color: oklch(0.3 0.08 150); }
-.epingle__duree--b2 { background: oklch(0.88 0.09 110); color: oklch(0.35 0.08 110); }
-.epingle__duree--b3 { background: oklch(0.9 0.08 75); color: oklch(0.4 0.09 70); }
-.epingle__duree--b4 { background: oklch(0.85 0.07 30); color: oklch(0.38 0.1 30); }
+.epingle__duree--b1 { background: var(--bande-1-fond); color: var(--bande-1-texte); }
+.epingle__duree--b2 { background: var(--bande-2-fond); color: var(--bande-2-texte); }
+.epingle__duree--b3 { background: var(--bande-3-fond); color: var(--bande-3-texte); }
+.epingle__duree--b4 { background: var(--bande-4-fond); color: var(--bande-4-texte); }
 
 /* La légende des bandes, dans le coin du plan.
    ⚠️ RENOMMÉE carte-bandes : elle s'appelait carte-legende — le nom d'une classe qui
@@ -3321,14 +3463,14 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   gap: 0.3rem;
   padding: 0.3rem 0.4rem;
   border-radius: 0.4rem;
-  background: oklch(1 0 0 / 0.85);
+  background: var(--carte-voile);
 }
 
 /* L'aveu du calque de densité : toggle actif, zéro cercle possible. Sans lui, « rien ne
    s'affiche » et « rien à montrer » se confondent — c'est le bug qu'on vient de vivre. */
 .carte-densite-vide {
   font-size: 0.8rem;
-  color: var(--text-soft);
+  color: var(--texte-doux);
   align-self: center;
 }
 
@@ -3361,7 +3503,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 }
 .duree__note {
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   line-height: 1.5;
 }
 .duree__bloc {
@@ -3394,7 +3536,7 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   align-items: baseline;
   gap: 0.5rem;
   padding: 0.4rem 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--bordure);
 }
 .duree__ligne:last-child { border-bottom: 0; }
 .duree__nom {
@@ -3407,13 +3549,13 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 .duree__valeur {
   font-family: var(--mono);
   font-size: var(--t-s);
-  color: var(--text);
+  color: var(--texte);
   white-space: nowrap;
 }
 .duree__n {
   font-family: var(--mono);
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
   white-space: nowrap;
 }
 
@@ -3438,13 +3580,13 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   gap: 0.1rem;
   min-height: var(--touche);
   justify-content: center;
-  color: var(--text);
+  color: var(--texte);
   text-decoration: none;
 }
 .archives__lien:hover .archives__entreprise { text-decoration: underline; text-underline-offset: 3px; }
 .archives__lien:focus-visible { outline: 2px solid var(--ambre); outline-offset: 3px; border-radius: var(--r-champ); }
 .archives__entreprise { font-weight: 700; font-size: var(--t-s); }
-.archives__poste { font-size: var(--t-xs); color: var(--text-soft); }
+.archives__poste { font-size: var(--t-xs); color: var(--texte-doux); }
 .archives__faits {
   display: flex;
   flex-wrap: wrap;
@@ -3452,12 +3594,12 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin-top: 0.3rem;
   font-family: var(--mono);
   font-size: var(--t-2xs);
-  color: var(--text-soft);
+  color: var(--texte-doux);
 }
 /* La durée est le sujet de cette page : elle prend l'encre, le reste recule. */
-.archives__duree { color: var(--text); }
+.archives__duree { color: var(--texte); }
 /* ⚠️ « Non mesurée » n'est pas « zéro » : une offre qu'aucun balayage n'a vue n'a pas de
    durée, et lui en afficher une serait un chiffre fabriqué. */
-.archives__duree--absente { color: var(--text-soft); font-style: italic; }
+.archives__duree--absente { color: var(--texte-doux); font-style: italic; }
 .archives__date { white-space: nowrap; }
 .archives__note { white-space: nowrap; }
