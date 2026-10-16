@@ -26,7 +26,7 @@ jobs:
     name: Gate (typecheck · tests · lint · build)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # [CI-PERSIST-CREDS] `actions/checkout` v2+ écrit le GITHUB_TOKEN dans la config git du
           # runner POUR TOUT LE RESTE DU RUN : n'importe quelle étape suivante, y compris une
@@ -49,7 +49,7 @@ jobs:
           node .github/ci/verifier-longueur.mjs CLAUDE.md
           node .github/ci/generer-index.mjs --verifier
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           # Aligné sur les autres dépôts de l'écosystème (.nvmrc fait foi).
           node-version-file: .nvmrc
@@ -100,10 +100,10 @@ jobs:
     name: Qualité (lint · couverture · code mort · architecture)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -113,7 +113,7 @@ jobs:
         run: node qualite/portes.mjs
       - name: Rapport
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: rapport-qualite
           path: qualite/rapport.json
@@ -129,7 +129,7 @@ jobs:
     name: Sécurité (secrets · analyse statique)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0 # gitleaks lit l'historique complet, pas seulement le dernier commit
           persist-credentials: false
@@ -141,7 +141,7 @@ jobs:
           echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tgz" | sha256sum -c -
           tar xzf gitleaks.tgz gitleaks
           ./gitleaks git . --no-banner --redact --log-opts="--full-history HEAD" --gitleaks-ignore-path .gitleaksignore
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: Analyse statique (Semgrep)
@@ -151,3 +151,48 @@ jobs:
           semgrep scan --metrics off --error --exclude .github \
             --config p/typescript --config p/react --config p/nextjs \
             --config p/secrets --config p/owasp-top-ten .
+
+  # Job SÉPARÉ du gate, volontairement : un avis de sécurité paraît sans qu'aucun commit n'ait eu lieu.
+  # Mêlé au gate, il peindrait un dépôt sain en rouge du jour au lendemain, et on prendrait l'habitude
+  # du rouge (modèle app-template, grille de conformité ligne 6). `--omit=dev` : seules les dépendances
+  # qui partent en production comptent. Mesuré le 16/10/2026 : 0 faille.
+  audit:
+    timeout-minutes: 10
+    name: Audit des dépendances de production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Dépendances
+        run: npm ci --ignore-scripts
+      - name: npm audit (production)
+        run: npm audit --omit=dev
+
+  # ---------------------------------------------------------------------------------------
+  # Contrôles COMMUNS aux dix dépôts, écrits une seule fois dans MoKarade/.github (plan de
+  # standardisation du 15/10/2026, JobAI#113). Ce fichier ne fait que les appeler ; l'appel d'un
+  # workflow commun reste en `@main` (voulu : un correctif y atteint tous les dépôts sans PR).
+  #
+  # `securite-commune` s'ajoute au job `securite` ci-dessus sans le remplacer : le renommer
+  # changerait le contrôle « Sécurité (secrets · analyse statique) » que .mergify.yml exige.
+  securite-commune:
+    name: Sécurité commune
+    uses: MoKarade/.github/.github/workflows/securite.yml@main
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+  # La grille de conformité : un tableau ligne par ligne dans le résumé du job. `bloquant: false` tant
+  # que les lignes 8 (JobAI#115), 9 (JobAI#117) et 12 (JobAI#116) attendent leur tâche ; passer à `true`
+  # quand toute la grille est verte.
+  conformite:
+    name: Conformité
+    uses: MoKarade/.github/.github/workflows/conformite.yml@main
+    with:
+      bloquant: false

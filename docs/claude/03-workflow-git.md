@@ -24,7 +24,7 @@
   Entre deux agents qui se contredisent, **celui qui a mesuré l'emporte sur celui qui a
   déduit**. La flotte ne remplace pas le gate déterministe.
 - **Documents vivants**, tenus à jour dans la **même PR** que le code : `HANDOVER.md` (état
-  courant, lu en premier), `BACKLOG.md` (coché au merge), `docs/LESSONS.md`, `docs/adr/`.
+  courant, lu en premier), les issues du dépôt (la preuve y est postée ; `BACKLOG.md` n'est qu'un renvoi), `docs/LESSONS.md`, `docs/adr/`.
   Doc périmée = pire que pas de doc.
 - **Boucle de leçons** : à chaque push, se demander « qu'ai-je appris ? ». Une leçon durable
   remonte en §9 ci-dessous, dans le même commit. Rien appris → le dire, jamais sauter en silence.

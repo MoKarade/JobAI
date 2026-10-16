@@ -32,7 +32,7 @@ demande au hub qui a le droit d'entrer (`lib/accesHub.ts`). Le premier lot réel
 de la veille est arrivé le 2026-07-31 (45 offres reçues, 40 ajoutées).
 
 L'état courant fait foi dans **[`HANDOVER.md`](./HANDOVER.md)** — à lire en premier, il est
-plus fin et plus à jour que ce README. Les tâches sont dans [`BACKLOG.md`](./BACKLOG.md),
+plus fin et plus à jour que ce README. Les tâches sont dans les [issues](https://github.com/MoKarade/JobAI/issues) (renvoi : [`BACKLOG.md`](./BACKLOG.md)),
 les décisions dans [`docs/adr/`](./docs/adr/).
 
 ## Ce qui est branché aujourd'hui
