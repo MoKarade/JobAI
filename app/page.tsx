@@ -14,6 +14,7 @@ import { lireEtat } from "@/lib/etat";
 import { CLE_RAYON, RAYON_DEFAUT_KM } from "@/lib/rayon";
 import { CLE_JOURNAL } from "@/lib/veilleComplete";
 import type { JournalVeille } from "@/lib/veille";
+import { signauxParEmployeur } from "@/lib/signauxEmployeur";
 import { fraicheursDuSuivi } from "@/lib/fraicheur";
 import { mesurerDistances } from "@/lib/actions";
 import { CLE_DISTANCES, DELAI_MESURE_AUTO_MS, reserverPasse } from "@/lib/synchro";
@@ -201,6 +202,7 @@ export default async function Accueil() {
           const relances = resumerRelances(offres, jour);
           const surveillance = aSurveiller(offres, jour);
           const fraicheurs = fraicheursDuSuivi(offres, journal, jour);
+          const signaux = signauxParEmployeur(offres, journal);
 
           return (
             <>
@@ -236,6 +238,7 @@ export default async function Accueil() {
                 rayonMaxKm={rayonMaxKm}
                 metiers={metiers}
                 fraicheurs={fraicheurs}
+                signaux={signaux}
               />
             </>
           );
