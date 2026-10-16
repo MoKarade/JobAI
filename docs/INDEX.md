@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-45 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+46 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -41,6 +41,7 @@
 - [ADR-0022 — L'identité d'un employeur devient la MÊME partout, et la carte cesse de lire en série](adr/0022-la-carte-cesse-de-reallouer-et-de-relire-en-serie.md) — `docs/adr/0022-la-carte-cesse-de-reallouer-et-de-relire-en-serie.md`
 - [ADR-0023 — Une table d'alias FERMÉE pour les employeurs déjà rencontrés](adr/0023-une-table-d-alias-fermee-pour-les-employeurs-deja-rencontres.md) — `docs/adr/0023-une-table-d-alias-fermee-pour-les-employeurs-deja-rencontres.md`
 - [ADR-0024 — La séniorité se lit aussi en toutes lettres](adr/0024-la-seniorite-se-lit-aussi-en-toutes-lettres.md) — `docs/adr/0024-la-seniorite-se-lit-aussi-en-toutes-lettres.md`
+- [ADR-0025 — Une seule façon de noter une offre](adr/0025-une-seule-facon-de-noter-une-offre.md) — `docs/adr/0025-une-seule-facon-de-noter-une-offre.md`
 - [Décisions d'architecture (ADR)](adr/README.md) — `docs/adr/README.md`
 
 ## docs/claude/
