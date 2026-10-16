@@ -64,6 +64,7 @@ async function appel(corps: unknown, accept = "application/json, text/event-stre
     lireResumeDistances: async () => ({ brut: null }),
     lireBareme: async () => null,
     diagnostiquerFlux: async () => ({ fin: "flux-termine" }),
+    sonderEmployeurs: async () => ({}),
   });
   await serveur.connect(t);
   const reponse = await t.handleRequest(
@@ -114,6 +115,7 @@ describe("le transport HTTP répond aux requêtes réelles", () => {
       "lire_offre",
       "modifier_suivi",
       "resume_suivi",
+      "sonde_employeurs",
     ]);
   });
 

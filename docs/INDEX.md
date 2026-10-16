@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-50 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+51 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -46,6 +46,7 @@
 - [ADR-0027 — Les années d'expérience se calculent depuis les dates du CV](adr/0027-les-annees-d-experience-se-calculent-depuis-les-dates.md) — `docs/adr/0027-les-annees-d-experience-se-calculent-depuis-les-dates.md`
 - [ADR-0028 — La revue du CV coche d'avance ce qui a une preuve](adr/0028-la-revue-du-cv-coche-d-avance-ce-qui-a-une-preuve.md) — `docs/adr/0028-la-revue-du-cv-coche-d-avance-ce-qui-a-une-preuve.md`
 - [ADR-0029 — Les signaux d'un employeur viennent du suivi, rien d'autre](adr/0029-les-signaux-d-un-employeur-viennent-du-suivi.md) — `docs/adr/0029-les-signaux-d-un-employeur-viennent-du-suivi.md`
+- [ADR-0030 — Les sources ouvertes sur les employeurs : ce qui est admis, et comment on les lit](adr/0030-sources-ouvertes-sur-les-employeurs.md) — `docs/adr/0030-sources-ouvertes-sur-les-employeurs.md`
 - [Décisions d'architecture (ADR)](adr/README.md) — `docs/adr/README.md`
 
 ## docs/claude/

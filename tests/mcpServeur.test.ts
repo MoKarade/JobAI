@@ -62,6 +62,7 @@ async function brancher(io: Partial<EntreesSorties> = {}) {
       exemplesRetenues: { noc2021: { "21301": ["Mechanical engineer"] } },
       professions: [],
     }),
+    sonderEmployeurs: async () => ({ employeursCherches: 2 }),
     ...io,
   });
   const client = new Client({ name: "test", version: "1.0.0" });
@@ -96,6 +97,7 @@ describe("la surface exposée à claude.ai", () => {
       "lire_offre",
       "modifier_suivi",
       "resume_suivi",
+      "sonde_employeurs",
     ]);
   });
 
@@ -110,7 +112,19 @@ describe("la surface exposée à claude.ai", () => {
     expect(parNom.get("diagnostic_flux")).toBe(true);
     expect(parNom.get("etat_synchro")).toBe(true);
     expect(parNom.get("diagnostic_bareme")).toBe(true);
+    expect(parNom.get("sonde_employeurs")).toBe(true);
     expect(parNom.get("modifier_suivi")).toBe(false);
+  });
+});
+
+describe("la sonde des employeurs", () => {
+  it("rend le rapport tel quel, et une base muette est une ERREUR, pas un rapport vide", async () => {
+    const { client } = await brancher();
+    expect(corps(await client.callTool({ name: "sonde_employeurs", arguments: {} })).employeursCherches).toBe(2);
+    const muet = await brancher({ sonderEmployeurs: async () => null });
+    const r = await muet.client.callTool({ name: "sonde_employeurs", arguments: {} });
+    expect(r.isError).toBe(true);
+    expect(String(corps(r).erreur)).toContain("pas pu regarder");
   });
 });
 
