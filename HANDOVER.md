@@ -25,7 +25,7 @@
 - **Ajout** : la sonde mesure aussi le registre **déjà importé en base** (`mesurerBase`, `lib/registreBase.ts`), sans réseau,
   avec les mêmes clés et variantes que le rattachement de `lib/actions.ts` ; bloc `base` de la réponse (uniques, ambigus,
   lignes en base). Limite : la base ne porte que la région de Québec.
-- **À confirmer** : lire `base` en production après déploiement, puis compléter la section « Mesure » de l'ADR-0030.
+- **Lu en production (17/10, après #180)** : `base` = 608 employeurs retrouvés sur 6 040 (10,1 %), 567 uniques, 41 ambigus. Section « Mesure » de l'ADR-0030 complétée.
 
 ## 2026-10-16 — JobAI#159 : les signaux d'un employeur, depuis le suivi (ADR-0029)
 
