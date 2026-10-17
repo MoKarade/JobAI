@@ -32,7 +32,7 @@
 import { Readable } from "node:stream";
 import { createInflateRaw } from "node:zlib";
 import { cleGroupement, normaliserNomEmployeur } from "../employeurs";
-import { decouperCsv, indicesColonnes, retirerBom } from "../registre";
+import { clesDeRecherche, decouperCsv, indicesColonnes, retirerBom } from "../registre";
 import type { Offre } from "../types";
 
 const URL_REQ_ZIP =
@@ -497,6 +497,85 @@ export async function mesurerSalaires(fetchFn: Fetch, population: Population): P
     const delai = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
     return { ...base, fin: delai ? "temps-ecoule" : "injoignable", detail: delai ? "délai dépassé" : "réseau ou JSON illisible" };
   }
+}
+
+// ── Le registre déjà en base ────────────────────────────────────────────────
+//
+// Le registre des entreprises est DÉJÀ en base (`registre_noms`, `registre_etablissements`, importés
+// depuis le poste de Marc) : le serveur déployé n'a donc pas besoin de le lire en ligne, ce que
+// Cloudflare lui refuse (HTTP 403 constaté en production le 17/10/2026). Cette mesure ne fait que
+// COMPTER, avec la même clé et les mêmes variantes que `lib/actions.ts` (`clesDeRecherche`) :
+// aucun nom d'entreprise ne sort. Limite dite : la base ne porte que les entités de la région de
+// Québec, un employeur d'ailleurs y est donc « introuvable » sans que ce soit une absence du REQ.
+
+/** Pour chaque clé trouvée en base, combien de NEQ distincts la portent (0 = absente de la Map). */
+export type LireClesRegistre = (cles: readonly string[]) => Promise<ReadonlyMap<string, number>>;
+
+export interface MesureBase {
+  source: "base";
+  fin: FinMesure;
+  detail: string;
+  employeursCherches: number;
+  retrouves: number;
+  /** Retrouvés sous exactement UN NEQ (le rattachement le moins douteux). */
+  uniques: number;
+  /** Retrouvés sous PLUSIEURS NEQ : un homonyme est possible, on ne tranche pas. */
+  ambigus: number;
+  tauxPct: number | null;
+}
+
+/** Le nom, tel qu'écrit sur la première offre, de chaque employeur distinct (même clé que la liste). */
+function employeursNommes(offres: readonly Offre[]): string[] {
+  const noms = new Map<string, string>();
+  for (const o of offres) {
+    if (o.histo) continue;
+    const cle = cleGroupement(o.entreprise, o.id);
+    if (cle.startsWith("\u0000") || noms.has(cle)) continue;
+    noms.set(cle, o.entreprise);
+  }
+  return [...noms.values()];
+}
+
+/** Quelle part des employeurs suivis se retrouve dans le registre en base ? Ne lève pas. */
+export async function mesurerBase(offres: readonly Offre[], lireCles: LireClesRegistre): Promise<MesureBase> {
+  const noms = employeursNommes(offres);
+  const base: MesureBase = {
+    source: "base",
+    fin: "termine",
+    detail: "registre lu en base",
+    employeursCherches: noms.length,
+    retrouves: 0,
+    uniques: 0,
+    ambigus: 0,
+    tauxPct: null,
+  };
+  const variantes = noms.map((nom) => clesDeRecherche(nom));
+  const cles = [...new Set(variantes.flat())];
+  if (cles.length === 0) return { ...base, detail: "aucun employeur nommé" };
+
+  let trouvees: ReadonlyMap<string, number>;
+  try {
+    trouvees = await lireCles(cles);
+  } catch {
+    return { ...base, fin: "injoignable", detail: "base illisible" };
+  }
+
+  let retrouves = 0;
+  let uniques = 0;
+  for (const v of variantes) {
+    // La PREMIÈRE variante qui donne quelque chose gagne, comme à l'écriture des adresses.
+    const n = v.map((c) => trouvees.get(c) ?? 0).find((x) => x > 0);
+    if (n === undefined) continue;
+    retrouves++;
+    if (n === 1) uniques++;
+  }
+  return {
+    ...base,
+    retrouves,
+    uniques,
+    ambigus: retrouves - uniques,
+    tauxPct: pourcent(retrouves, noms.length),
+  };
 }
 
 // ── L'ensemble ──────────────────────────────────────────────────────────────

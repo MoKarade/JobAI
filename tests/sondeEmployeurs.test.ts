@@ -11,6 +11,7 @@ import {
   lireFinZip,
   lireLigneNom,
   lireRena,
+  mesurerBase,
   lireRepertoireZip,
   mesurerRena,
   mesurerReq,
@@ -20,6 +21,7 @@ import {
   sonderEmployeurs,
   type Fetch,
 } from "@/lib/ingest/sondeEmployeurs";
+import { clesDeRecherche } from "@/lib/registre";
 import type { Offre } from "@/lib/types";
 
 function offre(id: string, entreprise: string, reste: Partial<Offre> = {}): Offre {
@@ -239,6 +241,75 @@ describe("rattachement au registre des entreprises", () => {
     expect((await mesurerReq(serveurDePlages(sansNom), populationDe(OFFRES), 30_000)).fin).toBe("format-inattendu");
     const mauvais = fabriquerZip([{ nom: "Nom.csv", contenu: "A,B\n1,2\n" }]);
     expect((await mesurerReq(serveurDePlages(mauvais), populationDe(OFFRES), 30_000)).fin).toBe("format-inattendu");
+  });
+});
+
+describe("rattachement au registre déjà en base", () => {
+  const offres = [
+    offre("1", "Alpha Inc."),
+    offre("2", "Alpha Inc."), // même employeur : compté une fois
+    offre("3", "Bêta (Québec) inc."),
+    offre("4", "Gamma ltée"),
+    offre("5", "Delta SENC"),
+    offre("6", ""), // sans nom : jamais un employeur
+    offre("7", "Epsilon inc.", { histo: true }), // hors liste suivie
+  ];
+
+  /** Une fausse base : on lui donne les clés EXACTES calculées par l'application. */
+  function base(par: Record<string, number>) {
+    return async (cles: readonly string[]) => {
+      const m = new Map<string, number>();
+      for (const c of cles) if (par[c] !== undefined) m.set(c, par[c]);
+      return m as ReadonlyMap<string, number>;
+    };
+  }
+
+  it("compte uniques, ambigus et absents, un employeur une seule fois", async () => {
+    const cles = (n: string) => clesDeRecherche(n);
+    const lire = base({
+      [cles("Alpha Inc.")[0]!]: 1,
+      [cles("Gamma ltée")[0]!]: 3,
+    });
+    const r = await mesurerBase(offres, lire);
+    expect(r.fin).toBe("termine");
+    expect(r.employeursCherches).toBe(4);
+    expect(r.retrouves).toBe(2);
+    expect(r.uniques).toBe(1);
+    expect(r.ambigus).toBe(1);
+    expect(r.tauxPct).toBe(50);
+  });
+
+  it("retombe sur la variante sans parenthèse", async () => {
+    const variantes = clesDeRecherche("Bêta (Québec) inc.");
+    expect(variantes.length).toBeGreaterThan(1);
+    const r = await mesurerBase(offres, base({ [variantes[variantes.length - 1]!]: 1 }));
+    expect(r.retrouves).toBe(1);
+    expect(r.uniques).toBe(1);
+  });
+
+  it("ne lève pas : une base illisible rend « injoignable » sans taux", async () => {
+    const r = await mesurerBase(offres, async () => {
+      throw new Error("base coupée");
+    });
+    expect(r.fin).toBe("injoignable");
+    expect(r.tauxPct).toBeNull();
+    expect(r.retrouves).toBe(0);
+  });
+
+  it("aucun employeur nommé : pas de taux, pas d'appel à la base", async () => {
+    let appels = 0;
+    const r = await mesurerBase([offre("9", "")], async () => {
+      appels++;
+      return new Map();
+    });
+    expect(appels).toBe(0);
+    expect(r.employeursCherches).toBe(0);
+    expect(r.tauxPct).toBeNull();
+  });
+
+  it("ne rend aucun nom d'entreprise", async () => {
+    const r = await mesurerBase(offres, base({}));
+    expect(JSON.stringify(r)).not.toMatch(/Alpha|Gamma|Delta|Bêta/);
   });
 });
 
