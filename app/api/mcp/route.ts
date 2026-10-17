@@ -22,7 +22,8 @@ import { db } from "@/lib/db";
 import { offers, syncState } from "@/lib/db/schema";
 import { lireOffres } from "@/lib/donnees";
 import { BUDGET_MS_MCP, diagnostiquerFlux } from "@/lib/ingest/diagnosticFlux";
-import { sonderEmployeurs } from "@/lib/ingest/sondeEmployeurs";
+import { mesurerBase, sonderEmployeurs } from "@/lib/ingest/sondeEmployeurs";
+import { compterRegistre, lireClesRegistre } from "@/lib/registreBase";
 import { creerServeur } from "@/lib/mcp/serveur";
 import { lireEtat, lireEtatBrut } from "@/lib/etat";
 import { CLE_RESUME_DISTANCES } from "@/lib/resumePasse";
@@ -151,7 +152,11 @@ export async function POST(requete: Request): Promise<Response> {
     // sonde (45 s) tient sous le mur de 60 s de cette route.
     sonderEmployeurs: async () => {
       const offres = await lireOffres();
-      return offres === null ? null : { ...(await sonderEmployeurs(offres, fetch)) };
+      if (offres === null) return null;
+      // Le registre déjà en base d'abord (rapide), puis les sources en ligne (budget de 45 s).
+      const base = await mesurerBase(offres, lireClesRegistre);
+      const lignes = await compterRegistre().catch(() => null);
+      return { base: { ...base, lignesEnBase: lignes }, ...(await sonderEmployeurs(offres, fetch)) };
     },
     // ⚠️ DÉGRADE, NE LÈVE PAS. Le journal sert à NUANCER le résumé ; s'il est illisible, le
     // suivi doit rester lisible — avec un bloc `veille` qui dit zéro confirmée, ce qui est
