@@ -105,8 +105,21 @@ Sensibilité au salaire, une offre type du seed (note 68 au barème d'origine, 6
 de 0). Mais sans salaire affiché — 99 % des offres — une offre type perd 4 points, et le palier B (≥ 65) ne s'atteint plus
 qu'avec un salaire lu d'environ 70 000 $ ou plus : sur le seed, les huit offres calculées en B passent toutes en C.
 C'est la conséquence arithmétique de R1, pas un bug : elle est à valider par Marc sur l'aperçu avant d'appliquer.
-**Production** : à mesurer avec `diagnostic_bareme` + `apercu: true` une fois cette PR déployée, et à reporter ici
-(chiffres agrégés seulement : le dépôt est public).
+**Production** (`diagnostic_bareme`, 17/10/2026 après le déploiement de #184, agrégats seulement) :
+
+- Le profil enregistré (v7, issu d'un CV) porte un poids de salaire de **15**, pas 10 : la somme de ses poids fait 105
+  (le défaut d'origine avait remis le salaire à 10 pour financer les conditions ; le document enregistré avait gardé
+  15). La mise à l'échelle part des poids RÉELS du profil (32 / 15 pour le salaire) et le ramène à 100.
+- 6 519 offres ouvertes, toutes à note calculée (aucune manuelle), dont 73 avec un salaire affiché. 6 196 sont
+  hors des métiers retenus.
+- Les notes enregistrées (moyenne 46, maximum 77) ne sont pas celles que le barème actuel donne aujourd'hui avec le code de
+  profession et les métiers (moyenne 26,1) : **6 191 offres sur 6 519 diffèrent** (écart moyen −20,9). C'est l'héritage
+  des anciens régimes de notation (ADR-0025), pas du nouveau barème : appliquer ce barème re-note TOUT avec la méthode
+  unique, donc ces offres baisseront aussi. L'aperçu sépare les deux (`ecartMoyenBaremeSeul` = nouveau barème contre
+  recalcul actuel ; `/profil` l'affiche à part).
+- L'aperçu lui-même (`apercu: true`) n'a pas pu être lu depuis la session de travail : le schéma d'outil du connecteur y
+  est resté celui d'avant le déploiement, et il envoie le paramètre sous forme de texte. Il se lit sur `/profil` ou
+  depuis une session de connecteur neuve.
 
 ## Alternatives rejetées
 
