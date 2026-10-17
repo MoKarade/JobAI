@@ -157,6 +157,20 @@ function SectionNouveauBareme({ apercu, sansCv, plafond }: { apercu: ApercuBarem
               <dd>
                 {m.montent}, {m.baissent}, {m.inchangees}
               </dd>
+            </div>            <div>
+              <dt>Écart moyen dû au nouveau barème seul</dt>
+              <dd>
+                {m.ecartMoyenBaremeSeul === null ? "—" : signe(m.ecartMoyenBaremeSeul)} point
+                {Math.abs(m.ecartMoyenBaremeSeul ?? 0) >= 2 ? "s" : ""}
+              </dd>
+            </div>
+            <div>
+              <dt>Notes déjà différentes du barème actuel (anciens régimes)</dt>
+              <dd>
+                {apercu.population.calculees - apercu.population.avantEgalAncien} sur{" "}
+                {apercu.population.calculees} : elles seront aussi remises d’aplomb, ce qui explique
+                une partie des mouvements ci-dessus
+              </dd>
             </div>
           </dl>
           {apercu.exemples.montent.length > 0 ? (
