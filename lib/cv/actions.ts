@@ -12,7 +12,7 @@
 // qui ne dit rien laisse Marc recommencer avec le même fichier.
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { db } from "../db";
 import { offers } from "../db/schema";
 import { exigerSession } from "../session";
@@ -22,6 +22,7 @@ import { extraireTexte, TAILLE_MAX_OCTETS } from "./texte";
 import { extraireFaits } from "./extraction";
 import {
   activerProfil,
+  cvActifId,
   enregistrerCv,
   lireContenuPourAnalyse,
   majExtraction,
@@ -31,7 +32,8 @@ import {
 } from "./depot";
 import { aujourdhui as jourDansLeFuseau } from "../ajout";
 import { appliquerEcarts, calculerEcarts } from "./proposition";
-import { planifierRenotation, resumerPlan } from "./renotation";
+import { planifierRenotation, resumerPlan, type PlanRenotation } from "./renotation";
+import { appliquerNouveauBareme, dejaApplique } from "../nouveauBareme";
 
 export type Resultat<T = undefined> =
   | ({ ok: true } & (T extends undefined ? { message?: string } : { valeur: T; message?: string }))
@@ -189,26 +191,7 @@ export async function validerProfil(
 
   // Les notes ensuite : si l'activation échoue, aucune note n'aura bougé. L'inverse
   // laisserait des notes calculées par un profil que la base ne connaît pas.
-  //
-  // ⚠️ CETTE BOUCLE N'EST PAS ATOMIQUE, et elle ne peut pas l'être : le driver `neon-http`
-  // n'a pas de transaction. Chaque UPDATE est un aller-retour réseau ; une coupure au
-  // quinzième laisserait un lot mi-ancien mi-nouveau. On ne peut pas l'empêcher — on peut
-  // refuser que ça passe inaperçu. D'où : chaque note porte la version de profil qui l'a
-  // produite (`scoreProfilVersion`), le compte des échecs est REMONTÉ à l'écran, et le
-  // remède est dit. Relancer la validation est sans danger : le plan est déterministe, les
-  // offres déjà à jour ressortiront simplement « inchangées ».
-  let echecs = 0;
-  for (const c of plan.changements) {
-    try {
-      await db
-        .update(offers)
-        .set({ score: c.apres, scoreProfilVersion: nouveau.version })
-        .where(eq(offers.id, c.id));
-    } catch (e) {
-      echecs++;
-      console.error(`[cv] note non écrite pour ${c.id}`, e);
-    }
-  }
+  const echecs = await ecrireNotes(plan, nouveau.version);
 
   revalidatePath("/");
   revalidatePath("/profil");
@@ -226,6 +209,132 @@ export async function validerProfil(
   }
 
   return { ok: true, valeur: { resume: resumerPlan(plan) }, message: "Profil appliqué." };
+}
+
+/**
+ * Écrit les notes d'un plan, une par une. Rend le nombre d'échecs.
+ *
+ * ⚠️ CETTE BOUCLE N'EST PAS ATOMIQUE, et elle ne peut pas l'être : le driver `neon-http`
+ * n'a pas de transaction. Chaque UPDATE est un aller-retour réseau ; une coupure au
+ * quinzième laisserait un lot mi-ancien mi-nouveau. On ne peut pas l'empêcher — on peut
+ * refuser que ça passe inaperçu. D'où : chaque note porte la version de profil qui l'a
+ * produite (`scoreProfilVersion`), le compte des échecs est REMONTÉ à l'écran, et le
+ * remède est dit. Relancer est sans danger : le plan est déterministe, les offres déjà à
+ * jour ressortiront simplement « inchangées ».
+ */
+/** Identifiants par UPDATE : assez petit pour une requête raisonnable, assez grand pour ~100 lots. */
+const TAILLE_LOT = 500;
+
+async function ecrireNotes(plan: PlanRenotation, version: number): Promise<number> {
+  // ⚠️ PAR LOTS, PAS UNE REQUÊTE PAR OFFRE : un barème qui déplace presque toutes les notes de ~8 600
+  // offres ferait ~8 600 allers-retours `neon-http` dans une Server Action au temps borné. Les offres
+  // qui reçoivent la MÊME note partagent un UPDATE (au plus une centaine de valeurs), découpé par
+  // paquets de `TAILLE_LOT` identifiants. Un lot qui échoue compte tous ses identifiants en échec.
+  const parNote = new Map<number, string[]>();
+  for (const c of plan.changements) {
+    const ids = parNote.get(c.apres);
+    if (ids) ids.push(c.id);
+    else parNote.set(c.apres, [c.id]);
+  }
+  let echecs = 0;
+  for (const [note, ids] of parNote) {
+    for (let i = 0; i < ids.length; i += TAILLE_LOT) {
+      const lot = ids.slice(i, i + TAILLE_LOT);
+      try {
+        await db
+          .update(offers)
+          .set({ score: note, scoreProfilVersion: version })
+          .where(inArray(offers.id, lot));
+      } catch (e) {
+        echecs += lot.length;
+        console.error(`[cv] ${lot.length} note(s) non écrite(s) (lot à ${note})`, e);
+      }
+    }
+  }
+  return echecs;
+}
+
+/**
+ * Applique le nouveau barème (ADR-0032, JobAI#152) : le salaire passe en premier dans la note.
+ *
+ * ⚠️ UN GESTE DE MARC, APRÈS L'APERÇU. Le bouton de `/profil` affiche l'écart avant de proposer
+ * d'appliquer ; cette action ne le recalcule pas pour décider, elle recalcule pour ÉCRIRE. Elle
+ * repart du profil ACTIF (ses paliers de séniorité sont ceux de son CV), le met à l'échelle des
+ * nouveaux poids, l'active avec une version de plus, puis re-note — sans jamais toucher une note
+ * manuelle (`planifierRenotation`).
+ */
+export async function appliquerBaremeSalaire(): Promise<Resultat<{ resume: string }>> {
+  const refus = await session();
+  if (refus) return { ok: false, erreur: refus };
+
+  let courant;
+  try {
+    courant = await profilActif();
+  } catch (e) {
+    return { ok: false, erreur: `Profil actif illisible : ${(e as Error).message}` };
+  }
+  // ⚠️ UN PROFIL DÉJÀ APPLIQUÉ N'ARRÊTE PAS L'ACTION : c'est le chemin de la relance. L'écriture des
+  // notes n'est pas atomique (voir `ecrireNotes`) ; après une coupure, le profil est écrit et des
+  // notes ne suivent pas. Relancer recalcule le plan sur ce profil, saute l'activation et n'écrit
+  // que ce qui diffère — sans quoi « Relance » rendrait un succès sans rien réparer.
+  const dejaEnPlace = dejaApplique(courant);
+
+  let id: number | null = null;
+  if (!dejaEnPlace) {
+    try {
+      id = await cvActifId();
+    } catch (e) {
+      return { ok: false, erreur: `CV actif illisible : ${(e as Error).message}` };
+    }
+    if (id === null) {
+      return {
+        ok: false,
+        erreur:
+          "Aucun CV actif : le barème en vigueur est celui du code. Valide d'abord un CV ; si une " +
+          "activation précédente a été interrompue, revalide-le depuis la liste des CV.",
+      };
+    }
+  }
+
+  let metiers: string[];
+  let offres;
+  try {
+    metiers = await lireMetiers();
+    offres = (await lireOffres()) ?? [];
+  } catch (e) {
+    return { ok: false, erreur: `Offres ou métiers illisibles : ${(e as Error).message}` };
+  }
+  const nouveau = appliquerNouveauBareme(courant, aujourdhui());
+  const plan = planifierRenotation(offres, { profil: nouveau, metiers });
+
+  if (id !== null) {
+    try {
+      await activerProfil(id, nouveau);
+    } catch (e) {
+      return { ok: false, erreur: (e as Error).message };
+    }
+  }
+  const echecs = await ecrireNotes(plan, nouveau.version);
+
+  revalidatePath("/");
+  revalidatePath("/profil");
+  revalidatePath("/references");
+
+  if (echecs > 0) {
+    return {
+      ok: false,
+      erreur:
+        `Barème appliqué, mais ${echecs} note${echecs > 1 ? "s" : ""} sur ` +
+        `${plan.changements.length} n'${echecs > 1 ? "ont" : "a"} pas pu être recalculée${
+          echecs > 1 ? "s" : ""
+        }. Relance : le bouton reste là tant que des notes ne suivent pas le barème, et ce qui est déjà à jour n'est pas retouché.`,
+    };
+  }
+  return {
+    ok: true,
+    valeur: { resume: resumerPlan(plan) },
+    message: dejaEnPlace ? "Notes remises d'aplomb." : "Nouveau barème appliqué.",
+  };
 }
 
 /** Supprime un CV et son fichier. */

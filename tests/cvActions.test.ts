@@ -37,6 +37,7 @@ vi.mock("@/lib/session", () => ({
   },
 }));
 vi.mock("@/lib/donnees", () => ({ lireOffres: async () => [] }));
+vi.mock("@/lib/actionsMetiers", () => ({ lireMetiers: async () => [] }));
 vi.mock("@/lib/db", () => ({ db: { update: () => ({ set: () => ({ where: async () => {} }) }) } }));
 vi.mock("@/lib/cv/texte", async () => {
   const reel = await vi.importActual<typeof import("@/lib/cv/texte")>("@/lib/cv/texte");
@@ -64,7 +65,7 @@ vi.mock("@/lib/cv/depot", () => ({
   profilActif: async () => {
     appels.push("profilActif");
     const { PROFIL_DEFAUT } = await import("@/lib/profil");
-    return PROFIL_DEFAUT;
+    return profilRendu ?? PROFIL_DEFAUT;
   },
   propositionDe: async () => {
     appels.push("propositionDe");
@@ -73,11 +74,20 @@ vi.mock("@/lib/cv/depot", () => ({
   activerProfil: async () => {
     appels.push("activerProfil");
   },
+  cvActifId: async () => {
+    appels.push("cvActifId");
+    return cvActif;
+  },
 }));
 
 let propositionRendue: unknown = null;
+let cvActif: number | null = 3;
+/** Le profil que `profilActif` rend ; `null` = le défaut. */
+let profilRendu: unknown = null;
 
-const { televerserCv, reanalyserCv, validerProfil, retirerCv } = await import("@/lib/cv/actions");
+const { televerserCv, reanalyserCv, validerProfil, retirerCv, appliquerBaremeSalaire } = await import(
+  "@/lib/cv/actions"
+);
 
 /** Un `FormData` porteur d'un fichier, comme le formulaire l'envoie. */
 function formulaire(octets: number, nom = "cv.pdf"): FormData {
@@ -91,11 +101,13 @@ beforeEach(() => {
   lecture = { ok: true, texte: "Coordonnateur de projets. ".repeat(20) };
   faits = { ok: true, brut: {} };
   propositionRendue = null;
+  cvActif = 3;
+  profilRendu = null;
   appels.length = 0;
 });
 
 describe("la session — une promesse écrite en commentaire, désormais tenue par un test", () => {
-  it("LES QUATRE actions refusent, et AUCUNE ne touche au dépôt avant de refuser", async () => {
+  it("LES CINQ actions refusent, et AUCUNE ne touche au dépôt avant de refuser", async () => {
     // ⚠️ Les deux moitiés comptent. Un refus qui arrive APRÈS l'écriture serait un refus
     // décoratif : le fichier serait déjà stocké, le CV déjà supprimé. C'est pour ça que
     // l'assertion porte aussi sur `appels`, et pas seulement sur la valeur rendue.
@@ -106,6 +118,7 @@ describe("la session — une promesse écrite en commentaire, désormais tenue p
       await reanalyserCv(1),
       await validerProfil(1, []),
       await retirerCv(1),
+      await appliquerBaremeSalaire(),
     ]) {
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.erreur).toBe("Authentification requise.");
@@ -178,5 +191,33 @@ describe("retirerCv", () => {
     const r = await retirerCv(42);
     expect(r.ok).toBe(true);
     expect(appels).toEqual(["supprimerCv(42)"]);
+  });
+});
+
+describe("appliquerBaremeSalaire — l'application et sa relance", () => {
+  it("sans CV actif : une erreur claire, et rien n'est activé", async () => {
+    cvActif = null;
+    const r = await appliquerBaremeSalaire();
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erreur).toContain("Aucun CV actif");
+    expect(appels).not.toContain("activerProfil");
+  });
+
+  it("premier appel : le profil est activé", async () => {
+    const r = await appliquerBaremeSalaire();
+    if (!r.ok) throw new Error(r.erreur);
+    expect(appels).toContain("activerProfil");
+  });
+
+  it("relance sur un profil déjà appliqué : pas de nouvelle activation, mais un vrai succès", async () => {
+    // ⚠️ C'est le chemin qui répare une coupure en cours d'écriture : il ne doit ni réactiver le profil
+    // ni répondre « déjà fait » sans avoir regardé les notes.
+    const { PROFIL_DEFAUT } = await import("@/lib/profil");
+    const { appliquerNouveauBareme } = await import("@/lib/nouveauBareme");
+    profilRendu = appliquerNouveauBareme(PROFIL_DEFAUT, "2026-10-17");
+    const r = await appliquerBaremeSalaire();
+    expect(r.ok).toBe(true);
+    expect(appels).not.toContain("activerProfil");
+    expect(appels).not.toContain("cvActifId");
   });
 });

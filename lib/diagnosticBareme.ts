@@ -128,11 +128,11 @@ export interface DiagnosticBareme {
   meilleures: OffreMesuree[];
 }
 
-function arrondi(x: number): number {
+export function arrondi(x: number): number {
   return Math.round(x * 10) / 10;
 }
 
-function distribution(notes: readonly number[]): DistributionNotes {
+export function distribution(notes: readonly number[]): DistributionNotes {
   const tranches: Record<string, number> = {};
   for (const t of TRANCHES) tranches[t.etiquette] = 0;
   for (const n of notes) {

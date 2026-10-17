@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-10-17 — JobAI#152 : le salaire passe en premier dans la note, après un aperçu (ADR-0032)
+
+- **Avant** : poids rôle 40, distance 20, séniorité 15, salaire 10, statut migratoire 10, conditions 5 ; l'axe du salaire
+  était inerte (aucun montant passé à la note).
+- **Fait (rien n'est encore appliqué en production)** : `lib/nouveauBareme.ts` (poids salaire 32, rôle 28, distance 20,
+  séniorité 10, immigration 5, conditions 5 ; chaque table de points mise à l'échelle, seuils intacts) ;
+  `lib/apercuBareme.ts` (notes avant/après, paliers A/B/C, trois offres qui montent et deux qui descendent) servi par
+  `diagnostic_bareme` avec `apercu: true` et affiché sur `/profil` ; bouton « Appliquer le nouveau barème »
+  (`appliquerBaremeSalaire`, `lib/cv/actions.ts`) qui écrit le profil (version + 1) et re-note, notes manuelles
+  intactes. Nouveau champ de profil `salaireDansLaNote` (faux tant que Marc n'a pas appliqué : le code déployé note
+  comme avant). Deux couplages d'échelle corrigés : `plancherFitRole` (ingestion) et `paliersSenioriteDepuisAnnees`
+  (validation de CV).
+- **Effet à connaître (audit du seed, ADR-0032)** : sans salaire affiché une offre type perd 4 points ; le palier B
+  (≥ 65) demande alors un salaire lu d'environ 70 000 $. Levier si Marc le juge trop fort : `salaireNonAffiche` ou les
+  seuils A/B.
+- **À faire par Marc** : ouvrir `/profil`, relire l'aperçu (ou le demander via le connecteur), valider cinq offres
+  exemples, puis appuyer sur le bouton. Preuve : version du profil lue en production après l'application.
+
 ## 2026-10-16 — JobAI#145 : contrat hub v1.5.0 (zod 4)
 
 - **Avant** : `@mokarade/hub-contract` épinglé `v1.4.0`, dont zod 3 était installé en double à côté du zod 4 de l'app.

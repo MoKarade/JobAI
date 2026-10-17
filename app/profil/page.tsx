@@ -13,14 +13,22 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Cadre } from "@/components/Cadre";
 import { RevueProfil } from "@/components/RevueProfil";
+import { AppliquerBareme } from "@/components/AppliquerBareme";
 import { ReanalyseCv } from "@/components/ReanalyseCv";
 import { TeleversementCv } from "@/components/TeleversementCv";
 import { listerCvs, profilActif, propositionDe } from "@/lib/cv/depot";
+import { apercuNouveauBareme, type ApercuBareme, type ExempleApercu } from "@/lib/apercuBareme";
+import { lireOffres } from "@/lib/donnees";
+import { lireMetiers } from "@/lib/actionsMetiers";
+import { aujourdhui } from "@/lib/ajout";
 import { calculerEcarts } from "@/lib/cv/proposition";
 import { PROFIL_DEFAUT } from "@/lib/profil";
 import { dateLisible } from "@/lib/dateLisible";
 
 export const metadata = { title: "Profil — JobAI" };
+
+// L'aperçu lit tout le suivi et note chaque offre deux fois (ADR-0032) : même borne que l'accueil.
+export const maxDuration = 60;
 
 /** Un poids de fichier lisible. « 214 ko » se compare, « 219136 » se déchiffre. */
 function poids(octets: number): string {
@@ -60,6 +68,133 @@ function ListeEtiquettes({ titre, valeurs }: { titre: string; valeurs: readonly 
   );
 }
 
+/** Un écart signé, avec le vrai signe moins. */
+function signe(n: number): string {
+  return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : "0";
+}
+
+function LigneExemple({ e }: { e: ExempleApercu }) {
+  return (
+    <li>
+      <strong>{e.entreprise}</strong> — {e.poste} : de {e.avant} à {e.apres} ({signe(e.ecart)})
+      {e.salaireAnnuel !== null ? ` · salaire lu ${e.salaireAnnuel.toLocaleString("fr-CA")} $/an` : ""}
+    </li>
+  );
+}
+
+/**
+ * Ce que le nouveau barème ferait aux notes, avant que Marc l'applique (ADR-0032).
+ *
+ * ⚠️ UNE LECTURE : rien n'est écrit tant que le bouton n'est pas pressé. `avant` est la note
+ * enregistrée — celle qu'il voit aujourd'hui —, pas un recalcul.
+ *
+ * ⚠️ UNE SEULE `<section>` ET `AppliquerBareme` À LA MÊME PLACE dans les deux états : l'action
+ * revalide la page, qui passe de « aperçu » à « appliqué ». Un composant démonté à ce moment
+ * perdrait son message de résultat. Le bouton reste tant qu'il y a quelque chose à faire — y
+ * compris des notes qui ne suivent pas un barème déjà écrit, après une coupure en cours de route.
+ */
+function SectionNouveauBareme({ apercu, sansCv, plafond }: { apercu: ApercuBareme; sansCv: boolean; plafond: number }) {
+  const p = apercu.poids;
+  const d = apercu.distribution;
+  const m = apercu.mouvement;
+  const enRetard = m.montent + m.baissent;
+  const reste = !apercu.dejaApplique || enRetard > 0;
+  return (
+    <section className="carte-info">
+      <h2>{apercu.dejaApplique ? "Nouveau barème" : "Nouveau barème : le salaire en premier"}</h2>
+      {apercu.dejaApplique ? (
+        <p className="profil__aide">
+          Appliqué : le salaire pèse {p.avant.salaire} points sur 100 et entre dans la note quand
+          l’offre l’affiche. Version {apercu.versionActuelle} du profil.
+          {enRetard > 0
+            ? ` ${enRetard} note${enRetard > 1 ? "s ne suivent" : " ne suit"} pas encore ce barème : relance l’application.`
+            : ""}
+        </p>
+      ) : (
+        <>
+          <p className="profil__aide">
+            Aperçu, rien n’est modifié. Salaire : de {p.avant.salaire} à {p.apres.salaire} points ;
+            rôle : de {p.avant.fitRole} à {p.apres.fitRole} ; expérience exigée : de{" "}
+            {p.avant.seniorite} à {p.apres.seniorite} ; statut migratoire : de {p.avant.immigration}{" "}
+            à {p.apres.immigration}. Tes notes manuelles ({apercu.population.manuellesPreservees})
+            ne bougent jamais.
+          </p>
+          <dl className="profil__faits">
+            <div>
+              <dt>Notes calculées mesurées (offres ouvertes)</dt>
+              <dd>
+                {apercu.population.calculees}, dont {apercu.population.avecSalaireAnnuel} avec un
+                salaire lu. {apercu.population.autresRenotees} offres historiques ou périmées seront
+                aussi recalculées, sans figurer dans les chiffres ci-dessous.
+              </dd>
+            </div>
+            <div>
+              <dt>Note moyenne</dt>
+              <dd>
+                De {d.avant.moyenne ?? "—"} à {d.apres.moyenne ?? "—"}
+              </dd>
+            </div>
+            <div>
+              <dt>Offres arrêtées au plafond de {plafond}, avant puis après</dt>
+              <dd>
+                {apercu.auPlafond.avant}, puis {apercu.auPlafond.apres}
+              </dd>
+            </div>
+            <div>
+              <dt>Offres par palier, avant</dt>
+              <dd>
+                A {apercu.paliers.avant.A}, B {apercu.paliers.avant.B}, C {apercu.paliers.avant.C}
+              </dd>
+            </div>
+            <div>
+              <dt>Offres par palier, après</dt>
+              <dd>
+                A {apercu.paliers.apres.A}, B {apercu.paliers.apres.B}, C {apercu.paliers.apres.C}
+              </dd>
+            </div>
+            <div>
+              <dt>Notes qui montent, baissent, ne bougent pas</dt>
+              <dd>
+                {m.montent}, {m.baissent}, {m.inchangees}
+              </dd>
+            </div>
+          </dl>
+          {apercu.exemples.montent.length > 0 ? (
+            <div className="profil__groupe">
+              <h3 className="profil__groupe-titre">Offres dont la note monte</h3>
+              <ul>
+                {apercu.exemples.montent.map((e) => (
+                  <LigneExemple key={e.id} e={e} />
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {apercu.exemples.descendent.length > 0 ? (
+            <div className="profil__groupe">
+              <h3 className="profil__groupe-titre">Offres dont la note baisse</h3>
+              <ul>
+                {apercu.exemples.descendent.map((e) => (
+                  <LigneExemple key={e.id} e={e} />
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </>
+      )}
+      {sansCv && !apercu.dejaApplique ? (
+        <p className="profil__aide">
+          Pour appliquer ce barème, valide d’abord un CV : sans CV actif, le barème en vigueur est
+          celui du code et il n’y a pas de profil à réécrire.
+        </p>
+      ) : null}
+      <AppliquerBareme
+        reste={reste && !sansCv}
+        libelle={apercu.dejaApplique ? "Relancer l’application" : "Appliquer le nouveau barème"}
+      />
+    </section>
+  );
+}
+
 export default async function Profil() {
   const session = await auth();
   if (!session) redirect("/connexion");
@@ -88,6 +223,21 @@ export default async function Profil() {
     erreurProfil = (e as Error).message;
     // Le détail reste dans les journaux du serveur ; l'écran n'affiche qu'une phrase simple.
     console.error("[profil] profil enregistré illisible :", erreurProfil);
+  }
+
+  // L'aperçu du nouveau barème (ADR-0032). Absent, il se dit par son absence : une panne de lecture
+  // ne doit pas faire croire qu'il n'y a rien à appliquer — et ne doit pas casser la page.
+  let apercu: ApercuBareme | null = null;
+  let apercuIndisponible = erreurProfil !== null;
+  if (erreurProfil === null) {
+    try {
+      const [offres, metiers] = await Promise.all([lireOffres(), lireMetiers()]);
+      if (offres === null) apercuIndisponible = true;
+      else apercu = apercuNouveauBareme(offres, profil, metiers, aujourdhui(new Date()));
+    } catch (e) {
+      console.error("[profil] aperçu du nouveau barème impossible :", e);
+      apercuIndisponible = true;
+    }
   }
 
   // Le CV le plus récent qui porte une proposition : c'est celui qu'on donne à relire.
@@ -226,6 +376,17 @@ export default async function Profil() {
           · version {profil.version} · établi le {profil.etabliLe}
         </p>
       </section>
+
+      {apercu ? <SectionNouveauBareme apercu={apercu} sansCv={profil.origine === "defaut"} plafond={profil.plafondNoteCalculee} /> : null}
+      {apercuIndisponible ? (
+        <section className="carte-info">
+          <h2>Nouveau barème</h2>
+          <p className="revue__retour revue__retour--echec" role="alert">
+            Aperçu indisponible : les offres, les métiers ou le profil n’ont pas pu être lus. Recharge
+            la page ; rien n’est appliqué tant que l’aperçu manque.
+          </p>
+        </section>
+      ) : null}
 
       <section className="carte-info">
         <h2>Téléverser un CV</h2>

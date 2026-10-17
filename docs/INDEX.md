@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-52 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+53 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -48,6 +48,7 @@
 - [ADR-0029 — Les signaux d'un employeur viennent du suivi, rien d'autre](adr/0029-les-signaux-d-un-employeur-viennent-du-suivi.md) — `docs/adr/0029-les-signaux-d-un-employeur-viennent-du-suivi.md`
 - [ADR-0030 — Les sources ouvertes sur les employeurs : ce qui est admis, et comment on les lit](adr/0030-sources-ouvertes-sur-les-employeurs.md) — `docs/adr/0030-sources-ouvertes-sur-les-employeurs.md`
 - [ADR-0031 — Les erreurs partent à Sentry, expurgées, et seulement si un DSN est posé](adr/0031-les-erreurs-partent-a-sentry-expurgees.md) — `docs/adr/0031-les-erreurs-partent-a-sentry-expurgees.md`
+- [ADR-0032 — Le salaire passe en premier dans la note, appliqué après un aperçu avant/après](adr/0032-le-salaire-passe-en-premier-dans-la-note.md) — `docs/adr/0032-le-salaire-passe-en-premier-dans-la-note.md`
 - [Décisions d'architecture (ADR)](adr/README.md) — `docs/adr/README.md`
 
 ## docs/claude/

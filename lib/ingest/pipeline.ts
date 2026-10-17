@@ -36,6 +36,22 @@ import type { OffreBrute } from "./types";
  */
 export const FIT_ROLE_PLANCHER = 14;
 
+/** L'échelle sur laquelle `FIT_ROLE_PLANCHER` est exprimé : le poids du rôle avant l'ADR-0032. */
+const FIT_ROLE_ECHELLE_REFERENCE = 40;
+
+/**
+ * Le plancher de rôle à l'échelle du profil qui note (ADR-0032). PURE.
+ *
+ * ⚠️ 14 SUR 40 EST UNE PROPORTION, PAS UN NOMBRE DE POINTS. Quand le rôle passe à 28 points, un
+ * plancher resté à 14 exigerait la moitié du maximum au lieu d'un peu plus du tiers. Avec les
+ * points d'aujourd'hui (technique 18, hors sujet 6) les deux planchers donnent le même tri : on garde
+ * la proportion pour qu'un réglage futur des points ne le désaccorde pas en silence. Pour le profil
+ * d'avant (rôle 40) le résultat est exactement 14.
+ */
+export function plancherFitRole(profil: Profil): number {
+  return Math.round((FIT_ROLE_PLANCHER * profil.ponderation.fitRole) / FIT_ROLE_ECHELLE_REFERENCE);
+}
+
 /** Ce qu'une passe a fait de chaque offre trouvée. */
 export interface Tri {
   /** Prêtes à entrer dans le suivi : dédoublonnées, notées, au-dessus du plancher. */
@@ -416,7 +432,7 @@ export function trier(
     // hors-domaine tombe à ~28 au lieu de ~56. Le trieur, c'est la NOTE ; l'ingestion n'a
     // plus à refuser ce que la note sait déclasser.
     const jugeParLeCode = brute.noc != null && brute.noc.trim() !== "";
-    if (!jugeParLeCode && note.parts.fitRole < FIT_ROLE_PLANCHER) {
+    if (!jugeParLeCode && note.parts.fitRole < plancherFitRole(profil)) {
       souslePlancher++;
       refusees.push({
         entreprise,

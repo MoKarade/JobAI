@@ -41,10 +41,9 @@ export interface PlanRenotation {
 /**
  * Calcule ce que le nouveau profil ferait aux notes, SANS rien écrire.
  *
- * `salaireAnnuel` n'est pas passé : `salaireAffiche` est du texte libre (« 40 $/h+ »,
- * « 52 260 – 120 727 $ ») et en tirer un annuel exige des arbitrages qui changent la note.
- * C'est une modification du barème, pas un détail d'implémentation — elle se décide, elle
- * ne se glisse pas dans une re-notation. Même choix qu'à l'ajout manuel (`lib/ajout.ts`).
+ * Le salaire annuel de l'offre (`salaireAnnuel`, lu depuis le flux, ADR-0026) n'entre dans la
+ * note que si le profil le demande (`salaireDansLaNote`, ADR-0032) : `noterOffre` en décide,
+ * pas cette fonction. `salaireAffiche`, lui, reste du texte libre et n'est jamais lu.
  */
 export function planifierRenotation(
   offres: readonly Offre[],
