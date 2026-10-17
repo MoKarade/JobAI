@@ -98,6 +98,19 @@ export async function profilActif(): Promise<Profil> {
 }
 
 /**
+ * L'identifiant du CV dont le profil note aujourd'hui, ou `null` quand c'est celui du code.
+ *
+ * Sert à RÉÉCRIRE le profil actif (ADR-0032) : sans CV actif il n'y a pas de ligne où le poser, et
+ * l'action le dit au lieu d'en inventer une.
+ */
+export async function cvActifId(): Promise<number | null> {
+  if (!process.env.DATABASE_URL) return null;
+  await assurerMigrations();
+  const [ligne] = await db.select({ id: cvs.id }).from(cvs).where(eq(cvs.actif, true)).limit(1);
+  return ligne?.id ?? null;
+}
+
+/**
  * L'extraction proposée par un CV.
  *
  * ⚠️ TROIS ISSUES, ET ELLES NE SE CONFONDENT PAS. Rendre `null` dans tous les cas —

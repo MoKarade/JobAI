@@ -167,7 +167,12 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
     extraction.anneesExperience !== null &&
     extraction.anneesExperience !== courant.faits.anneesExperience
   ) {
-    const proposes = paliersSenioriteDepuisAnnees(extraction.anneesExperience);
+    // L'échelle du profil en cours : trois paliers, leurs points à lui (ADR-0032).
+    const [p0, p1, p2] = courant.paliersSeniorite.map((p) => p.points);
+    const proposes = paliersSenioriteDepuisAnnees(
+      extraction.anneesExperience,
+      p0 !== undefined && p1 !== undefined && p2 !== undefined ? [p0, p1, p2] : undefined,
+    );
     const rendu = (xs: readonly { max: number; points: number }[]) =>
       xs.map((x) => `≤ ${x.max} ans : ${x.points} pts`).join(" · ");
     if (rendu(proposes) !== rendu(courant.paliersSeniorite)) {

@@ -223,6 +223,16 @@ export const ProfilSchema = z.object({
    */
   facteurHorsDomaine: z.number().gt(0).max(1),
 
+  /**
+   * Le salaire annuel de l'offre entre-t-il dans la note ? (ADR-0032)
+   *
+   * ⚠️ FAUX TANT QUE MARC N'A PAS APPLIQUÉ LE NOUVEAU BARÈME. L'offre porte son salaire depuis
+   * JobAI#150, mais le lire changerait des notes avant que Marc ait vu l'écart : l'interrupteur
+   * est dans le PROFIL (donc versionné avec lui), pas dans le code, pour qu'un profil enregistré
+   * avant l'ADR-0032 — comblé à `false` par la migration — note exactement comme hier.
+   */
+  salaireDansLaNote: z.boolean(),
+
   // ── Ce que la veille cherche ─────────────────────────────────────────────
   /**
    * Le bassin de termes interrogés, tiré en rotation.
@@ -416,9 +426,8 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
   senioritePlancher: 7,
 
   // ⚠️ REMIS À L'ÉCHELLE 15 → 10 le 2026-08-20 (ADR-0014 D2), dans le même rapport.
-  // Cet axe est INERTE : aucun appelant de `computeScore` ne passe `salaireAnnuel` (voir
-  // `renotation.ts`, qui explique pourquoi — `salaireAffiche` est du texte libre). Il rend
-  // donc `salaireNonAffiche` pour TOUTES les offres. Lui retirer cinq points ne coûte aucune
+  // Cet axe est INERTE tant que `salaireDansLaNote` est faux (ADR-0032) : `noterOffre` ne passe alors
+  // pas `salaireAnnuel`. Il rend donc `salaireNonAffiche` pour TOUTES les offres. Lui retirer cinq points ne coûte aucune
   // discrimination, et c'est ce qui finance les conditions d'emploi.
   paliersSalaire: [
     // Du plus généreux au moins généreux : le premier seuil atteint l'emporte.
@@ -435,6 +444,7 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
 
   plafondNoteCalculee: 85,
   facteurHorsDomaine: 0.5,
+  salaireDansLaNote: false,
 
   // ⚠️ ÉLARGI LE 2026-08-17, ET C'EST UN AJUSTEMENT ASSUMÉ, PAS UN REFACTOR EN PASSANT
   // (demande de Marc : « je veux que ce soit beaucoup plus efficace à trouver des jobs »).
@@ -613,11 +623,20 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
  * La forme est celle d'aujourd'hui, translatée : « en dessous de mon niveau » vaut plein
  * pot, « à mon niveau » presque, « deux ans au-dessus » est un étirement.
  */
-export function paliersSenioriteDepuisAnnees(annees: number): PalierPlafond[] {
+export function paliersSenioriteDepuisAnnees(
+  annees: number,
+  /**
+   * Les points des trois paliers, du meilleur au moins bon. Par défaut ceux du barème d'origine
+   * (15/13/9) ; un profil dont l'axe a changé d'échelle (ADR-0032) passe les siens, sinon la
+   * première validation de CV lui rendrait la séniorité à 15 points sur un total qui n'en a plus
+   * que 10.
+   */
+  points: readonly [number, number, number] = [15, 13, 9],
+): PalierPlafond[] {
   const n = Math.max(0, Math.round(annees));
   return [
-    { max: Math.max(0, n - 1), points: 15 },
-    { max: n, points: 13 },
-    { max: n + 2, points: 9 },
+    { max: Math.max(0, n - 1), points: points[0] },
+    { max: n, points: points[1] },
+    { max: n + 2, points: points[2] },
   ];
 }

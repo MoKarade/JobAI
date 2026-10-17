@@ -405,6 +405,21 @@ describe("diagnostic_bareme — mesurer le barème sans le modifier", () => {
     expect(enregistrees).toHaveLength(0);
   });
 
+  it("avec `apercu`, rend l'aperçu du nouveau barème et n'écrit rien (JobAI#152)", async () => {
+    const { client, enregistrees } = await brancher();
+    const r = await client.callTool({ name: "diagnostic_bareme", arguments: { apercu: true } });
+    const c = corps(r) as unknown as {
+      dejaApplique: boolean;
+      poids: { avant: { salaire: number }; apres: { salaire: number } };
+      exemples: { montent: unknown[]; descendent: unknown[] };
+    };
+    expect(c.dejaApplique).toBe(false);
+    expect(c.poids.avant.salaire).toBe(PROFIL_DEFAUT.ponderation.salaire);
+    expect(c.poids.apres.salaire).toBe(32);
+    expect(Array.isArray(c.exemples.montent)).toBe(true);
+    expect(enregistrees).toHaveLength(0);
+  });
+
   it("dit une panne plutôt que de mesurer le profil par défaut", async () => {
     const { client } = await brancher({ lireBareme: async () => null });
     const r = await client.callTool({ name: "diagnostic_bareme", arguments: {} });

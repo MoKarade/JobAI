@@ -24,6 +24,8 @@ import type { LigneSynchroBrute } from "../diagnosticSynchro";
 import { resumerEtatSynchro } from "../diagnosticSynchro";
 import { lireResume } from "../resumePasse";
 import { diagnostiquerBareme } from "../diagnosticBareme";
+import { apercuNouveauBareme } from "../apercuBareme";
+import { aujourdhui } from "../ajout";
 import type { Profil } from "../profil";
 import type { Offre } from "../types";
 import type { SuiviVeille } from "../veille";
@@ -294,11 +296,19 @@ export function creerServeur(io: EntreesSorties): McpServer {
         "chemins de notation. Rend aussi le profil actif (version, mots de vocabulaire ajoutés " +
         "au défaut), la couverture des données (code de profession, salaire affiché, distance) " +
         "et les meilleures offres avec leurs parts. Sert à DÉCIDER d'un nouveau barème " +
-        "(JobAI#148) : une note absente d'un recalcul n'est pas une note mauvaise.",
-      inputSchema: { meilleures: z.number().int().min(0).max(40).optional() },
+        "(JobAI#148) : une note absente d'un recalcul n'est pas une note mauvaise. Avec " +
+        "`apercu: true`, rend à la place l'APERÇU du nouveau barème où le salaire passe en " +
+        "premier (JobAI#152, ADR-0032) : poids avant/après, répartition des notes et des " +
+        "paliers A/B/C, nombre d'offres qui montent ou baissent, et trois offres qui montent " +
+        "et deux qui descendent, avec leurs points par axe. Rien n'est modifié : appliquer est " +
+        "un geste de Marc sur la page Profil.",
+      inputSchema: {
+        meilleures: z.number().int().min(0).max(40).optional(),
+        apercu: z.boolean().optional(),
+      },
       annotations: { readOnlyHint: true },
     },
-    async ({ meilleures }) => {
+    async ({ meilleures, apercu }) => {
       const offres = await io.lireOffres();
       if (offres === null) return panne(BASE_MUETTE);
       const bareme = await io.lireBareme();
@@ -307,6 +317,9 @@ export function creerServeur(io: EntreesSorties): McpServer {
           "Le profil actif ou les métiers retenus n'ont pas pu être lus : le diagnostic " +
             "mesurerait un autre barème que celui qui note les offres.",
         );
+      }
+      if (apercu === true) {
+        return json(apercuNouveauBareme(offres, bareme.profil, bareme.metiers, aujourdhui(new Date())));
       }
       return json(diagnostiquerBareme(offres, bareme.profil, bareme.metiers, meilleures ?? 30));
     },
