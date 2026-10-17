@@ -230,7 +230,8 @@ export function creerServeur(io: EntreesSorties): McpServer {
       description:
         "Depuis l'app déployée, interroge trois sources publiques et officielles et rend, SANS " +
         "NOM D'ENTREPRISE, quelles répondent et quelle part des employeurs suivis on y retrouve : " +
-        "le Registre des entreprises du Québec (nom exact, `uniques` / `ambigus`), le registre des " +
+        "le Registre des entreprises du Québec déjà importé en base (`base`) et lu en ligne (`req`, " +
+        "souvent refusé par le serveur) (nom exact, `uniques` / `ambigus`), le registre des " +
         "entreprises non admissibles aux contrats publics (un compte), et le catalogue de données " +
         "ouvertes du Canada pour les salaires par code de profession (taux d'offres avec un code). " +
         "⚠️ Un taux n'est valide que si `fin` vaut « termine » ; un rattachement par nom est un " +

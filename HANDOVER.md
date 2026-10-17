@@ -30,8 +30,12 @@
 - **Fait** : outil MCP en lecture seule `sonde_employeurs` (`lib/ingest/sondeEmployeurs.ts`) : REQ (`Nom.csv` du ZIP de données
   ouvertes lu par plages d'octets), RENA (un compte, jamais un nom) et catalogue CKAN des salaires (+ part d'offres avec un
   code de profession). Rattachement par nom normalisé exact ; ambigus comptés à part ; `fin` ≠ « termine » = pas de taux.
-- **À confirmer** : lire la mesure en production (reconnexion du connecteur peut être nécessaire pour voir le nouvel outil),
-  puis compléter la section « Mesure » de l'ADR-0030.
+- **Lu en production (17/10)** : RENA 2 employeurs en cause sur 6040 ; 96,3 % des offres avec un code de profession ; le ZIP du
+  REQ est **refusé (HTTP 403)** au serveur déployé, donc pas de taux par cette voie.
+- **Ajout** : la sonde mesure aussi le registre **déjà importé en base** (`mesurerBase`, `lib/registreBase.ts`), sans réseau,
+  avec les mêmes clés et variantes que le rattachement de `lib/actions.ts` ; bloc `base` de la réponse (uniques, ambigus,
+  lignes en base). Limite : la base ne porte que la région de Québec.
+- **Lu en production (17/10, après #180)** : `base` = 608 employeurs retrouvés sur 6 040 (10,1 %), 567 uniques, 41 ambigus. Section « Mesure » de l'ADR-0030 complétée.
 
 ## 2026-10-16 — JobAI#159 : les signaux d'un employeur, depuis le suivi (ADR-0029)
 

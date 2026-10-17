@@ -57,5 +57,21 @@ pourcentage.
 
 ## Mesure
 
-À compléter avec les chiffres lus en production (JobAI#160) : taux de rattachement au REQ (uniques, ambigus), employeurs
-en cause dans le RENA (un compte), couverture des codes de profession et catalogue des salaires.
+Lu en production le 17/10/2026 (déploiement du 17/10, outil MCP `sonde_employeurs`), sur 6 040 employeurs suivis :
+
+| Source | Résultat | Lecture |
+|---|---|---|
+| Registre des entreprises (REQ), lu en ligne | refusé, HTTP 403 en 0,2 s | Le serveur déployé ne peut pas lire le ZIP ouvert (protection du fournisseur) ; aucun taux par cette voie. Le user-agent honnête n'est pas contourné. |
+| Registre des entreprises, déjà importé en base | 608 retrouvés (10,1 %) : 567 sous un seul NEQ, 41 sous plusieurs | Rattachement par nom normalisé exact ; les 41 ambigus ne sont pas tranchés. La base compte 59 194 noms et 28 821 établissements. |
+| RENA (entreprises non admissibles aux contrats publics) | fichier lu en entier, 1 844 inscriptions, 2 employeurs suivis en cause | Un compte, jamais un nom (dépôt public). |
+| Salaires par code de profession (catalogue CKAN) | 56 jeux ; 8 271 offres sur 8 585 portent un code (96,3 %) | Le code existe presque partout ; le catalogue sert de source de référence. |
+
+Conclusions :
+
+- **Le rattachement n'est pas le levier espéré.** Un taux de 10,1 % dit que 9 employeurs sur 10 ne se retrouvent pas par leur nom exact. Causes
+  probables, non mesurées une par une : la base ne couvre que la région de Québec, et beaucoup d'offres viennent de recruteurs, de chaînes
+  ou de raisons sociales écrites autrement. Aucun rapprochement flou n'est ajouté : un mauvais rattachement vaut moins que pas de
+  rattachement (garde-fou n°3).
+- **La voie en ligne du REQ est fermée** depuis l'app déployée ; la base importée depuis le poste de Marc reste la seule source du registre.
+- **Les 567 rattachements uniques** sont utilisables par un dossier employeur, avec la mention « nom identique, entité unique ».
+- **Aucun code de notation n'est touché** par cette décision.
