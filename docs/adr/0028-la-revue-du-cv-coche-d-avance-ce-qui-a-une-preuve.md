@@ -26,6 +26,10 @@ décochés, et Marc les coche lui-même :
   déduction du code, pas une lecture du CV — elle modifie les notes, donc elle demande un geste ;
 - un « non établi » proposé à la place d'une valeur existante : il effacerait ce que le profil sait déjà.
 
+> **Amendé par ADR-0033 (JobAI#155)** : la fiche de compétences est un fait avec preuve (chaque ligne cite sa phrase et
+> son poste, retrouvés dans le texte du CV) : elle est cochée d'avance, comme les années. Et l'écart « vocabulaire
+> technique du barème » n'existe plus : les outils du CV n'entrent plus dans `motsTechnique`.
+
 Un seul bouton « Appliquer N changements » valide ; les cases cochées d'avance sont marquées « source citée » pour dire
 pourquoi. Le compteur et le texte du pied de l'écran restent exacts quand tout est décoché.
 
