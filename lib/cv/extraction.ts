@@ -27,6 +27,16 @@ import { z } from "zod";
 import { baliserDonnees, CONSIGNE_DONNEES, sanitizePromptText } from "../promptSafety";
 import { enregistrerUsageLlm } from "../coutLlmStore";
 import { FaitsSchema, type Faits } from "../profil";
+import {
+  COMPETENCES_MAX,
+  CompetenceProuveeSchema,
+  IDS_COMPETENCES,
+  NIVEAUX,
+  PREUVE_MAX,
+  VOCABULAIRE_COMPETENCES,
+  verifierCompetences,
+  type CompetenceRejetee,
+} from "../competences";
 import { calculerAnnees, LONGUEUR_MAX_DETAIL } from "./anneesExperience";
 
 /**
@@ -93,6 +103,8 @@ export const PLAFONDS = {
   parcours: 12,
   /** Réalisations retenues par poste. Assez pour préparer une entrevue, pas un roman. */
   faitsParPoste: 10,
+  /** Lignes de la fiche de compétences (JobAI#155) : au plus le vocabulaire fermé entier. */
+  competences: COMPETENCES_MAX,
 } as const;
 
 /**
@@ -136,6 +148,12 @@ export const ReponseExtractionSchema = z.object({
   titresOccupes: z.array(z.string().min(1).max(120)).max(PLAFONDS.titresOccupes).default([]),
   /** Termes de recherche que le modèle déduit des postes occupés. */
   recherchesSuggerees: z.array(z.string().min(1).max(80)).max(PLAFONDS.recherchesSuggerees).default([]),
+  /**
+   * La fiche de compétences prouvées (JobAI#155) : vocabulaire fermé, niveau, et pour chaque
+   * ligne la phrase du CV et le poste. Jamais le brut du modèle : `verifierCompetences` retrouve
+   * la phrase dans le texte du CV avant de la laisser entrer ici.
+   */
+  competences: z.array(CompetenceProuveeSchema).max(PLAFONDS.competences).default([]),
   /** Ce que le CV établit et qui joue en faveur — matière à SWOT, jamais le SWOT lui-même. */
   forces: z.array(z.string().min(1).max(300)).max(PLAFONDS.forces).default([]),
   /** Ce que le CV révèle comme manque OBJECTIF (une compétence absente, pas un jugement). */
@@ -159,6 +177,8 @@ export type ReponseExtraction = z.infer<typeof ReponseExtractionSchema>;
 const ReponseModeleSchema = ReponseExtractionSchema.extend({
   anneesExperience: z.unknown().optional(),
   anneesExperienceProvenance: z.unknown().optional(),
+  // Le brut du modèle : n'importe quoi tant que `verifierCompetences` ne l'a pas retrouvé dans le CV.
+  competences: z.array(z.unknown()).max(PLAFONDS.competences).default([]),
 });
 
 /** Le résultat d'une extraction : un succès sourcé, ou un échec qui se nomme. */
@@ -170,6 +190,8 @@ export type ResultatExtraction =
       provenances: Record<string, string>;
       /** Ce que les plafonds ont retiré. Vide = rien n'a été tronqué. */
       troncatures: string[];
+      /** Les compétences proposées que le CV ne prouve pas, et pourquoi. Vide = aucune n'a été refusée. */
+      competencesRejetees: CompetenceRejetee[];
     }
   | { ok: false; raison: string };
 
@@ -222,6 +244,12 @@ const CONSIGNE = [
   "Dans faits, reprends ce que le poste comportait, dans les termes du CV. N'ajoute rien",
   "que le document ne dit pas, et ne reformule pas en mieux : ces phrases serviront à",
   "préparer une entrevue, où c'est le CV qui fera foi.",
+  "",
+  "competences : choisis UNIQUEMENT dans la liste fermée de l'outil (champ id). Pour chacune,",
+  "recopie MOT POUR MOT une phrase du CV qui la montre (phrase) et l'intitulé du poste où elle",
+  "se lit (poste, tel qu'écrit dans parcours). Niveau : notions = simplement nommée ; pratique =",
+  "utilisée dans un poste ; maitrise = au cœur du poste, avec réalisations ou usage prolongé.",
+  "Pas de phrase dans le CV = pas de ligne : ne propose JAMAIS une compétence que tu déduis.",
   "",
   "forces : ce que le CV ÉTABLIT et qui joue en faveur d'une candidature.",
   "manques : une compétence ou une exigence courante du métier que le CV ne montre PAS.",
@@ -277,6 +305,28 @@ export const OUTIL_EXTRACTION = {
             },
           },
           required: ["titre"],
+        },
+      },
+      competences: {
+        type: "array",
+        maxItems: PLAFONDS.competences,
+        description:
+          "Compétences du vocabulaire fermé que le CV prouve : " +
+          VOCABULAIRE_COMPETENCES.map((c) => `${c.id} (${c.libelle})`).join(", ") +
+          ". Une ligne sans phrase retrouvable dans le CV est refusée.",
+        items: {
+          type: "object" as const,
+          properties: {
+            id: { type: "string", enum: [...IDS_COMPETENCES] },
+            niveau: { type: "string", enum: [...NIVEAUX] },
+            phrase: {
+              type: "string",
+              maxLength: PREUVE_MAX,
+              description: "Une phrase du CV recopiée mot pour mot.",
+            },
+            poste: { type: "string", description: "L'intitulé du poste, tel qu'écrit dans parcours." },
+          },
+          required: ["id", "niveau", "phrase", "poste"],
         },
       },
       forces: { type: "array", items: { type: "string" }, maxItems: PLAFONDS.forces },
@@ -387,7 +437,7 @@ export async function extraireFaits(
     const client = new Anthropic({ apiKey: cle });
     reponse = await client.messages.create({
       model: MODELE,
-      max_tokens: 2000,
+      max_tokens: 5000,
       system: CONSIGNE,
       tools: [OUTIL_EXTRACTION],
       tool_choice: { type: "tool", name: "rendre_profil" },
@@ -499,6 +549,19 @@ export async function extraireFaits(
   // pas se glisser à la place du calcul.
   const calcul = calculerAnnees(parcoursPropre, options.aujourdhui ?? new Date());
 
+  // ⚠️ LA PREUVE SE VÉRIFIE ICI, SUR LE TEXTE DU CV, AVANT TOUT NETTOYAGE : la phrase doit s'y
+  // retrouver telle que le modèle l'a recopiée. Ce qui ne s'y retrouve pas est rendu dans
+  // `competencesRejetees`, jamais avalé (JobAI#155, ADR-0033).
+  const verification = verifierCompetences(
+    brut.competences,
+    texte,
+    parcoursPropre.map((e) => e.titre),
+  );
+  const competences = verification.retenues.map((c) => ({
+    ...c,
+    phrase: expurgerCoordonnees(sanitizePromptText(c.phrase)).trim(),
+  }));
+
   const propre: ReponseExtraction = {
     anneesExperience: calcul.annees,
     anneesExperienceProvenance: calcul.detail,
@@ -512,6 +575,7 @@ export async function extraireFaits(
     // volontiers. Un objet imbriqué ne dispense pas du traitement, il le rend juste plus
     // facile à oublier.
     parcours: parcoursPropre,
+    competences,
     forces: netto(brut.forces),
     manques: netto(brut.manques),
   };
@@ -522,6 +586,7 @@ export async function extraireFaits(
     diplomes: propre.diplomes,
     outils: propre.outils,
     titresOccupes: propre.titresOccupes,
+    competences: propre.competences,
   });
 
   return {
@@ -532,5 +597,6 @@ export async function extraireFaits(
     // ⚠️ COMPTÉ SUR LA RÉPONSE D'ORIGINE, pas sur `propre` : la troncature a déjà eu lieu au
     // parse, et `propre` ne porte plus la trace de ce qui manque.
     troncatures: tronquees,
+    competencesRejetees: verification.rejetees,
   };
 }

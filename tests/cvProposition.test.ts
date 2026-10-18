@@ -34,6 +34,7 @@ const EXTRACTION_VIDE: ReponseExtraction = {
   outils: [],
   titresOccupes: [],
   recherchesSuggerees: [],
+  competences: [],
   forces: [],
   manques: [],
 };
@@ -191,11 +192,48 @@ describe("les écarts proposés", () => {
       .toBeUndefined();
   });
 
-  it("les outils du CV enrichissent le vocabulaire technique, sans le remplacer", () => {
-    const e = calculerEcarts(PROFIL_DEFAUT, extraction({ outils: ["TIA Portal", "SolidWorks"] }));
-    const mots = e.find((x) => x.cle === "motsTechnique");
-    expect(mots?.valeur).toContain("tia portal");
-    for (const m of PROFIL_DEFAUT.motsTechnique) expect(mots?.valeur as string[]).toContain(m);
+  it("les outils du CV n'entrent plus dans le vocabulaire du barème par morceaux de mots (ADR-0033)", () => {
+    const e = calculerEcarts(PROFIL_DEFAUT, extraction({ outils: ["ROS", "Unity", "SolidWorks"] }));
+    expect(e.find((x) => x.cle === "motsTechnique")).toBeUndefined();
+  });
+
+  it("la fiche de compétences est un fait AVEC preuve, coché d'avance, et dit sa phrase et son poste", () => {
+    const fiche = [
+      {
+        id: "automates-programmables",
+        niveau: "maitrise" as const,
+        phrase: "Programmation d'automates programmables",
+        poste: "Technicien en automatisation",
+      },
+    ];
+    const e = calculerEcarts(PROFIL_DEFAUT, extraction({ competences: fiche }));
+    const ligne = e.find((x) => x.cle === "faits.competences");
+    expect(ligne?.nature).toBe("fait");
+    expect(ligne?.preuve).toBe(true);
+    expect(ligne?.apres).toContain("Programmation d'automates programmables");
+    expect(ligne?.apres).toContain("Technicien en automatisation");
+    expect(retenusParDefaut(e)).toContain("faits.competences");
+    const applique = appliquerEcarts(PROFIL_DEFAUT, e, ["faits.competences"], "2026-10-18");
+    expect(applique.faits.competences).toEqual(fiche);
+  });
+
+  it("une fiche identique à celle du profil ne propose aucun écart", () => {
+    const fiche = [
+      { id: "scada", niveau: "pratique" as const, phrase: "Supervision SCADA d'une ligne", poste: "Chef de quart" },
+    ];
+    const courant = appliquerEcarts(
+      PROFIL_DEFAUT,
+      calculerEcarts(PROFIL_DEFAUT, extraction({ competences: fiche })),
+      ["faits.competences"],
+      "2026-10-18",
+    );
+    expect(calculerEcarts(courant, extraction({ competences: fiche })).find((x) => x.cle === "faits.competences"))
+      .toBeUndefined();
+  });
+
+  it("une fiche vide proposée n'efface pas celle du profil", () => {
+    expect(calculerEcarts(PROFIL_DEFAUT, EXTRACTION_VIDE).find((x) => x.cle === "faits.competences"))
+      .toBeUndefined();
   });
 });
 

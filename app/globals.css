@@ -2799,6 +2799,8 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
 }
 .ecart__apres {
   color: var(--ambre-texte);
+  /* La fiche de compétences met une ligne par compétence, preuve comprise. */
+  white-space: pre-line;
 }
 /* La provenance, et surtout son ABSENCE : un chiffre supposé ne doit pas
    ressembler à un chiffre lu dans le document. */

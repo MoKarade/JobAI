@@ -26,6 +26,7 @@
 // numérique plausible, elle ne lèvera plus — elle notera faux, sans rien dire.
 
 import { PROFIL_DEFAUT, type Profil } from "./profil";
+import { expressionsDeNotation } from "./competences";
 import { codeRetenu, lireCodeNoc } from "./nocProfession";
 
 /** Répartition des points. La somme fait 100 — vérifié par test, pas par confiance. */
@@ -73,6 +74,68 @@ export function normaliserTitre(s: string): string {
     .replace(/\s+/g, " ");
 }
 
+/**
+ * Un mot entier, pas un morceau de mot (ADR-0033). `ros` n'est pas dans « prosthesis », `unity` n'est
+ * pas dans « community ». Le pluriel simple passe (`s`), les chiffres et lettres voisins non.
+ * Le texte et le terme arrivent déjà repliés par `normaliserTitre`.
+ */
+const MOTS_ENTIERS = new Map<string, RegExp>();
+export function contientMot(texteReplie: string, terme: string): boolean {
+  if (terme === "") return false;
+  let re = MOTS_ENTIERS.get(terme);
+  if (re === undefined) {
+    re = new RegExp(`(?<![a-z0-9])${terme.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?(?![a-z0-9])`);
+    MOTS_ENTIERS.set(terme, re);
+  }
+  return re.test(texteReplie);
+}
+
+interface TermeTechnique {
+  /** Le terme tel que le profil l'écrit (pour le diagnostic). */
+  brut: string;
+  /** Le terme, replié. */
+  terme: string;
+  /** Vrai = vocabulaire d'origine du barème, comparé comme depuis ADR-0013 (morceau de mot permis). */
+  sousChaine: boolean;
+}
+
+let origineTechnique: ReadonlySet<string> | undefined;
+
+/**
+ * Tout ce qui fait d'un texte un texte « technique » pour ce profil.
+ *
+ * ⚠️ DEUX RÉGIMES, VOLONTAIRES. Le vocabulaire d'origine (expressions choisies à la main, ADR-0013)
+ * garde sa comparaison par sous-chaîne : « robotic » doit continuer à trouver « robotics », et
+ * changer cela déplacerait des notes sans mesure. Tout le reste — termes ajoutés depuis un CV avant
+ * ADR-0033, expressions de la fiche de compétences — se compare par MOTS ENTIERS.
+ */
+function termesTechniques(profil: Profil): TermeTechnique[] {
+  origineTechnique ??= new Set(PROFIL_DEFAUT.motsTechnique.map(normaliserTitre));
+  const vus = new Set<string>();
+  const sortie: TermeTechnique[] = [];
+  const ajouter = (brut: string, origineBrut: boolean) => {
+    const terme = normaliserTitre(brut);
+    if (terme === "" || vus.has(terme)) return;
+    vus.add(terme);
+    sortie.push({ brut, terme, sousChaine: origineBrut && (origineTechnique?.has(terme) ?? false) });
+  };
+  for (const m of profil.motsTechnique) ajouter(m, true);
+  for (const e of expressionsDeNotation(profil.faits.competences)) ajouter(e, false);
+  return sortie;
+}
+
+function correspond(texteReplie: string, x: TermeTechnique): boolean {
+  return x.sousChaine ? texteReplie.includes(x.terme) : contientMot(texteReplie, x.terme);
+}
+
+/** Les termes techniques d'un texte (pour le diagnostic) : ceux que `scoreFitRole` a vus. */
+export function motsTechniqueDe(texte: string, profil: Profil): string[] {
+  const t = normaliserTitre(texte);
+  return termesTechniques(profil)
+    .filter((x) => correspond(t, x))
+    .map((x) => x.brut);
+}
+
 /** 40 pts — le poste combine-t-il coordination d'équipe ET contenu technique ? */
 export function scoreFitRole(titre: string, description = "", profil: Profil = PROFIL_DEFAUT): number {
   const t = normaliserTitre(`${titre} ${description}`);
@@ -80,7 +143,7 @@ export function scoreFitRole(titre: string, description = "", profil: Profil = P
   // par Marc depuis `/profil`, donc rien ne garantit leur graphie — et comparer une forme
   // repliée à une forme brute ne trouverait plus rien.
   const coord = profil.motsCoordination.some((m) => t.includes(normaliserTitre(m)));
-  const tech = profil.motsTechnique.some((m) => t.includes(normaliserTitre(m)));
+  const tech = termesTechniques(profil).some((x) => correspond(t, x));
   // « technicien » sans encadrement = recul hiérarchique par rapport au poste actuel.
   const technicien = /\btechnicien/.test(t) && !coord;
 

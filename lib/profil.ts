@@ -29,6 +29,7 @@
 // circuler dans les écrans, les exports et les journaux sans précaution particulière.
 
 import { z } from "zod";
+import { COMPETENCES_MAX, CompetenceProuveeSchema } from "./competences";
 
 /**
  * Un palier PLAFOND : « jusqu'à ce seuil inclus, ce nombre de points ». Se lit du plus
@@ -74,6 +75,12 @@ export const FaitsSchema = z.object({
   outils: z.array(z.string().min(1)).max(60),
   /** Intitulés déjà occupés : la meilleure source de termes de recherche qui existe. */
   titresOccupes: z.array(z.string().min(1)).max(30),
+  /**
+   * La fiche de compétences prouvées (ADR-0033, JobAI#155) : un vocabulaire fermé, un niveau, et
+   * pour chaque ligne la phrase du CV et le poste qui la prouvent. Vide par défaut — comme le
+   * reste des faits, elle se remplit à l'analyse d'un CV. Voir `lib/competences.ts`.
+   */
+  competences: z.array(CompetenceProuveeSchema).max(COMPETENCES_MAX).default([]),
   /**
    * Le parcours détaillé, du plus récent au plus ancien.
    *
@@ -295,6 +302,7 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
     diplomes: [],
     outils: [],
     titresOccupes: [],
+    competences: [],
     parcours: [],
   },
 
