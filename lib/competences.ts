@@ -159,7 +159,9 @@ export function verifierCompetences(
   titresDuParcours: readonly string[],
 ): { retenues: CompetenceProuvee[]; rejetees: CompetenceRejetee[] } {
   const cv = replier(texteCv);
-  const postes = titresDuParcours.map(replier).filter((t) => t.trim().length >= 3);
+  const postes = titresDuParcours
+    .map((titre) => ({ titre, replie: replier(titre) }))
+    .filter((t) => t.replie.trim().length >= 3);
   const parId = new Map<string, CompetenceProuvee>();
   const rejetees: CompetenceRejetee[] = [];
 
@@ -187,13 +189,23 @@ export function verifierCompetences(
       rejeter("phrase introuvable dans le CV");
       continue;
     }
+    // ⚠️ LE POSTE ÉCRIT SUR LA LIGNE EST LE TITRE DU PARCOURS, JAMAIS LE TEXTE DU MODÈLE. Égalité
+    // repliée, ou le modèle a raccourci un titre plus long (au moins 5 caractères). Un poste plus
+    // LONG qu'un titre ne passe pas : il porterait du texte libre venu du modèle dans le profil.
     const posteReplie = replier(poste);
-    if (posteReplie.trim() === "" || !postes.some((p) => p === posteReplie || p.includes(posteReplie) || posteReplie.includes(p))) {
+    const trouve =
+      posteReplie.trim().length === 0
+        ? undefined
+        : postes.find(
+            (p) =>
+              p.replie === posteReplie || (posteReplie.trim().length >= 5 && p.replie.includes(posteReplie)),
+          );
+    if (trouve === undefined) {
       rejeter("poste absent du parcours");
       continue;
     }
 
-    const ligne: CompetenceProuvee = { id, niveau: o.niveau, phrase, poste };
+    const ligne: CompetenceProuvee = { id, niveau: o.niveau, phrase, poste: trouve.titre };
     const deja = parId.get(id);
     if (deja === undefined || RANG[ligne.niveau] > RANG[deja.niveau]) parId.set(id, ligne);
   }
