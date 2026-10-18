@@ -33,6 +33,12 @@ export interface DefinitionCompetence {
    */
   readonly expressions: readonly string[];
   /**
+   * Ce qu'une phrase de preuve doit nommer pour être une preuve DE CETTE compétence (écrit à la
+   * main, comparé à mots entiers). Sans lui, n'importe quelle phrase du CV prouverait n'importe
+   * quelle compétence : la phrase existe, mais elle ne parle pas de la compétence.
+   */
+  readonly indices: readonly string[];
+  /**
    * Cette compétence règle-t-elle la note (axe technique du rôle) ? Faux = elle figure sur la
    * fiche et sert à l'entrevue, sans déplacer une seule note. Le cœur de cible de Marc
    * (automatisation, robotique, contrôle) règle la note ; un langage de programmation ou un
@@ -41,29 +47,36 @@ export interface DefinitionCompetence {
   readonly reglaNote: boolean;
 }
 
-const note = (id: string, libelle: string, expressions: readonly string[]): DefinitionCompetence => ({
+const note = (
+  id: string,
+  libelle: string,
+  expressions: readonly string[],
+  indicesEnPlus: readonly string[] = [],
+): DefinitionCompetence => ({
   id,
   libelle,
   expressions,
+  indices: [...expressions, ...indicesEnPlus],
   reglaNote: true,
 });
-const fiche = (id: string, libelle: string): DefinitionCompetence => ({
+const fiche = (id: string, libelle: string, indices: readonly string[]): DefinitionCompetence => ({
   id,
   libelle,
   expressions: [],
+  indices,
   reglaNote: false,
 });
 
 /** Le vocabulaire fermé. Ajouter une ligne ici est le seul moyen d'élargir ce qu'une fiche peut dire. */
 export const VOCABULAIRE_COMPETENCES: readonly DefinitionCompetence[] = [
   note("automates-programmables", "Automates programmables (PLC)", [
-    "plc", "automate programmable", "automates programmables", "programmable logic controller",
+    "plc", "plcs", "automate programmable", "automates programmables", "programmable logic controller",
   ]),
   note("scada", "SCADA", ["scada"]),
   note("robotique-industrielle", "Robotique industrielle", [
     "robotique", "robotic", "robot industriel", "robots industriels", "industrial robot", "cellule robotique",
     "robotic cell",
-  ]),
+  ], ["robot", "robots"]),
   note("ros", "ROS (Robot Operating System)", ["ros", "robot operating system"]),
   note("vision-industrielle", "Vision industrielle", [
     "vision industrielle", "machine vision", "systeme de vision", "vision system",
@@ -75,21 +88,21 @@ export const VOCABULAIRE_COMPETENCES: readonly DefinitionCompetence[] = [
   note("schemas-electriques", "Schémas électriques", [
     "schema electrique", "schemas electriques", "electrical schematic", "electrical drawing",
   ]),
-  fiche("cablage-electrique", "Câblage électrique"),
-  fiche("cao-3d", "Conception 3D (CAO)"),
-  fiche("soudure", "Soudure"),
-  fiche("travail-du-metal", "Travail du métal"),
-  fiche("python", "Python"),
-  fiche("java", "Java"),
-  fiche("cpp", "C++"),
-  fiche("unity", "Unity"),
-  fiche("iot", "Internet des objets (IoT)"),
-  fiche("developpement-jeux", "Développement de jeux"),
-  fiche("gestion-de-projet-outils", "Outils de gestion de projet (Gantt, WBS, Trello)"),
-  fiche("agile-scrum", "Méthodes agiles (Scrum)"),
-  fiche("analyse-des-risques", "Analyse des risques"),
-  fiche("tests-de-validation", "Tests de validation"),
-  fiche("bureautique", "Bureautique (Office 365)"),
+  fiche("cablage-electrique", "Câblage électrique", ["cablage", "wiring"]),
+  fiche("cao-3d", "Conception 3D (CAO)", ["cao", "cad", "3d", "solidworks", "autocad", "inventor", "catia"]),
+  fiche("soudure", "Soudure", ["soudure", "soudage", "weld", "welding"]),
+  fiche("travail-du-metal", "Travail du métal", ["metal", "tole", "usinage"]),
+  fiche("python", "Python", ["python"]),
+  fiche("java", "Java", ["java"]),
+  fiche("cpp", "C++", ["c++", "cpp"]),
+  fiche("unity", "Unity", ["unity"]),
+  fiche("iot", "Internet des objets (IoT)", ["iot", "internet des objets", "internet of things"]),
+  fiche("developpement-jeux", "Développement de jeux", ["jeu", "jeux", "game", "games", "unity", "unreal"]),
+  fiche("gestion-de-projet-outils", "Outils de gestion de projet (Gantt, WBS, Trello)", ["gantt", "wbs", "trello", "jira", "ms project"]),
+  fiche("agile-scrum", "Méthodes agiles (Scrum)", ["scrum", "agile", "kanban"]),
+  fiche("analyse-des-risques", "Analyse des risques", ["risque", "risques", "risk", "amdec", "fmea"]),
+  fiche("tests-de-validation", "Tests de validation", ["test", "tests", "validation", "essais"]),
+  fiche("bureautique", "Bureautique (Office 365)", ["office", "excel", "word", "powerpoint", "bureautique", "o365", "microsoft"]),
 ];
 
 const PAR_ID: ReadonlyMap<string, DefinitionCompetence> = new Map(
@@ -133,10 +146,25 @@ export interface CompetenceRejetee {
 export function replier(s: string): string {
   return ` ${s
     .toLowerCase()
-    .normalize("NFD")
+    // NFKD : une ligature de PDF (« ﬁ ») redevient « fi ». Les caractères invisibles (espace de
+    // largeur nulle, trait d'union conditionnel) sont retirés AVANT, pour ne pas couper un mot.
+    .replace(/\p{Cf}/gu, "")
+    .normalize("NFKD")
     .replace(/\p{Diacritic}/gu, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim()} `;
+}
+
+/** La phrase nomme-t-elle la compétence ? Un indice de l'entrée du vocabulaire, à mots entiers. */
+function phraseMontre(phrase: string, d: DefinitionCompetence): boolean {
+  const repliee = replier(phrase);
+  const brut = phrase.toLowerCase();
+  return d.indices.some((i) => {
+    // Un indice avec un signe (« c++ ») se cherche tel quel : le repli le réduirait à « c ».
+    if (/[^a-z0-9 ]/.test(i)) return brut.includes(i);
+    const r = replier(i);
+    return repliee.includes(r) || repliee.includes(`${r.trimEnd()}s `);
+  });
 }
 
 const RANG: Record<Niveau, number> = { notions: 0, pratique: 1, maitrise: 2 };
@@ -159,6 +187,7 @@ export function verifierCompetences(
   titresDuParcours: readonly string[],
 ): { retenues: CompetenceProuvee[]; rejetees: CompetenceRejetee[] } {
   const cv = replier(texteCv);
+  const cvSerre = cv.replace(/ /g, "");
   const postes = titresDuParcours
     .map((titre) => ({ titre, replie: replier(titre) }))
     .filter((t) => t.replie.trim().length >= 3);
@@ -185,21 +214,32 @@ export function verifierCompetences(
       rejeter("phrase absente ou hors longueur");
       continue;
     }
-    if (!cv.includes(phraseRepliee)) {
+    // Mots contigus d'abord ; sinon sans les espaces, qui absorbe un mot coupé en fin de ligne par le PDF.
+    if (!cv.includes(phraseRepliee) && !cvSerre.includes(phraseRepliee.replace(/ /g, ""))) {
       rejeter("phrase introuvable dans le CV");
       continue;
     }
-    // ⚠️ LE POSTE ÉCRIT SUR LA LIGNE EST LE TITRE DU PARCOURS, JAMAIS LE TEXTE DU MODÈLE. Égalité
-    // repliée, ou le modèle a raccourci un titre plus long (au moins 5 caractères). Un poste plus
-    // LONG qu'un titre ne passe pas : il porterait du texte libre venu du modèle dans le profil.
+    // ⚠️ LA PHRASE EXISTE, MAIS PARLE-T-ELLE DE LA COMPÉTENCE ? Sans cette porte, une phrase
+    // quelconque du CV « prouverait » SCADA, et la ligne ferait basculer des notes.
+    if (!phraseMontre(phrase, PAR_ID.get(id) as DefinitionCompetence)) {
+      rejeter("phrase sans rapport avec la compétence");
+      continue;
+    }
+    // ⚠️ LE POSTE ÉCRIT SUR LA LIGNE EST LE TITRE DU PARCOURS, JAMAIS LE TEXTE DU MODÈLE. On retient
+    // le plus long titre du parcours (5 caractères au moins) que le poste du modèle égale, raccourcit
+    // ou complète (« Technicien, Usine, 2022 ») : le texte autour est jeté, rien de libre n'entre
+    // dans le profil.
     const posteReplie = replier(poste);
-    const trouve =
-      posteReplie.trim().length === 0
-        ? undefined
-        : postes.find(
-            (p) =>
-              p.replie === posteReplie || (posteReplie.trim().length >= 5 && p.replie.includes(posteReplie)),
-          );
+    let trouve: { titre: string; replie: string } | undefined;
+    if (posteReplie.trim().length > 0) {
+      for (const p of postes) {
+        const lie =
+          p.replie === posteReplie ||
+          (posteReplie.trim().length >= 5 && p.replie.includes(posteReplie)) ||
+          (p.replie.trim().length >= 5 && posteReplie.includes(p.replie));
+        if (lie && (trouve === undefined || p.replie.length > trouve.replie.length)) trouve = p;
+      }
+    }
     if (trouve === undefined) {
       rejeter("poste absent du parcours");
       continue;
@@ -240,5 +280,8 @@ export function fichePourLecture(fiche: readonly CompetenceProuvee[]): string[] 
 export function resumeDesRefus(rejetees: readonly CompetenceRejetee[]): string {
   if (rejetees.length === 0) return "";
   const n = rejetees.length;
-  return ` ${n} compétence${n > 1 ? "s" : ""} proposée${n > 1 ? "s" : ""} par le modèle ${n > 1 ? "ont" : "a"} été écartée${n > 1 ? "s" : ""} faute de preuve dans le CV.`;
+  const parRaison = new Map<string, number>();
+  for (const r of rejetees) parRaison.set(r.raison, (parRaison.get(r.raison) ?? 0) + 1);
+  const detail = [...parRaison].map(([raison, k]) => `${k} × ${raison}`).join(", ");
+  return ` ${n} compétence${n > 1 ? "s" : ""} proposée${n > 1 ? "s" : ""} par le modèle ${n > 1 ? "ont" : "a"} été écartée${n > 1 ? "s" : ""} (${detail}).`;
 }

@@ -29,7 +29,7 @@ import {
   paliersSenioriteDepuisAnnees,
   type Profil,
 } from "../profil";
-import { fichePourLecture } from "../competences";
+import { definition, fichePourLecture } from "../competences";
 import { parserProfilStocke } from "../profilStocke";
 import type { ReponseExtraction } from "./extraction";
 
@@ -179,7 +179,7 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
       avant:
         courant.faits.competences.length === 0
           ? "non établies"
-          : `${courant.faits.competences.length} compétence(s)`,
+          : courant.faits.competences.map((c) => definition(c.id)?.libelle ?? c.id).join(", "),
       apres: fichePourLecture(extraction.competences).join("\n"),
       provenance: "Chaque ligne cite sa phrase et son poste, retrouvés dans le texte du CV.",
       preuve: true,

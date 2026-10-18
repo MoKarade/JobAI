@@ -84,10 +84,14 @@ export function contientMot(texteReplie: string, terme: string): boolean {
   if (terme === "") return false;
   let re = MOTS_ENTIERS.get(terme);
   if (re === undefined) {
-    re = new RegExp(`(?<![a-z0-9])${terme.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?(?![a-z0-9])`);
+    // Un terme court n'accepte pas le pluriel (« ros » ne trouve pas « Ross ») mais accepte une
+    // version collée (« ROS2 »). Un terme long accepte le pluriel simple.
+    const pluriel = terme.length > 3 ? "s?" : "\\d?";
+    const source = terme.replace(/[-–—]/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    re = new RegExp(`(?<![a-z0-9])${source}${pluriel}(?![a-z0-9])`);
     MOTS_ENTIERS.set(terme, re);
   }
-  return re.test(texteReplie);
+  return re.test(texteReplie.replace(/[-–—]/g, " "));
 }
 
 interface TermeTechnique {

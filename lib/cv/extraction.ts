@@ -35,6 +35,7 @@ import {
   PREUVE_MAX,
   VOCABULAIRE_COMPETENCES,
   verifierCompetences,
+  type CompetenceProuvee,
   type CompetenceRejetee,
 } from "../competences";
 import { calculerAnnees, LONGUEUR_MAX_DETAIL } from "./anneesExperience";
@@ -476,6 +477,12 @@ export async function extraireFaits(
     console.error("[cv] comptabilité de l'appel impossible", e);
   }
 
+  // Une réponse coupée par la limite de sortie n'est pas un résultat : la fiche, rendue tard, serait
+  // simplement absente et passerait pour « aucune compétence ».
+  if (reponse.stop_reason === "max_tokens") {
+    return { ok: false, raison: "La réponse du modèle a été coupée (trop longue). Relance l'analyse." };
+  }
+
   const bloc = reponse.content.find((c) => c.type === "tool_use");
   if (!bloc || bloc.type !== "tool_use") {
     return {
@@ -554,13 +561,29 @@ export async function extraireFaits(
   // `competencesRejetees`, jamais avalé (JobAI#155, ADR-0033).
   const verification = verifierCompetences(
     brut.competences,
-    texte,
+    // Le texte que le modèle a LU (assaini), pas le brut : sinon des caractères invisibles du PDF
+    // feraient écarter une phrase recopiée fidèlement.
+    sanitizePromptText(texte),
     parcoursPropre.map((e) => e.titre),
   );
-  const competences = verification.retenues.map((c) => ({
-    ...c,
-    phrase: expurgerCoordonnees(sanitizePromptText(c.phrase)).trim(),
-  }));
+  if (verification.rejetees.length > 0) {
+    console.warn(
+      `[cv] compétences écartées : ${verification.rejetees.map((r) => `${r.id}: ${r.raison}`).join(" · ")}`,
+    );
+  }
+  // Le nettoyage peut sortir une phrase des bornes du schéma (« [retiré] » plus long qu'un numéro) :
+  // une ligne qui n'y entre plus est écartée et dite, elle ne fait pas échouer l'analyse.
+  const competences: CompetenceProuvee[] = [];
+  const refusApresNettoyage: CompetenceRejetee[] = [];
+  for (const c of verification.retenues) {
+    const ligne = CompetenceProuveeSchema.safeParse({
+      ...c,
+      phrase: expurgerCoordonnees(sanitizePromptText(c.phrase)).trim(),
+    });
+    if (ligne.success) competences.push(ligne.data);
+    else refusApresNettoyage.push({ id: c.id, raison: "phrase hors longueur après nettoyage" });
+  }
+  const competencesRejetees = [...verification.rejetees, ...refusApresNettoyage];
 
   const propre: ReponseExtraction = {
     anneesExperience: calcul.annees,
@@ -597,6 +620,6 @@ export async function extraireFaits(
     // ⚠️ COMPTÉ SUR LA RÉPONSE D'ORIGINE, pas sur `propre` : la troncature a déjà eu lieu au
     // parse, et `propre` ne porte plus la trace de ce qui manque.
     troncatures: tronquees,
-    competencesRejetees: verification.rejetees,
+    competencesRejetees,
   };
 }

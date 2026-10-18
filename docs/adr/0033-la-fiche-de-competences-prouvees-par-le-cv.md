@@ -21,11 +21,15 @@ mot sans rapport (« across », « process », « patriot »).
 1. **Un vocabulaire fermé** (`lib/competences.ts`, 25 compétences). Le modèle ne propose plus un texte libre : il choisit
    un identifiant du vocabulaire (le schéma d'outil le lui impose), un niveau (`notions`, `pratique`, `maitrise`) et pour
    chaque ligne **une phrase du CV recopiée et le poste où elle se lit**.
-2. **Aucune ligne sans source, vérifiée par le code et non par la consigne.** `verifierCompetences` retrouve la phrase
-   dans le texte du CV (mots contigus ; casse, accents, ponctuation et coupures de ligne ignorés) et le poste dans le
-   parcours. Une ligne dont l'identifiant, le niveau, la phrase (8 à 200 caractères) ou le poste ne se vérifie pas est
-   écartée ; l'écran dit combien (« N compétence(s) écartée(s) faute de preuve »). Une compétence citée deux fois garde
-   son niveau le plus haut.
+2. **Aucune ligne sans source, vérifiée par le code et non par la consigne.** `verifierCompetences` écarte toute ligne
+   dont : l'identifiant n'est pas au vocabulaire ; le niveau est inconnu ; la phrase (8 à 200 caractères) ne se retrouve
+   pas dans le texte du CV que le modèle a lu (mots contigus ; casse, accents, ligatures, caractères invisibles,
+   ponctuation et mots coupés en fin de ligne ignorés) ; la phrase **ne nomme pas la compétence** (chaque entrée du
+   vocabulaire porte ses `indices`, écrits à la main : sans cela une phrase quelconque « prouverait » SCADA) ; le poste ne
+   contient aucun titre du parcours. Le poste écrit sur la ligne est **le titre du parcours**, jamais le texte du
+   modèle. Une compétence citée deux fois garde son niveau le plus haut. Chaque refus a sa raison ; l'écran donne le
+   nombre et la répartition par raison, et le journal serveur la liste. Une réponse coupée par la limite de sortie est un
+   échec dit, pas une fiche vide.
 3. **La fiche est un fait avec preuve** : un écart « Compétences prouvées » de la revue du CV, coché d'avance
    (ADR-0028), chaque ligne montrant sa phrase et son poste. Elle est écrite dans `faits.competences` du profil.
 4. **Les outils du CV n'entrent plus dans `motsTechnique`.** L'écart « Vocabulaire technique du barème » (conséquence)
@@ -39,7 +43,8 @@ mot sans rapport (« across », « process », « patriot »).
 6. **Deux régimes de comparaison dans `scoreFitRole`.** Le vocabulaire d'origine du barème (expressions écrites à la
    main, ADR-0013) garde la comparaison par sous-chaîne, pour que « robotic » trouve toujours « robotics » : rien ne
    bouge pour lui. Tout autre terme de `motsTechnique` (ceux ajoutés depuis un CV) et les expressions de la fiche se
-   comparent par **mots entiers** (`contientMot` : frontière lettre/chiffre de chaque côté, pluriel simple accepté).
+   comparent par **mots entiers** (`contientMot` : frontière lettre/chiffre de chaque côté ; trait d'union = espace ;
+   pluriel simple pour un terme de plus de 3 lettres, version collée « ROS2 » pour un terme court, jamais « Ross »).
    C'est ce qui règle le profil v7 déjà enregistré sans migration ni geste de Marc.
 7. Le diagnostic (`diagnostic_bareme`) utilise la même fonction (`motsTechniqueDe`) : il ne peut pas décrire une
    comparaison que la note n'applique pas.
@@ -57,9 +62,10 @@ L'analyse d'un CV se fait à chaque dépôt ou ré-analyse, pas à chaque offre.
   régler une note.
 - **R2 — la vérification est stricte.** Un modèle qui reformule la phrase au lieu de la recopier la voit écartée. La
   perte est dite à l'écran et coûte une ré-analyse, jamais une fausse ligne.
-- **R3 — la preuve vérifie que la phrase est dans le CV et que le poste est dans le parcours, pas que la phrase se lit
-  dans CE poste.** Une phrase d'une section « compétences » rattachée à un poste du parcours passe. [Probable] acceptable
-  : la phrase reste citée telle quelle et Marc la relit à l'écran.
+- **R3 — la preuve vérifie que la phrase est dans le CV, qu'elle nomme la compétence et que le poste est un titre du
+  parcours, pas que la phrase se lit dans CE poste.** Une phrase d'une section « compétences » rattachée à un poste du
+  parcours passe. [Probable] acceptable : la phrase reste citée telle quelle et Marc la relit à l'écran. Un CV sans
+  parcours (aucun poste daté) n'obtient aucune ligne : le refus est dit, il n'est pas contourné.
 - **R4 — des termes courts non préfixés par le vocabulaire d'origine changent de régime.** Un terme ajouté depuis un
   CV qui comptait sur la sous-chaîne (« robotiques » pour « robotique ») ne trouve plus que le mot entier. [Probable] sans
   conséquence ici : les termes composés du profil v7 (« robotiques », « conception de cellules »…) s'écrivent tels quels
