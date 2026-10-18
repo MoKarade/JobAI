@@ -26,7 +26,7 @@
 // tels quels. Seul `meilleures` nomme des offres (entreprise, poste) : c'est pour Claude et
 // Marc via le connecteur, pas pour un commentaire de dépôt public.
 
-import { computeScore, facteurDomaine, normaliserTitre, type DetailNote } from "./scoring";
+import { computeScore, facteurDomaine, motsTechniqueDe, normaliserTitre, type DetailNote } from "./scoring";
 import { PROFIL_DEFAUT, type Profil } from "./profil";
 import { lireCodeNoc } from "./nocProfession";
 import type { Offre } from "./types";
@@ -267,7 +267,7 @@ export function diagnostiquerBareme(
         facteurDomaine: d.facteurDomaine,
         totalComplet: d.total,
         motsCoordinationTrouves: motsTrouves(texte, profil.motsCoordination),
-        motsTechniqueTrouves: motsTrouves(texte, profil.motsTechnique),
+        motsTechniqueTrouves: motsTechniqueDe(texte, profil),
       };
     });
 

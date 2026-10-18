@@ -19,6 +19,7 @@ import { exigerSession } from "../session";
 import { lireOffres } from "../donnees";
 import { lireMetiers } from "../actionsMetiers";
 import { extraireTexte, TAILLE_MAX_OCTETS } from "./texte";
+import { resumeDesRefus } from "../competences";
 import { extraireFaits } from "./extraction";
 import {
   activerProfil,
@@ -106,7 +107,11 @@ export async function televerserCv(donnees: FormData): Promise<Resultat<{ id: nu
 
   revalidatePath("/profil");
   return faits.ok
-    ? { ok: true, valeur: { id }, message: "CV lu. Vérifie ce qu'il propose avant d'appliquer." }
+    ? {
+        ok: true,
+        valeur: { id },
+        message: `CV lu. Vérifie ce qu'il propose avant d'appliquer.${resumeDesRefus(faits.competencesRejetees)}`,
+      }
     : { ok: true, valeur: { id }, message: `CV enregistré, mais l'analyse a échoué : ${faits.raison}` };
 }
 
@@ -133,7 +138,9 @@ export async function reanalyserCv(id: number): Promise<Resultat> {
   });
 
   revalidatePath("/profil");
-  return faits.ok ? { ok: true, message: "Analyse refaite." } : { ok: false, erreur: faits.raison };
+  return faits.ok
+    ? { ok: true, message: `Analyse refaite.${resumeDesRefus(faits.competencesRejetees)}` }
+    : { ok: false, erreur: faits.raison };
 }
 
 /**

@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-10-18 — JobAI#155 : la fiche de compétences prouvées par le CV (ADR-0033)
+
+- **Avant** : les outils lus dans le CV entraient tels quels dans `motsTechnique` et se comparaient aux offres par morceaux
+  de mots. Mesuré le 17/10 : `ros` dans « prosthesis » avait fait de la meilleure note (77) une offre de prothésiste dentaire,
+  `unity` dans « community » la deuxième.
+- **Fait** : `lib/competences.ts` (vocabulaire fermé de 25 compétences, niveau `notions`/`pratique`/`maitrise`, preuve =
+  phrase du CV + poste, `verifierCompetences` qui retrouve la phrase dans le texte du CV avant de l'accepter) ; l'analyse du
+  CV rend la fiche dans le même appel (`max_tokens` 2 000 → 5 000) ; écart « Compétences prouvées » coché d'avance ;
+  l'écart « vocabulaire technique » disparaît ; `scoreFitRole` compare à **mots entiers** tout terme qui n'est pas du
+  vocabulaire d'origine du barème (`contientMot`, `termesTechniques`, `lib/scoring.ts`), `diagnostic_bareme` aussi.
+- **Effet à connaître** : le profil v7 déjà enregistré est corrigé sans migration (ses 29 termes ajoutés passent à mots
+  entiers). Les notes déjà stockées ne bougent qu'à la prochaine re-notation.
+- **À faire par Marc** : ré-analyser son CV sur `/profil` (le même geste que JobAI#154) ; la fiche apparaît dans la revue avec
+  une phrase et un poste par ligne. Preuve en production : `diagnostic_bareme` (offre de prothésiste : plus de terme
+  technique trouvé), puis la fiche lue avec Marc.
+
 ## 2026-10-17 — JobAI#152 : le salaire passe en premier dans la note, après un aperçu (ADR-0032)
 
 - **Avant** : poids rôle 40, distance 20, séniorité 15, salaire 10, statut migratoire 10, conditions 5 ; l'axe du salaire

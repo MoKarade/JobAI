@@ -255,6 +255,7 @@ describe("ce que le changement d'échelle emporte avec lui", () => {
       outils: [],
       titresOccupes: [],
       recherchesSuggerees: [],
+      competences: [],
       forces: [],
       manques: [],
     };

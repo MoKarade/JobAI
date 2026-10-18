@@ -29,6 +29,7 @@ import {
   paliersSenioriteDepuisAnnees,
   type Profil,
 } from "../profil";
+import { definition, fichePourLecture } from "../competences";
 import { parserProfilStocke } from "../profilStocke";
 import type { ReponseExtraction } from "./extraction";
 
@@ -160,6 +161,32 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
     });
   }
 
+  // ── La fiche de compétences (ADR-0033) ───────────────────────────────────
+  // Un fait AVEC preuve : chaque ligne cite la phrase du CV et le poste, retrouvés dans le texte
+  // par l'extraction. C'est ce qui l'autorise à être cochée d'avance (ADR-0028). Elle remplace
+  // l'ancien ajout des outils au vocabulaire du barème : la fiche règle la note par ses propres
+  // expressions, à mots entiers, jamais en ajoutant des morceaux de mots à `motsTechnique`.
+  const signatureFiche = (xs: readonly { id: string; niveau: string; phrase: string; poste: string }[]) =>
+    JSON.stringify(xs.map((c) => `${c.id}|${c.niveau}|${c.phrase}|${c.poste}`.toLowerCase()).sort());
+  if (
+    extraction.competences.length > 0 &&
+    signatureFiche(extraction.competences) !== signatureFiche(courant.faits.competences)
+  ) {
+    ecarts.push({
+      cle: "faits.competences",
+      libelle: "Compétences prouvées",
+      nature: "fait",
+      avant:
+        courant.faits.competences.length === 0
+          ? "non établies"
+          : courant.faits.competences.map((c) => definition(c.id)?.libelle ?? c.id).join(", "),
+      apres: fichePourLecture(extraction.competences).join("\n"),
+      provenance: "Chaque ligne cite sa phrase et son poste, retrouvés dans le texte du CV.",
+      preuve: true,
+      valeur: extraction.competences,
+    });
+  }
+
   // ── Les conséquences sur le barème ───────────────────────────────────────
   // Le CV ne PROPOSE pas ces valeurs : le code les DÉDUIT des faits ci-dessus. Étiquetées
   // « conséquence » pour que Marc puisse retenir le fait sans retenir ce qu'on en tire.
@@ -204,25 +231,6 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
       provenance: `Ajout de ${nouvelles.length} terme(s) déduits du parcours.`,
       preuve: false,
       valeur: [...courant.recherches, ...nouvelles],
-    });
-  }
-
-  // Les outils du CV enrichissent le vocabulaire technique du barème : c'est ce qui fait
-  // qu'une annonce mentionnant une compétence réelle de Marc cesse d'être notée « hors
-  // sujet ». Ajout seul, jamais de remplacement.
-  const motsNouveaux = extraction.outils
-    .map((o) => o.toLowerCase().trim())
-    .filter((o) => o.length >= 3 && !courant.motsTechnique.includes(o));
-  if (motsNouveaux.length > 0) {
-    ecarts.push({
-      cle: "motsTechnique",
-      libelle: "Vocabulaire technique du barème",
-      nature: "consequence",
-      avant: listeEnTexte(courant.motsTechnique),
-      apres: listeEnTexte([...courant.motsTechnique, ...motsNouveaux]),
-      provenance: `Ajout de ${motsNouveaux.length} terme(s) tirés des outils du CV.`,
-      preuve: false,
-      valeur: [...courant.motsTechnique, ...motsNouveaux],
     });
   }
 
