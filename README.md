@@ -84,9 +84,10 @@ le module CV** : `lib/cv/extraction.ts` appelle Anthropic (Haiku 4.5) pour lire 
 n'était donc plus une absence, c'était un **trou** — le total affiché par le hub ignorait ce
 que JobAI dépense.
 
-Il y a trois sites d'appel de modèle dans le dépôt, tous comptés au même endroit : `lib/cv/extraction.ts`
-(lecture d'un CV), `lib/analyseMarcheLlm.ts` (lecture des tendances de la veille) et `lib/candidatureLlm.ts`
-(brouillon de CV et de lettre pour une offre, JobAI#108) ; `lib/cv/proposition.ts`, `lib/cv/renotation.ts` et la
+Il y a quatre sites d'appel de modèle dans le dépôt, tous comptés au même endroit : `lib/cv/extraction.ts`
+(lecture d'un CV), `lib/analyseMarcheLlm.ts` (lecture des tendances de la veille), `lib/candidatureLlm.ts`
+(brouillon de CV et de lettre pour une offre, JobAI#108) et `lib/comparaisonOffreLlm.ts` (exigences d'une annonce,
+JobAI#157) ; `lib/cv/proposition.ts`, `lib/cv/renotation.ts` et la
 notation des offres sont déterministes. Il est désormais compté au moment où il est facturé,
 accumulé dans l'état, converti en dollars US et publié :
 

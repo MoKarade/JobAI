@@ -61,7 +61,18 @@ de l'ordre de 0,3 à 1 $ US. Pas de plafond dur (décision de Marc du 16/10 : su
 
 ## Audit sur le jeu de départ (protocole de précision)
 
-À remplir avec le résultat mesuré (voir HANDOVER du 2026-10-19).
+Mesuré le 2026-10-19 avec `eligibiliteComparaison` sur le jeu de départ (`SEED`, 53 offres, fictives) :
+
+| Constat | Nombre |
+| --- | --- |
+| Offres du jeu de départ | 53 |
+| Ouvertes (ni `histo`, ni périmée) | 38 |
+| Avec un `texteNote` non vide | 0 |
+| Refusées : « aucun texte d'annonce » | 38 |
+| Refusées : périmée ou archivée | 15 |
+| Éligibles à la comparaison | 0 |
+
+Lecture : sur le jeu de départ, la fonction ne change rien à aucune offre (aucune n'est éligible), et elle ne touche ni la note ni le suivi. Ce que ça ne dit pas : la part des offres de production qui portent un `texteNote` (pas d'accès à la base depuis cette session). L'audit sur de vraies offres est la preuve de la tâche : 5 offres relues avec Marc, verdict accepté ou refusé, coût lu dans le bloc `usage` du hub.
 
 ## Retour arrière
 

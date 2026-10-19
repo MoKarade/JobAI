@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-54 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+55 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -50,6 +50,7 @@
 - [ADR-0031 — Les erreurs partent à Sentry, expurgées, et seulement si un DSN est posé](adr/0031-les-erreurs-partent-a-sentry-expurgees.md) — `docs/adr/0031-les-erreurs-partent-a-sentry-expurgees.md`
 - [ADR-0032 — Le salaire passe en premier dans la note, appliqué après un aperçu avant/après](adr/0032-le-salaire-passe-en-premier-dans-la-note.md) — `docs/adr/0032-le-salaire-passe-en-premier-dans-la-note.md`
 - [ADR-0033 — La fiche de compétences prouvées par le CV, en vocabulaire fermé](adr/0033-la-fiche-de-competences-prouvees-par-le-cv.md) — `docs/adr/0033-la-fiche-de-competences-prouvees-par-le-cv.md`
+- [ADR-0034 — Comparer les exigences d'une offre à la fiche de compétences, au clic, pour les meilleures offres](adr/0034-comparer-les-exigences-d-une-offre-a-la-fiche.md) — `docs/adr/0034-comparer-les-exigences-d-une-offre-a-la-fiche.md`
 - [Décisions d'architecture (ADR)](adr/README.md) — `docs/adr/README.md`
 
 ## docs/claude/

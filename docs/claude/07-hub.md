@@ -32,9 +32,9 @@ Un test vert sur un champ retiré est exactement le genre de vert dont on prend 
   **Règle de maintenance** : chaque phase qui rend une métrique réellement disponible la
   branche ici et fait passer le statut à `ok`. Jamais de chiffre fabriqué.
 - Le bloc `usage` (coût LLM) n'est publié que **mesuré**, jamais estimé — et **pas du tout**
-  tant qu'aucun appel n'a eu lieu (`amount: 0` affirmerait « JobAI ne coûte rien »). Trois
+  tant qu'aucun appel n'a eu lieu (`amount: 0` affirmerait « JobAI ne coûte rien »). Quatre
   sites d'appel dans le dépôt (`lib/cv/extraction.ts`, `lib/analyseMarcheLlm.ts`,
-  `lib/candidatureLlm.ts`), chacun comptabilise lui-même, AU site d'appel (laisser chaque appelant y
+  `lib/candidatureLlm.ts`, `lib/comparaisonOffreLlm.ts`), chacun comptabilise lui-même, AU site d'appel (laisser chaque appelant y
   penser serait « un outil qu'on peut oublier d'appeler »). Pas de plafond dur : Marc a tranché
   « surveiller » le 16/10, la dépense s'affiche. Les
   prix, le cumul et la règle de publication sont PURS (`lib/coutLlm.ts`), la lecture/écriture

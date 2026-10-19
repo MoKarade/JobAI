@@ -5,7 +5,7 @@
 // affiche « aucune offre » alors que la base n'est pas configurée envoie Marc chercher un
 // bug dans ses données au lieu de sa configuration.
 
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { offerReasons, offers } from "./db/schema";
 import { assurerMigrations } from "./migrations";
@@ -133,4 +133,20 @@ export async function remplacerRaisons(offreId: string, raisons: readonly Raison
   await db.insert(offerReasons).values(
     raisons.map((r, i) => ({ offerId: offreId, ton: r.ton, texte: r.texte, ordre: i })),
   );
+}
+
+/**
+ * Le rang d'une offre parmi les offres OUVERTES, par note : 1 + le nombre d'offres ouvertes de note strictement plus haute.
+ * `null` si l'offre n'a pas de note, ou si la base n'est pas configurée.
+ *
+ * Ouverte = ni historique ni périmée (`histo` faux, `perimee_le` nul). Les égalités partagent le même rang : une offre
+ * ne passe pas derrière une autre qui a la même note.
+ */
+export async function rangParNote(offre: Pick<Offre, "score">): Promise<number | null> {
+  if (!process.env.DATABASE_URL || offre.score === null) return null;
+  const [ligne] = await db
+    .select({ n: count() })
+    .from(offers)
+    .where(and(eq(offers.histo, false), isNull(offers.perimeeLe), gt(offers.score, offre.score)));
+  return (ligne?.n ?? 0) + 1;
 }

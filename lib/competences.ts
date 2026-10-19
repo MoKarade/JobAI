@@ -156,7 +156,7 @@ export function replier(s: string): string {
 }
 
 /** La phrase nomme-t-elle la compétence ? Un indice de l'entrée du vocabulaire, à mots entiers. */
-function phraseMontre(phrase: string, d: DefinitionCompetence): boolean {
+export function phraseMontre(phrase: string, d: DefinitionCompetence): boolean {
   const repliee = replier(phrase);
   const brut = phrase.toLowerCase();
   return d.indices.some((i) => {

@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-10-19 — JobAI#157 : « ce que l'offre exige » face à la fiche de compétences (ADR-0034)
+
+- **Avant** : la note comparait des mots du titre, pas ce que l'annonce demande.
+- **Fait** : sur la page d'une offre, section « Ce que l'offre exige » et bouton « Comparer à ma fiche de compétences ».
+  Un appel Haiku (`lib/comparaisonOffreLlm.ts`) relève les exigences de l'annonce SANS connaître la fiche ; le code
+  (`lib/comparaisonOffre.ts`, pur) vérifie chaque phrase dans l'annonce et rend le verdict : « tu as », « notions », « il te
+  manque (pas sur ta fiche) », ou « hors fiche » quand le vocabulaire de 25 compétences ne sait pas comparer.
+  Réservé aux 100 meilleures offres (`rangParNote`, `lib/donnees.ts`), à un clic, jamais en lot. Rien n'est conservé ; la
+  note et le suivi ne bougent pas. L'appel est compté au site d'appel : le bloc `usage` du hub apparaît au premier clic.
+- **Mesuré sur le jeu de départ** : 0 offre éligible sur 53 (aucune n'a de texte d'annonce) ; voir l'ADR. Sur les offres de
+  production, la part qui porte un `texteNote` est **à confirmer**.
+- **À faire par Marc** : ré-analyser son CV sur `/profil` (sans fiche, le bouton dit pourquoi il refuse) ; ouvrir 5 des
+  meilleures offres, comparer, relire les verdicts avec Claude ; le coût se lit dans le bloc `usage` du hub.
+
+---
+
 ## 2026-10-18 — JobAI#155 : la fiche de compétences prouvées par le CV (ADR-0033)
 
 - **Avant** : les outils lus dans le CV entraient tels quels dans `motsTechnique` et se comparaient aux offres par morceaux

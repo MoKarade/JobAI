@@ -30,7 +30,7 @@ import {
 } from "./candidature";
 
 /**
- * Haiku, comme les deux autres sites d'appel : rédiger deux textes courts à partir de faits
+ * Haiku, comme les autres sites d'appel : rédiger deux textes courts à partir de faits
  * donnés ne demande pas un raisonnement difficile, et le bouton se clique plusieurs fois.
  */
 const MODELE = "claude-haiku-4-5-20251001";
