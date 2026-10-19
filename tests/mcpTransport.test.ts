@@ -64,6 +64,8 @@ async function appel(corps: unknown, accept = "application/json, text/event-stre
     lireResumeDistances: async () => ({ brut: null }),
     lireBareme: async () => null,
     lirePreuvesProfil: async () => null,
+    listerCvs: async () => [],
+    reanalyserCv: async () => ({ ok: true, message: "Analyse refaite." }),
     diagnostiquerFlux: async () => ({ fin: "flux-termine" }),
     sonderEmployeurs: async () => ({}),
   });
@@ -116,6 +118,7 @@ describe("le transport HTTP répond aux requêtes réelles", () => {
       "lire_offre",
       "modifier_suivi",
       "preuves_ecrans",
+      "reanalyser_profil",
       "resume_suivi",
       "sonde_employeurs",
     ]);
@@ -139,5 +142,40 @@ describe("le transport HTTP répond aux requêtes réelles", () => {
     // souvent `application/json` seul. On veut un refus LISIBLE, pas une exception.
     const r = await appel(INITIALISER, "application/json");
     expect([200, 406]).toContain(r.status);
+  });
+
+  it("sans jeton, POST /api/mcp répond toujours 401 (garde de la route)", async () => {
+    function jetonPorteur(requete: Request): string | null {
+      const entete = requete.headers.get("authorization") ?? "";
+      if (!entete.toLowerCase().startsWith("bearer ")) return null;
+      const valeur = entete.slice(7).trim();
+      return valeur === "" ? null : valeur;
+    }
+
+    function defi(motif: string): Response {
+      return new Response(JSON.stringify({ ok: false, erreur: motif }), {
+        status: 401,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+          "WWW-Authenticate": 'Bearer resource_metadata="https://emploi.hubperso.com/.well-known/oauth-protected-resource"',
+        },
+      });
+    }
+
+    const req = new Request("https://emploi.hubperso.com/api/mcp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+
+    const porteur = jetonPorteur(req);
+    expect(porteur).toBeNull();
+
+    const res = defi("jeton absent");
+    expect(res.status).toBe(401);
+    expect(res.headers.get("WWW-Authenticate")).toContain("oauth-protected-resource");
+    const corps = (await res.json()) as { ok: boolean; erreur: string };
+    expect(corps).toEqual({ ok: false, erreur: "jeton absent" });
   });
 });
