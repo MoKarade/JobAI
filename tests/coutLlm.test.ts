@@ -378,6 +378,31 @@ describe("prix par modèle (JobAI#158) — un token de Sonnet 5.5 ne se facture 
   });
 });
 
+describe("Haiku 5.5 (JobAI#158) — dix fois moins cher que Haiku 4.5, grille des prompts de 100 000 jetons ou moins", () => {
+  const HAIKU_5_5 = "claude-haiku-5-5";
+
+  it("0,10 $ en entrée, 0,50 $ en sortie, écriture de cache ×1,25, lecture de cache ×0,10", () => {
+    expect(coutUsd({ ...COMPTEUR_VIDE, entree: 1e6 }, HAIKU_5_5)).toBeCloseTo(0.1, 10);
+    expect(coutUsd({ ...COMPTEUR_VIDE, sortie: 1e6 }, HAIKU_5_5)).toBeCloseTo(0.5, 10);
+    expect(coutUsd({ ...COMPTEUR_VIDE, ecritureCache: 1e6 }, HAIKU_5_5)).toBeCloseTo(0.125, 10);
+    expect(coutUsd({ ...COMPTEUR_VIDE, lectureCache: 1e6 }, HAIKU_5_5)).toBeCloseTo(0.01, 10);
+  });
+
+  it("les mêmes jetons coûtent dix fois moins cher que chez Haiku 4.5", () => {
+    const c = { ...COMPTEUR_VIDE, appels: 1, entree: 10_000, sortie: 3_000 };
+    // Haiku 4.5 : 0,01 + 0,015 = 0,025 $ ; Haiku 5.5 : 0,001 + 0,0015 = 0,0025 $.
+    expect(coutUsd(c, MODELE_HISTORIQUE)).toBeCloseTo(0.025, 10);
+    expect(coutUsd(c, HAIKU_5_5)).toBeCloseTo(0.0025, 10);
+  });
+
+  it("un appel de Haiku 5.5 s'ajoute au compteur d'avant sans le toucher", () => {
+    const avant = { [MODELE_HISTORIQUE]: { ...COMPTEUR_VIDE, appels: 4, entree: 4000, sortie: 800 } };
+    const apres = ajouterUsageModele(avant, HAIKU_5_5, { input_tokens: 2000, output_tokens: 300 });
+    expect(apres[MODELE_HISTORIQUE]).toEqual(avant[MODELE_HISTORIQUE]);
+    expect(apres[HAIKU_5_5]).toMatchObject({ appels: 1, entree: 2000, sortie: 300 });
+  });
+});
+
 describe("chaque modèle appelé par le dépôt a un prix", () => {
   function sources(dossier: string): string[] {
     return readdirSync(dossier).flatMap((nom) => {

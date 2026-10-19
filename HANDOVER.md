@@ -15,8 +15,9 @@
   du CV aurait été sous-estimé de moitié. Le compteur déjà en base (format à plat) se relit comme celui de Haiku 4.5.
 - **Aussi corrigé en route** : une ré-analyse qui échoue n'efface plus la proposition de profil déjà en base
   (`majExtraction` n'écrivait `null` que pour l'échec ; il n'écrit plus que l'erreur).
-- **Pas fait, à trancher avec Marc** : les trois autres appels (comparaison d'offre, brouillon, tendances) restent à
-  Haiku 4.5. Haiku 5.5 est publié dix fois moins cher (0,10 $ / 0,50 $) : carte posée dans le fil.
+- **Les trois autres appels (comparaison d'offre, brouillon, tendances) passent à Haiku 5.5** : choix de Marc sur la
+  carte du fil le 2026-10-19 (PR de suite, ADR-0035). 0,10 $ / 0,50 $, appel d'outil forcé toujours accepté, effort
+  `low` pour les tendances, plafonds de sortie relevés d'un tiers (tokenizer). Non éprouvé en réel (pas de clé).
 - **Non éprouvé en réel** : aucune clé API dans la session de travail. Les paramètres viennent de la documentation de
   Sonnet 5.5 et du SDK installé. La preuve est la prochaine analyse de Marc (`/profil`, « Ré-analyser le CV »).
 - **À faire par Marc** : la ré-analyse de son CV (le même geste que #154/#155) ; le coût d'une analyse se lit ensuite dans

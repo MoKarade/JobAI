@@ -31,7 +31,7 @@ export const MODELE_HISTORIQUE = "claude-haiku-4-5-20251001";
 export interface PrixModele {
   entree: number;
   sortie: number;
-  /** Lecture de cache : multiple du prix d'entrée (0,10 chez Haiku 4.5, 0,05 chez Sonnet 5.5). */
+  /** Lecture de cache : multiple du prix d'entrée (0,10 chez Haiku 4.5 et 5.5, 0,05 chez Sonnet 5.5). */
   facteurLectureCache: number;
 }
 
@@ -41,7 +41,11 @@ export interface PrixModele {
  *
  * ⚠️ PROVENANCE. Relus le 2026-10-19 sur la page de tarifs de l'API (platform.claude.com/docs/en/about-claude/pricing) :
  *   · Haiku 4.5 : 1 $ en entrée, 5 $ en sortie, lecture de cache 0,10 $ (soit ×0,10) ;
- *   · Sonnet 5.5 : 2 $ en entrée, 10 $ en sortie, lecture de cache 0,10 $ (soit ×0,05).
+ *   · Sonnet 5.5 : 2 $ en entrée, 10 $ en sortie, lecture de cache 0,10 $ (soit ×0,05) ;
+ *   · Haiku 5.5 : 0,10 $ en entrée, 0,50 $ en sortie, lecture de cache ×0,10 (JobAI#158, ADR-0035). ⚠️ C'est la grille
+ *     des prompts de 100 000 jetons ou moins ; au-delà, la grille est 0,50 $ / 2,50 $. Les trois appels de Haiku 5.5
+ *     envoient quelques milliers de jetons (extrait d'annonce de 2 000 caractères, profil, chiffres de la veille) :
+ *     la grille basse est la bonne. Un appel qui dépasserait 100 000 jetons serait sous-estimé ici.
  * Le prix d'écriture de cache (5 minutes) est ×1,25 du prix d'entrée chez les deux (1,25 $ et 2,50 $) : dérivé, jamais
  * recopié, comme avant. La pensée du modèle se facture au prix de SORTIE et est déjà comptée dans `output_tokens`.
  * Haiku 4.5 était aussi dans `CONFIG.LLM_PRIX` de DriveAI (`haiku_in: 1`, `haiku_out: 5`).
@@ -52,6 +56,7 @@ export interface PrixModele {
 export const PRIX_PAR_MODELE: Readonly<Record<string, PrixModele>> = {
   [MODELE_HISTORIQUE]: { entree: 1, sortie: 5, facteurLectureCache: 0.1 },
   "claude-sonnet-5-5": { entree: 2, sortie: 10, facteurLectureCache: 0.05 },
+  "claude-haiku-5-5": { entree: 0.1, sortie: 0.5, facteurLectureCache: 0.1 },
 };
 
 /** Les prix de `modele`, ou `undefined` : une clé héritée (« constructor ») n'est pas un modèle. PURE. */

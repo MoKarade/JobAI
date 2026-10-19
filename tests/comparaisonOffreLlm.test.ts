@@ -33,7 +33,14 @@ const OFFRE = {
   texteNote: ANNONCE,
 } as unknown as Offre;
 
-let appels: { system: string; messages: { content: string }[]; tool_choice: unknown; tools: unknown[] }[] = [];
+let appels: {
+  model: string;
+  max_tokens: number;
+  system: string;
+  messages: { content: string }[];
+  tool_choice: unknown;
+  tools: unknown[];
+}[] = [];
 let reponse: Record<string, unknown> = {};
 let lever: Error | null = null;
 
@@ -125,7 +132,14 @@ describe("comparerOffreALaFiche", () => {
     await comparerOffreALaFiche(OFFRE, FICHE, options);
     expect(comptes).toEqual([{ input_tokens: 900, output_tokens: 150 }]);
     // Le relevé est compté sous le nom du modèle appelé : c'est lui qui donne le prix.
-    expect(modelesComptes).toEqual(["claude-haiku-4-5-20251001"]);
+    expect(modelesComptes).toEqual(["claude-haiku-5-5"]);
+    // Le modèle appelé est celui qui est compté (JobAI#158) : un écart ferait publier le coût au prix d'un autre.
+    expect(appels[0]?.model).toBe("claude-haiku-5-5");
+    // Haiku 5.5 accepte l'appel forcé d'outil ; le tokenizer plus gourmand a relevé le plafond de 1 500 à 2 000.
+    expect(appels[0]?.tool_choice).toEqual({ type: "tool", name: "rendre_exigences" });
+    expect(appels[0]?.max_tokens).toBe(2000);
+    // Haiku 5.5 refuse tout réglage d'échantillonnage hors défaut (400) : aucun n'est envoyé.
+    expect(Object.keys(appels[0] ?? {})).not.toEqual(expect.arrayContaining(["temperature"]));
   });
 
   it("compte l'appel même quand la réponse est inutilisable", async () => {

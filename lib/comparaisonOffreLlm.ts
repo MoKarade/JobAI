@@ -30,14 +30,18 @@ import {
 /** Borne de l'appel : sous le `maxDuration` de la page (60 s), pour qu'une panne se dise au lieu de tuer la fonction. */
 const DELAI_MS = 40_000;
 
-/** Haiku 4.5 (choix à trancher avec Marc, ADR-0035) : relever des phrases dans un extrait ne demande pas de raisonner. */
-const MODELE = "claude-haiku-4-5-20251001";
+/**
+ * Haiku 5.5 (choix de Marc, ADR-0035) : relever des phrases dans un extrait ne demande pas de raisonner. L'appel d'outil
+ * forcé est accepté par ce modèle, sans pensée avant l'outil.
+ */
+const MODELE = "claude-haiku-5-5";
 
 /**
  * Borne de COÛT : quinze exigences de moins de 200 caractères tiennent dans ce plafond. Une coupure
  * (`stop_reason: max_tokens`) laisse l'appel d'outil incomplet : elle est DITE, jamais rendue comme une liste.
+ * 2 000 et non 1 500 : le tokenizer de Haiku 5.5 donne environ 30 % de jetons de plus pour le même texte.
  */
-const MAX_TOKENS = 1500;
+const MAX_TOKENS = 2000;
 
 export type ResultatComparaison =
   | {

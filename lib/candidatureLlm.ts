@@ -30,17 +30,19 @@ import {
 } from "./candidature";
 
 /**
- * Haiku 4.5 (le choix du modèle de ce site est à trancher avec Marc, ADR-0035) : rédiger deux textes courts à partir de faits
- * donnés ne demande pas un raisonnement difficile, et le bouton se clique plusieurs fois.
+ * Haiku 5.5, le Haiku de la génération courante (choix de Marc, ADR-0035) : rédiger deux textes courts à partir de faits
+ * donnés ne demande pas un raisonnement difficile, et le bouton se clique plusieurs fois. Haiku 5.5 ACCEPTE l'appel forcé
+ * d'outil (`tool_choice` « tool ») ; il ne pense alors pas avant l'outil, donc rien de plus à régler ici.
  */
-const MODELE = "claude-haiku-4-5-20251001";
+const MODELE = "claude-haiku-5-5";
 
 /**
  * Borne de COÛT et de lisibilité : un CV ciblé et une lettre tiennent largement dans ce
  * plafond. Une coupure (`stop_reason: max_tokens`) laisse l'appel de l'outil incomplet : elle
- * est DITE comme telle, jamais rendue comme un brouillon.
+ * est DITE comme telle, jamais rendue comme un brouillon. 4 000 et non 3 000 : le tokenizer de Haiku 5.5 donne environ
+ * 30 % de jetons de plus pour le même texte que celui de Haiku 4.5.
  */
-const MAX_TOKENS = 3000;
+const MAX_TOKENS = 4000;
 
 const CONSIGNE = [
   "Tu prépares un BROUILLON de CV ciblé et de lettre de présentation, en français québécois,",

@@ -84,7 +84,7 @@ le module CV** : `lib/cv/extraction.ts` appelle Anthropic (Sonnet 5.5 depuis Job
 n'était donc plus une absence, c'était un **trou** — le total affiché par le hub ignorait ce
 que JobAI dépense.
 
-Il y a quatre sites d'appel de modèle dans le dépôt, tous comptés au même endroit : `lib/cv/extraction.ts`
+Il y a quatre sites d'appel de modèle dans le dépôt (Sonnet 5.5 pour le CV, Haiku 5.5 pour les trois autres, JobAI#158), tous comptés au même endroit : `lib/cv/extraction.ts`
 (lecture d'un CV), `lib/analyseMarcheLlm.ts` (lecture des tendances de la veille), `lib/candidatureLlm.ts`
 (brouillon de CV et de lettre pour une offre, JobAI#108) et `lib/comparaisonOffreLlm.ts` (exigences d'une annonce,
 JobAI#157) ; `lib/cv/proposition.ts`, `lib/cv/renotation.ts` et la
