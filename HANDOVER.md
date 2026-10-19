@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-10-19 — JobAI#158 : l'analyse du CV passe à Sonnet 5.5 (ADR-0035)
+
+- **Avant** : tous les appels du dépôt utilisaient Haiku 4.5 ; la règle de Marc est « dernière génération seulement ».
+- **Fait** : l'analyse du CV appelle `claude-sonnet-5-5` (2 $ / 10 $ par million de jetons). Ce modèle REFUSE l'appel
+  forcé d'outil : `tool_choice: auto` + consigne, sans pensée avant l'outil (`between_tools`, effort `medium`),
+  `max_tokens` 8 000. Le compteur de coût du hub est PAR MODÈLE (`PRIX_PAR_MODELE`, `lib/coutLlm.ts`) : sans cela le coût
+  du CV aurait été sous-estimé de moitié. Le compteur déjà en base (format à plat) se relit comme celui de Haiku 4.5.
+- **Aussi corrigé en route** : une ré-analyse qui échoue n'efface plus la proposition de profil déjà en base
+  (`majExtraction` n'écrivait `null` que pour l'échec ; il n'écrit plus que l'erreur).
+- **Pas fait, à trancher avec Marc** : les trois autres appels (comparaison d'offre, brouillon, tendances) restent à
+  Haiku 4.5. Haiku 5.5 est publié dix fois moins cher (0,10 $ / 0,50 $) : carte posée dans le fil.
+- **Non éprouvé en réel** : aucune clé API dans la session de travail. Les paramètres viennent de la documentation de
+  Sonnet 5.5 et du SDK installé. La preuve est la prochaine analyse de Marc (`/profil`, « Ré-analyser le CV »).
+- **À faire par Marc** : la ré-analyse de son CV (le même geste que #154/#155) ; le coût d'une analyse se lit ensuite dans
+  le bloc `usage` du hub, de l'ordre de quelques cents.
+
+---
+
 ## 2026-10-19 — JobAI#157 : « ce que l'offre exige » face à la fiche de compétences (ADR-0034)
 
 - **Avant** : la note comparait des mots du titre, pas ce que l'annonce demande.

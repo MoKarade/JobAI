@@ -41,11 +41,11 @@ import {
 import { calculerAnnees, LONGUEUR_MAX_DETAIL } from "./anneesExperience";
 
 /**
- * Haiku suffit : l'extraction structurée d'un document court est exactement ce qu'il fait
- * bien, et le budget du projet ne supporterait pas de faire lire chaque offre par un modèle
- * plus cher (ADR-0009, impact coût).
+ * Sonnet 5.5, le modèle de la génération courante (JobAI#158, ADR-0035). L'analyse du CV est un appel par document et
+ * c'est la lecture la plus lourde du dépôt : la fiche de compétences et les faits qui serviront en entrevue
+ * valent un modèle plus fort que Haiku. Les autres appels (offres, tendances, brouillon) restent à trancher avec Marc.
  */
-const MODELE = "claude-haiku-4-5-20251001";
+const MODELE = "claude-sonnet-5-5";
 
 /** Un CV plus long que ça n'est pas un CV. Borne de coût, pas de sécurité. */
 const LONGUEUR_MAX_CV = 60_000;
@@ -256,7 +256,8 @@ const CONSIGNE = [
   "manques : une compétence ou une exigence courante du métier que le CV ne montre PAS.",
   "Ce sont des constats sur le document, pas des conseils de carrière.",
   "",
-  "Réponds UNIQUEMENT par un objet JSON conforme au schéma fourni. Aucun texte autour.",
+  "Rends ta réponse en appelant l'outil rendre_profil, une seule fois, avec un objet conforme à son schéma.",
+  "Aucun texte autour.",
 ].join("\n");
 
 /** Le schéma d'outil : c'est lui qui force une sortie structurée plutôt qu'à la prière. */
@@ -411,7 +412,7 @@ export async function extraireFaits(
      * oubli produirait un cumul silencieusement amputé. Injecté pour rester testable sans
      * base — le module ne connaît toujours aucune I/O de persistance en propre.
      */
-    comptabiliser?: (usage: unknown) => Promise<void>;
+    comptabiliser?: (usage: unknown, modele: string) => Promise<void>;
     /** L'horloge du calcul (« Présent » = ce mois-ci). Injectée pour rester testable. */
     aujourdhui?: Date;
   } = {},
@@ -438,10 +439,18 @@ export async function extraireFaits(
     const client = new Anthropic({ apiKey: cle });
     reponse = await client.messages.create({
       model: MODELE,
-      max_tokens: 5000,
+      // 8 000 et non 5 000 : le tokenizer de Sonnet 5.5 découpe le même texte en plus de jetons que celui de Haiku 4.5.
+      max_tokens: 8000,
       system: CONSIGNE,
       tools: [OUTIL_EXTRACTION],
-      tool_choice: { type: "tool", name: "rendre_profil" },
+      // ⚠️ SONNET 5.5 REFUSE L'APPEL FORCÉ (400 « type "tool" and "any" are not supported ») : `auto` et la consigne
+      // d'appeler l'outil. Un modèle qui répondrait en texte tombe dans « pas de résultat structuré » plus bas, et son
+      // appel est compté quand même.
+      tool_choice: { type: "auto" },
+      // Pas de pensée avant l'outil : l'extraction recopie un document, elle ne raisonne pas. La pensée se facture en
+      // sortie (10 $ par million) et, au défaut (adaptative, effort « high »), elle ferait grimper le coût d'un CV.
+      thinking: { type: "between_tools" },
+      output_config: { effort: "medium" },
       messages: [
         {
           role: "user",
@@ -472,7 +481,7 @@ export async function extraireFaits(
   // appelant qui passe le sien. Perdre la mesure d'un appel est regrettable ; perdre
   // l'analyse d'un CV parce que la comptabilité a hoqueté ne l'est pas.
   try {
-    await comptabiliser(reponse.usage);
+    await comptabiliser(reponse.usage, MODELE);
   } catch (e) {
     console.error("[cv] comptabilité de l'appel impossible", e);
   }
@@ -485,6 +494,8 @@ export async function extraireFaits(
 
   const bloc = reponse.content.find((c) => c.type === "tool_use");
   if (!bloc || bloc.type !== "tool_use") {
+    // Sans appel forcé (Sonnet 5.5), un modèle peut répondre en texte : on garde la trace de la fréquence (ADR-0035, R1).
+    console.error("[cv] réponse sans appel d'outil", { stop_reason: reponse.stop_reason });
     return {
       ok: false,
       raison: `Le modèle n'a pas rendu de résultat structuré (fin : ${reponse.stop_reason}).`,

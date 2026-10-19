@@ -13,9 +13,15 @@
 //    discrètement amputé est pire qu'une erreur visible : il se présente comme une mesure.
 
 import { describe, it, expect } from "vitest";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { validateSummary } from "@mokarade/hub-contract";
 import {
   COMPTEUR_VIDE,
+  MODELE_HISTORIQUE,
+  PRIX_PAR_MODELE,
+  ajouterUsageModele,
+  coutUsdTotal,
   FACTEUR_ECRITURE_CACHE,
   FACTEUR_LECTURE_CACHE,
   PRIX_USD_PAR_MTOK,
@@ -62,7 +68,7 @@ describe("lireUsage — ce qui se lit, et ce qui s'avoue illisible", () => {
     const lu = lireUsage(USAGE_SIMPLE);
     expect(lu?.ecritureCache).toBe(0);
     expect(lu?.lectureCache).toBe(0);
-    expect(Number.isNaN(coutUsd({ ...COMPTEUR_VIDE, ...lu!, appels: 1 }))).toBe(false);
+    expect(Number.isNaN(coutUsd({ ...COMPTEUR_VIDE, ...lu!, appels: 1 }, MODELE_HISTORIQUE))).toBe(false);
   });
 
   it("compte les tokens de cache quand ils sont là — ils se PAIENT", () => {
@@ -103,7 +109,7 @@ describe("ajouterUsage — un cumul est un cumul", () => {
   it("aucun NaN ne peut entrer, même sur une longue série", () => {
     let c = COMPTEUR_VIDE;
     for (let i = 0; i < 20; i++) c = ajouterUsage(c, USAGE_SIMPLE);
-    expect(Number.isFinite(coutUsd(c))).toBe(true);
+    expect(Number.isFinite(coutUsd(c, MODELE_HISTORIQUE))).toBe(true);
     expect(c.appels).toBe(20);
   });
 
@@ -113,7 +119,7 @@ describe("ajouterUsage — un cumul est un cumul", () => {
     expect(apres.ignores).toBe(1);
     expect(apres.appels).toBe(1);
     expect(apres.entree).toBe(un.entree);
-    expect(coutUsd(apres)).toBe(coutUsd(un));
+    expect(coutUsd(apres, MODELE_HISTORIQUE)).toBe(coutUsd(un, MODELE_HISTORIQUE));
   });
 
   it("ne mute pas le compteur qu'on lui donne", () => {
@@ -126,19 +132,19 @@ describe("ajouterUsage — un cumul est un cumul", () => {
 describe("coutUsd — les prix, et d'où ils viennent", () => {
   it("entrée et sortie, aux prix repris de DriveAI/src/Config.gs", () => {
     // 1 M de tokens d'entrée = 1 $, 1 M de sortie = 5 $.
-    expect(coutUsd({ ...COMPTEUR_VIDE, entree: 1e6 })).toBeCloseTo(PRIX_USD_PAR_MTOK.entree, 10);
-    expect(coutUsd({ ...COMPTEUR_VIDE, sortie: 1e6 })).toBeCloseTo(PRIX_USD_PAR_MTOK.sortie, 10);
+    expect(coutUsd({ ...COMPTEUR_VIDE, entree: 1e6 }, MODELE_HISTORIQUE)).toBeCloseTo(PRIX_USD_PAR_MTOK.entree, 10);
+    expect(coutUsd({ ...COMPTEUR_VIDE, sortie: 1e6 }, MODELE_HISTORIQUE)).toBeCloseTo(PRIX_USD_PAR_MTOK.sortie, 10);
   });
 
   it("les prix de cache sont DÉRIVÉS du prix d'entrée, pas recopiés", () => {
     // Le test se dérive des mêmes constantes que le code : codé « 1,25 $ », il mentirait
     // au premier rajustement du prix d'entrée — et un prix recopié finit toujours par
     // diverger de celui dont il dépend.
-    expect(coutUsd({ ...COMPTEUR_VIDE, ecritureCache: 1e6 })).toBeCloseTo(
+    expect(coutUsd({ ...COMPTEUR_VIDE, ecritureCache: 1e6 }, MODELE_HISTORIQUE)).toBeCloseTo(
       PRIX_USD_PAR_MTOK.entree * FACTEUR_ECRITURE_CACHE,
       10,
     );
-    expect(coutUsd({ ...COMPTEUR_VIDE, lectureCache: 1e6 })).toBeCloseTo(
+    expect(coutUsd({ ...COMPTEUR_VIDE, lectureCache: 1e6 }, MODELE_HISTORIQUE)).toBeCloseTo(
       PRIX_USD_PAR_MTOK.entree * FACTEUR_LECTURE_CACHE,
       10,
     );
@@ -166,7 +172,25 @@ describe("relireCompteur — absent, mesure et illisible ne se confondent pas", 
   });
 
   it("relit un compteur écrit", () => {
-    expect(relireCompteur(JSON.stringify(COMPLET))).toEqual({ etat: "compteur", compteur: COMPLET });
+    expect(relireCompteur(JSON.stringify({ parModele: { "claude-sonnet-5-5": COMPLET } }))).toEqual({
+      etat: "compteur",
+      parModele: { "claude-sonnet-5-5": COMPLET },
+    });
+  });
+
+  it("relit l'ancien format à plat comme celui de Haiku 4.5, le seul modèle d'avant JobAI#158", () => {
+    // ⚠️ Le compteur en production est à plat : le perdre ou le prendre pour illisible amputerait le cumul.
+    expect(relireCompteur(JSON.stringify(COMPLET))).toEqual({
+      etat: "compteur",
+      parModele: { [MODELE_HISTORIQUE]: COMPLET },
+    });
+  });
+
+  it("un compteur par modèle dont une entrée est illisible rend tout ILLISIBLE", () => {
+    expect(
+      relireCompteur(JSON.stringify({ parModele: { "claude-sonnet-5-5": COMPLET, autre: { appels: "x" } } })),
+    ).toEqual({ etat: "illisible" });
+    expect(relireCompteur(JSON.stringify({ parModele: 3 }))).toEqual({ etat: "illisible" });
   });
 
   it("un JSON corrompu est ILLISIBLE, pas un compteur à zéro", () => {
@@ -189,14 +213,14 @@ describe("relireCompteur — absent, mesure et illisible ne se confondent pas", 
 describe("coutAPublier — ce que le hub voit", () => {
   it("aucun appel ⇒ rien à publier", () => {
     expect(coutAPublier({ etat: "absent" })).toEqual({ etat: "aucun-appel" });
-    expect(coutAPublier({ etat: "compteur", compteur: COMPTEUR_VIDE })).toEqual({
+    expect(coutAPublier({ etat: "compteur", parModele: { [MODELE_HISTORIQUE]: COMPTEUR_VIDE } })).toEqual({
       etat: "aucun-appel",
     });
   });
 
   it("des appels, aucun mesuré ⇒ pas de montant, mais on le DIT", () => {
     expect(
-      coutAPublier({ etat: "compteur", compteur: { ...COMPTEUR_VIDE, ignores: 3 } }),
+      coutAPublier({ etat: "compteur", parModele: { [MODELE_HISTORIQUE]: { ...COMPTEUR_VIDE, ignores: 3 } } }),
     ).toEqual({ etat: "non-mesure", appelsNonMesures: 3 });
   });
 
@@ -206,7 +230,7 @@ describe("coutAPublier — ce que le hub voit", () => {
     // ~0,0002 $ : le bloc existe, le montant vaut 0.
     const r = coutAPublier({
       etat: "compteur",
-      compteur: { ...COMPTEUR_VIDE, appels: 1, entree: 100, sortie: 20 },
+      parModele: { [MODELE_HISTORIQUE]: { ...COMPTEUR_VIDE, appels: 1, entree: 100, sortie: 20 } },
     });
     expect(r).toEqual({ etat: "mesure", montantUsd: 0, appelsNonMesures: 0 });
   });
@@ -299,14 +323,99 @@ describe("bout en bout : d'un relevé d'API au montant publié", () => {
     // → arrondi au cent : 0,00 $. C'est une MESURE (le bloc existe), pas une absence.
     let c = ajouterUsage(COMPTEUR_VIDE, { input_tokens: 1000, output_tokens: 200 });
     c = ajouterUsage(c, { input_tokens: 1000, output_tokens: 200 });
-    expect(coutUsd(c)).toBeCloseTo(0.004, 10);
+    expect(coutUsd(c, MODELE_HISTORIQUE)).toBeCloseTo(0.004, 10);
 
-    const publie = coutAPublier({ etat: "compteur", compteur: c });
+    const publie = coutAPublier({ etat: "compteur", parModele: { [MODELE_HISTORIQUE]: c } });
     expect(publie).toEqual({ etat: "mesure", montantUsd: 0, appelsNonMesures: 0 });
     expect(construireSummary(RESUME, "2026-08-19T12:00:00.000Z", publie).usage?.cost).toEqual({
       amount: 0,
       currency: "USD",
       period: "total",
     });
+  });
+});
+
+describe("prix par modèle (JobAI#158) — un token de Sonnet 5.5 ne se facture pas au prix de Haiku", () => {
+  const SONNET = "claude-sonnet-5-5";
+
+  it("Sonnet 5.5 : 2 $ en entrée, 10 $ en sortie, lecture de cache ×0,05", () => {
+    expect(coutUsd({ ...COMPTEUR_VIDE, entree: 1e6 }, SONNET)).toBeCloseTo(2, 10);
+    expect(coutUsd({ ...COMPTEUR_VIDE, sortie: 1e6 }, SONNET)).toBeCloseTo(10, 10);
+    expect(coutUsd({ ...COMPTEUR_VIDE, ecritureCache: 1e6 }, SONNET)).toBeCloseTo(2.5, 10);
+    expect(coutUsd({ ...COMPTEUR_VIDE, lectureCache: 1e6 }, SONNET)).toBeCloseTo(0.1, 10);
+  });
+
+  it("les mêmes tokens coûtent plus cher chez Sonnet que chez Haiku", () => {
+    const c = { ...COMPTEUR_VIDE, appels: 1, entree: 10_000, sortie: 3_000 };
+    // Haiku : 0,01 + 0,015 = 0,025 $ ; Sonnet : 0,02 + 0,03 = 0,05 $.
+    expect(coutUsd(c, MODELE_HISTORIQUE)).toBeCloseTo(0.025, 10);
+    expect(coutUsd(c, SONNET)).toBeCloseTo(0.05, 10);
+  });
+
+  it("un modèle sans prix connu ne se chiffre pas : il est compté NON MESURÉ, jamais au prix d'un autre", () => {
+    expect(coutUsd({ ...COMPTEUR_VIDE, entree: 1e6 }, "claude-inconnu-9")).toBeNull();
+    const p = ajouterUsageModele({}, "claude-inconnu-9", { input_tokens: 1000, output_tokens: 100 });
+    expect(p["claude-inconnu-9"]).toEqual({ ...COMPTEUR_VIDE, ignores: 1 });
+    expect(coutAPublier({ etat: "compteur", parModele: p })).toEqual({ etat: "non-mesure", appelsNonMesures: 1 });
+  });
+
+  it("le total est la SOMME des modèles, chacun à son prix", () => {
+    let p = ajouterUsageModele({}, MODELE_HISTORIQUE, { input_tokens: 10_000, output_tokens: 3_000 });
+    p = ajouterUsageModele(p, SONNET, { input_tokens: 10_000, output_tokens: 3_000 });
+    expect(coutUsdTotal(p)).toBeCloseTo(0.075, 10);
+    expect(coutAPublier({ etat: "compteur", parModele: p })).toEqual({
+      etat: "mesure",
+      montantUsd: 0.08,
+      appelsNonMesures: 0,
+    });
+  });
+
+  it("un appel de Sonnet s'ajoute au compteur d'avant sans le toucher", () => {
+    const avant = { [MODELE_HISTORIQUE]: { ...COMPTEUR_VIDE, appels: 4, entree: 4000, sortie: 800 } };
+    const apres = ajouterUsageModele(avant, SONNET, { input_tokens: 5000, output_tokens: 1000 });
+    expect(apres[MODELE_HISTORIQUE]).toEqual(avant[MODELE_HISTORIQUE]);
+    expect(apres[SONNET]).toMatchObject({ appels: 1, entree: 5000, sortie: 1000 });
+  });
+});
+
+describe("chaque modèle appelé par le dépôt a un prix", () => {
+  function sources(dossier: string): string[] {
+    return readdirSync(dossier).flatMap((nom) => {
+      const chemin = join(dossier, nom);
+      return statSync(chemin).isDirectory() ? sources(chemin) : chemin.endsWith(".ts") ? [chemin] : [];
+    });
+  }
+
+  it("tout identifiant « claude-… » écrit dans lib/ est chiffrable, sinon son coût ne se publierait jamais", () => {
+    // ⚠️ Un nouveau modèle sans prix serait compté « non mesuré » en silence : le montant du hub sous-estimerait.
+    const trouves = new Set<string>();
+    for (const f of sources(join(process.cwd(), "lib"))) {
+      for (const m of readFileSync(f, "utf8").matchAll(/"(claude-(?:haiku|sonnet|opus|fable|mythos)-[0-9][0-9a-z-]*)"/g)) {
+        if (m[1] !== undefined) trouves.add(m[1]);
+      }
+    }
+    expect(trouves.size).toBeGreaterThan(0);
+    for (const modele of trouves) expect(PRIX_PAR_MODELE[modele], modele).toBeDefined();
+  });
+
+  it("des jetons déjà en base sous un modèle SANS prix ne se publient jamais comme un coût nul", () => {
+    // ⚠️ Le prix a pu être retiré ou renommé depuis l'écriture : relire ne doit pas rabattre ces appels sur 0 $.
+    const inconnu = { ...COMPTEUR_VIDE, appels: 2, entree: 1000, sortie: 200 };
+    expect(coutAPublier({ etat: "compteur", parModele: { "claude-inconnu-9": inconnu } })).toEqual({
+      etat: "non-mesure",
+      appelsNonMesures: 2,
+    });
+    const mixte = coutAPublier({
+      etat: "compteur",
+      parModele: {
+        "claude-inconnu-9": inconnu,
+        [MODELE_HISTORIQUE]: { ...COMPTEUR_VIDE, appels: 1, entree: 1_000_000 },
+      },
+    });
+    expect(mixte).toEqual({ etat: "mesure", montantUsd: 1, appelsNonMesures: 2 });
+  });
+
+  it("une clé héritée de l'objet (« constructor ») n'est pas un modèle chiffrable", () => {
+    expect(coutUsd({ ...COMPTEUR_VIDE, entree: 1 }, "constructor")).toBeNull();
   });
 });

@@ -30,7 +30,7 @@ import {
 /** Borne de l'appel : sous le `maxDuration` de la page (60 s), pour qu'une panne se dise au lieu de tuer la fonction. */
 const DELAI_MS = 40_000;
 
-/** Haiku, comme les autres sites d'appel : relever des phrases dans un extrait ne demande pas de raisonner. */
+/** Haiku 4.5 (choix à trancher avec Marc, ADR-0035) : relever des phrases dans un extrait ne demande pas de raisonner. */
 const MODELE = "claude-haiku-4-5-20251001";
 
 /**
@@ -62,7 +62,7 @@ export async function comparerOffreALaFiche(
   offre: Offre,
   fiche: readonly CompetenceProuvee[],
   options: {
-    comptabiliser?: (usage: unknown) => Promise<void>;
+    comptabiliser?: (usage: unknown, modele: string) => Promise<void>;
     cle?: string | undefined;
   } = {},
 ): Promise<ResultatComparaison> {
@@ -107,7 +107,7 @@ export async function comparerOffreALaFiche(
   // ⚠️ COMPTÉ ICI, AVANT TOUTE VALIDATION, et sous son propre try : l'appel est facturé même si ce qui suit échoue,
   // et une comptabilité qui hoquette ne doit jamais coûter le résultat.
   try {
-    await comptabiliser(reponse.usage);
+    await comptabiliser(reponse.usage, MODELE);
   } catch (e) {
     console.error("[comparaison] comptabilité de l'appel impossible", e);
   }

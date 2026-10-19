@@ -80,7 +80,7 @@ les décisions dans [`docs/adr/`](./docs/adr/).
 
 Ce README a affirmé pendant des semaines qu'« il n'y a aucun appel LLM dans l'app », et en
 tirait que l'absence de bloc `usage` au contrat du hub était honnête. **C'était faux depuis
-le module CV** : `lib/cv/extraction.ts` appelle Anthropic (Haiku 4.5) pour lire un CV. Ce
+le module CV** : `lib/cv/extraction.ts` appelle Anthropic (Sonnet 5.5 depuis JobAI#158, Haiku 4.5 avant) pour lire un CV. Ce
 n'était donc plus une absence, c'était un **trou** — le total affiché par le hub ignorait ce
 que JobAI dépense.
 
