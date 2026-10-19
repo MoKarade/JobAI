@@ -57,6 +57,8 @@ async function brancher(io: Partial<EntreesSorties> = {}) {
     lireResumeDistances: async () => ({ brut: null }),
     lireBareme: async () => ({ profil: PROFIL_DEFAUT, metiers: ["21"] }),
     lirePreuvesProfil: async () => ({ profil: PROFIL_DEFAUT, proposition: null }),
+    listerCvs: async () => [],
+    reanalyserCv: async () => ({ ok: true, message: "Analyse refaite." }),
     diagnostiquerFlux: async () => ({
       fin: "flux-termine",
       verdicts: { "dans-la-region": 2 },
@@ -99,6 +101,7 @@ describe("la surface exposée à claude.ai", () => {
       "lire_offre",
       "modifier_suivi",
       "preuves_ecrans",
+      "reanalyser_profil",
       "resume_suivi",
       "sonde_employeurs",
     ]);
@@ -118,6 +121,7 @@ describe("la surface exposée à claude.ai", () => {
     expect(parNom.get("sonde_employeurs")).toBe(true);
     expect(parNom.get("preuves_ecrans")).toBe(true);
     expect(parNom.get("modifier_suivi")).toBe(false);
+    expect(parNom.get("reanalyser_profil")).toBe(false);
   });
 });
 
@@ -577,5 +581,169 @@ describe("preuves_ecrans — prouver les écrans sans session", () => {
     const muet2 = await brancher({ lireOffres: async () => null });
     const r2 = await muet2.client.callTool({ name: "preuves_ecrans", arguments: {} });
     expect(r2.isError).toBe(true);
+  });
+});
+
+describe("reanalyser_profil — refaire la proposition sans session de la page profil", () => {
+  it("cible le CV qui porte une proposition sans être actif, sinon le CV actif", async () => {
+    let reanalyseId: number | null = null;
+    const { client } = await brancher({
+      listerCvs: async () => [
+        {
+          id: 1,
+          nomFichier: "cv1.pdf",
+          typeMime: "application/pdf",
+          tailleOctets: 1000,
+          actif: true,
+          erreurExtraction: null,
+          aUneProposition: true,
+          televerseLe: "2026-08-01",
+          valideLe: "2026-08-01",
+        },
+        {
+          id: 2,
+          nomFichier: "cv2.pdf",
+          typeMime: "application/pdf",
+          tailleOctets: 1000,
+          actif: false,
+          erreurExtraction: null,
+          aUneProposition: true,
+          televerseLe: "2026-08-02",
+          valideLe: null,
+        },
+      ],
+      reanalyserCv: async (id) => {
+        reanalyseId = id;
+        return { ok: true, message: "Analyse refaite." };
+      },
+    });
+
+    const res = corps(await client.callTool({ name: "reanalyser_profil", arguments: {} }));
+    expect(res.ok).toBe(true);
+    expect(reanalyseId).toBe(2);
+  });
+
+  it("cible le CV actif si aucun CV non actif n'a de proposition", async () => {
+    let reanalyseId: number | null = null;
+    const { client } = await brancher({
+      listerCvs: async () => [
+        {
+          id: 1,
+          nomFichier: "cv1.pdf",
+          typeMime: "application/pdf",
+          tailleOctets: 1000,
+          actif: true,
+          erreurExtraction: null,
+          aUneProposition: true,
+          televerseLe: "2026-08-01",
+          valideLe: "2026-08-01",
+        },
+      ],
+      reanalyserCv: async (id) => {
+        reanalyseId = id;
+        return { ok: true, message: "Analyse refaite." };
+      },
+    });
+
+    const res = corps(await client.callTool({ name: "reanalyser_profil", arguments: {} }));
+    expect(res.ok).toBe(true);
+    expect(reanalyseId).toBe(1);
+  });
+
+  it("refait la proposition sans toucher profilActif ni les notes", async () => {
+    let reanalyseAppelee = false;
+    const { client, enregistrees } = await brancher({
+      listerCvs: async () => [
+        {
+          id: 1,
+          nomFichier: "cv1.pdf",
+          typeMime: "application/pdf",
+          tailleOctets: 1000,
+          actif: true,
+          erreurExtraction: null,
+          aUneProposition: true,
+          televerseLe: "2026-08-01",
+          valideLe: "2026-08-01",
+        },
+      ],
+      reanalyserCv: async () => {
+        reanalyseAppelee = true;
+        return { ok: true, message: "Analyse refaite." };
+      },
+    });
+
+    const res = corps(await client.callTool({ name: "reanalyser_profil", arguments: {} }));
+    expect(res.ok).toBe(true);
+    expect(reanalyseAppelee).toBe(true);
+    expect(enregistrees).toHaveLength(0);
+  });
+
+  it("qu'une panne du modèle rend ok: false avec la raison", async () => {
+    const { client } = await brancher({
+      listerCvs: async () => [
+        {
+          id: 1,
+          nomFichier: "cv1.pdf",
+          typeMime: "application/pdf",
+          tailleOctets: 1000,
+          actif: true,
+          erreurExtraction: null,
+          aUneProposition: true,
+          televerseLe: "2026-08-01",
+          valideLe: "2026-08-01",
+        },
+      ],
+      reanalyserCv: async () => ({
+        ok: false,
+        erreur: "Le modèle Anthropic n'a pas répondu",
+      }),
+    });
+
+    const res = corps(await client.callTool({ name: "reanalyser_profil", arguments: {} }));
+    expect(res.ok).toBe(false);
+    expect(res.erreur).toBe("Le modèle Anthropic n'a pas répondu");
+  });
+
+  it("rend ok: false sans rien appeler quand aucun CV n'est présent", async () => {
+    let reanalyseAppelee = false;
+    const { client } = await brancher({
+      listerCvs: async () => [],
+      reanalyserCv: async () => {
+        reanalyseAppelee = true;
+        return { ok: true };
+      },
+    });
+
+    const res = corps(await client.callTool({ name: "reanalyser_profil", arguments: {} }));
+    expect(res.ok).toBe(false);
+    expect(res.erreur).toContain("Aucun CV");
+    expect(reanalyseAppelee).toBe(false);
+  });
+
+  it("ne rend jamais le texte du CV ni les faits extraits dans sa réponse", async () => {
+    const { client } = await brancher({
+      listerCvs: async () => [
+        {
+          id: 1,
+          nomFichier: "cv.pdf",
+          typeMime: "application/pdf",
+          tailleOctets: 1000,
+          actif: true,
+          erreurExtraction: null,
+          aUneProposition: true,
+          televerseLe: "2026-08-01",
+          valideLe: "2026-08-01",
+        },
+      ],
+      reanalyserCv: async () => ({
+        ok: true,
+        message: "Analyse refaite.",
+      }),
+    });
+
+    const brut = await client.callTool({ name: "reanalyser_profil", arguments: {} });
+    const texteRendu = JSON.stringify(brut);
+    expect(texteRendu.includes("anneesExperience")).toBe(false);
+    expect(texteRendu.includes("texteDuCv")).toBe(false);
   });
 });

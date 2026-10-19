@@ -32,6 +32,8 @@ import type { SuiviVeille } from "../veille";
 import { FiltresSchema, chercherOffres, lireOffreVue, resumerPourMcp } from "./lecture.spec";
 import { EcritureSuiviSchema, preparerEcriture } from "./ecriture.spec";
 import { PreuvesSchema, construirePreuves, type PreuvesEntrees } from "./preuvesEcrans.spec";
+import { choisirCvCible } from "./reanalyse.spec";
+import type { CvResume } from "../cv/depot";
 
 /** Ce que le serveur ne sait pas faire lui-même, et qu'on lui donne. */
 export interface EntreesSorties {
@@ -86,6 +88,13 @@ export interface EntreesSorties {
   lireBareme: () => Promise<{ profil: Profil; metiers: readonly string[] } | null>;
   // null = la base n'a pas répondu, ou le profil actif est illisible ; jamais le profil par défaut en repli, comme lireBareme
   lirePreuvesProfil: () => Promise<PreuvesEntrees | null>;
+  /** Les résumés de CV, du plus récent au plus ancien, ou `null` si la base n'a pas répondu. */
+  listerCvs: () => Promise<readonly CvResume[] | null>;
+  /**
+   * Re-analyse un CV par son identifiant en extrayant à nouveau ses faits.
+   * Ne valide pas le profil et ne recalcule pas les notes.
+   */
+  reanalyserCv: (id: number) => Promise<{ ok: boolean; message?: string; erreur?: string }>;
 }
 
 /** Une réponse d'outil : du JSON, dans le seul format que le protocole transporte. */
@@ -350,6 +359,29 @@ export function creerServeur(io: EntreesSorties): McpServer {
       }
       const journal = employeur !== undefined ? await io.lireJournal() : {};
       return json(construirePreuves(preuvesEntrees, offres, journal, employeur));
+    },
+  );
+
+  serveur.registerTool(
+    "reanalyser_profil",
+    {
+      title: "Ré-analyser le profil",
+      description:
+        "Relance l'extraction des faits professionnels sur le CV le plus récent à valider " +
+        "ou le CV actif. Ne modifie ni le profil actif ni les notes : les écarts proposés " +
+        "deviennent consultables via preuves_ecrans.",
+      inputSchema: {},
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    },
+    async () => {
+      const cvs = await io.listerCvs();
+      if (cvs === null) return panne(BASE_MUETTE);
+      const cible = choisirCvCible(cvs);
+      if (cible === null) {
+        return json({ ok: false, erreur: "Aucun CV disponible pour la ré-analyse." });
+      }
+      const resultat = await io.reanalyserCv(cible.id);
+      return json(resultat);
     },
   );
 

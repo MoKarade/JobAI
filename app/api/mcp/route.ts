@@ -33,7 +33,10 @@ import { empreinte, estProprietaire } from "@/lib/mcp/oauth";
 import { origineDe } from "@/lib/mcp/origine";
 import { lireJetonValide } from "@/lib/oauthStore";
 import { classerPanne } from "@/lib/panne";
-import { listerCvs, profilActif, propositionDe } from "@/lib/cv/depot";
+import { lireContenuPourAnalyse, listerCvs, majExtraction, profilActif, propositionDe } from "@/lib/cv/depot";
+import { extraireTexte } from "@/lib/cv/texte";
+import { extraireFaits } from "@/lib/cv/extraction";
+import { resumeDesRefus } from "@/lib/competences";
 import { lireMetiers } from "@/lib/actionsMetiers";
 import { aujourdhui } from "@/lib/ajout";
 import { CHAMPS_UTILISATEUR, type Offre } from "@/lib/types";
@@ -211,6 +214,36 @@ export async function POST(requete: Request): Promise<Response> {
         console.error("[api/mcp] lecture des preuves impossible", err);
         return null;
       }
+    },
+    listerCvs: async () => {
+      try {
+        return await listerCvs();
+      } catch (err) {
+        console.error("[api/mcp] lecture des CVs impossible", err);
+        return null;
+      }
+    },
+    reanalyserCv: async (id: number) => {
+      const stocke = await lireContenuPourAnalyse(id);
+      if (!stocke) return { ok: false, erreur: "CV introuvable." };
+
+      let texte = stocke.texte;
+      if (!texte) {
+        const lecture = await extraireTexte(new Uint8Array(Buffer.from(stocke.contenu, "base64")));
+        if (!lecture.ok) return { ok: false, erreur: lecture.raison };
+        texte = lecture.texte;
+      }
+
+      const faits = await extraireFaits(texte);
+      await majExtraction(id, {
+        texte,
+        extraction: faits.ok ? faits.brut : null,
+        erreur: faits.ok ? null : faits.raison,
+      });
+
+      return faits.ok
+        ? { ok: true, message: `Analyse refaite.${resumeDesRefus(faits.competencesRejetees)}` }
+        : { ok: false, erreur: faits.raison };
     },
   });
 
