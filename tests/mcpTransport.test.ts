@@ -63,6 +63,7 @@ async function appel(corps: unknown, accept = "application/json, text/event-stre
     lireEtatSynchro: async () => [],
     lireResumeDistances: async () => ({ brut: null }),
     lireBareme: async () => null,
+    lirePreuvesProfil: async () => null,
     diagnostiquerFlux: async () => ({ fin: "flux-termine" }),
     sonderEmployeurs: async () => ({}),
   });
@@ -114,6 +115,7 @@ describe("le transport HTTP répond aux requêtes réelles", () => {
       "etat_synchro",
       "lire_offre",
       "modifier_suivi",
+      "preuves_ecrans",
       "resume_suivi",
       "sonde_employeurs",
     ]);

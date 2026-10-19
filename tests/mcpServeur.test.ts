@@ -17,6 +17,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { creerServeur, type EntreesSorties } from "../lib/mcp/serveur";
 import { PROFIL_DEFAUT } from "../lib/profil";
 import type { Offre } from "../lib/types";
+import { ReponseExtractionSchema } from "../lib/cv/extraction";
 
 const BASE: Offre = {
   id: "laserax-coordonnateur",
@@ -55,6 +56,7 @@ async function brancher(io: Partial<EntreesSorties> = {}) {
     lireEtatSynchro: async () => [],
     lireResumeDistances: async () => ({ brut: null }),
     lireBareme: async () => ({ profil: PROFIL_DEFAUT, metiers: ["21"] }),
+    lirePreuvesProfil: async () => ({ profil: PROFIL_DEFAUT, proposition: null }),
     diagnostiquerFlux: async () => ({
       fin: "flux-termine",
       verdicts: { "dans-la-region": 2 },
@@ -96,6 +98,7 @@ describe("la surface exposée à claude.ai", () => {
       "etat_synchro",
       "lire_offre",
       "modifier_suivi",
+      "preuves_ecrans",
       "resume_suivi",
       "sonde_employeurs",
     ]);
@@ -113,6 +116,7 @@ describe("la surface exposée à claude.ai", () => {
     expect(parNom.get("etat_synchro")).toBe(true);
     expect(parNom.get("diagnostic_bareme")).toBe(true);
     expect(parNom.get("sonde_employeurs")).toBe(true);
+    expect(parNom.get("preuves_ecrans")).toBe(true);
     expect(parNom.get("modifier_suivi")).toBe(false);
   });
 });
@@ -431,5 +435,147 @@ describe("diagnostic_bareme — mesurer le barème sans le modifier", () => {
     const { client } = await brancher({ lireOffres: async () => null });
     const r = await client.callTool({ name: "diagnostic_bareme", arguments: {} });
     expect(r.isError).toBe(true);
+  });
+});
+
+describe("preuves_ecrans — prouver les écrans sans session", () => {
+  it("rend anneesExperience: null (et non 0) pour le profil par défaut", async () => {
+    const { client } = await brancher();
+    const r = corps(await client.callTool({ name: "preuves_ecrans", arguments: {} }));
+    expect(r.anneesExperience).toBeNull();
+  });
+
+  it("rend la fiche de compétences avec libelle, niveau, phrase, poste", async () => {
+    const profilFictif = {
+      ...PROFIL_DEFAUT,
+      faits: {
+        ...PROFIL_DEFAUT.faits,
+        competences: [
+          {
+            id: "automates-programmables",
+            niveau: "pratique" as const,
+            phrase: "Programmation d'automates PLC",
+            poste: "Coordonnateur",
+          },
+        ],
+      },
+    };
+    const { client } = await brancher({
+      lirePreuvesProfil: async () => ({ profil: profilFictif, proposition: null }),
+    });
+    const r = corps(await client.callTool({ name: "preuves_ecrans", arguments: {} }));
+    expect(r.competences).toEqual([
+      {
+        id: "automates-programmables",
+        libelle: "Automates programmables (PLC)",
+        niveau: "pratique",
+        phrase: "Programmation d'automates PLC",
+        poste: "Coordonnateur",
+      },
+    ]);
+  });
+
+  it("rend un écart d'années avec provenance, preuve et coche quand une proposition lisible propose une valeur différente", async () => {
+    const extractionFictive = ReponseExtractionSchema.parse({
+      anneesExperience: 5,
+      anneesExperienceProvenance: "5 ans d'expérience en gestion",
+      langues: [],
+      diplomes: [],
+      outils: [],
+      titresOccupes: [],
+      parcours: [],
+      competences: [],
+      forces: [],
+      manques: [],
+      recherchesSuggerees: [],
+    });
+    const { client } = await brancher({
+      lirePreuvesProfil: async () => ({
+        profil: PROFIL_DEFAUT,
+        proposition: { ok: true, extraction: extractionFictive },
+      }),
+    });
+    const r = corps(await client.callTool({ name: "preuves_ecrans", arguments: {} }));
+    const props = r.propositions as Array<Record<string, unknown>>;
+    const ecartAnnees = props.find((p) => p.cle === "faits.anneesExperience");
+    expect(ecartAnnees).toBeDefined();
+    expect(ecartAnnees?.provenance).toBe("5 ans d'expérience en gestion");
+    expect(ecartAnnees?.preuve).toBe(true);
+    expect(ecartAnnees?.coche).toBe(true);
+  });
+
+  it("rend propositions: { illisible: '…' } pour { ok: false, raison: '…' }", async () => {
+    const { client } = await brancher({
+      lirePreuvesProfil: async () => ({
+        profil: PROFIL_DEFAUT,
+        proposition: { ok: false, raison: "Proposition corrompue" },
+      }),
+    });
+    const r = corps(await client.callTool({ name: "preuves_ecrans", arguments: {} }));
+    expect(r.propositions).toEqual({ illisible: "Proposition corrompue" });
+  });
+
+  it("rend les signaux d'un employeur fictif quand employeur est donné, et employeur: null quand il n'a aucune offre", async () => {
+    const { client } = await brancher({
+      lireOffres: async () => [
+        offre({ entreprise: "Entreprise Fictive Inc.", perimeeLe: null }),
+      ],
+      lireJournal: async () => ({
+        "laserax-coordonnateur": { premiereVue: "2026-08-01", derniereVue: "2026-08-10", absences: 0 },
+      }),
+    });
+
+    const r1 = corps(
+      await client.callTool({
+        name: "preuves_ecrans",
+        arguments: { employeur: "Entreprise Fictive" },
+      }),
+    );
+    expect(r1.employeur).not.toBeNull();
+    const emp = r1.employeur as Record<string, unknown>;
+    expect(emp.offres).toBe(1);
+
+    const r2 = corps(
+      await client.callTool({
+        name: "preuves_ecrans",
+        arguments: { employeur: "Inexistant Ltd" },
+      }),
+    );
+    expect(r2.employeur).toBeNull();
+  });
+
+  it("ne contient jamais la clé valeur ni le texte brut d'un CV (JSON.stringify de la réponse ne contient pas 'valeur')", async () => {
+    const extractionFictive = ReponseExtractionSchema.parse({
+      anneesExperience: 3,
+      anneesExperienceProvenance: "3 ans d'expérience",
+      langues: [],
+      diplomes: [],
+      outils: [],
+      titresOccupes: [],
+      parcours: [],
+      competences: [],
+      forces: [],
+      manques: [],
+      recherchesSuggerees: [],
+    });
+    const { client } = await brancher({
+      lirePreuvesProfil: async () => ({
+        profil: PROFIL_DEFAUT,
+        proposition: { ok: true, extraction: extractionFictive },
+      }),
+    });
+    const res = await client.callTool({ name: "preuves_ecrans", arguments: {} });
+    const jsonStr = JSON.stringify(res);
+    expect(jsonStr.includes('"valeur"')).toBe(false);
+  });
+
+  it("une base muette (lirePreuvesProfil: async () => null, puis lireOffres: async () => null) rend isError: true", async () => {
+    const muet1 = await brancher({ lirePreuvesProfil: async () => null });
+    const r1 = await muet1.client.callTool({ name: "preuves_ecrans", arguments: {} });
+    expect(r1.isError).toBe(true);
+
+    const muet2 = await brancher({ lireOffres: async () => null });
+    const r2 = await muet2.client.callTool({ name: "preuves_ecrans", arguments: {} });
+    expect(r2.isError).toBe(true);
   });
 });
