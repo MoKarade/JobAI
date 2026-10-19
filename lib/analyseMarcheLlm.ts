@@ -16,11 +16,11 @@ import { baliserDonnees, CONSIGNE_DONNEES } from "./promptSafety";
 import { tendancesEnTexte, type Tendances } from "./analyseMarche";
 
 /**
- * Haiku 4.5 (le choix du modèle de ce site est à trancher avec Marc, ADR-0035) : c'est une lecture de quelques
- * lignes de chiffres, pas un raisonnement difficile, et le budget du projet ne supporte pas
- * un modèle plus cher pour un bouton qu'on peut cliquer plusieurs fois par jour.
+ * Haiku 5.5, le Haiku de la génération courante (choix de Marc, ADR-0035) : c'est une lecture de quelques lignes de
+ * chiffres, pas un raisonnement difficile, et le budget du projet ne supporte pas un modèle plus cher pour un bouton
+ * qu'on peut cliquer plusieurs fois par jour.
  */
-const MODELE = "claude-haiku-4-5-20251001";
+const MODELE = "claude-haiku-5-5";
 
 /**
  * Plafond de sortie.
@@ -28,8 +28,11 @@ const MODELE = "claude-haiku-4-5-20251001";
  * L'analyse tient en un paragraphe : c'est une borne de COÛT, et aussi de qualité — sans
  * elle le modèle rédige un rapport que personne ne lit. La coupure éventuelle est DITE
  * (`stop_reason`), jamais rendue comme une réponse complète.
+ *
+ * 1 200 et non 700 : le tokenizer de Haiku 5.5 découpe le même texte en plus de jetons (environ 30 % de plus que Haiku
+ * 4.5), et la pensée du modèle, même courte à l'effort « low », compte dans ce plafond.
  */
-const MAX_TOKENS = 700;
+const MAX_TOKENS = 1200;
 
 const CONSIGNE = `Tu lis les chiffres d'une veille d'offres d'emploi dans la région de Québec.
 
@@ -74,6 +77,9 @@ export async function analyserMarche(
     reponse = await client.messages.create({
       model: MODELE,
       max_tokens: MAX_TOKENS,
+      // Haiku 5.5 pense par défaut (effort « medium »). Quatre phrases sur des chiffres donnés n'en demandent pas : « low »
+      // le laisse sauter la pensée, qui se facture au prix de sortie.
+      output_config: { effort: "low" },
       system: `${CONSIGNE}\n\n${CONSIGNE_DONNEES}`,
       messages: [
         { role: "user", content: baliserDonnees("tendances", tendancesEnTexte(tendances)) },

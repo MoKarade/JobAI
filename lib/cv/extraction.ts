@@ -43,7 +43,7 @@ import { calculerAnnees, LONGUEUR_MAX_DETAIL } from "./anneesExperience";
 /**
  * Sonnet 5.5, le modèle de la génération courante (JobAI#158, ADR-0035). L'analyse du CV est un appel par document et
  * c'est la lecture la plus lourde du dépôt : la fiche de compétences et les faits qui serviront en entrevue
- * valent un modèle plus fort que Haiku. Les autres appels (offres, tendances, brouillon) restent à trancher avec Marc.
+ * valent un modèle plus fort que Haiku. Les trois autres appels (offres, tendances, brouillon) sont à Haiku 5.5.
  */
 const MODELE = "claude-sonnet-5-5";
 

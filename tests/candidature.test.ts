@@ -245,12 +245,14 @@ let contenuRendu: unknown[] = [];
 let arretRendu = "tool_use";
 let appels = 0;
 let dernierPrompt = "";
+let dernierEnvoi: Record<string, unknown> = {};
 
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     messages = {
       create: async (args: { messages: { content: string }[] }) => {
         appels += 1;
+        dernierEnvoi = args;
         dernierPrompt = args.messages[0]!.content;
         return { stop_reason: arretRendu, content: contenuRendu, usage: usageRendu };
       },
@@ -300,7 +302,13 @@ describe("redigerCandidature — la comptabilité vit au site d'appel", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(comptabilise).toHaveBeenCalledTimes(1);
-    expect(comptabilise).toHaveBeenCalledWith(usageRendu, "claude-haiku-4-5-20251001");
+    expect(comptabilise).toHaveBeenCalledWith(usageRendu, "claude-haiku-5-5");
+    // Le modèle appelé est celui qui est compté (JobAI#158), l'appel d'outil reste forcé (Haiku 5.5 l'accepte), et le
+    // plafond a monté de 3 000 à 4 000 avec le tokenizer plus gourmand.
+    expect(dernierEnvoi.model).toBe("claude-haiku-5-5");
+    expect(dernierEnvoi.tool_choice).toEqual({ type: "tool", name: "rendre_brouillon" });
+    expect(dernierEnvoi.max_tokens).toBe(4000);
+    expect(dernierEnvoi).not.toHaveProperty("temperature");
     expect(r.brouillon.cv.postes[0]!.employeur).toBe("Usine Exemple");
     // Profil et offre partent en blocs de DONNÉES; la note privée reste ici.
     expect(dernierPrompt).toContain('<donnees nom="profil">');

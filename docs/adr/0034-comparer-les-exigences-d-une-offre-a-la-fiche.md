@@ -1,7 +1,7 @@
 # ADR-0034 — Comparer les exigences d'une offre à la fiche de compétences, au clic, pour les meilleures offres
 
 **Date** : 2026-10-19 · **Statut** : Proposé — tâche JobAI#157 (mission JobAI#147, plan « analyse du CV et dossier
-employeur », étape A4). Dépend de la fiche de compétences (ADR-0033). Coût IA : un appel Haiku par clic.
+employeur », étape A4). Dépend de la fiche de compétences (ADR-0033). Coût IA : un appel Haiku par clic (Haiku 5.5 depuis ADR-0035).
 
 ## Contexte
 
@@ -39,7 +39,7 @@ preuve tirée du CV. Il manque le pas suivant : poser l'une à côté de l'autre
 
 ## Impact coût LLM
 
-Haiku 4,5, entrée ≈ 1 200 jetons (vocabulaire 25 lignes + extrait de 2 000 caractères au plus), sortie ≤ 1 500 jetons
+Haiku 4,5 à l'écriture de cet ADR, passé à Haiku 5.5 depuis (ADR-0035) : entrée ≈ 1 200 jetons (vocabulaire 25 lignes + extrait de 2 000 caractères au plus), sortie ≤ 1 500 jetons
 (`max_tokens`). Environ 0,003 à 0,01 $ US par clic ; les 100 meilleures offres, comparées une fois chacune, coûteraient
 de l'ordre de 0,3 à 1 $ US. Pas de plafond dur (décision de Marc du 16/10 : surveiller) ; le montant s'ajoute au bloc
 `usage`.

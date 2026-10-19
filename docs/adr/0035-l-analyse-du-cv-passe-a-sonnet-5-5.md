@@ -1,4 +1,4 @@
-# ADR-0035 — L'analyse du CV passe à Sonnet 5.5, et le coût se chiffre par modèle
+# ADR-0035 — L'analyse du CV passe à Sonnet 5.5, les autres appels à Haiku 5.5, et le coût se chiffre par modèle
 
 **Date** : 2026-10-19 · **Statut** : Proposé — tâche JobAI#158 (mission JobAI#147, plan « analyse du CV et dossier
 employeur », étape A5). Coût IA : oui, l'analyse d'un CV coûte environ deux fois plus par jeton qu'avant.
@@ -14,9 +14,20 @@ en entrevue : c'est la lecture la plus lourde du dépôt, et elle n'a lieu qu'un
 1. **L'analyse du CV appelle `claude-sonnet-5-5`** (`lib/cv/extraction.ts`). Prix relus le 2026-10-19 sur la page de
    tarifs de l'API : 2 $ par million de jetons en entrée, 10 $ en sortie. Source de l'identifiant : la page « Models
    overview » de la même documentation.
-2. **Les trois autres appels restent à Haiku 4.5** (comparaison d'offre, brouillon de candidature, tendances de la
-   veille). Leur choix est à trancher avec Marc : la tâche le dit, et rien ici ne le fait à sa place. À savoir pour cette
-   décision : Haiku 5.5, plus récent, est publié à 0,10 $ / 0,50 $, soit dix fois moins cher que Haiku 4.5.
+2. **Les trois autres appels passent à `claude-haiku-5-5`** (comparaison d'offre, brouillon de candidature, tendances de
+   la veille). C'est le choix de Marc, tapé sur la carte du fil le 2026-10-19 (« Haiku 5.5 ») ; la tâche demandait de le
+   trancher avec lui. Haiku 5.5 est publié à 0,10 $ / 0,50 $ par million de jetons (grille des prompts de 100 000 jetons
+   ou moins ; 0,50 $ / 2,50 $ au-delà), soit dix fois moins que Haiku 4.5, et c'est la dernière génération. Réglages,
+   relus dans la documentation de Haiku 5.5 :
+   - **L'appel forcé d'outil est accepté** (contrairement à Sonnet 5.5) : comparaison et brouillon gardent
+     `tool_choice` « tool ». Le modèle ne pense alors pas avant l'outil.
+   - **Les tendances (texte libre) passent à l'effort `low`.** Haiku 5.5 pense par défaut (effort `medium`) et la pensée
+     se facture au prix de sortie ; quatre phrases sur des chiffres donnés n'en demandent pas.
+   - **Aucun `temperature`, `top_p` ni `top_k`** (un autre que le défaut rend 400) : le dépôt n'en envoie aucun.
+   - **Les plafonds de sortie montent d'un tiers environ** (tokenizer plus gourmand de 30 % pour le même texte, pensée
+     comprise dans `max_tokens`) : tendances 700 → 1 200, brouillon 3 000 → 4 000, comparaison 1 500 → 2 000.
+   - **Le prix est dans `PRIX_PAR_MODELE`** avec la grille basse : les trois appels envoient quelques milliers de jetons,
+     très loin des 100 000. Un appel qui les dépasserait serait sous-estimé dans le bloc `usage`.
 3. **Sonnet 5.5 refuse l'appel forcé d'outil.** `tool_choice` « tool » ou « any » rend une erreur 400 sur ce modèle
    (documentation de Sonnet 5.5). L'appel passe donc à `tool_choice: auto`, et la consigne dit d'appeler l'outil
    `rendre_profil`. Un modèle qui répondrait en texte donne « pas de résultat structuré » et son appel est compté.
@@ -43,6 +54,10 @@ sur les prix publiés, pas mesuré]. **La mesure réelle est la preuve de la tâ
 hub après la prochaine analyse de Marc. Le cumul mensuel de référence (20 $ CA) n'est pas un plafond dur (« surveiller »,
 16/10).
 
+Les trois autres appels, à Haiku 5.5 : une comparaison d'offre (≈ 1 600 jetons d'entrée, ≤ 2 000 en sortie) coûte au plus
+de l'ordre de 0,001 $ US, un brouillon de candidature et une analyse des tendances de l'ordre de quelques millièmes de
+dollar [Probable : calculé sur les prix publiés, pas mesuré]. C'est environ dix fois moins qu'à Haiku 4.5.
+
 ## Risques
 
 - **R1 — Le modèle répond en texte au lieu d'appeler l'outil.** Sans appel forcé, c'est possible. Visible : l'analyse dit
@@ -53,10 +68,17 @@ hub après la prochaine analyse de Marc. Le cumul mensuel de référence (20 $ C
 - **R3 — Qualité de la fiche.** Un modèle plus fort devrait mieux recopier les phrases ; c'est la relecture de la fiche
   avec Marc (JobAI#155) qui le dira, la vérification du code (phrase retrouvée dans le CV) reste le filet.
 
+- **R4 — Haiku 5.5 non éprouvé en réel pour ces trois appels** (pas de clé dans la session). Visible : « Appel à l'API
+  refusé… » avec le message de l'API, ou « pas de liste structurée » / « brouillon coupé ». Retour arrière : remettre le
+  nom du modèle et les trois plafonds ; le prix de Haiku 5.5 peut rester dans `PRIX_PAR_MODELE`.
+- **R5 — qualité des textes de Haiku 5.5** (brouillon, tendances) : jugée à l'usage par Marc ; la vérification du code
+  (phrases retrouvées dans l'annonce ou le CV) reste le filet des deux appels qui citent.
+
 ## Retour arrière
 
-Remettre `MODELE = "claude-haiku-4-5-20251001"`, `tool_choice` forcé et retirer `thinking` / `output_config` dans
-`lib/cv/extraction.ts`. Le compteur par modèle reste valide et n'a pas à être touché.
+Pour l'analyse du CV : remettre `MODELE = "claude-haiku-4-5-20251001"`, `tool_choice` forcé et retirer `thinking` /
+`output_config` dans `lib/cv/extraction.ts`. Pour les trois autres appels : remettre le nom `claude-haiku-4-5-20251001`
+et les anciens plafonds. Le compteur par modèle reste valide et n'a pas à être touché.
 
 ⚠️ **Pas de `git revert` complet de la PR une fois que `parModele` est écrit en base** : l'ancien code ne sait pas lire ce
 format, il publierait « illisible » et n'écrirait plus rien. Revert partiel seulement (l'appel du CV), ou reconvertir
