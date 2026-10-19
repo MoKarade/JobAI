@@ -31,6 +31,7 @@ import type { Offre } from "../types";
 import type { SuiviVeille } from "../veille";
 import { FiltresSchema, chercherOffres, lireOffreVue, resumerPourMcp } from "./lecture.spec";
 import { EcritureSuiviSchema, preparerEcriture } from "./ecriture.spec";
+import { PreuvesSchema, construirePreuves, type PreuvesEntrees } from "./preuvesEcrans.spec";
 
 /** Ce que le serveur ne sait pas faire lui-même, et qu'on lui donne. */
 export interface EntreesSorties {
@@ -83,6 +84,8 @@ export interface EntreesSorties {
    * repli : un diagnostic du barème qui mesurerait le mauvais barème dirait faux avec aplomb.
    */
   lireBareme: () => Promise<{ profil: Profil; metiers: readonly string[] } | null>;
+  // null = la base n'a pas répondu, ou le profil actif est illisible ; jamais le profil par défaut en repli, comme lireBareme
+  lirePreuvesProfil: () => Promise<PreuvesEntrees | null>;
 }
 
 /** Une réponse d'outil : du JSON, dans le seul format que le protocole transporte. */
@@ -322,6 +325,31 @@ export function creerServeur(io: EntreesSorties): McpServer {
         return json(apercuNouveauBareme(offres, bareme.profil, bareme.metiers, aujourdhui(new Date())));
       }
       return json(diagnostiquerBareme(offres, bareme.profil, bareme.metiers, meilleures ?? 30));
+    },
+  );
+
+  serveur.registerTool(
+    "preuves_ecrans",
+    {
+      title: "Preuves des écrans Profil et employeur",
+      description:
+        "Rend les données nécessaires pour prouver les écrans Profil et employeur sans session du hub : " +
+        "années d'expérience du profil actif, fiche de compétences, écarts de la proposition à valider " +
+        "(avec coche si la preuve est établie), et optionnellement les signaux d'un employeur suivi.",
+      inputSchema: PreuvesSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    async (args) => {
+      const { employeur } = PreuvesSchema.parse(args);
+      const [preuvesEntrees, offres] = await Promise.all([
+        io.lirePreuvesProfil(),
+        io.lireOffres(),
+      ]);
+      if (preuvesEntrees === null || offres === null) {
+        return panne(BASE_MUETTE);
+      }
+      const journal = employeur !== undefined ? await io.lireJournal() : {};
+      return json(construirePreuves(preuvesEntrees, offres, journal, employeur));
     },
   );
 

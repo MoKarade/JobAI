@@ -33,7 +33,7 @@ import { empreinte, estProprietaire } from "@/lib/mcp/oauth";
 import { origineDe } from "@/lib/mcp/origine";
 import { lireJetonValide } from "@/lib/oauthStore";
 import { classerPanne } from "@/lib/panne";
-import { profilActif } from "@/lib/cv/depot";
+import { listerCvs, profilActif, propositionDe } from "@/lib/cv/depot";
 import { lireMetiers } from "@/lib/actionsMetiers";
 import { aujourdhui } from "@/lib/ajout";
 import { CHAMPS_UTILISATEUR, type Offre } from "@/lib/types";
@@ -197,6 +197,18 @@ export async function POST(requete: Request): Promise<Response> {
         return { profil, metiers };
       } catch (err) {
         console.error("[api/mcp] lecture du barème impossible", err);
+        return null;
+      }
+    },
+    lirePreuvesProfil: async () => {
+      try {
+        const [profil, cvs] = await Promise.all([profilActif(), listerCvs()]);
+        if (cvs === null) return null;
+        const cvPropose = cvs.find((c) => c.aUneProposition && !c.actif);
+        const proposition = cvPropose ? await propositionDe(cvPropose.id) : null;
+        return { profil, proposition };
+      } catch (err) {
+        console.error("[api/mcp] lecture des preuves impossible", err);
         return null;
       }
     },
