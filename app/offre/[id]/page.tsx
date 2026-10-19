@@ -10,10 +10,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { lireOffre } from "@/lib/donnees";
+import { lireOffre, rangParNote } from "@/lib/donnees";
 import { palier } from "@/lib/scoring";
 import { ControlesOffre } from "@/components/ControlesOffre";
 import { BrouillonCandidature } from "@/components/BrouillonCandidature";
+import { ComparaisonOffre } from "@/components/ComparaisonOffre";
+import { eligibiliteComparaison } from "@/lib/comparaisonOffre";
+import { profilActif } from "@/lib/cv/depot";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { lienDeOffre } from "@/lib/lienOffre";
 import { fraicheurOffre } from "@/lib/fraicheur";
@@ -27,6 +30,9 @@ import { dateLisible } from "@/lib/dateLisible";
 import { titreOffre } from "@/lib/titreOffre";
 
 export const dynamic = "force-dynamic";
+
+// La Server Action de comparaison (JobAI#157) tourne avec la durée de CETTE page : un appel au modèle de 40 s au plus.
+export const maxDuration = 60;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -67,6 +73,26 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
   if (!offre) notFound();
 
   const p = palier(offre.score);
+  // La comparaison à la fiche est réservée aux 100 meilleures offres, avec une fiche et un texte d'annonce. Le refus
+  // se DIT à l'écran (jamais un bouton qui échoue) ; l'action serveur recalcule la même règle. Une panne de lecture
+  // du rang ou du profil se dit aussi : elle ne doit pas emporter la fiche de l'offre.
+  const refusComparaison = await (async (): Promise<string | null> => {
+    try {
+      const [rang, profil] = await Promise.all([rangParNote(offre), profilActif()]);
+      const e = eligibiliteComparaison({
+        fiche: profil.faits.competences,
+        texteNote: offre.texteNote,
+        score: offre.score,
+        histo: offre.histo,
+        perimeeLe: offre.perimeeLe,
+        rang,
+      });
+      return e.ok ? null : e.raison;
+    } catch (err) {
+      console.error("[offre] éligibilité de la comparaison illisible", { id: offre.id, err });
+      return "La comparaison n’a pas pu être préparée (la base ou le profil n’a pas répondu). Voir les journaux.";
+    }
+  })();
   // Genre et adresse du MÊME appel — voir `lib/lienOffre.ts` : deux règles séparées
   // finiraient par se contredire à l'écran.
   const lien = lienDeOffre(offre.lien, offre.entreprise, offre.poste);
@@ -220,6 +246,11 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
             <p className="detail__texte">{offre.notes}</p>
           </section>
         ) : null}
+
+        <section className="detail__bloc">
+          <h2>Ce que l’offre exige</h2>
+          <ComparaisonOffre idOffre={offre.id} refus={refusComparaison} />
+        </section>
 
         <section className="detail__bloc">
           <h2>Suivi</h2>
