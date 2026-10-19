@@ -201,7 +201,13 @@ export async function enregistrerCv(entree: {
   return ligne.id;
 }
 
-/** Remplace l'extraction d'un CV existant (ré-analyse). */
+/**
+ * Remplace l'extraction d'un CV existant (ré-analyse).
+ *
+ * ⚠️ UNE RÉ-ANALYSE QUI ÉCHOUE NE DÉTRUIT PAS LA PROPOSITION DÉJÀ LÀ. L'échec s'écrit dans `erreurExtraction` seulement :
+ * la proposition valide d'avant reste lisible et applicable. Écraser par `null` perdait le résultat d'une analyse réussie
+ * sur un simple refus de l'API ou une réponse en texte (JobAI#158 : nouveau modèle, nouvelle chance d'échec).
+ */
 export async function majExtraction(
   id: number,
   entree: { texte: string | null; extraction: ReponseExtraction | null; erreur: string | null },
@@ -210,7 +216,7 @@ export async function majExtraction(
     .update(cvs)
     .set({
       texte: entree.texte,
-      profilPropose: entree.extraction ? JSON.stringify(entree.extraction) : null,
+      ...(entree.extraction ? { profilPropose: JSON.stringify(entree.extraction) } : {}),
       erreurExtraction: entree.erreur,
     })
     .where(eq(cvs.id, id));

@@ -258,9 +258,9 @@ vi.mock("@anthropic-ai/sdk", () => ({
   },
 }));
 
-const comptabilise = vi.fn(async (_usage: unknown) => {});
+const comptabilise = vi.fn(async (_usage: unknown, _modele: string) => {});
 vi.mock("@/lib/coutLlmStore", () => ({
-  enregistrerUsageLlm: (usage: unknown) => comptabilise(usage),
+  enregistrerUsageLlm: (usage: unknown, modele: string) => comptabilise(usage, modele),
 }));
 
 const { redigerCandidature } = await import("@/lib/candidatureLlm");
@@ -300,7 +300,7 @@ describe("redigerCandidature — la comptabilité vit au site d'appel", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(comptabilise).toHaveBeenCalledTimes(1);
-    expect(comptabilise).toHaveBeenCalledWith(usageRendu);
+    expect(comptabilise).toHaveBeenCalledWith(usageRendu, "claude-haiku-4-5-20251001");
     expect(r.brouillon.cv.postes[0]!.employeur).toBe("Usine Exemple");
     // Profil et offre partent en blocs de DONNÉES; la note privée reste ici.
     expect(dernierPrompt).toContain('<donnees nom="profil">');

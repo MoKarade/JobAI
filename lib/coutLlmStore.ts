@@ -12,15 +12,17 @@ import { lireEtatBrut, ecrireEtat } from "./etat";
 import { assurerMigrations } from "./migrations";
 import {
   CLE_COUT_LLM,
-  COMPTEUR_VIDE,
-  ajouterUsage,
+  ajouterUsageModele,
   coutAPublier,
   relireCompteur,
   type CoutPublie,
 } from "./coutLlm";
 
 /**
- * Enregistre le relevé d'usage d'UN appel réussi.
+ * Enregistre le relevé d'usage d'UN appel réussi, sous le nom du `modele` appelé.
+ *
+ * ⚠️ LE MODÈLE EST OBLIGATOIRE : les modèles ne se facturent pas au même prix (JobAI#158), donc un relevé sans nom de
+ * modèle ne se chiffre pas. Chaque site d'appel passe le sien.
  *
  * ⚠️ LA LECTURE-MODIFICATION-ÉCRITURE N'EST PAS ATOMIQUE, ET C'EST SANS CONSÉQUENCE ICI —
  * pas par indulgence, mais parce que le seul site d'appel est l'analyse d'un CV, déclenchée
@@ -29,7 +31,7 @@ import {
  * le même et unique utilisateur. Le jour où un second site d'appel apparaît — une analyse en
  * lot, un cron — cette phrase cesse d'être vraie et l'incrément devra devenir atomique.
  */
-export async function enregistrerUsageLlm(usage: unknown): Promise<void> {
+export async function enregistrerUsageLlm(usage: unknown, modele: string): Promise<void> {
   try {
     // Le compteur peut être la PREMIÈRE écriture d'une instance froide (l'extraction
     // précède l'enregistrement du CV) : le schéma se garantit ici comme partout ailleurs.
@@ -47,8 +49,8 @@ export async function enregistrerUsageLlm(usage: unknown): Promise<void> {
       return;
     }
 
-    const avant = etat.etat === "compteur" ? etat.compteur : COMPTEUR_VIDE;
-    await ecrireEtat(CLE_COUT_LLM, ajouterUsage(avant, usage));
+    const avant = etat.etat === "compteur" ? etat.parModele : {};
+    await ecrireEtat(CLE_COUT_LLM, { parModele: ajouterUsageModele(avant, modele, usage) });
   } catch (err) {
     // Des NOMBRES dans les journaux, jamais un extrait de CV ni une réponse du modèle
     // (garde-fou n°1 : le dépôt est public, et les journaux se relisent).

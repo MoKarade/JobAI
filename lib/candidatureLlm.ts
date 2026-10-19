@@ -30,7 +30,7 @@ import {
 } from "./candidature";
 
 /**
- * Haiku, comme les autres sites d'appel : rédiger deux textes courts à partir de faits
+ * Haiku 4.5 (le choix du modèle de ce site est à trancher avec Marc, ADR-0035) : rédiger deux textes courts à partir de faits
  * donnés ne demande pas un raisonnement difficile, et le bouton se clique plusieurs fois.
  */
 const MODELE = "claude-haiku-4-5-20251001";
@@ -101,7 +101,7 @@ export async function redigerCandidature(
   offre: Offre,
   faits: Faits,
   options: {
-    comptabiliser?: (usage: unknown) => Promise<void>;
+    comptabiliser?: (usage: unknown, modele: string) => Promise<void>;
     cle?: string | undefined;
   } = {},
 ): Promise<ResultatRedaction> {
@@ -157,7 +157,7 @@ export async function redigerCandidature(
   // ⚠️ COMPTÉ ICI, AVANT TOUTE VALIDATION, et sous son propre try : l'appel est facturé même
   // si ce qui suit échoue, et une comptabilité qui hoquette ne doit jamais coûter le brouillon.
   try {
-    await comptabiliser(reponse.usage);
+    await comptabiliser(reponse.usage, MODELE);
   } catch (e) {
     console.error("[candidature] comptabilité de l'appel impossible", e);
   }

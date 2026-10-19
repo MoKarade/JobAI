@@ -37,7 +37,7 @@ Un test vert sur un champ retiré est exactement le genre de vert dont on prend 
   `lib/candidatureLlm.ts`, `lib/comparaisonOffreLlm.ts`), chacun comptabilise lui-même, AU site d'appel (laisser chaque appelant y
   penser serait « un outil qu'on peut oublier d'appeler »). Pas de plafond dur : Marc a tranché
   « surveiller » le 16/10, la dépense s'affiche. Les
-  prix, le cumul et la règle de publication sont PURS (`lib/coutLlm.ts`), la lecture/écriture
+  prix PAR MODÈLE (`PRIX_PAR_MODELE` : un jeton de Sonnet ne se compte pas au prix de Haiku, et un modèle sans prix est « non mesuré »), le cumul et la règle de publication sont PURS (`lib/coutLlm.ts`), la lecture/écriture
   du compteur est impure (`lib/coutLlmStore.ts`), et le bloc se compose en UN exemplaire
   (`blocUsage`) pour les deux consommateurs — summary complet et summary « en construction ».
   Période `total`, devise `USD` : le hub somme par période et convertit lui-même.

@@ -63,14 +63,20 @@ let contenuRendu: unknown[] = [
   { type: "tool_use", name: "rendre_profil", input: REPONSE_AVEC_COORDONNEES },
 ];
 
+/** La dernière requête envoyée au faux SDK : on éprouve ce qu'on demande au modèle, pas seulement ce qu'il rend. */
+let requete: Record<string, unknown> = {};
+
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
     messages = {
-      create: async () => ({
+      create: async (args: Record<string, unknown>) => {
+        requete = args;
+        return {
         stop_reason: "tool_use",
         content: contenuRendu,
         usage: usageRendu,
-      }),
+        };
+      },
     };
   },
 }));
@@ -79,9 +85,9 @@ vi.mock("@anthropic-ai/sdk", () => ({
  * La comptabilité est mockée : `extraireFaits` l'appelle par DÉFAUT (c'est le point — elle
  * ne doit pas pouvoir être oubliée par un appelant), et l'écrivain réel touche la base.
  */
-const comptabilise = vi.fn(async (_usage: unknown) => {});
+const comptabilise = vi.fn(async (_usage: unknown, _modele: string) => {});
 vi.mock("@/lib/coutLlmStore", () => ({
-  enregistrerUsageLlm: (usage: unknown) => comptabilise(usage),
+  enregistrerUsageLlm: (usage: unknown, modele: string) => comptabilise(usage, modele),
 }));
 
 const { extraireFaits, expurgerCoordonnees } = await import("@/lib/cv/extraction");
@@ -186,6 +192,38 @@ describe("les échecs restent honnêtes", () => {
   });
 });
 
+describe("la requête envoyée au modèle (JobAI#158)", () => {
+  beforeEach(() => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "cle-de-test");
+    usageRendu = { input_tokens: 1000, output_tokens: 200 };
+    contenuRendu = [{ type: "tool_use", name: "rendre_profil", input: REPONSE_AVEC_COORDONNEES }];
+  });
+
+  it("appelle Sonnet 5.5, sans appel forcé (refusé en 400) et sans pensée avant l'outil", async () => {
+    await extraireFaits(TEXTE_CV, { aujourdhui: AUJOURDHUI });
+    expect(requete.model).toBe("claude-sonnet-5-5");
+    // ⚠️ Sonnet 5.5 renvoie 400 sur tool_choice « tool » ou « any » : un retour à l'appel forcé casserait l'analyse.
+    expect(requete.tool_choice).toEqual({ type: "auto" });
+    // La pensée se facture en sortie : au défaut (adaptative, effort « high ») elle gonflerait le coût d'un CV.
+    expect(requete.thinking).toEqual({ type: "between_tools" });
+    expect(requete.output_config).toEqual({ effort: "medium" });
+  });
+
+  it("la consigne demande d'appeler l'outil, puisque rien ne l'impose plus", async () => {
+    await extraireFaits(TEXTE_CV, { aujourdhui: AUJOURDHUI });
+    expect(String(requete.system)).toMatch(/appelant l'outil rendre_profil/);
+  });
+
+  it("une réponse en texte, sans appel d'outil, est un échec dit ET l'appel est compté", async () => {
+    contenuRendu = [{ type: "text", text: "Voici le profil…" }];
+    comptabilise.mockClear();
+    const r = await extraireFaits(TEXTE_CV, { aujourdhui: AUJOURDHUI });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.raison).toMatch(/pas rendu de résultat structuré/);
+    expect(comptabilise).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("la comptabilité de l'appel", () => {
   beforeEach(() => {
     vi.stubEnv("ANTHROPIC_API_KEY", "cle-de-test");
@@ -200,7 +238,7 @@ describe("la comptabilité de l'appel", () => {
     // rien » — et le premier oubli produirait un cumul silencieusement amputé.
     await extraireFaits(TEXTE_CV);
     expect(comptabilise).toHaveBeenCalledTimes(1);
-    expect(comptabilise).toHaveBeenCalledWith({ input_tokens: 1000, output_tokens: 200 });
+    expect(comptabilise).toHaveBeenCalledWith({ input_tokens: 1000, output_tokens: 200 }, "claude-sonnet-5-5");
   });
 
   it("compte l'appel MÊME quand la réponse est ensuite refusée", async () => {

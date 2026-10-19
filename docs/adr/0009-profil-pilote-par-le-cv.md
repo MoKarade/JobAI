@@ -95,7 +95,7 @@ Les quatre arbitrages, tels que tranchés :
 
 - L'extraction d'un profil depuis un CV est un appel **par téléversement**, déclenché par un
   geste de Marc — jamais en tâche de fond, jamais à l'ouverture d'une page. Un CV fait
-  quelques milliers de jetons ; Haiku suffit largement pour de l'extraction structurée.
+  quelques milliers de jetons ; Haiku suffit largement pour de l'extraction structurée (remplacé par Sonnet 5.5, ADR-0035).
 - L'ordre de grandeur est donc de quelques cents par téléversement, et Marc ne téléverse pas
   son CV tous les jours. Ce n'est pas ce poste qui menace le budget.
 - **Ce qui le menacerait**, c'est de noter chaque offre par lecture LLM (`[V3-02]`). Ce

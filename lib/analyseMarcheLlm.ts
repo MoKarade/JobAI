@@ -16,7 +16,7 @@ import { baliserDonnees, CONSIGNE_DONNEES } from "./promptSafety";
 import { tendancesEnTexte, type Tendances } from "./analyseMarche";
 
 /**
- * Haiku, comme l'extraction de CV et pour la même raison : c'est une lecture de quelques
+ * Haiku 4.5 (le choix du modèle de ce site est à trancher avec Marc, ADR-0035) : c'est une lecture de quelques
  * lignes de chiffres, pas un raisonnement difficile, et le budget du projet ne supporte pas
  * un modèle plus cher pour un bouton qu'on peut cliquer plusieurs fois par jour.
  */
@@ -56,7 +56,7 @@ export type ResultatAnalyse =
 export async function analyserMarche(
   tendances: Tendances,
   options: {
-    comptabiliser?: (usage: unknown) => Promise<void>;
+    comptabiliser?: (usage: unknown, modele: string) => Promise<void>;
     cle?: string;
   } = {},
 ): Promise<ResultatAnalyse> {
@@ -90,7 +90,7 @@ export async function analyserMarche(
   // raisons qu'à l'extraction de CV : l'appel est facturé même si ce qui suit échoue, et
   // une comptabilité qui hoquette ne doit jamais coûter le résultat.
   try {
-    await comptabiliser(reponse.usage);
+    await comptabiliser(reponse.usage, MODELE);
   } catch (e) {
     console.error("[marche] comptabilité de l'appel impossible", e);
   }

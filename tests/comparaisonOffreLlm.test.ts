@@ -78,16 +78,19 @@ beforeEach(() => {
 });
 
 const comptes: unknown[] = [];
+const modelesComptes: string[] = [];
 const options = {
   cle: "cle-de-test",
-  comptabiliser: async (u: unknown) => {
+  comptabiliser: async (u: unknown, modele: string) => {
     comptes.push(u);
+    modelesComptes.push(modele);
   },
 };
 
 describe("comparerOffreALaFiche", () => {
   beforeEach(() => {
     comptes.length = 0;
+    modelesComptes.length = 0;
   });
 
   it("rend un verdict par exigence vérifiée, avec la preuve de la fiche", async () => {
@@ -121,6 +124,8 @@ describe("comparerOffreALaFiche", () => {
   it("compte l'appel une fois, avec le relevé d'usage de la réponse", async () => {
     await comparerOffreALaFiche(OFFRE, FICHE, options);
     expect(comptes).toEqual([{ input_tokens: 900, output_tokens: 150 }]);
+    // Le relevé est compté sous le nom du modèle appelé : c'est lui qui donne le prix.
+    expect(modelesComptes).toEqual(["claude-haiku-4-5-20251001"]);
   });
 
   it("compte l'appel même quand la réponse est inutilisable", async () => {
