@@ -19,6 +19,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 /** Les lignes que la fausse base rend au bout de la chaîne. Réglées par test. */
 let lignesRendues: unknown[] = [];
+/** Les valeurs passées à `.set()`, dans l'ordre. */
+const ecritures: unknown[] = [];
+/** Numéro (à partir de 1) de l'écriture qui doit échouer, ou 0. */
+let ecritureEnEchec = 0;
 
 /**
  * Une fausse base DRIZZLE — thenable, comme le vrai constructeur de requête.
@@ -31,11 +35,22 @@ vi.mock("@/lib/db", () => {
   const chaine: Record<string, unknown> = {};
   for (const m of ["from", "where", "limit", "orderBy"]) chaine[m] = () => chaine;
   chaine.then = (resoudre: (v: unknown[]) => unknown) => resoudre(lignesRendues);
-  return { db: { select: () => chaine } };
+  // `update().set(valeurs).where(...)` : on note les valeurs écrites, dans l'ordre, et on peut faire
+  // échouer une écriture précise (`ecritureEnEchec`) pour éprouver ce que le module en fait.
+  const miseAJour = (valeurs: unknown) => {
+    ecritures.push(valeurs);
+    const numero = ecritures.length;
+    return {
+      where: async () => {
+        if (ecritureEnEchec === numero) throw new Error("écriture refusée");
+      },
+    };
+  };
+  return { db: { select: () => chaine, update: () => ({ set: miseAJour }) } };
 });
 vi.mock("@/lib/migrations", () => ({ assurerMigrations: async () => {} }));
 
-const { listerCvs, profilActif, propositionDe } = await import("@/lib/cv/depot");
+const { activerProfil, listerCvs, profilActif, propositionDe } = await import("@/lib/cv/depot");
 const { PROFIL_DEFAUT } = await import("@/lib/profil");
 
 /**
@@ -66,6 +81,8 @@ function baseConfiguree(oui: boolean): void {
 beforeEach(() => {
   baseConfiguree(true);
   lignesRendues = [];
+  ecritures.length = 0;
+  ecritureEnEchec = 0;
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -135,5 +152,35 @@ describe("propositionDe — TROIS issues, et c'est tout l'intérêt", () => {
     baseConfiguree(false);
     lignesRendues = [{ profilPropose: "{}", nomFichier: "cv.pdf" }];
     expect(await propositionDe(1)).toBeNull();
+  });
+});
+
+describe("activerProfil — une proposition plus ancienne que le profil appliqué ne reste pas à valider (JobAI#200)", () => {
+  it("désactive les autres, active ce CV, PUIS efface les propositions des autres lignes", async () => {
+    await activerProfil(7, PROFIL_DEFAUT);
+    expect(ecritures).toHaveLength(3);
+    expect(ecritures[0]).toEqual({ actif: false });
+    expect(ecritures[1]).toMatchObject({ actif: true });
+    // Dernier, et seul à poser `null` : la proposition du CV appliqué n'est pas touchée par cette écriture.
+    expect(ecritures[2]).toEqual({ profilPropose: null });
+  });
+
+  it("un échec de l'effacement se dit dans le journal sans défaire l'application", async () => {
+    const journal = vi.spyOn(console, "error").mockImplementation(() => {});
+    ecritureEnEchec = 3;
+    await expect(activerProfil(7, PROFIL_DEFAUT)).resolves.toBeUndefined();
+    expect(journal).toHaveBeenCalledWith(
+      expect.stringContaining("propositions plus anciennes"),
+      expect.any(Error),
+    );
+    journal.mockRestore();
+  });
+
+  it("un échec de l'ACTIVATION reste une erreur franche et n'efface rien", async () => {
+    const journal = vi.spyOn(console, "error").mockImplementation(() => {});
+    ecritureEnEchec = 2;
+    await expect(activerProfil(7, PROFIL_DEFAUT)).rejects.toThrow(/plus aucun CV n'est actif/);
+    expect(ecritures).toHaveLength(2);
+    journal.mockRestore();
   });
 });

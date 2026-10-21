@@ -22,6 +22,7 @@ import {
   profilCourantOuDefaut,
 } from "@/lib/cv/proposition";
 import { planifierRenotation, resumerPlan } from "@/lib/cv/renotation";
+import { calculerAnnees, PREFIXE_CALCUL_ANNEES } from "@/lib/cv/anneesExperience";
 import type { ReponseExtraction } from "@/lib/cv/extraction";
 import type { Offre } from "@/lib/types";
 
@@ -39,6 +40,12 @@ const EXTRACTION_VIDE: ReponseExtraction = {
   manques: [],
 };
 
+/** Le détail que le CODE écrit : produit par `calculerAnnees`, pas recopié, pour que le test suive le code. */
+const CALCUL_DU_CODE = calculerAnnees(
+  [{ titre: "Poste fictif", debut: "janvier 2021", fin: "janvier 2026" }],
+  new Date("2026-10-21T12:00:00Z"),
+);
+
 function extraction(patch: Partial<ReponseExtraction>): ReponseExtraction {
   return { ...EXTRACTION_VIDE, ...patch };
 }
@@ -55,7 +62,7 @@ describe("les écarts proposés", () => {
       PROFIL_DEFAUT,
       extraction({
         anneesExperience: 5,
-        anneesExperienceProvenance: "§Expérience, 2021-2026",
+        anneesExperienceProvenance: CALCUL_DU_CODE.detail,
       }),
     );
     const annees = e.find((x) => x.cle === "faits.anneesExperience");
@@ -63,7 +70,42 @@ describe("les écarts proposés", () => {
     expect(annees?.nature).toBe("fait");
     expect(annees?.avant).toBe("non établi");
     expect(annees?.apres).toBe("5");
-    expect(annees?.provenance).toBe("§Expérience, 2021-2026");
+    expect(annees?.provenance).toBe(CALCUL_DU_CODE.detail);
+  });
+
+  it("le détail du calcul du code commence par le préfixe qui fait foi (JobAI#200)", () => {
+    // Si ce préfixe changeait d'un côté seulement, plus aucune année ne serait cochée d'avance.
+    expect(CALCUL_DU_CODE.detail.startsWith(PREFIXE_CALCUL_ANNEES)).toBe(true);
+  });
+
+  it("des années dont la provenance n'est PAS le calcul du code ne sont pas cochées d'avance (JobAI#200)", () => {
+    // Le cas vu le 2026-10-19 : une phrase du modèle (« environ 2 ans depuis avril 2023 ») sur 1 an,
+    // alors que le profil porte 3,6 ans calculés. Cochée d'avance, un clic ramenait 3,6 à 1.
+    const courant = { ...PROFIL_DEFAUT, faits: { ...PROFIL_DEFAUT.faits, anneesExperience: 3.6 } };
+    const e = calculerEcarts(
+      courant,
+      extraction({
+        anneesExperience: 1,
+        anneesExperienceProvenance: "Environ 2 ans depuis avril 2023",
+      }),
+    );
+    const annees = e.find((x) => x.cle === "faits.anneesExperience");
+    expect(annees?.preuve).toBe(false);
+    expect(annees?.provenance).toBe(
+      "estimation, non calculée par le code : Environ 2 ans depuis avril 2023",
+    );
+    expect(retenusParDefaut(e)).toEqual([]);
+  });
+
+  it("une provenance qui ne fait que CITER le préfixe plus loin n'est pas un calcul du code", () => {
+    const e = calculerEcarts(
+      PROFIL_DEFAUT,
+      extraction({
+        anneesExperience: 5,
+        anneesExperienceProvenance: `Selon moi. ${PREFIXE_CALCUL_ANNEES} : 5 ans`,
+      }),
+    );
+    expect(e.find((x) => x.cle === "faits.anneesExperience")?.preuve).toBe(false);
   });
 
   it("un fait SANS provenance reste distinguable d'un fait vérifié", () => {
@@ -78,7 +120,7 @@ describe("les écarts proposés", () => {
       PROFIL_DEFAUT,
       extraction({
         anneesExperience: 5,
-        anneesExperienceProvenance: "§Expérience, 2021-2026",
+        anneesExperienceProvenance: CALCUL_DU_CODE.detail,
         langues: ["français", "anglais"],
         outils: ["Excel", "Power BI"],
         forces: ["Bilingue"],

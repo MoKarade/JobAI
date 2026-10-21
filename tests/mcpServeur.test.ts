@@ -18,6 +18,7 @@ import { creerServeur, type EntreesSorties } from "../lib/mcp/serveur";
 import { PROFIL_DEFAUT } from "../lib/profil";
 import type { Offre } from "../lib/types";
 import { ReponseExtractionSchema } from "../lib/cv/extraction";
+import { PREFIXE_CALCUL_ANNEES } from "../lib/cv/anneesExperience";
 
 const BASE: Offre = {
   id: "laserax-coordonnateur",
@@ -480,10 +481,10 @@ describe("preuves_ecrans — prouver les écrans sans session", () => {
     ]);
   });
 
-  it("rend un écart d'années avec provenance, preuve et coche quand une proposition lisible propose une valeur différente", async () => {
+  it("rend un écart d'années coché d'avance seulement quand sa provenance est le calcul du code", async () => {
     const extractionFictive = ReponseExtractionSchema.parse({
       anneesExperience: 5,
-      anneesExperienceProvenance: "5 ans d'expérience en gestion",
+      anneesExperienceProvenance: `${PREFIXE_CALCUL_ANNEES} (mois de début et de fin inclus) · total : 60 mois = 5 ans`,
       langues: [],
       diplomes: [],
       outils: [],
@@ -504,9 +505,39 @@ describe("preuves_ecrans — prouver les écrans sans session", () => {
     const props = r.propositions as Array<Record<string, unknown>>;
     const ecartAnnees = props.find((p) => p.cle === "faits.anneesExperience");
     expect(ecartAnnees).toBeDefined();
-    expect(ecartAnnees?.provenance).toBe("5 ans d'expérience en gestion");
+    expect(ecartAnnees?.provenance).toBe(extractionFictive.anneesExperienceProvenance);
     expect(ecartAnnees?.preuve).toBe(true);
     expect(ecartAnnees?.coche).toBe(true);
+  });
+
+  it("une estimation d'années (provenance qui n'est pas le calcul du code) n'est ni preuve ni cochée (JobAI#200)", async () => {
+    const extractionFictive = ReponseExtractionSchema.parse({
+      anneesExperience: 1,
+      anneesExperienceProvenance: "5 ans d'expérience en gestion",
+      langues: [],
+      diplomes: [],
+      outils: [],
+      titresOccupes: [],
+      parcours: [],
+      competences: [],
+      forces: [],
+      manques: [],
+      recherchesSuggerees: [],
+    });
+    const { client } = await brancher({
+      lirePreuvesProfil: async () => ({
+        profil: PROFIL_DEFAUT,
+        proposition: { ok: true, extraction: extractionFictive },
+      }),
+    });
+    const r = corps(await client.callTool({ name: "preuves_ecrans", arguments: {} }));
+    const props = r.propositions as Array<Record<string, unknown>>;
+    const ecartAnnees = props.find((p) => p.cle === "faits.anneesExperience");
+    expect(ecartAnnees?.provenance).toBe(
+      "estimation, non calculée par le code : 5 ans d'expérience en gestion",
+    );
+    expect(ecartAnnees?.preuve).toBe(false);
+    expect(ecartAnnees?.coche).toBe(false);
   });
 
   it("rend propositions: { illisible: '…' } pour { ok: false, raison: '…' }", async () => {
