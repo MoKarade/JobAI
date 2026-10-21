@@ -140,8 +140,16 @@ export function motsTechniqueDe(texte: string, profil: Profil): string[] {
     .map((x) => x.brut);
 }
 
-/** 40 pts — le poste combine-t-il coordination d'équipe ET contenu technique ? */
-export function scoreFitRole(titre: string, description = "", profil: Profil = PROFIL_DEFAUT): number {
+/** Le rôle que le barème lit dans un titre : une des cinq lignes de `profil.pointsRole`. */
+export type RoleLu = keyof Profil["pointsRole"];
+
+/**
+ * Le rôle que les MOTS-CLÉS lisent dans un titre (et une description). PURE.
+ *
+ * ⚠️ UNE SEULE LECTURE : `scoreFitRole` en tire ses points, et la lecture du modèle (`lib/lectureAnnonce.ts`, ADR-0039)
+ * se compare à CE rôle-là, ligne pour ligne. Deux vocabulaires finiraient par diverger.
+ */
+export function roleDe(titre: string, description = "", profil: Profil = PROFIL_DEFAUT): RoleLu {
   const t = normaliserTitre(`${titre} ${description}`);
   // Les mots du profil passent par LA MÊME fonction que le titre (ADR-0017) : ils sont saisis
   // par Marc depuis `/profil`, donc rien ne garantit leur graphie — et comparer une forme
@@ -151,12 +159,16 @@ export function scoreFitRole(titre: string, description = "", profil: Profil = P
   // « technicien » sans encadrement = recul hiérarchique par rapport au poste actuel.
   const technicien = /\btechnicien/.test(t) && !coord;
 
-  const p = profil.pointsRole;
-  if (coord && tech) return p.combinaison; // la combinaison recherchée
-  if (coord) return p.coordination; // encadrement sans contenu technique
-  if (tech && !technicien) return p.technique; // technique sans encadrement
-  if (technicien) return p.technicien;
-  return p.horsSujet;
+  if (coord && tech) return "combinaison"; // la combinaison recherchée
+  if (coord) return "coordination"; // encadrement sans contenu technique
+  if (tech && !technicien) return "technique"; // technique sans encadrement
+  if (technicien) return "technicien";
+  return "horsSujet";
+}
+
+/** 40 pts — le poste combine-t-il coordination d'équipe ET contenu technique ? */
+export function scoreFitRole(titre: string, description = "", profil: Profil = PROFIL_DEFAUT): number {
+  return profil.pointsRole[roleDe(titre, description, profil)];
 }
 
 /**

@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-10-21 — JobAI#109 : un modèle lit la description d'une offre, sans toucher à la note (ADR-0039)
+
+- Nouvel outil MCP **`lire_annonces`** (payant, jamais seul) : Haiku 5.5 lit le titre et l'extrait de 2 000 caractères et rend un
+  rôle (les cinq lignes de `pointsRole`), une adéquation 0-100 et trois raisons au plus. La lecture est gardée dans la table
+  `lectures_annonce` (migration 0027, additive). Un lot : 20 annonces au plus, les mieux notées pas encore lues d'abord.
+- **La note n'est pas modifiée**, le plafond de 85 reste. Découpe de la tâche : mesure de la lecture contre les offres que Marc a
+  déjà tranchées = JobAI#211 ; entrée dans la note et levée du plafond = JobAI#212 (après accord de Marc sur le tableau).
+- `scoreFitRole` passe par `roleDe` (même comportement) pour que le modèle et les mots-clés se comparent ligne pour ligne.
+- Les relevés de coût d'un lot s'écrivent en file (`lib/serie.ts`) : le compteur n'est pas atomique.
+- Coût estimé : environ 0,00016 $ US l'annonce, de l'ordre de 1 $ US pour les 6 513 offres ouvertes [Probable, pas mesuré : la mesure
+  est la preuve de la tâche, dans le bloc `usage` du hub].
+
+---
+
 ## 2026-10-21 — JobAI#151 : le domaine gradué et la proposition de métiers (ADR-0038)
 
 - Trois niveaux de domaine d'après le code de profession : **retenu**, **voisin** (même domaine et même niveau, deux chiffres, qu'un

@@ -251,6 +251,22 @@ export const offerReasons = pgTable(
 );
 
 /**
+ * La lecture d'une annonce par le modèle (JobAI#109, ADR-0039) : une ligne par offre lue, au plus.
+ *
+ * POURQUOI UNE TABLE ET PAS DES COLONNES SUR `offers` : la lecture est un résultat PAYANT et DATÉ d'un modèle, pas un fait de
+ * l'offre. Elle se jette et se refait (nouvelle version du cadre, nouveau modèle) sans réécrire l'offre, et l'ajouter à `Offre`
+ * aurait fait partir un nouveau champ vers tous les chemins qui recopient une offre (surface MCP comprise) sans que personne
+ * ne l'ait décidé. `lecture` est le JSON validé par `lib/lectureAnnonce.ts`, expurgé avant stockage.
+ */
+export const lecturesAnnonce = pgTable("lectures_annonce", {
+  offerId: text("offer_id")
+    .primaryKey()
+    .references(() => offers.id, { onDelete: "cascade" }),
+  lecture: text("lecture").notNull(),
+  luLe: timestamp("lu_le", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
  * Coordonnées des municipalités, géocodées une fois puis conservées.
  *
  * POURQUOI UNE TABLE, ET PAS DES COLONNES SUR `offers` : les villes se répètent (une

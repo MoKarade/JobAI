@@ -24,12 +24,10 @@ import {
  * ⚠️ LE MODÈLE EST OBLIGATOIRE : les modèles ne se facturent pas au même prix (JobAI#158), donc un relevé sans nom de
  * modèle ne se chiffre pas. Chaque site d'appel passe le sien.
  *
- * ⚠️ LA LECTURE-MODIFICATION-ÉCRITURE N'EST PAS ATOMIQUE, ET C'EST SANS CONSÉQUENCE ICI —
- * pas par indulgence, mais parce que le seul site d'appel est l'analyse d'un CV, déclenchée
- * par un formulaire à bouton unique, désactivé pendant la transition. Deux extractions
- * simultanées supposeraient deux téléversements dans les deux secondes d'un même appel, par
- * le même et unique utilisateur. Le jour où un second site d'appel apparaît — une analyse en
- * lot, un cron — cette phrase cesse d'être vraie et l'incrément devra devenir atomique.
+ * ⚠️ LA LECTURE-MODIFICATION-ÉCRITURE N'EST PAS ATOMIQUE, ET C'EST SANS CONSÉQUENCE POUR DEUX APPELS SEULS : l'analyse d'un CV
+ * est déclenchée par un formulaire à bouton unique, la comparaison d'offre par un clic. Le LOT de lectures d'annonces (JobAI#109,
+ * `lire_annonces`) lance en revanche cinq appels de front : ses relevés passent par `enFileSerie` (`lib/serie.ts`), qui les
+ * écrit un à la fois. Un nouveau site d'appel concurrent doit faire de même, ou rendre l'incrément atomique.
  */
 export async function enregistrerUsageLlm(usage: unknown, modele: string): Promise<void> {
   try {

@@ -34,6 +34,10 @@ import { EcritureSuiviSchema, preparerEcriture } from "./ecriture.spec";
 import { PreuvesSchema, construirePreuves, type PreuvesEntrees } from "./preuvesEcrans.spec";
 import type { EtatCompteur } from "../coutLlm";
 import { choisirCvCible } from "./reanalyse.spec";
+import { LireAnnoncesSchema, choisirALire, ligneLecture } from "./lectureAnnonces.spec";
+import { parLots } from "../serie";
+import type { LectureAnnonce } from "../lectureAnnonce";
+import type { ResultatLecture } from "../lectureAnnonceLlm";
 import type { CvResume } from "../cv/depot";
 
 /** Ce que le serveur ne sait pas faire lui-même, et qu'on lui donne. */
@@ -101,6 +105,17 @@ export interface EntreesSorties {
    * Ne valide pas le profil et ne recalcule pas les notes.
    */
   reanalyserCv: (id: number) => Promise<{ ok: boolean; message?: string; erreur?: string }>;
+  /** Les lectures d'annonce gardées (JobAI#109) et le nombre de lignes illisibles, ou `null` si la base n'a pas répondu. */
+  lireLecturesGardees: () => Promise<{ lectures: ReadonlyMap<string, LectureAnnonce>; illisibles: number } | null>;
+  /**
+   * Lit UNE annonce avec le modèle (JobAI#109). PAYANT : le coût est compté par l'appel lui-même.
+   *
+   * ⚠️ INJECTÉE pour la même raison que `diagnostiquerFlux` : le SDK du modèle ne s'importe pas ici, et l'appel se teste
+   * sans réseau. Ne lève pas : un échec se rend comme une valeur.
+   */
+  lireUneAnnonce: (offre: { poste: string; texte: string }, profil: Profil) => Promise<ResultatLecture>;
+  /** Garde la lecture d'une offre. Lève si la base refuse. */
+  garderLecture: (offerId: string, lecture: LectureAnnonce) => Promise<void>;
 }
 
 /** Une réponse d'outil : du JSON, dans le seul format que le protocole transporte. */
@@ -391,6 +406,64 @@ export function creerServeur(io: EntreesSorties): McpServer {
       }
       const resultat = await io.reanalyserCv(cible.id);
       return json(resultat);
+    },
+  );
+
+  serveur.registerTool(
+    "lire_annonces",
+    {
+      title: "Lire des annonces avec le modèle",
+      description:
+        "Fait lire par un modèle (Haiku 5.5) le titre et l'extrait d'annonce d'offres ouvertes, et GARDE la lecture : le rôle lu " +
+        "(combinaison, coordination, technique, technicien, horsSujet), une adéquation de 0 à 100 et trois raisons au plus. " +
+        "Chaque ligne rend aussi le rôle que les mots-clés lisent dans le même texte, et si les deux s'accordent. " +
+        "⚠️ PAYANT (de l'ordre de 0,0002 $ US l'annonce, compté dans le bloc `usage` du hub) : un lot ne dépasse jamais 20 " +
+        "annonces ; ne lance pas de lecture de ta propre initiative ni en boucle. Sans `ids`, lit les mieux notées pas encore " +
+        "lues ; avec `ids`, rend la lecture déjà gardée sans rappeler le modèle (sauf `relire`). La NOTE des offres n'est pas " +
+        "modifiée : la lecture sert à mesurer, pas à noter.",
+      inputSchema: LireAnnoncesSchema.shape,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async (args) => {
+      const demande = LireAnnoncesSchema.parse(args);
+      const [offres, bareme, gardees] = await Promise.all([io.lireOffres(), io.lireBareme(), io.lireLecturesGardees()]);
+      if (offres === null) return panne(BASE_MUETTE);
+      if (bareme === null) {
+        return panne("Le profil actif est illisible ou la base n'a pas répondu : je ne lis rien avec un vocabulaire que Marc n'a pas.");
+      }
+      if (gardees === null) return panne("Les lectures déjà gardées sont illisibles : je ne relance pas de lot payant à l'aveugle.");
+
+      const choix = choisirALire(offres, gardees.lectures, demande);
+      const faites = await parLots(choix.aLire, 5, async (offre) => {
+        const lu = await io.lireUneAnnonce({ poste: offre.poste, texte: offre.texteNote ?? "" }, bareme.profil);
+        if (!lu.ok) return { offre, lecture: null, raison: lu.raison };
+        try {
+          await io.garderLecture(offre.id, lu.lecture);
+        } catch (err) {
+          // L'appel est facturé même si l'écriture échoue : on le DIT, pour que personne ne relise à l'aveugle.
+          console.error("[api/mcp] lecture non gardée", err);
+          return { offre, lecture: null, raison: "L'écriture de la lecture en base a échoué (l'appel est compté)." };
+        }
+        return { offre, lecture: lu.lecture, raison: null };
+      });
+
+      const lues = faites.flatMap((f) => (f.lecture === null ? [] : [ligneLecture(f.offre, f.lecture, bareme.profil)]));
+      const dejaLues = choix.dejaLues.flatMap((o) => {
+        const l = gardees.lectures.get(o.id);
+        return l === undefined ? [] : [ligneLecture(o, l, bareme.profil)];
+      });
+      const vues = [...lues, ...dejaLues];
+      return json({
+        lues,
+        dejaLues,
+        echecs: faites.flatMap((f) => (f.lecture === null ? [{ id: f.offre.id, raison: f.raison }] : [])),
+        sansTexte: choix.sansTexte,
+        introuvables: choix.introuvables,
+        restantes: Math.max(0, choix.nonLues - lues.length),
+        accordDesRoles: { sur: vues.length, memeRole: vues.filter((v) => v.accord).length },
+        lecturesIllisibles: gardees.illisibles,
+        note: "La note des offres n'est pas modifiée par cette lecture.",
+      });
     },
   );
 

@@ -61,6 +61,9 @@ async function brancher(io: Partial<EntreesSorties> = {}) {
     lireCompteurUsage: async () => ({ etat: "absent" }),
     listerCvs: async () => [],
     reanalyserCv: async () => ({ ok: true, message: "Analyse refaite." }),
+    lireLecturesGardees: async () => ({ lectures: new Map(), illisibles: 0 }),
+    lireUneAnnonce: async () => ({ ok: false, raison: "pas de modèle dans ce test" }),
+    garderLecture: async () => undefined,
     diagnostiquerFlux: async () => ({
       fin: "flux-termine",
       verdicts: { "dans-la-region": 2 },
@@ -100,6 +103,7 @@ describe("la surface exposée à claude.ai", () => {
       "diagnostic_bareme",
       "diagnostic_flux",
       "etat_synchro",
+      "lire_annonces",
       "lire_offre",
       "modifier_suivi",
       "preuves_ecrans",
@@ -124,6 +128,8 @@ describe("la surface exposée à claude.ai", () => {
     expect(parNom.get("preuves_ecrans")).toBe(true);
     expect(parNom.get("modifier_suivi")).toBe(false);
     expect(parNom.get("reanalyser_profil")).toBe(false);
+    // Un appel payant n'est jamais une lecture anodine : le client doit pouvoir le distinguer.
+    expect(parNom.get("lire_annonces")).toBe(false);
   });
 });
 
