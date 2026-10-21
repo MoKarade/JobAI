@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-60 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+61 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -55,6 +55,7 @@
 - [ADR-0036 — Une annonce du Guichet est une seule offre, même quand l'employeur change de nom](adr/0036-une-annonce-du-guichet-est-une-seule-offre.md) — `docs/adr/0036-une-annonce-du-guichet-est-une-seule-offre.md`
 - [ADR-0037 — Le dossier employeur A, B ou C ne cite que le suivi, et dit « inconnu » sans source](adr/0037-le-dossier-employeur-a-b-c-ne-cite-que-le-suivi.md) — `docs/adr/0037-le-dossier-employeur-a-b-c-ne-cite-que-le-suivi.md`
 - [ADR-0038 — Le domaine est gradué (retenu, voisin, autre) et les métiers précis se proposent depuis le CV](adr/0038-le-domaine-est-gradue-et-les-metiers-se-proposent.md) — `docs/adr/0038-le-domaine-est-gradue-et-les-metiers-se-proposent.md`
+- [ADR-0039 — Un modèle lit la description d'une offre, et sa lecture est gardée sans toucher à la note](adr/0039-un-modele-lit-la-description-sans-toucher-a-la-note.md) — `docs/adr/0039-un-modele-lit-la-description-sans-toucher-a-la-note.md`
 - [Décisions d'architecture (ADR)](adr/README.md) — `docs/adr/README.md`
 
 ## docs/claude/

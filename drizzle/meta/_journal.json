@@ -190,6 +190,13 @@
       "when": 1792178800398,
       "tag": "0026_salaire_experience",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792601116681,
+      "tag": "0027_lecture_annonce",
+      "breakpoints": true
     }
   ]
 }

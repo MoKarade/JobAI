@@ -67,6 +67,9 @@ async function appel(corps: unknown, accept = "application/json, text/event-stre
     lireCompteurUsage: async () => null,
     listerCvs: async () => [],
     reanalyserCv: async () => ({ ok: true, message: "Analyse refaite." }),
+    lireLecturesGardees: async () => ({ lectures: new Map(), illisibles: 0 }),
+    lireUneAnnonce: async () => ({ ok: false, raison: "pas de modèle dans ce test" }),
+    garderLecture: async () => undefined,
     diagnostiquerFlux: async () => ({ fin: "flux-termine" }),
     sonderEmployeurs: async () => ({}),
   });
@@ -116,6 +119,7 @@ describe("le transport HTTP répond aux requêtes réelles", () => {
       "diagnostic_bareme",
       "diagnostic_flux",
       "etat_synchro",
+      "lire_annonces",
       "lire_offre",
       "modifier_suivi",
       "preuves_ecrans",

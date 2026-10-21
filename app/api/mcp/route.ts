@@ -41,9 +41,19 @@ import { resumeDesRefus } from "@/lib/competences";
 import { lireMetiers } from "@/lib/actionsMetiers";
 import { aujourdhui } from "@/lib/ajout";
 import { CHAMPS_UTILISATEUR, type Offre } from "@/lib/types";
+import { lireAnnonce } from "@/lib/lectureAnnonceLlm";
+import { garderLecture, lireLectures } from "@/lib/lectureAnnonceStore";
+import { enregistrerUsageLlm } from "@/lib/coutLlmStore";
+import { enFileSerie } from "@/lib/serie";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+/**
+ * Le compteur de coût se met à jour par lecture-modification-écriture : les lectures d'un lot partent de front, mais leurs
+ * relevés s'écrivent UN À LA FOIS (`lib/serie.ts`), sinon un appel facturé disparaîtrait du cumul.
+ */
+const comptabiliserEnSerie = enFileSerie(async (usage: unknown, modele: string) => enregistrerUsageLlm(usage, modele));
 
 /** Le jeton porté par l'en-tête `Authorization`, ou `null`. */
 function jetonPorteur(requete: Request): string | null {
@@ -234,6 +244,9 @@ export async function POST(requete: Request): Promise<Response> {
         return null;
       }
     },
+    lireLecturesGardees: lireLectures,
+    lireUneAnnonce: (offre, profil) => lireAnnonce(offre, profil, { comptabiliser: comptabiliserEnSerie }),
+    garderLecture,
     reanalyserCv: async (id: number) => {
       const stocke = await lireContenuPourAnalyse(id);
       if (!stocke) return { ok: false, erreur: "CV introuvable." };
