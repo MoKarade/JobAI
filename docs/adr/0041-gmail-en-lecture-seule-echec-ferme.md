@@ -30,6 +30,13 @@ un second flux, distinct**, qui ne crée aucune session et ne remplace rien.
    `google-refuse` (jeton révoqué). C'est le point de contrôle de Marc et de Claude après le geste de JobAI#201, et ce que consommera JobAI#218.
 7. **Les erreurs de Google ne sont jamais reprises telles quelles** : statut et code d'erreur standard seulement (le corps peut citer le client).
 
+## Variables (à poser dans Vercel par Marc, JobAI#201 ; volontairement absentes de `.env.example`)
+
+`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, et optionnellement `GMAIL_REDIRECT_URI` (par défaut `https://emploi.hubperso.com/api/gmail/retour`, l'adresse à
+déclarer comme URI de redirection autorisée dans le client OAuth de type « Application Web »). `AUTH_SECRET` existe déjà. Elles ne figurent pas dans
+`.env.example` : le Garde-fou traite toute variable secrète ajoutée à un fichier `.env*` comme un geste de Marc, et ce fichier n'aurait de toute façon porté
+que des lignes vides.
+
 ## Ce que cette tâche ne fait pas
 
 Aucune proposition de statut (JobAI#218), aucun écran (JobAI#219), aucune écriture dans le suivi. La lecture d'un vrai courriel attend le client OAuth
