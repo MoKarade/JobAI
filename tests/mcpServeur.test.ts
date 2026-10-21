@@ -57,6 +57,7 @@ async function brancher(io: Partial<EntreesSorties> = {}) {
     lireResumeDistances: async () => ({ brut: null }),
     lireBareme: async () => ({ profil: PROFIL_DEFAUT, metiers: ["21"] }),
     lirePreuvesProfil: async () => ({ profil: PROFIL_DEFAUT, proposition: null }),
+    lireCompteurUsage: async () => ({ etat: "absent" }),
     listerCvs: async () => [],
     reanalyserCv: async () => ({ ok: true, message: "Analyse refaite." }),
     diagnostiquerFlux: async () => ({
@@ -581,6 +582,63 @@ describe("preuves_ecrans — prouver les écrans sans session", () => {
     const muet2 = await brancher({ lireOffres: async () => null });
     const r2 = await muet2.client.callTool({ name: "preuves_ecrans", arguments: {} });
     expect(r2.isError).toBe(true);
+  });
+});
+
+describe("preuves_ecrans — le coût des appels de modèle (JobAI#198)", () => {
+  it("sans aucun appel, le bloc usage dit « aucun-appel » (jamais 0 $)", async () => {
+    const { client } = await brancher();
+    const r = corps(await client.callTool({ name: "preuves_ecrans", arguments: {} }));
+    expect(r.usage).toEqual({ etat: "aucun-appel" });
+  });
+
+  it("rend un modèle chiffré et un modèle sans prix « non mesuré », sans l'additionner au total", async () => {
+    const { client } = await brancher({
+      lireCompteurUsage: async () => ({
+        etat: "compteur",
+        parModele: {
+          "claude-sonnet-5-5": {
+            appels: 1,
+            entree: 20_000,
+            sortie: 3_000,
+            ecritureCache: 0,
+            lectureCache: 0,
+            ignores: 0,
+          },
+          "modele-sans-prix": {
+            appels: 0,
+            entree: 0,
+            sortie: 0,
+            ecritureCache: 0,
+            lectureCache: 0,
+            ignores: 2,
+          },
+        },
+      }),
+    });
+    const r = corps(await client.callTool({ name: "preuves_ecrans", arguments: {} }));
+    const usage = r.usage as { etat: string; devise: string; coutTotal: number; modeles: Array<Record<string, unknown>> };
+    expect(usage.etat).toBe("compteur");
+    expect(usage.devise).toBe("USD");
+    const sonnet = usage.modeles.find((m) => m.modele === "claude-sonnet-5-5");
+    // (20 000 × 2 $ + 3 000 × 10 $) / 1 000 000 = 0,07 $ : le prix de Sonnet 5.5, pas celui d'un autre modèle.
+    expect(sonnet?.cout).toBe(0.07);
+    expect(sonnet?.appels).toBe(1);
+    const inconnu = usage.modeles.find((m) => m.modele === "modele-sans-prix");
+    expect(inconnu?.cout).toBe("non mesuré");
+    expect(inconnu?.ignores).toBe(2);
+    expect(usage.coutTotal).toBe(0.07);
+  });
+
+  it("un compteur illisible ou muet se dit « illisible », sans faire échouer les preuves du CV", async () => {
+    for (const compteur of [{ etat: "illisible" as const }, null]) {
+      const { client } = await brancher({ lireCompteurUsage: async () => compteur });
+      const res = await client.callTool({ name: "preuves_ecrans", arguments: {} });
+      expect(res.isError).toBeFalsy();
+      const r = corps(res);
+      expect((r.usage as { etat: string }).etat).toBe("illisible");
+      expect(r.competences).toBeDefined();
+    }
   });
 });
 

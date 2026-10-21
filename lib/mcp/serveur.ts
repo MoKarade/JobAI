@@ -32,6 +32,7 @@ import type { SuiviVeille } from "../veille";
 import { FiltresSchema, chercherOffres, lireOffreVue, resumerPourMcp } from "./lecture.spec";
 import { EcritureSuiviSchema, preparerEcriture } from "./ecriture.spec";
 import { PreuvesSchema, construirePreuves, type PreuvesEntrees } from "./preuvesEcrans.spec";
+import type { EtatCompteur } from "../coutLlm";
 import { choisirCvCible } from "./reanalyse.spec";
 import type { CvResume } from "../cv/depot";
 
@@ -88,6 +89,11 @@ export interface EntreesSorties {
   lireBareme: () => Promise<{ profil: Profil; metiers: readonly string[] } | null>;
   // null = la base n'a pas répondu, ou le profil actif est illisible ; jamais le profil par défaut en repli, comme lireBareme
   lirePreuvesProfil: () => Promise<PreuvesEntrees | null>;
+  /**
+   * Le compteur d'appels de modèle (`cout-llm`), relu sans rien écrire, ou `null` si la base n'a pas répondu.
+   * Il ne sort qu'en nombres, par `resumerUsage` (JobAI#198).
+   */
+  lireCompteurUsage: () => Promise<EtatCompteur | null>;
   /** Les résumés de CV, du plus récent au plus ancien, ou `null` si la base n'a pas répondu. */
   listerCvs: () => Promise<readonly CvResume[] | null>;
   /**
@@ -344,21 +350,24 @@ export function creerServeur(io: EntreesSorties): McpServer {
       description:
         "Rend les données nécessaires pour prouver les écrans Profil et employeur sans session du hub : " +
         "années d'expérience du profil actif, fiche de compétences, écarts de la proposition à valider " +
-        "(avec coche si la preuve est établie), et optionnellement les signaux d'un employeur suivi.",
+        "(avec coche si la preuve est établie), le coût des appels de modèle par modèle (nombres seulement, " +
+        "« non mesuré » pour un modèle sans prix), et optionnellement les signaux d'un employeur suivi.",
       inputSchema: PreuvesSchema.shape,
       annotations: { readOnlyHint: true },
     },
     async (args) => {
       const { employeur } = PreuvesSchema.parse(args);
-      const [preuvesEntrees, offres] = await Promise.all([
+      const [preuvesEntrees, offres, compteur] = await Promise.all([
         io.lirePreuvesProfil(),
         io.lireOffres(),
+        io.lireCompteurUsage(),
       ]);
       if (preuvesEntrees === null || offres === null) {
         return panne(BASE_MUETTE);
       }
       const journal = employeur !== undefined ? await io.lireJournal() : {};
-      return json(construirePreuves(preuvesEntrees, offres, journal, employeur));
+      // Un compteur muet ne fait pas tomber les preuves du CV : le bloc `usage` se dit « illisible ».
+      return json(construirePreuves(preuvesEntrees, offres, journal, employeur, compteur));
     },
   );
 
