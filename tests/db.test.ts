@@ -122,7 +122,7 @@ describe("migration", () => {
     expect(r.rows.map((x) => x.table_name)).toEqual([...declarees].sort());
   });
 
-  it("pose bien les 15 contraintes CHECK du schéma", async () => {
+  it("pose bien les 17 contraintes CHECK du schéma", async () => {
     const r = await pg.query<{ constraint_name: string }>(
       `SELECT con.conname AS constraint_name
        FROM pg_constraint con
@@ -140,7 +140,11 @@ describe("migration", () => {
       "entreprises_lieux_lon_ck",
       "entreprises_lieux_precision_ck",
       "offer_reasons_ton_ck",
+      // Ajoutées le 2026-10-21 (ADR-0040) : un début de code postal a la forme lettre-chiffre-lettre, et une distance « postale »
+      // est une distance (`km_source` sans `km` ne dirait rien).
+      "offers_code_postal_ck",
       "offers_km_ck",
+      "offers_km_source_ck",
       "offers_priorite_ck",
       "offers_score_bornes_ck",
       "offers_score_source_ck",
@@ -152,6 +156,21 @@ describe("migration", () => {
       "villes_lat_ck",
       "villes_lon_ck",
     ]);
+  });
+});
+
+describe("table offers — distance approchée par le code postal (ADR-0040)", () => {
+  it("accepte une distance postale et un début de code postal bien formé", async () => {
+    await expect(insererOffre({ id: "cp-ok", km: 48, km_source: "postale", code_postal: "G1V" })).resolves.toBe("cp-ok");
+    await expect(insererOffre({ id: "cp-null", km: null, km_source: null, code_postal: null })).resolves.toBe("cp-null");
+  });
+
+  it("refuse un km_source sans km, une source inconnue et un code postal mal formé", async () => {
+    await expect(insererOffre({ id: "cp-sans-km", km: null, km_source: "postale" })).rejects.toThrow();
+    await expect(insererOffre({ id: "cp-inconnue", km: 48, km_source: "devine" })).rejects.toThrow();
+    for (const mauvais of ["g1v", "G1V4G6", "123", ""]) {
+      await expect(insererOffre({ id: `cp-${mauvais}`, code_postal: mauvais })).rejects.toThrow();
+    }
   });
 });
 

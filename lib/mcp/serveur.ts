@@ -290,7 +290,7 @@ export function creerServeur(io: EntreesSorties): McpServer {
         "Le nom et la dernière écriture (`majLe`, `ageMs`) de chaque ligne de `sync_state` — " +
         "jamais son contenu — sauf la ligne `distances-resume`, qui porte sous `resume` le " +
         "résumé de la DERNIÈRE passe de distances terminée (`finiLe`, `villesManquantes`, " +
-        "`distancesEffacees`, `centresCorriges`, `bornesMesurees`, budget par étape) : " +
+        "`distancesEffacees`, `distancesPostales`, `lieuInconnuSansDistance`, `centresCorriges`, `bornesMesurees`, budget par étape) : " +
         "des compteurs, jamais de texte libre. Sert quand les journaux runtime Vercel ont expiré (~17 min de " +
         "rétention) : les clés `geocodage-auto` et `distances-auto` disent quand le cron de " +
         "géocodage a réservé son tour pour la dernière fois ; `veille-auto`, la passe " +

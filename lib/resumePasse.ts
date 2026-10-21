@@ -60,6 +60,16 @@ export const ResumeDistancesSchema = z.object({
   villesManquantes: CompteOuNull,
   /** Km retirés parce qu'ils venaient d'une position invraisemblable (ADR-0021). */
   distancesEffacees: CompteOuNull,
+  /**
+   * Distances écrites cette passe depuis le début du code postal (ADR-0040) : approchées, pas mesurées.
+   * Facultatif : un résumé écrit avant JobAI#92 doit rester lisible.
+   */
+  distancesPostales: CompteOuNull.optional(),
+  /**
+   * Offres ouvertes « lieu inconnu » qui n'ont toujours pas de distance à la fin de la passe : le compte qui doit BAISSER
+   * (JobAI#92). Facultatif pour la même raison.
+   */
+  lieuInconnuSansDistance: CompteOuNull.optional(),
   /** Centres que la re-vérification a déplacés de plus de `RAYON_VALIDATION_KM`. */
   centresCorriges: CompteOuNull,
   bornesMesurees: CompteOuNull,
@@ -85,6 +95,8 @@ export function resumeVierge(): EntreeResume {
     placees: null,
     villesManquantes: null,
     distancesEffacees: null,
+    distancesPostales: null,
+    lieuInconnuSansDistance: null,
     centresCorriges: null,
     bornesMesurees: null,
     bornesCandidates: null,

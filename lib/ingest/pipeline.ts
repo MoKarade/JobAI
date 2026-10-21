@@ -12,6 +12,7 @@
 
 import { extraitPourNote, noterOffre } from "../noteOffre";
 import { numeroAnnonce } from "../annonce";
+import { debutCodePostal } from "../codePostal";
 import { lireExperienceMois, lireSalaireAnnuel, salaireAffichable } from "./conditionsFlux";
 import { PROFIL_DEFAUT, type Profil } from "../profil";
 import { normaliserLieu, situer } from "./region";
@@ -293,6 +294,29 @@ export function idsStockesVus(
 }
 
 /**
+ * Les offres déjà suivies dont le début de code postal manque en base alors que la source le donne (ADR-0040, JobAI#92).
+ *
+ * ⚠️ POURQUOI ÇA EXISTE : une offre connue est comptée « doublon » par `trier` et rien d'elle n'est réécrit. Sans ce rattrapage,
+ * les offres « lieu inconnu » déjà en base (3 874 au 2026-10-21) ne recevraient jamais de code postal : seules les nouvelles
+ * en auraient un. Même règle que `liensARafraichir` : une ligne seulement si l'information MANQUE en base et qu'on en tient une
+ * valide ; un code déjà gardé n'est jamais réécrit, un code absent ou mal formé de la source ne remplace rien.
+ */
+export function codesPostauxARattraper(
+  connues: readonly { id: string; codePostal?: string | null }[],
+  vues: ReadonlyMap<string, OffreBrute>,
+): { id: string; codePostal: string }[] {
+  const majs: { id: string; codePostal: string }[] = [];
+  for (const o of connues) {
+    if (o.codePostal) continue;
+    const brute = vues.get(o.id);
+    if (brute === undefined) continue;
+    const codePostal = debutCodePostal(brute.codePostal);
+    if (codePostal !== null) majs.push({ id: o.id, codePostal });
+  }
+  return majs;
+}
+
+/**
  * Les offres suivies dont le LIEN a changé depuis la dernière fois qu'on les a vues.
  *
  * ⚠️ POURQUOI CETTE FONCTION EXISTE — MARC, 2026-09-17 : « il y a des jobs périmés qui
@@ -474,6 +498,9 @@ export function trier(
       poste: brute.titre,
       lien: brute.lien,
       km: null,
+      // Le DÉBUT du code postal repart avec l'offre (ADR-0040, JobAI#92) : c'est lui qui permet d'approcher une distance quand le
+      // nom de la ville ne situe rien. Trois caractères, pas les six : la distance n'en demande pas plus.
+      codePostal: debutCodePostal(brute.codePostal),
       // La ville est CONSERVÉE : sans elle, un employeur hors des cibles ne peut pas être
       // géocodé plus tard, et sa distance — le critère n°1 — resterait inconnue à vie.
       ville: brute.ville.trim() || null,
