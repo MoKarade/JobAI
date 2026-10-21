@@ -80,6 +80,8 @@ export interface EntreesSorties {
    * valeur (`[OBS-01]`). `null` si la base n'a pas répondu.
    */
   lireEtatSynchro: () => Promise<readonly LigneSynchroBrute[] | null>;
+  /** L'accès Gmail est-il configuré ? Des noms de variables, jamais de valeur (JobAI#107). Absent = la ligne `gmail` n'est pas rendue. */
+  lireConfigGmail?: () => { configure: boolean; manquantes: readonly string[] };
   /**
    * La valeur BRUTE de `distances-resume` (`[OBS-02]`) : `{ brut: null }` = jamais écrite,
    * `null` = la base n'a pas répondu. Elle ne sort qu'après `lireResume` (schéma à liste blanche).
@@ -291,7 +293,8 @@ export function creerServeur(io: EntreesSorties): McpServer {
         "jamais son contenu — sauf la ligne `distances-resume`, qui porte sous `resume` le " +
         "résumé de la DERNIÈRE passe de distances terminée (`finiLe`, `villesManquantes`, " +
         "`distancesEffacees`, `distancesPostales`, `lieuInconnuSansDistance`, `centresCorriges`, `bornesMesurees`, budget par étape) : " +
-        "des compteurs, jamais de texte libre. Sert quand les journaux runtime Vercel ont expiré (~17 min de " +
+        "des compteurs, jamais de texte libre. Une ligne `gmail` (`configure`, `manquantes` = NOMS de variables, `connecte`) dit où en est l'accès " +
+        "Gmail en lecture seule. Sert quand les journaux runtime Vercel ont expiré (~17 min de " +
         "rétention) : les clés `geocodage-auto` et `distances-auto` disent quand le cron de " +
         "géocodage a réservé son tour pour la dernière fois ; `veille-auto`, la passe " +
         "d'ingestion ; `seed`, la dernière synchronisation du jeu de départ. ⚠️ NE PROUVE " +
@@ -311,7 +314,7 @@ export function creerServeur(io: EntreesSorties): McpServer {
       if (resume === null) {
         return panne("La base n'a pas répondu : impossible de lire le résumé de la dernière passe de distances.");
       }
-      return json(resumerEtatSynchro(lignes, new Date(), lireResume(resume.brut)));
+      return json(resumerEtatSynchro(lignes, new Date(), lireResume(resume.brut), io.lireConfigGmail?.()));
     },
   );
 
