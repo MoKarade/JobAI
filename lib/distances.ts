@@ -20,6 +20,7 @@
 import { noterOffre, type Bareme } from "./noteOffre";
 import { distanceKm, RAYON_VALIDATION_KM } from "./geocodage";
 import { cleGroupement, creerRecherchePosition, memeEmployeur } from "./employeurs";
+import { centreDeCodePostal } from "./codePostal";
 import { estDansLaRegion, normaliserLieu } from "./ingest/region";
 import type { Offre } from "./types";
 
@@ -37,7 +38,8 @@ export interface MiseAJourDistance {
   km: number;
   /** Recalculée avec la vraie distance. `null` si la note ne doit pas changer. */
   score: number | null;
-  precision: "exacte" | "ville";
+  /** `postale` = approchée par le début du code postal de l'annonce (ADR-0040) : à écrire avec `kmSource: "postale"`. */
+  precision: "exacte" | "ville" | "postale";
 }
 
 /** Arrondi au dixième : afficher « 12,3 km » est honnête, « 12,3184 km » ne l'est pas. */
@@ -69,7 +71,7 @@ export function invaliderDistancesPrecisees(
   if (entreprisesPrecisees.length === 0) return [...offres];
   return offres.map((o) =>
     o.km !== null && entreprisesPrecisees.some((nom) => memeEmployeur(o.entreprise, nom))
-      ? { ...o, km: null }
+      ? { ...o, km: null, kmSource: null }
       : o,
   );
 }
@@ -185,14 +187,15 @@ export function invaliderDistancesImplausibles(
   const positionDe = creerRecherchePosition(positions);
   const villes = villesParEmployeur(offres);
   return offres.map((o) => {
-    if (o.km === null || o.histo) return o;
+    // Une distance postale ne vient pas de la position de l'employeur : elle ne peut pas être « invraisemblable » pour elle (ADR-0040).
+    if (o.km === null || o.histo || o.kmSource === "postale") return o;
     const pos = positionDe(o.entreprise);
     if (!pos) return o;
     const centre = centreDe(o.ville) ?? null;
     const faux =
       positionInvraisemblable(pos, centre) ||
       positionNonProuvee(o, centre, villes.get(cleGroupement(o.entreprise, o.id)));
-    return faux ? { ...o, km: null } : o;
+    return faux ? { ...o, km: null, kmSource: null } : o;
   });
 }
 
@@ -220,6 +223,39 @@ export function villesParUrgence(
 }
 
 /**
+ * La distance MESURÉE d'une offre depuis la position de son employeur, ou `null` quand rien ne la prouve. PURE.
+ *
+ * C'est le corps d'origine de `planifierDistances`, sorti pour que le repli postal (ADR-0040) ne s'essaie qu'APRÈS lui.
+ */
+function distanceMesuree(
+  o: Offre,
+  positionDe: (entreprise: string) => Position | null,
+  villes: ReadonlyMap<string, ReadonlySet<string>>,
+  centreDe: CentreDe,
+  distance: (p: { lat: number; lon: number }) => number,
+): { km: number; precision: "exacte" | "ville" } | null {
+  // `positionDe` : l'employeur peut être situé sous un autre nom que celui de l'annonce
+  // (« Laserax » côté liste de chasse, « Laserax inc. » côté offre). La comparaison
+  // littérale d'avant laissait l'offre sans distance alors que la position existait.
+  const pos = positionDe(o.entreprise);
+  if (!pos) return null;
+
+  // La position d'un EMPLOYEUR ne mesure pas une offre annoncée ailleurs (ADR-0021).
+  // Mieux vaut « distance à mesurer » que 6,1 km pour un emploi à 200 km.
+  const centre = centreDe(o.ville) ?? null;
+  if (positionInvraisemblable(pos, centre)) return null;
+  // Et quand le centre n'est pas encore connu, un employeur à plusieurs sites ne prouve rien
+  // pour une ville non régionale (JobAI#90).
+  if (positionNonProuvee(o, centre, villes.get(cleGroupement(o.entreprise, o.id)))) return null;
+
+  const km = arrondirKm(distance(pos));
+  // Une distance aberrante trahit une résolution fausse (homonyme, signe inversé) : on
+  // préfère ne rien écrire plutôt qu'un chiffre qui ferait douter de tous les autres.
+  if (!Number.isFinite(km) || km < 0 || km > 500) return null;
+  return { km, precision: pos.precision };
+}
+
+/**
  * Quelles offres peuvent recevoir une distance, et laquelle.
  *
  * @param offres     Le suivi actuel.
@@ -230,7 +266,7 @@ export function villesParUrgence(
 export function planifierDistances(
   offres: readonly Offre[],
   positions: ReadonlyMap<string, Position>,
-  distance: (p: Position) => number,
+  distance: (p: { lat: number; lon: number }) => number,
   /**
    * Le centre de la ville d'une offre, quand il est connu.
    *
@@ -263,32 +299,34 @@ export function planifierDistances(
     if (o.histo) continue;
     // Une distance déjà connue reste : elle vient d'un relevé de Marc, ou d'un calcul
     // précédent. La recalculer à chaque passage ferait bouger l'affichage sans raison.
-    if (o.km !== null) continue;
+    // SAUF une distance APPROCHÉE par le code postal (ADR-0040) : dès qu'une vraie mesure existe, elle la remplace.
+    const approchee = o.kmSource === "postale";
+    if (o.km !== null && !approchee) continue;
 
-    // `positionDe` : l'employeur peut être situé sous un autre nom que celui de l'annonce
-    // (« Laserax » côté liste de chasse, « Laserax inc. » côté offre). La comparaison
-    // littérale d'avant laissait l'offre sans distance alors que la position existait.
-    const pos = positionDe(o.entreprise);
-    if (!pos) continue;
+    const mesuree = distanceMesuree(o, positionDe, villes, centreDe, distance);
+    if (mesuree !== null) {
+      majs.push({
+        id: o.id,
+        km: mesuree.km,
+        score: bareme === null ? null : scoreAvecDistance(o, mesuree.km, bareme),
+        precision: mesuree.precision,
+      });
+      continue;
+    }
+    // Déjà approchée et toujours rien de mieux : on ne la réécrit pas, l'affichage ne doit pas bouger sans cause.
+    if (approchee) continue;
 
-    // La position d'un EMPLOYEUR ne mesure pas une offre annoncée ailleurs (ADR-0021).
-    // Mieux vaut « distance à mesurer » que 6,1 km pour un emploi à 200 km.
-    const centre = centreDe(o.ville) ?? null;
-    if (positionInvraisemblable(pos, centre)) continue;
-    // Et quand le centre n'est pas encore connu, un employeur à plusieurs sites ne prouve rien
-    // pour une ville non régionale (JobAI#90).
-    if (positionNonProuvee(o, centre, villes.get(cleGroupement(o.entreprise, o.id)))) continue;
-
-    const km = arrondirKm(distance(pos));
-    // Une distance aberrante trahit une résolution fausse (homonyme, signe inversé) : on
-    // préfère ne rien écrire plutôt qu'un chiffre qui ferait douter de tous les autres.
+    // ⚠️ LE REPLI POSTAL VIENT APRÈS LA MESURE, JAMAIS AVANT (ADR-0040, JobAI#92). Le centre d'un début de code postal rural est un
+    // centre de région : il ne doit servir qu'à une offre que rien d'autre ne situe. Absent de la table = rien d'écrit.
+    const centrePostal = centreDeCodePostal(o.codePostal);
+    if (centrePostal === null) continue;
+    const km = Math.round(distance(centrePostal));
     if (!Number.isFinite(km) || km < 0 || km > 500) continue;
-
     majs.push({
       id: o.id,
       km,
       score: bareme === null ? null : scoreAvecDistance(o, km, bareme),
-      precision: pos.precision,
+      precision: "postale",
     });
   }
 
@@ -326,7 +364,8 @@ export function employeursASituer(
   const positionDe = creerRecherchePosition(positions);
 
   for (const o of offres) {
-    if (o.histo || o.km !== null) continue;
+    // Une distance seulement APPROCHÉE par le code postal attend toujours son employeur (ADR-0040).
+    if (o.histo || (o.km !== null && o.kmSource !== "postale")) continue;
     // Même règle que partout : un employeur déjà situé sous un autre nom n'est PAS à
     // situer. Sans ça, on redemande à Nominatim ce qu'on sait déjà — un appel de plus à
     // un service bénévole, et une seconde ligne pour un même lieu.

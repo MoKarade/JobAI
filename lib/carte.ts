@@ -55,6 +55,8 @@ export interface OffreSurCarte {
   poste: string;
   score: number | null;
   km: number | null;
+  /** `true` = `km` est approché par le code postal de l'annonce (ADR-0040) : à écrire « ≈ 47 km », jamais celui de l'employeur. */
+  kmApproche: boolean;
   statut: Offre["statut"];
 }
 
@@ -256,6 +258,7 @@ export function construireVue(
       poste: o.poste,
       score: o.score,
       km: o.km,
+      kmApproche: o.kmSource === "postale",
       statut: o.statut,
     });
   }
@@ -318,7 +321,8 @@ export function construireVue(
     // ses offres est MESURÉE (`mesurerDistances`), donc utilisable telle quelle. Sans ça,
     // la fiche dirait « distance non mesurée » à côté d'offres qui affichent leur km.
     if (entreprise.km === null) {
-      entreprise.km = entreprise.offres.find((o) => o.km !== null)?.km ?? null;
+      // Jamais une distance APPROCHÉE par le code postal (ADR-0040) : celle d'une offre ne dit rien de l'employeur.
+      entreprise.km = entreprise.offres.find((o) => o.km !== null && !o.kmApproche)?.km ?? null;
     }
 
     if (position.precision === "exacte") {

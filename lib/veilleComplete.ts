@@ -230,6 +230,11 @@ export async function executerVeilleComplete(
       await db.update(offers).set({ lien, majLe: new Date() }).where(eq(offers.id, id));
     }
 
+    // Les débuts de code postal manquants (ADR-0040, JobAI#92) : additif, une ligne seulement là où la base n'en avait pas.
+    for (const { id, codePostal } of rapport.codesPostaux) {
+      await db.update(offers).set({ codePostal, majLe: new Date() }).where(and(eq(offers.id, id), isNull(offers.codePostal)));
+    }
+
     // Les péremptions : une DATE de constat, jamais un drapeau. Le suivi de Marc n'est pas
     // touché — la veille n'écrit que `perimeeLe` (garde-fou n°2).
     for (const id of rapport.perimees) {

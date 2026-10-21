@@ -26,15 +26,11 @@ import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { raisonsAffichables } from "@/lib/raisons";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { lienDeOffre } from "@/lib/lienOffre";
+import { kmVirgule } from "@/lib/kmVirgule";
 import { dateLisible } from "@/lib/dateLisible";
 import { MOT_DOUTE, type Fraicheur } from "@/lib/fraicheur";
 import { Fait } from "./Icone";
 import { ControlesOffre } from "./ControlesOffre";
-
-/** Les distances s'écrivent à la française : 3,5 km. */
-function formaterKm(km: number): string {
-  return `${km.toString().replace(".", ",")} km`;
-}
 
 export function CarteOffre({
   offre,
@@ -111,7 +107,7 @@ export function CarteOffre({
           « — » quand elle n'est pas mesurée : jamais un zéro plausible (garde-fou n°3). */}
       <p className="carte__km">
         <Fait genre="route" discret={offre.km === null}>
-          {offre.km !== null ? formaterKm(offre.km) : "—"}
+          {offre.km !== null ? kmVirgule(offre.km, offre.kmSource === "postale") : "—"}
         </Fait>
         {/* La jauge REND VISIBLE ce que le barème fait déjà du kilométrage : un segment
             allumé par palier atteint. Les seuils viennent de `PALIERS_DISTANCE_KM`, pas
