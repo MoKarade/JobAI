@@ -8,7 +8,7 @@
 // circule, plus elle a d'occasions de finir dans une trace d'erreur, un journal de requêtes
 // ou une réponse d'API. Ce qu'on ne charge pas ne peut pas fuir.
 
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, isNotNull, ne, and } from "drizzle-orm";
 import { db } from "../db";
 import { colonnesCv, cvs } from "../db/schema";
 import { assurerMigrations } from "../migrations";
@@ -253,6 +253,28 @@ export async function activerProfil(id: number, profil: Profil): Promise<void> {
       "L'activation du profil s'est interrompue : plus aucun CV n'est actif, et les notes " +
         "utilisent de nouveau le barème par défaut. Relance la validation.",
     );
+  }
+  await oublierPropositionsPlusAnciennes(id);
+}
+
+/**
+ * Efface la proposition des AUTRES CV une fois un profil appliqué (JobAI#200).
+ *
+ * Toute proposition qui existe à cet instant a été faite AVANT ce profil : elle se comparait à un profil
+ * qui n'est plus celui qui note. La laisser « à valider » ramenait des valeurs d'avant (3,6 ans → 1 an,
+ * vu le 2026-10-19) à un clic d'« Appliquer ». Une nouvelle analyse (quelques cents) la refait avec le
+ * profil et le code d'aujourd'hui. La proposition du CV qu'on vient d'appliquer reste : ses écarts
+ * décochés par Marc sont à lui. Le profil est déjà écrit : un échec ici se DIT dans le journal sans
+ * défaire l'application.
+ */
+async function oublierPropositionsPlusAnciennes(idApplique: number): Promise<void> {
+  try {
+    await db
+      .update(cvs)
+      .set({ profilPropose: null })
+      .where(and(ne(cvs.id, idApplique), isNotNull(cvs.profilPropose)));
+  } catch (e) {
+    console.error("[cv] propositions plus anciennes que le profil appliqué non effacées", e);
   }
 }
 

@@ -31,6 +31,7 @@ import {
 } from "../profil";
 import { definition, fichePourLecture } from "../competences";
 import { parserProfilStocke } from "../profilStocke";
+import { PREFIXE_CALCUL_ANNEES } from "./anneesExperience";
 import type { ReponseExtraction } from "./extraction";
 
 /** La nature d'un écart — elle change ce que Marc doit vérifier avant de cocher. */
@@ -90,15 +91,24 @@ export function calculerEcarts(courant: Profil, extraction: ReponseExtraction): 
 
   // ── Les faits ────────────────────────────────────────────────────────────
   if (extraction.anneesExperience !== courant.faits.anneesExperience) {
+    // ⚠️ LA PREUVE DES ANNÉES, C'EST LE CALCUL DU CODE (JobAI#200). Une provenance non vide ne suffit pas :
+    // une proposition d'une ancienne analyse (avant que le code calcule) porte une phrase du modèle
+    // (« environ 2 ans depuis avril 2023 ») et se cochait d'avance, au risque de ramener 3,6 ans à 1 an
+    // et de déplacer le barème de séniorité de toutes les offres. Seul le détail poste par poste écrit
+    // par `calculerAnnees` établit la valeur.
+    const provenance = p(extraction.anneesExperienceProvenance);
+    const calculeParLeCode = provenance.startsWith(PREFIXE_CALCUL_ANNEES);
+    // Une provenance VIDE reste vide : c'est le signal « le modèle a supposé », que l'écran dit déjà.
+    const estimation =
+      extraction.anneesExperience !== null && provenance !== "" && !calculeParLeCode;
     ecarts.push({
       cle: "faits.anneesExperience",
       libelle: "Années d'expérience",
       nature: "fait",
       avant: courant.faits.anneesExperience?.toString() ?? "non établi",
       apres: extraction.anneesExperience?.toString() ?? "non établi",
-      provenance: p(extraction.anneesExperienceProvenance),
-      preuve:
-        extraction.anneesExperience !== null && p(extraction.anneesExperienceProvenance) !== "",
+      provenance: estimation ? `estimation, non calculée par le code : ${provenance}` : provenance,
+      preuve: extraction.anneesExperience !== null && calculeParLeCode,
       valeur: extraction.anneesExperience,
     });
   }

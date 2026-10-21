@@ -161,6 +161,12 @@ export interface CalculAnnees {
 /** Longueur maximale du détail gardé comme provenance. */
 export const LONGUEUR_MAX_DETAIL = 1500;
 
+/**
+ * Début du détail que SEUL le code écrit (`calculerAnnees`). Une provenance qui n'y commence pas est une
+ * estimation du modèle ou d'une ancienne analyse : elle ne se coche pas d'avance (JobAI#200).
+ */
+export const PREFIXE_CALCUL_ANNEES = "Calcul du code sur les dates du CV";
+
 const court = (s: string, n = 40) => (s.length <= n ? s : `${s.slice(0, n - 1)}…`);
 
 /**
@@ -262,7 +268,7 @@ export function calculerAnnees(parcours: readonly PosteCv[], aujourdhui: Date): 
   const annees = Math.round((mois / 12) * 10) / 10;
   const total = `${String(annees).replace(".", ",")} ans`;
   const parties = [
-    "Calcul du code sur les dates du CV (mois de début et de fin inclus)",
+    `${PREFIXE_CALCUL_ANNEES} (mois de début et de fin inclus)`,
     ...lignes.map((l) => l.texte),
     ...(chevauchementMois > 0 ? [`chevauchements retirés : ${chevauchementMois} mois`] : []),
     `total : ${mois} mois = ${total}`,
