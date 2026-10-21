@@ -21,6 +21,7 @@ import { useState, useTransition } from "react";
 import { reglerMetiers } from "@/lib/actionsMetiers";
 import { lireMesureMetiers, type LigneMetier, type MesureMetiers } from "@/lib/metiersMesure";
 import { normaliserMetiers } from "@/lib/metiersRetenus";
+import type { Proposition } from "@/lib/propositionMetiers";
 
 /** Titres montrés par ligne. Trois suffisent à reconnaître un métier, dix ne se lisent pas. */
 const TITRES_MONTRES = 3;
@@ -70,7 +71,14 @@ function Tableau({
   );
 }
 
-export function ReglageMetiers({ metiersInitiaux }: { metiersInitiaux: string[] }) {
+export function ReglageMetiers({
+  metiersInitiaux,
+  proposition = null,
+}: {
+  metiersInitiaux: string[];
+  /** Les métiers précis tirés des offres suivies et du CV (ADR-0038). `null` : pas de proposition à montrer. */
+  proposition?: Proposition | null;
+}) {
   // ⚠️ UNE SEULE SOURCE DE VÉRITÉ : LA SAISIE. Le premier jet gardait un `Set` d'un côté et
   // dérivait le champ texte de lui — donc chaque frappe passait par `normaliserMetiers`, qui
   // jette ce qui n'a pas deux ou cinq chiffres : taper « 21301 » perdait les caractères
@@ -149,6 +157,14 @@ export function ReglageMetiers({ metiersInitiaux }: { metiersInitiaux: string[] 
 
   const gele = enCours || mesureEnCours;
 
+  // La proposition REMPLACE la saisie, elle ne l'enregistre pas : Marc relit, retouche, puis enregistre.
+  function appliquerProposition() {
+    if (proposition === null) return;
+    setSaisie(proposition.proposes.join(" "));
+    setMessage("Proposition mise dans le champ. Rien n’est enregistré tant que tu n’as pas cliqué sur Enregistrer.");
+    setErreur(null);
+  }
+
   return (
     <div className="metiers">
       <p className="metiers__aide">
@@ -159,8 +175,10 @@ export function ReglageMetiers({ metiersInitiaux }: { metiersInitiaux: string[] 
       <p className="metiers__aide">
         Les codes ci-dessous servent à deux choses selon le mode : en «&nbsp;mon domaine
         seulement&nbsp;» ils FILTRENT ce qui entre&nbsp;; en «&nbsp;toute la région&nbsp;»
-        ils ne filtrent plus rien et définissent le domaine pour la NOTE — hors d’eux, elle
-        est divisée par deux.
+        ils ne filtrent plus rien et définissent le domaine pour la NOTE. Deux chiffres retiennent un
+        domaine entier&nbsp;; cinq chiffres, un métier précis. Avec le nouveau barème, une offre du même
+        domaine et du même niveau qu’un métier retenu (mais d’un autre métier) est plafonnée plus bas, et
+        une offre d’un autre domaine plus bas encore.
       </p>
 
       <div className="metiers__actuels">
@@ -180,6 +198,52 @@ export function ReglageMetiers({ metiersInitiaux }: { metiersInitiaux: string[] 
           {enCours ? "Enregistrement…" : "Enregistrer"}
         </button>
       </div>
+
+      {proposition !== null ? (
+        <div className="metiers__bloc">
+          <h3 className="metiers__soustitre">Proposition tirée de ton CV</h3>
+          <p className="metiers__aide">
+            Parmi les {proposition.avecCode} offres ouvertes qui portent un code, ces métiers précis ont des titres qui se
+            lisent comme ton domaine (les mots de ton profil). C’est une proposition à relire&nbsp;: coche ou décoche, puis
+            enregistre.
+          </p>
+          {proposition.lignes.length === 0 ? (
+            <p className="metiers__aide">
+              Aucun métier ne ressort assez : trop peu d’offres suivies portent le même code avec des titres de ton domaine.
+            </p>
+          ) : (
+            <>
+              <ul className="metiers__table">
+                {proposition.lignes.map((l) => (
+                  <li key={l.code} className="metiers__ligne">
+                    <label className="metiers__choix">
+                      <input
+                        type="checkbox"
+                        checked={retenus.has(l.code)}
+                        onChange={() => basculer(l.code)}
+                        disabled={gele}
+                      />
+                      <span className="metiers__code">{l.code}</span>
+                    </label>
+                    <span className="metiers__n">
+                      {l.lues}/{l.offres}
+                    </span>
+                    <span className="metiers__titres">
+                      {l.propose ? "proposé · " : "à voir · "}
+                      {l.titres.join(" · ")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="metiers__ligne-actions">
+                <button type="button" className="bouton" onClick={appliquerProposition} disabled={gele}>
+                  Mettre la proposition dans le champ
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
 
       {mesureEnCours ? (
         <p className="metiers__aide">

@@ -27,7 +27,7 @@
 
 import { PROFIL_DEFAUT, type Profil } from "./profil";
 import { expressionsDeNotation } from "./competences";
-import { codeRetenu, lireCodeNoc } from "./nocProfession";
+import { codeRetenu, lireCodeNoc, niveauDomaine, type NiveauDomaine } from "./nocProfession";
 
 /** Répartition des points. La somme fait 100 — vérifié par test, pas par confiance. */
 export const PONDERATION = PROFIL_DEFAUT.ponderation;
@@ -350,6 +350,17 @@ export function plancherRoleNoc(
   return Math.max(role, profil.pointsRole.coordination);
 }
 
+/**
+ * Le plafond que le domaine gradué pose à un niveau (ADR-0038). PURE.
+ * `retenu` et `inconnu` n'en ont pas : un métier retenu n'est borné que par le plafond des notes calculées, et une
+ * offre sans code (ou sans métier retenu) n'est pas jugée.
+ */
+export function plafondDuNiveau(niveau: NiveauDomaine, profil: Profil = PROFIL_DEFAUT): number | null {
+  if (niveau === "voisin") return profil.plafondVoisin;
+  if (niveau === "autre") return profil.plafondHorsDomaine;
+  return null;
+}
+
 export interface DetailNote {
   /** Note finale, plafonnée si elle est calculée. */
   total: number;
@@ -364,6 +375,16 @@ export interface DetailNote {
    * précisément le cas le plus fréquent une fois le flux du Guichet branché.
    */
   facteurDomaine: number;
+  /**
+   * Le niveau de domaine de l'offre (ADR-0038) : `retenu`, `voisin`, `autre` ou `inconnu`.
+   * Toujours calculé, même quand le profil ne gradue pas : l'aperçu s'en sert pour dire ce qui bougerait.
+   */
+  niveauDomaine: NiveauDomaine;
+  /**
+   * Le plafond posé par le domaine (domaine gradué seulement), sinon `null`.
+   * ⚠️ Un plafond n'est pas une note : une offre à 38 sous un plafond de 40 n'est pas touchée.
+   */
+  plafondDomaine: number | null;
   /**
    * La version de profil qui a produit cette note.
    *
@@ -415,15 +436,22 @@ export function computeScore(
     conditions: scoreConditions(input.typePoste, input.dureeEmploi, profil),
   };
   const brut = Object.values(parts).reduce((a, b) => a + b, 0);
-  const facteur = facteurDomaine(input.noc, metiers, profil);
+  const niveau = niveauDomaine(input.noc, metiers);
+  // ⚠️ GRADUÉ OU NON, JAMAIS LES DEUX. Domaine gradué : le plafond par niveau remplace le multiplicateur (le
+  // facteur affiché reste 1, sinon une offre serait pénalisée deux fois). Sinon : le barème d'avant, à l'identique.
+  const facteur = profil.domaineGradue ? 1 : facteurDomaine(input.noc, metiers, profil);
+  const plafondDomaine = profil.domaineGradue ? plafondDuNiveau(niveau, profil) : null;
   // ⚠️ ARRONDI AVANT LE PLAFOND, et une seule fois : `brut` reste la somme des parts (il
   // sert à expliquer un écrêtage), c'est le TOTAL qui porte le facteur. Les afficher tous
   // deux évite la question « pourquoi 29 alors que ça fait 58 ».
+  const plafonne = Math.min(Math.round(brut * facteur), profil.plafondNoteCalculee);
   return {
-    total: Math.min(Math.round(brut * facteur), profil.plafondNoteCalculee),
+    total: plafondDomaine === null ? plafonne : Math.min(plafonne, plafondDomaine),
     brut,
     parts,
     facteurDomaine: facteur,
+    niveauDomaine: niveau,
+    plafondDomaine,
     profilVersion: profil.version,
   };
 }

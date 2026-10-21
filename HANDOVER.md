@@ -6,6 +6,21 @@
 
 ---
 
+## 2026-10-21 — JobAI#151 : le domaine gradué et la proposition de métiers (ADR-0038)
+
+- Trois niveaux de domaine d'après le code de profession : **retenu**, **voisin** (même domaine et même niveau, deux chiffres, qu'un
+  métier retenu), **autre**. Avec le domaine gradué, un plafond par niveau (voisin 55, autre 40) remplace le multiplicateur 0,5.
+  `domaineGradue` est faux tant que Marc n'a pas appliqué le nouveau barème : rien ne bouge avant son geste.
+- Le nouveau barème (ADR-0032) allume aussi le domaine gradué : un aperçu, un geste. L'aperçu de `/profil` dit la composition des 30
+  premières offres (retenu / voisin / autre) avant et après.
+- `/profil` monte l'écran « Tes métiers » (le composant existait sans être monté) avec une **proposition de métiers précis** tirée
+  du CV et des offres suivies. Marc la met dans le champ, la relit, enregistre. Seuils (hypothèses) : 3 offres au moins par code, 50 % de
+  titres qui se lisent comme son domaine, 20 codes au plus.
+- **À faire par Marc** : relire la proposition, remplacer les quatre domaines par ses métiers, puis appliquer le nouveau barème. La
+  preuve de la tâche (aucun métier hors domaine dans les 30 premières offres) se lit après ces deux gestes.
+
+---
+
 ## 2026-10-21 — JobAI#161 : le dossier employeur A, B ou C (ADR-0037)
 
 - La fiche d'une offre (`/offre/[id]`) montre « Employeur : A, B, C ou inconnu » avec ses lignes, chacune citant sa source (suivi de

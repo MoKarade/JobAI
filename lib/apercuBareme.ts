@@ -24,6 +24,7 @@ import { distribution, arrondi, type DistributionNotes } from "./diagnosticBarem
 import { appliquerNouveauBareme, dejaApplique } from "./nouveauBareme";
 import { noterOffre } from "./noteOffre";
 import { palier } from "./scoring";
+import type { NiveauDomaine } from "./nocProfession";
 import type { Profil } from "./profil";
 import type { Offre } from "./types";
 
@@ -50,6 +51,8 @@ export interface ApercuBareme {
   versionActuelle: number;
   versionNouvelle: number;
   poids: { avant: Profil["ponderation"]; apres: Profil["ponderation"] };
+  /** Les plafonds du domaine gradué que le nouveau barème poserait (ADR-0038). */
+  plafondsDomaine: { voisin: number; autre: number };
   population: {
     /** Offres ouvertes avec une note CALCULÉE : celles que l'aperçu mesure. */
     calculees: number;
@@ -86,7 +89,35 @@ export interface ApercuBareme {
     ecartMoyenBaremeSeul: number | null;
   };
   moyenneParts: { ancien: Record<Axe, number | null>; apres: Record<Axe, number | null> };
+  /**
+   * Le domaine gradué (ADR-0038, JobAI#151) : ce que le nouveau barème en fait.
+   *
+   * ⚠️ LE HAUT DE LA LISTE EST CE QUE MARC LIT. « Aucun métier hors domaine dans les 30 premières offres » se
+   * juge sur ces comptes : `hautDeListe.apres.retenu` doit être le total, et chaque offre voisine ou d'un autre
+   * domaine qui reste dans le haut de la liste est à regarder. Le niveau vient du code de profession seul.
+   */
+  domaine: {
+    /** Toutes les calculées, par niveau (le niveau ne dépend pas du barème, seulement des métiers retenus). */
+    niveaux: Record<NiveauDomaine, number>;
+    /** Calculées dont le plafond de domaine abaisse la note du nouveau barème. */
+    plafonnees: number;
+    /** Les 30 premières offres, avant (notes enregistrées) et après (nouveau barème), par niveau. */
+    hautDeListe: {
+      taille: number;
+      avant: Record<NiveauDomaine, number>;
+      apres: Record<NiveauDomaine, number>;
+    };
+  };
   exemples: { montent: ExempleApercu[]; descendent: ExempleApercu[] };
+}
+
+/** Les premières offres que Marc lit (ADR-0038). */
+const TAILLE_HAUT_DE_LISTE = 30;
+
+function compteNiveaux(niveaux: readonly NiveauDomaine[]): Record<NiveauDomaine, number> {
+  const r: Record<NiveauDomaine, number> = { retenu: 0, voisin: 0, autre: 0, inconnu: 0 };
+  for (const n of niveaux) r[n] += 1;
+  return r;
 }
 
 const NB_MONTENT = 3;
@@ -161,6 +192,7 @@ export function apercuNouveauBareme(
     versionActuelle: profil.version,
     versionNouvelle: nouveau.version,
     poids: { avant: profil.ponderation, apres: nouveau.ponderation },
+    plafondsDomaine: { voisin: nouveau.plafondVoisin, autre: nouveau.plafondHorsDomaine },
     population: {
       calculees: calculees.length,
       autresRenotees: offres.filter(
@@ -194,6 +226,26 @@ export function apercuNouveauBareme(
       ancien: moyennes(lignes.map((l) => l.ancien.parts)),
       apres: moyennes(lignes.map((l) => l.apres.parts)),
     },
+    domaine: {
+      niveaux: compteNiveaux(lignes.map((l) => l.apres.niveauDomaine)),
+      plafonnees: lignes.filter(
+        (l) =>
+          l.apres.plafondDomaine !== null &&
+          Math.min(l.apres.brut, nouveau.plafondNoteCalculee) > l.apres.plafondDomaine,
+      ).length,
+      hautDeListe: {
+        taille: Math.min(TAILLE_HAUT_DE_LISTE, lignes.length),
+        avant: compteNiveaux(hautDeListe(lignes, (l) => l.avant).map((l) => l.apres.niveauDomaine)),
+        apres: compteNiveaux(hautDeListe(lignes, (l) => l.apres.total).map((l) => l.apres.niveauDomaine)),
+      },
+    },
     exemples: { montent, descendent },
   };
+}
+
+/** Les premières offres par note décroissante ; à note égale, l'ordre de l'identifiant (le résultat se refait). */
+function hautDeListe<T extends { o: Offre }>(lignes: readonly T[], note: (l: T) => number): T[] {
+  return [...lignes]
+    .sort((a, b) => note(b) - note(a) || (a.o.id < b.o.id ? -1 : 1))
+    .slice(0, TAILLE_HAUT_DE_LISTE);
 }

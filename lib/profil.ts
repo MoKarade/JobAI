@@ -231,6 +231,22 @@ export const ProfilSchema = z.object({
   facteurHorsDomaine: z.number().gt(0).max(1),
 
   /**
+   * Le domaine est-il GRADUÉ ? (ADR-0038, JobAI#151)
+   *
+   * Faux = le barème d'avant : un code hors des métiers retenus multiplie la note par `facteurHorsDomaine`.
+   * Vrai = trois niveaux — métier retenu, voisin (même domaine et même niveau qu'un métier retenu), autre —
+   * et le multiplicateur cède la place à un PLAFOND par niveau.
+   *
+   * ⚠️ FAUX TANT QUE MARC N'A PAS APPLIQUÉ LE NOUVEAU BARÈME. Même mécanisme que `salaireDansLaNote` : un profil
+   * enregistré avant l'ADR-0038, comblé à `false` par la migration, note exactement comme hier.
+   */
+  domaineGradue: z.boolean(),
+  /** Plafond d'une offre VOISINE d'un métier retenu (domaine gradué seulement). Hypothèse, à valider sur l'aperçu. */
+  plafondVoisin: z.number().int().min(0).max(100),
+  /** Plafond d'une offre d'un AUTRE domaine (domaine gradué seulement). 40 : réponse de Marc du 2026-10-19. */
+  plafondHorsDomaine: z.number().int().min(0).max(100),
+
+  /**
    * Le salaire annuel de l'offre entre-t-il dans la note ? (ADR-0032)
    *
    * ⚠️ FAUX TANT QUE MARC N'A PAS APPLIQUÉ LE NOUVEAU BARÈME. L'offre porte son salaire depuis
@@ -452,6 +468,9 @@ export const PROFIL_DEFAUT: Profil = ProfilSchema.parse({
 
   plafondNoteCalculee: 85,
   facteurHorsDomaine: 0.5,
+  domaineGradue: false,
+  plafondVoisin: 55,
+  plafondHorsDomaine: 40,
   salaireDansLaNote: false,
 
   // ⚠️ ÉLARGI LE 2026-08-17, ET C'EST UN AJUSTEMENT ASSUMÉ, PAS UN REFACTOR EN PASSANT

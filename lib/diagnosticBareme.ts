@@ -63,7 +63,7 @@ export interface RecalculResume {
   differentesDuStocke: number;
   /** Écart moyen (recalculé − enregistré) sur ces offres, `null` s'il n'y en a aucune. */
   ecartMoyenDuStocke: number | null;
-  /** Offres dont le facteur de domaine est inférieur à 1. */
+  /** Offres hors des métiers retenus (voisines ou d'un autre domaine). */
   horsDomaine: number;
 }
 
@@ -78,6 +78,8 @@ export interface OffreMesuree {
   /** Les parts du recalcul `complet`. */
   parts: Record<Axe, number>;
   facteurDomaine: number;
+  /** Retenu, voisin, autre ou inconnu (ADR-0038) : c'est ce qui se lit sur le haut de la liste. */
+  niveauDomaine: DetailNote["niveauDomaine"];
   totalComplet: number;
   /** Les mots du vocabulaire du profil retrouvés dans le titre + les notes. */
   motsCoordinationTrouves: string[];
@@ -115,6 +117,9 @@ export interface DiagnosticBareme {
     motsTechniqueAjoutes: string[];
     ponderation: Profil["ponderation"];
     facteurHorsDomaine: number;
+    domaineGradue: boolean;
+    plafondVoisin: number;
+    plafondHorsDomaine: number;
     plafondNoteCalculee: number;
   };
   metiersRetenus: string[];
@@ -192,7 +197,9 @@ function recalculer(
     details.set(o.id, d);
     totaux.push(d.total);
     for (const a of AXES) sommes[a] += d.parts[a];
-    if (d.facteurDomaine < 1) horsDomaine++;
+    // Voisin ou autre = hors des métiers retenus. Le niveau, et non le facteur : un profil au domaine gradué
+    // (ADR-0038) laisse le facteur à 1 et pose un plafond à la place.
+    if (d.niveauDomaine === "voisin" || d.niveauDomaine === "autre") horsDomaine++;
     if (o.score !== null && d.total !== o.score) {
       differentes++;
       sommeEcarts += d.total - o.score;
@@ -265,6 +272,7 @@ export function diagnostiquerBareme(
         scoreSource: o.scoreSource,
         parts: d.parts,
         facteurDomaine: d.facteurDomaine,
+        niveauDomaine: d.niveauDomaine,
         totalComplet: d.total,
         motsCoordinationTrouves: motsTrouves(texte, profil.motsCoordination),
         motsTechniqueTrouves: motsTechniqueDe(texte, profil),
@@ -292,6 +300,9 @@ export function diagnostiquerBareme(
       motsTechniqueAjoutes: motsAjoutes(profil.motsTechnique, PROFIL_DEFAUT.motsTechnique),
       ponderation: profil.ponderation,
       facteurHorsDomaine: profil.facteurHorsDomaine,
+      domaineGradue: profil.domaineGradue,
+      plafondVoisin: profil.plafondVoisin,
+      plafondHorsDomaine: profil.plafondHorsDomaine,
       plafondNoteCalculee: profil.plafondNoteCalculee,
     },
     metiersRetenus: [...metiers],

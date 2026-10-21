@@ -3,8 +3,9 @@
 // ── CE QUE FAIT CE MODULE ───────────────────────────────────────────────────────────
 //
 // Il transforme un profil en un autre : mêmes seuils, mêmes mots, mêmes faits, mais les POINTS de
-// chaque axe remis à l'échelle de nouveaux poids. Il n'écrit rien et ne lit rien : l'aperçu
-// (`lib/apercuBareme.ts`) et l'action de `/profil` s'en servent chacun de leur côté.
+// chaque axe remis à l'échelle de nouveaux poids, le salaire lu et le domaine gradué (ADR-0038). Il
+// n'écrit rien et ne lit rien : l'aperçu (`lib/apercuBareme.ts`) et l'action de `/profil` s'en servent
+// chacun de leur côté.
 //
 // ⚠️ UNE MISE À L'ÉCHELLE PROPORTIONNELLE, PAS UNE RÉINVENTION. Chaque valeur d'un axe est multipliée
 // par `poids cible / poids actuel` puis arrondie. Le haut de chaque table retombe donc exactement sur
@@ -33,6 +34,7 @@ export const POIDS_NOUVEAU_BAREME: Readonly<Record<Axe, number>> = {
 export function dejaApplique(profil: Profil): boolean {
   return (
     profil.salaireDansLaNote &&
+    profil.domaineGradue &&
     (Object.keys(POIDS_NOUVEAU_BAREME) as Axe[]).every(
       (a) => profil.ponderation[a] === POIDS_NOUVEAU_BAREME[a],
     )
@@ -75,6 +77,8 @@ export function appliquerNouveauBareme(profil: Profil, etabliLe: string): Profil
     etabliLe,
     ponderation: { ...POIDS_NOUVEAU_BAREME },
     salaireDansLaNote: true,
+    // Le domaine devient gradué avec le même geste (ADR-0038, JobAI#151) : Marc voit UN aperçu, valide UN barème.
+    domaineGradue: true,
 
     pointsRole: {
       combinaison: role(p.combinaison),
