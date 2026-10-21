@@ -27,6 +27,7 @@ import { numeroAnnonce } from "../annonce";
 import {
   brutesParIdStocke,
   cleCanonique,
+  codesPostauxARattraper,
   liensARafraichir,
   lieuxAMesurer,
   trier,
@@ -126,6 +127,8 @@ export interface RapportPasse {
    * le suivi de Marc n'est jamais touché (garde-fou n°2).
    */
   liens: { id: string; lien: string }[];
+  /** Les débuts de code postal à écrire sur des offres déjà suivies qui n'en avaient pas (ADR-0040) : vide quand rien ne manque. */
+  codesPostaux: { id: string; codePostal: string }[];
   /**
    * Les offres que la passe a fermées D'OFFICE, faute qu'aucun balayage ne puisse les
    * confirmer, et le motif quand elle s'en est abstenue.
@@ -349,6 +352,7 @@ export async function executerPasse(
   // ouverte à juste titre — la source la publie — mais son adresse menait à une annonce
   // fermée. Voir `liensARafraichir` pour les deux refus d'écrasement.
   const liens = liensARafraichir(connues, revues);
+  const codesPostaux = codesPostauxARattraper(connues, revues);
 
   const apresAjout = [...connues, ...tri.retenues];
   const vues = apresAjout.filter((o) => idsVus.has(o.id));
@@ -452,6 +456,7 @@ export async function executerPasse(
      * cas nominal, et il ne doit produire aucune écriture.
      */
     liens,
+    codesPostaux,
     fermetureAuto: fermeture,
     resume: aucuneSourceEnSucces
       ? "balayage suspendu : aucune source n'a répondu — compteurs d'absences inchangés"

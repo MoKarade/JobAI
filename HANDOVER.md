@@ -13,6 +13,20 @@
   repris » ne comptent plus à partir de 10 offres observées (embauche en continu, 10 = supposition de bon sens).
 - La tâche reste en **preuve attendue** jusqu'à l'acceptation de Marc ; les 5 dossiers sont relus en production après le déploiement.
 
+## 2026-10-21 — JobAI#92 : une distance approchée par le début du code postal (ADR-0040)
+
+- Les 3 874 offres « lieu inconnu » du diagnostic du 2026-10-21 portent toutes un code postal que l'ingestion lisait puis jetait. Il est
+  désormais gardé (trois caractères, colonne `offers.code_postal`) et **rattrapé pour les offres déjà suivies** quand le flux les revoit.
+- Nouvelle table `lib/data/fsaQuebec.ts` : 421 centres de débuts de code postal du Québec (GeoNames, CC-BY 4.0, crédit dans le README).
+  Un centre, pas un point : un code rural couvre une région, l'erreur peut atteindre plusieurs dizaines de km [Probable, non mesuré].
+- `planifierDistances` essaie d'abord la position de l'employeur ; **seulement sans elle**, la distance du centre du code postal est
+  écrite, arrondie au km, avec `km_source = 'postale'`. Une vraie mesure la remplace ensuite. Affichée « ≈ 47 km » (carte d'offre, fiche,
+  liste de la carte) et `kmApproche: true` dans la vue MCP ; jamais reprise comme distance d'un employeur sur la carte.
+- Le constat : `etat_synchro` (`resume`) porte `distancesPostales` et `lieuInconnuSansDistance`, et la ligne `[distances] passe terminée`
+  les dit aussi. **À lire après la première passe suivant le déploiement** : le second doit baisser (preuve de la tâche).
+- Migration 0028 additive (deux colonnes et deux contraintes). La note n'a pas de nouveau barème : l'inconnu (10/20) est remplacé par
+  la distance approchée, notes manuelles et plafond de 85 inchangés.
+
 ---
 
 ## 2026-10-21 — JobAI#109 : un modèle lit la description d'une offre, sans toucher à la note (ADR-0039)

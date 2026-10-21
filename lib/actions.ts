@@ -1757,10 +1757,27 @@ export async function mesurerDistances(
       bareme,
     );
     for (const m of majs) {
-      const valeurs: { km: number; majLe: Date; score?: number } = { km: m.km, majLe: new Date() };
+      // `kmSource` suit `km` à chaque écriture : une mesure d'employeur remet la colonne à NULL (ADR-0040).
+      const valeurs: { km: number; kmSource: "postale" | null; majLe: Date; score?: number } = {
+        km: m.km,
+        kmSource: m.precision === "postale" ? "postale" : null,
+        majLe: new Date(),
+      };
       if (m.score !== null) valeurs.score = m.score;
       await db.update(offers).set(valeurs).where(eq(offers.id, m.id));
     }
+
+    // Le constat de JobAI#92, écrit avec la passe : combien d'offres « lieu inconnu » restent sans distance, et combien ont reçu
+    // une distance approchée cette fois-ci. Le premier doit baisser, le second dit pourquoi.
+    const ecrites = new Map(majs.map((m) => [m.id, m.km]));
+    resume.distancesPostales = majs.filter((m) => m.precision === "postale").length;
+    resume.lieuInconnuSansDistance = offresAMesurer.filter(
+      (o) =>
+        !o.histo &&
+        o.perimeeLe === null &&
+        o.situation === "lieu-inconnu" &&
+        (ecrites.get(o.id) ?? o.km) === null,
+    ).length;
 
     // ⚠️ TRACER CE QUE LA PASSE A FAIT — MÊME QUAND ELLE N'A RIEN FAIT.
     //
@@ -1786,6 +1803,8 @@ export async function mesurerDistances(
         // ici est une bonne nouvelle ; un compte qui ne redescend jamais dit que la position
         // de l'employeur, elle, n'a pas été reprise.
         `${effacees > 0 ? `effacées=${effacees} ` : ""}` +
+        // JobAI#92 : le compte qui doit baisser, et ce qui l'a fait baisser (distances ≈ du code postal, ADR-0040).
+        `postales=${resume.distancesPostales} lieuInconnuSansDistance=${resume.lieuInconnuSansDistance} ` +
         `${centresCorriges > 0 ? `centresCorrigés=${centresCorriges} ` : ""}` +
         `villes=${aRattraper.length} ` +
         `adresses=${adresses.ecrites}/${adresses.candidates}` +

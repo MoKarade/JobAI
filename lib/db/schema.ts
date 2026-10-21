@@ -53,6 +53,14 @@ export const offers = pgTable(
     km: real("km"),
 
     /**
+     * `'postale'` = `km` est APPROCHÉ par le centre du début de `code_postal` (ADR-0040, JobAI#92) ; `NULL` = mesuré ou relevé à la
+     * main. Une mesure d'employeur remplace une distance postale et remet cette colonne à `NULL`.
+     */
+    kmSource: text("km_source", { enum: ["postale"] }),
+    /** Début (3 caractères) du code postal annoncé, `NULL` si la source n'en donne pas ou s'il est mal formé. */
+    codePostal: text("code_postal"),
+
+    /**
      * Code de profession NOC 2021, quand la source en publie un.
      *
      * ⚠️ STOCKÉ POUR QUE LA CATÉGORIE AFFICHÉE NE CONTREDISE PAS LA NOTE. Le barème s'en
@@ -219,6 +227,9 @@ export const offers = pgTable(
       "offers_situation_ck",
       sql`${table.situation} IS NULL OR ${table.situation} IN ('dans-la-region', 'hors-region', 'lieu-inconnu')`,
     ),
+    // Une distance « postale » est une distance : sans `km`, la colonne d'origine ne dirait rien (ADR-0040).
+    check("offers_km_source_ck", sql`${table.kmSource} IS NULL OR (${table.kmSource} = 'postale' AND ${table.km} IS NOT NULL)`),
+    check("offers_code_postal_ck", sql`${table.codePostal} IS NULL OR ${table.codePostal} ~ '^[A-Z][0-9][A-Z]$'`),
   ],
 );
 

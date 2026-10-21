@@ -433,7 +433,7 @@ describe("garde-fou n°1 — la carte ne dit rien du domicile", () => {
       positions([["Laserax", "exacte", 46.75, -71.29]]),
     );
     const champs = Object.keys(vue.epingles[0]!.entreprises[0]!.offres[0]!);
-    expect(champs.sort()).toEqual(["entreprise", "id", "km", "poste", "score", "statut"]);
+    expect(champs.sort()).toEqual(["entreprise", "id", "km", "kmApproche", "poste", "score", "statut"]);
   });
 
   it("rend null sans épingle, plutôt qu'un centre arbitraire", () => {
@@ -628,6 +628,7 @@ describe("trierEntreprisesListees — le tri de la liste à droite de la carte",
         poste: "Poste",
         score,
         km,
+        kmApproche: false,
         statut: "Identifiee" as Offre["statut"],
       })),
     };

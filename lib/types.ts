@@ -82,6 +82,16 @@ export const OffreSchema = z.object({
   lien: z.string().url().or(z.literal("")),
   /** Distance à vol d'oiseau, en km. null = inconnue (pas zéro). */
   km: z.number().finite().min(0).nullable(),
+  /**
+   * D'où vient `km` quand il n'est PAS une mesure : `"postale"` = approché par le centre du début du code postal de l'annonce
+   * (ADR-0040, JobAI#92). `null` ou absent = mesuré (position de l'employeur) ou relevé à la main. À afficher « ≈ 47 km ».
+   */
+  kmSource: z.enum(["postale"]).nullable().optional(),
+  /**
+   * Début (3 caractères) du code postal annoncé, en majuscules (`J0K`), ou `null` si la source n'en donne pas ou s'il est mal
+   * formé. Trois caractères suffisent à la distance approchée et gardent moins de donnée (dépôt public).
+   */
+  codePostal: z.string().regex(/^[A-Z]\d[A-Z]$/).nullable().optional(),
 
   /**
    * Code de profession NOC 2021, quand la source en publie un. `null` sinon.

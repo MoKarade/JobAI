@@ -53,6 +53,8 @@ export function colonnesSeed(o: Offre) {
     poste: o.poste,
     lien: o.lien,
     km: o.km,
+    kmSource: o.kmSource ?? null,
+    codePostal: o.codePostal ?? null,
     noc: o.noc ?? null,
     typePoste: o.typePoste ?? null,
     dureeEmploi: o.dureeEmploi ?? null,
