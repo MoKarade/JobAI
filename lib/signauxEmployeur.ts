@@ -5,7 +5,7 @@
 // mêmes postes, et combien d'offres elle a d'ouvertes. Tout se tire des offres suivies et du
 // journal de veille : aucune source de plus, aucun appel IA, aucun scraping (garde-fous 3 et 4).
 //
-// ⚠️ QUATRE HONNÊTETÉS, DONT TROIS VIENNENT DE `lib/dureeVie.ts` ET SONT REPRISES TELLES QUELLES
+// ⚠️ CINQ HONNÊTETÉS, DONT TROIS VIENNENT DE `lib/dureeVie.ts` ET SONT REPRISES TELLES QUELLES
 // (une règle écrite deux fois est une règle et demie) :
 //
 //   1. UNE DURÉE EST CELLE QU'ON A VUE. `premiereVue` est le jour où NOTRE balayage a trouvé
@@ -16,15 +16,19 @@
 //      première vue serait un chiffre fabriqué.
 //   3. UNE MÉDIANE SE TIENT À UN EFFECTIF. Trois offres fermées au minimum, sinon pas de
 //      médiane (deux offres de plus la déplaceraient de moitié) ; le nombre de fermées reste dit.
-//   4. UNE « REPUBLICATION » EST UN INTITULÉ REPRIS, PAS UNE PREUVE. Le Guichet republie un
+//   4. UNE ANNONCE COMPTE POUR UNE OFFRE (JobAI#195). Le Guichet renomme parfois l'employeur d'une annonce : elle entre
+//      alors deux fois dans le suivi, sous deux noms. Les copies d'un même numéro d'annonce forment UNE offre ; sa durée
+//      court de la première vue de ses copies à leur dernière vue. Le suivi, lui, n'est pas touché.
+//   5. UNE « REPUBLICATION » EST UN INTITULÉ REPRIS, PAS UNE PREUVE. Le Guichet republie un
 //      poste sous un nouveau numéro, mais un employeur peut aussi ouvrir deux postes vraiment
 //      distincts sous le même titre. Le module compte donc des INTITULÉS REPRIS (même employeur,
 //      même titre une fois accents, casse et ponctuation écartés) et l'écran les nomme ainsi.
 //
 // Fonctions PURES : le journal et les offres sont des paramètres, aucune horloge.
 
-import { cleGroupement } from "./employeurs";
+import { copiesParAnnonce, representante } from "./doublonsAnnonce";
 import { joursEntre } from "./dureeVie";
+import { cleEnseigne } from "./enseigne";
 import type { Offre } from "./types";
 import type { JournalVeille } from "./veille";
 
@@ -84,20 +88,27 @@ function mediane(valeurs: readonly number[]): number {
 
 /** Les signaux d'UN employeur, à partir de ses offres. PURE. */
 export function signauxDe(offres: readonly Offre[], journal: Readonly<JournalVeille>): SignauxEmployeur {
-  const suivies = offres.filter((o) => !o.histo);
-  const ouvertes = suivies.filter((o) => o.perimeeLe === null);
-  const fermees = suivies.filter((o) => o.perimeeLe !== null);
+  // Une annonce, une offre : la représentante compte, ses copies lui prêtent leurs lignes de journal.
+  const annonces = copiesParAnnonce(offres.filter((o) => !o.histo)).map((copies) => ({
+    offre: representante(copies),
+    copies,
+  }));
+  const suivies = annonces.map((a) => a.offre);
+  const ouvertes = annonces.filter((a) => a.offre.perimeeLe === null);
+  const fermees = annonces.filter((a) => a.offre.perimeeLe !== null);
 
-  const duree = (o: Offre): { jours: number; premiereVue: string } | null => {
-    const l = journal[o.id];
-    if (!l) return null;
-    const j = joursEntre(l.premiereVue, l.derniereVue);
-    return j === null ? null : { jours: Math.max(0, j), premiereVue: l.premiereVue };
+  const duree = (a: (typeof annonces)[number]): { jours: number; premiereVue: string } | null => {
+    const lignes = a.copies.map((c) => journal[c.id]).filter((l): l is NonNullable<typeof l> => l !== undefined);
+    if (lignes.length === 0) return null;
+    const premiere = lignes.map((l) => l.premiereVue).reduce((x, y) => (x <= y ? x : y));
+    const derniere = lignes.map((l) => l.derniereVue).reduce((x, y) => (x >= y ? x : y));
+    const j = joursEntre(premiere, derniere);
+    return j === null ? null : { jours: Math.max(0, j), premiereVue: premiere };
   };
 
   let plusAncienneOuverte: SignauxEmployeur["plusAncienneOuverte"] = null;
-  for (const o of ouvertes) {
-    const d = duree(o);
+  for (const a of ouvertes) {
+    const d = duree(a);
     if (d && (plusAncienneOuverte === null || d.jours > plusAncienneOuverte.jours)) {
       plusAncienneOuverte = { jours: d.jours, repereeLe: d.premiereVue };
     }
@@ -131,8 +142,9 @@ export function signauxDe(offres: readonly Offre[], journal: Readonly<JournalVei
 }
 
 /**
- * Les signaux de tous les employeurs, par `cleGroupement` — la MÊME clé que la carte et la
- * liste, pour qu'une entreprise regroupée à l'écran porte les signaux de tout son groupe.
+ * Les signaux de tous les employeurs, par `cleEnseigne` : « Harvey's », « Harvey's 2538 » et « Harvey's 2789 » sont une
+ * enseigne et portent les mêmes signaux (JobAI#195). C'est `cleGroupement` — la clé de la carte et des positions, que
+ * rien ne change — dont `cleEnseigne` ne diffère QUE par le numéro de succursale retiré.
  *
  * Calculés sur TOUTES les offres suivies, jamais sur ce qu'un filtre laisse voir : un filtre de
  * distance ne change pas combien d'offres un employeur a d'ouvertes.
@@ -143,7 +155,7 @@ export function signauxParEmployeur(
 ): Record<string, SignauxEmployeur> {
   const groupes = new Map<string, Offre[]>();
   for (const o of offres) {
-    const cle = cleGroupement(o.entreprise, o.id);
+    const cle = cleEnseigne(o.entreprise, o.id);
     const liste = groupes.get(cle);
     if (liste) liste.push(o);
     else groupes.set(cle, [o]);

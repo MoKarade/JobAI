@@ -87,3 +87,74 @@ export function mesurerDoublonsAnnonce(offres: readonly Offre[]): MesureDoublons
     exemples: eclatees.slice(0, MAX_EXEMPLES),
   };
 }
+
+/**
+ * Les offres regroupées par annonce : chaque groupe réunit les copies d'une même annonce du Guichet (même numéro dans
+ * le lien), une offre sans numéro lisible formant un groupe à elle seule. L'ordre est celui de la première copie
+ * rencontrée. PURE.
+ */
+export function copiesParAnnonce(offres: readonly Offre[]): Offre[][] {
+  const groupes: Offre[][] = [];
+  const parNumero = new Map<string, Offre[]>();
+  for (const o of offres) {
+    const n = numeroAnnonce(o.lien);
+    if (n === null) {
+      groupes.push([o]);
+      continue;
+    }
+    const g = parNumero.get(n);
+    if (g) g.push(o);
+    else {
+      const neuf = [o];
+      parNumero.set(n, neuf);
+      groupes.push(neuf);
+    }
+  }
+  return groupes;
+}
+
+/** Marc a-t-il touché à cette offre ? (champs qui lui appartiennent : garde-fou n°2, `CHAMPS_UTILISATEUR`.) */
+export function touchee(o: Offre): boolean {
+  return o.statut !== "Identifiee" || o.dateEnvoi !== "" || o.userNote !== "";
+}
+
+/**
+ * Celle des copies qui parle pour l'annonce : une offre ouverte avant une périmée, puis la plus récemment repérée,
+ * puis l'identifiant (pour que le choix ne dépende pas de l'ordre de lecture). PURE.
+ */
+export function representante(copies: readonly Offre[]): Offre {
+  return [...copies].sort((a, b) => {
+    const ouverteA = a.perimeeLe === null ? 0 : 1;
+    const ouverteB = b.perimeeLe === null ? 0 : 1;
+    if (ouverteA !== ouverteB) return ouverteA - ouverteB;
+    if (a.dateReperage !== b.dateReperage) return a.dateReperage < b.dateReperage ? 1 : -1;
+    return a.id.localeCompare(b.id);
+  })[0]!;
+}
+
+/**
+ * Retire des RÉSULTATS d'une lecture les copies d'une même annonce : une annonce, une offre.
+ *
+ * ⚠️ NE TOUCHE À RIEN DANS LE SUIVI, et ne cache jamais ce qui appartient à Marc. Quand deux copies, ou plus, portent
+ * chacune un statut, une date d'envoi ou une note de Marc, on les garde toutes : choisir laisserait de côté une
+ * décision qu'il a prise. Quand une seule en porte, c'est elle qui reste. Sinon, `representante` tranche.
+ * `masquees` dit combien de copies ont été retirées, pour que l'absence ne se lise pas comme un vide.
+ */
+export function unePourChaqueAnnonce(offres: readonly Offre[]): { offres: Offre[]; masquees: number } {
+  const gardees = new Set<Offre>();
+  let masquees = 0;
+  for (const copies of copiesParAnnonce(offres)) {
+    if (copies.length === 1) {
+      gardees.add(copies[0]!);
+      continue;
+    }
+    const touchees = copies.filter(touchee);
+    if (touchees.length >= 2) {
+      for (const c of copies) gardees.add(c);
+      continue;
+    }
+    gardees.add(touchees[0] ?? representante(copies));
+    masquees += copies.length - 1;
+  }
+  return { offres: offres.filter((o) => gardees.has(o)), masquees };
+}

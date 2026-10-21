@@ -18,6 +18,7 @@ import { vueOffre, type OffreVue } from "./vue";
 import { joursEntre } from "../dureeVie";
 import { SEUIL_ABSENCES_PEREMPTION, type SuiviVeille } from "../veille";
 import { seuilFermetureJours } from "../fermetureAuto";
+import { unePourChaqueAnnonce } from "../doublonsAnnonce";
 
 /**
  * Offres rendues au maximum par une recherche.
@@ -54,8 +55,13 @@ export type Filtres = z.infer<typeof FiltresSchema>;
 export interface ResultatRecherche {
   /** Offres correspondant aux filtres, les mieux notées d'abord. */
   offres: OffreVue[];
-  /** Combien correspondaient AVANT la limite. */
+  /** Combien correspondaient AVANT la limite (une annonce comptée une fois). */
   correspondances: number;
+  /**
+   * Copies d'une même annonce du Guichet retirées de la liste (JobAI#195) : le Guichet renomme parfois l'employeur d'une
+   * annonce, qui entre alors deux fois dans le suivi. Le suivi n'est pas modifié ; zéro = rien n'a été retiré.
+   */
+  copiesMasquees: number;
   /**
    * `true` si la limite a mordu.
    *
@@ -95,7 +101,9 @@ export function chercherOffres(offres: readonly Offre[], filtres: Filtres): Resu
     return true;
   });
 
-  const triees = [...gardees].sort((a, b) => {
+  const { offres: uniques, masquees } = unePourChaqueAnnonce(gardees);
+
+  const triees = [...uniques].sort((a, b) => {
     if (a.score === null && b.score === null) return a.entreprise.localeCompare(b.entreprise);
     if (a.score === null) return 1;
     if (b.score === null) return -1;
@@ -105,6 +113,7 @@ export function chercherOffres(offres: readonly Offre[], filtres: Filtres): Resu
   return {
     offres: triees.slice(0, filtres.limite).map(vueOffre),
     correspondances: triees.length,
+    copiesMasquees: masquees,
     tronque: triees.length > filtres.limite,
   };
 }

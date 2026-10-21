@@ -7,7 +7,7 @@ import { calculerEcarts, retenusParDefaut } from "../cv/proposition";
 import { definition } from "../competences";
 import { signauxParEmployeur } from "../signauxEmployeur";
 import { mesurerDoublonsAnnonce } from "../doublonsAnnonce";
-import { cleGroupement } from "../employeurs";
+import { cleEnseigne } from "../enseigne";
 import { coutUsd, type EtatCompteur } from "../coutLlm";
 
 export type PreuvesEntrees = {
@@ -121,7 +121,7 @@ export function construirePreuves(
 
   if (employeur !== undefined) {
     const tousSignaux = signauxParEmployeur(offres, journal);
-    const cle = cleGroupement(employeur, employeur);
+    const cle = cleEnseigne(employeur, employeur);
     res.employeur = tousSignaux[cle] ?? null;
   }
 

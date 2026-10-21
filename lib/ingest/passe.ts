@@ -23,6 +23,7 @@ import {
 import { fermeturesAutomatiques, type FermetureAuto } from "../fermetureAuto";
 import type { Offre } from "../types";
 import type { Profil } from "../profil";
+import { numeroAnnonce } from "../annonce";
 import {
   brutesParIdStocke,
   cleCanonique,
@@ -309,6 +310,12 @@ export async function executerPasse(
     }
   }
 
+  // Les annonces du Guichet déjà suivies (JobAI#195) : une annonce dont l'employeur a changé de nom entre deux passages
+  // n'entre pas une seconde fois.
+  const annoncesConnues = new Set(
+    connues.map((o) => numeroAnnonce(o.lien)).filter((n): n is string => n !== null),
+  );
+
   const tri = trier(
     brutes,
     dejaSuivies,
@@ -316,6 +323,7 @@ export async function executerPasse(
     verdictsFermes(mesure.registre),
     flux?.metiers ?? [],
     flux?.profil,
+    annoncesConnues,
   );
 
   // Ce que le balayage a VU : les nouvelles retenues, et les offres déjà suivies qu'une

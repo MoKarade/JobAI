@@ -19,7 +19,7 @@ import { couleurNote, encreSurNote } from "@/lib/couleurNote";
 import { Fait } from "./Icone";
 import { CarteOffre } from "./CarteOffre";
 import type { Fraicheur } from "@/lib/fraicheur";
-import { cleGroupement } from "@/lib/employeurs";
+import { cleEnseigne } from "@/lib/enseigne";
 import type { SignauxEmployeur as Signaux } from "@/lib/signauxEmployeur";
 import { SignauxEmployeur } from "./SignauxEmployeur";
 
@@ -31,7 +31,7 @@ export function CarteEntreprise({
   groupe: GroupeEntreprise;
   /** Par identifiant d'offre, et seulement pour celles qui ont quelque chose à dire. */
   fraicheurs?: Readonly<Record<string, Fraicheur>>;
-  /** Par `cleGroupement`, calculés sur tout le suivi (jamais sur ce qu'un filtre laisse voir). */
+  /** Par `cleEnseigne`, calculés sur tout le suivi (jamais sur ce qu'un filtre laisse voir). */
   signaux?: Readonly<Record<string, Signaux>>;
 }) {
   const [ouverte, setOuverte] = useState(false);
@@ -40,7 +40,7 @@ export function CarteEntreprise({
   const plusieurs = groupe.offres.length > 1;
   const premiere = groupe.offres[0];
   const signauxEmployeur = premiere
-    ? signaux[cleGroupement(premiere.entreprise, premiere.id)]
+    ? signaux[cleEnseigne(premiere.entreprise, premiere.id)]
     : undefined;
 
   return (
