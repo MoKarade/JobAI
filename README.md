@@ -168,3 +168,8 @@ consomme ne peut pas publier ses coûts le jour où elle en a.
 
 Le hub interroge l'endpoint **côté serveur**. Aucun header CORS à configurer — si le besoin
 apparaît, c'est le signe que le fetch est parti côté client.
+
+## Données tierces
+
+Les centres des débuts de code postal du Québec (`lib/data/fsaQuebec.ts`, ADR-0040) viennent de [GeoNames](https://www.geonames.org/)
+(codes postaux du Canada), sous licence [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).

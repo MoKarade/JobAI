@@ -19,6 +19,7 @@
 
 import { useMemo, useState } from "react";
 import { lienTelephone } from "@/lib/lienTelephone";
+import { kmVirgule } from "@/lib/kmVirgule";
 import Link from "next/link";
 import {
   aplatirEntreprises,
@@ -140,7 +141,7 @@ export function ListeCarte({ epingles }: { epingles: readonly Epingle[] }) {
                       </span>
                       <Link href={`/offre/${o.id}`}>{o.poste}</Link>
                       <span className="carte-liste__faits">
-                        {o.km === null ? "" : `${String(o.km).replace(".", ",")} km`}
+                        {o.km === null ? "" : kmVirgule(o.km, o.kmApproche)}
                       </span>
                     </li>
                   ))}

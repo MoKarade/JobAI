@@ -41,6 +41,8 @@ export interface OffreVue {
   ville: string | null;
   /** Distance à vol d'oiseau, en km. `null` = jamais mesurée — pas zéro. */
   km: number | null;
+  /** `true` = `km` est APPROCHÉ par le début du code postal de l'annonce (ADR-0040) : à relayer « environ », jamais comme une mesure. */
+  kmApproche: boolean;
   salaireAffiche: string | null;
   statut: Offre["statut"];
   priorite: Offre["priorite"];
@@ -78,6 +80,7 @@ export function vueOffre(o: Offre): OffreVue {
     poste: tiers(o.poste),
     ville: o.ville === null ? null : tiers(o.ville),
     km: o.km,
+    kmApproche: o.kmSource === "postale",
     salaireAffiche: o.salaireAffiche === null ? null : tiers(o.salaireAffiche),
     statut: o.statut,
     priorite: o.priorite,

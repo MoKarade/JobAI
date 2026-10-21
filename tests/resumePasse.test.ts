@@ -19,6 +19,8 @@ const ENTREE: EntreeResume = {
   placees: 4,
   villesManquantes: 41,
   distancesEffacees: 2,
+  distancesPostales: 7,
+  lieuInconnuSansDistance: 3200,
   centresCorriges: 1,
   bornesMesurees: 5,
   bornesCandidates: 8,
@@ -46,6 +48,11 @@ describe("construireResume / lireResume", () => {
     expect(r.villesManquantes).toBe(41);
     expect(r.distancesEffacees).toBe(2);
     expect(r.centresCorriges).toBe(1);
+  });
+
+  it("un résumé écrit avant JobAI#92 (sans les deux comptes postaux) reste lisible", () => {
+    const { distancesPostales: _a, lieuInconnuSansDistance: _b, ...ancien } = construireResume(ENTREE, ECRIT, true);
+    expect(lireResume(JSON.stringify(ancien)).etat).toBe("ok");
   });
 
   it("un budget illimité (null) est conservé, pas remplacé par 0", () => {

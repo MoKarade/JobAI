@@ -65,7 +65,7 @@ describe("vueOffre — ce qui sort de l'app, et ce qui n'en sort pas", () => {
     // futur sans qu'aucune décision ne soit prise — la faute « composer par étalement laisse
     // passer tout le reste », déjà payée sur le profil de CV.
     expect(Object.keys(vueOffre(BASE)).sort()).toEqual([
-      "atouts", "dateEnvoi", "dateReperage", "entreprise", "histo", "id", "km", "lien",
+      "atouts", "dateEnvoi", "dateReperage", "entreprise", "histo", "id", "km", "kmApproche", "lien",
       "perimeeLe", "poste", "priorite", "reserves", "salaireAffiche", "score", "scoreSource",
       "statut", "userNote", "ville",
     ]);

@@ -19,6 +19,7 @@ import { eligibiliteComparaison } from "@/lib/comparaisonOffre";
 import { profilActif } from "@/lib/cv/depot";
 import { lienTrajetGoogleMaps } from "@/lib/lienTrajet";
 import { lienDeOffre } from "@/lib/lienOffre";
+import { kmVirgule } from "@/lib/kmVirgule";
 import { fraicheurOffre } from "@/lib/fraicheur";
 import { raisonsAffichables } from "@/lib/raisons";
 import { aujourdhui } from "@/lib/ajout";
@@ -195,7 +196,7 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
           <div>
             <dt>Distance</dt>
             <dd>
-              {offre.km === null ? "inconnue" : `${offre.km.toString().replace(".", ",")} km`}
+              {offre.km === null ? "inconnue" : kmVirgule(offre.km, offre.kmSource === "postale")}
             </dd>
           </div>
           <div>
