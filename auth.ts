@@ -8,8 +8,9 @@
 // AUCUN SCOPE GOOGLE ICI, ET PLUS AUCUN MOYEN D'EN DEMANDER. Le scan des réponses (V2) et
 // la lecture du CV (V3) en auront besoin — ce sont des scopes RESTREINTS, qui changent le
 // régime de vérification de l'application entière. Ils feront l'objet de l'ADR-0002 du
-// chantier V2, et ils devront passer par le HUB : c'est lui qui détient désormais le
-// client OAuth, et lui seul qui peut prêter un jeton.
+// chantier V2. Décision de Marc du 2026-10-19 (ADR-0041) : l'accès Gmail est un flux SÉPARÉ de la
+// connexion, avec un client OAuth propre à JobAI en lecture seule (`lib/gmail/`) ; ce fichier
+// n'y touche pas et reste sans fournisseur.
 
 import NextAuth from "next-auth";
 import { estEmailAutorise } from "@/lib/autorisation";

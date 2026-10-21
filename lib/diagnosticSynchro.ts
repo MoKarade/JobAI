@@ -42,6 +42,22 @@ export interface EtatSynchro {
 }
 
 /**
+ * L'accès Gmail (JobAI#107) : configuré ou non, et connecté ou non. Des NOMS de variables absentes et des booléens, jamais une valeur.
+ * `connecte` = la ligne `gmail-jeton` existe (son contenu ne sort jamais, comme pour toute autre clé).
+ */
+export interface EtatGmail {
+  readonly cle: "gmail";
+  readonly configure: boolean;
+  readonly manquantes: readonly string[];
+  readonly connecte: boolean;
+}
+
+export interface ConfigGmailVue {
+  readonly configure: boolean;
+  readonly manquantes: readonly string[];
+}
+
+/**
  * Un instantané lisible de `sync_state` : quelle clé, écrite quand, il y a combien de temps.
  *
  * Découvre les clés au lieu de les nommer — la table en porte déjà onze (registre de coût,
@@ -51,9 +67,21 @@ export interface EtatSynchro {
 export function resumerEtatSynchro(
   lignes: readonly LigneSynchroBrute[],
   maintenant: Date,
+  resumeDistances?: LectureResume,
+): EtatSynchro[];
+export function resumerEtatSynchro(
+  lignes: readonly LigneSynchroBrute[],
+  maintenant: Date,
+  resumeDistances: LectureResume | undefined,
+  gmail: ConfigGmailVue | undefined,
+): (EtatSynchro | EtatGmail)[];
+export function resumerEtatSynchro(
+  lignes: readonly LigneSynchroBrute[],
+  maintenant: Date,
   resumeDistances: LectureResume = { etat: "absent" },
-): EtatSynchro[] {
-  return [...lignes]
+  gmail?: ConfigGmailVue,
+): (EtatSynchro | EtatGmail)[] {
+  const rendu: (EtatSynchro | EtatGmail)[] = [...lignes]
     .sort((a, b) => a.cle.localeCompare(b.cle))
     .map((l) => {
       const base = {
@@ -69,4 +97,13 @@ export function resumerEtatSynchro(
       }
       return base;
     });
+  if (gmail) {
+    rendu.push({
+      cle: "gmail",
+      configure: gmail.configure,
+      manquantes: [...gmail.manquantes],
+      connecte: lignes.some((l) => l.cle === "gmail-jeton"),
+    });
+  }
+  return rendu;
 }
