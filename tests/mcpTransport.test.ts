@@ -64,6 +64,7 @@ async function appel(corps: unknown, accept = "application/json, text/event-stre
     lireResumeDistances: async () => ({ brut: null }),
     lireBareme: async () => null,
     lirePreuvesProfil: async () => null,
+    lireCompteurUsage: async () => null,
     listerCvs: async () => [],
     reanalyserCv: async () => ({ ok: true, message: "Analyse refaite." }),
     diagnostiquerFlux: async () => ({ fin: "flux-termine" }),
