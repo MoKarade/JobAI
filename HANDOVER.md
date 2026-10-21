@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-10-21 — JobAI#195 : une annonce du Guichet est une seule offre (ADR-0036)
+
+- **Mesure avant** (PR #206, lue en production le 2026-10-21 : `preuves_ecrans` → `suivi.doublonsAnnonce`) : 8 800 offres
+  suivies hors historique, 40 annonces comptées pour plusieurs offres (41 en trop), 16 sous des noms d'employeur différents,
+  7 enseignes éclatées (20 noms).
+- **Correction** : `chercher_offres` rend une offre par annonce (champ `copiesMasquees`), sauf quand deux copies portent chacune
+  une décision de Marc ; les signaux d'employeur comptent une annonce une fois et se regroupent par enseigne
+  (`lib/enseigne.ts`, numéro de succursale retiré, ne sert qu'à compter) ; l'ingestion ne recrée pas une annonce déjà suivie
+  sous un autre nom (`trier`) et la retrouve pour le marquage « vue » (`brutesParIdStocke`).
+- **Rien n'est écrit dans le suivi** : les 41 copies restent en base, masquées à la lecture, et vieillissent d'elles-mêmes.
+- **À savoir** : trois cartes « Harvey's » montrent le même signal, celui de l'enseigne (#161 pourra le dire sur la carte).
+
+---
+
 ## 2026-10-19 — JobAI#158 : l'analyse du CV passe à Sonnet 5.5 (ADR-0035)
 
 - **Avant** : tous les appels du dépôt utilisaient Haiku 4.5 ; la règle de Marc est « dernière génération seulement ».

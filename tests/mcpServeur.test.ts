@@ -580,6 +580,26 @@ describe("preuves_ecrans — prouver les écrans sans session", () => {
     expect(r2.employeur).toBeNull();
   });
 
+  it("⚠️ un employeur renommé par le Guichet : les comptes reprennent les trois noms, l'annonce compte une fois (JobAI#195)", async () => {
+    const guichet = "https://www.qc.guichetemplois.gc.ca/jobsearch/jobposting";
+    const { client } = await brancher({
+      lireOffres: async () => [
+        offre({ id: "e-aide", entreprise: "Enseigne Fictive", poste: "aide de cuisine", lien: `${guichet}/10000001`, perimeeLe: "2026-09-27T12:00:00.000Z" }),
+        offre({ id: "e-2538-aide", entreprise: "Enseigne Fictive 2538", poste: "aide de cuisine", lien: `${guichet}/10000001`, perimeeLe: null }),
+        offre({ id: "e-2789-gerant", entreprise: "Enseigne Fictive 2789", poste: "gérant", lien: `${guichet}/10000002`, perimeeLe: null }),
+      ],
+    });
+    const r = corps(await client.callTool({ name: "preuves_ecrans", arguments: { employeur: "Enseigne Fictive" } }));
+    const emp = r.employeur as Record<string, unknown>;
+    // Trois offres suivies, DEUX annonces : une ouverte (la copie périmée ne compte pas en plus) et un gérant ouvert.
+    expect(emp.offres).toBe(2);
+    expect(emp.ouvertes).toBe(2);
+    expect(emp.fermees).toBe(0);
+    // Chercher le nom d'une succursale donne la même enseigne.
+    const r2 = corps(await client.callTool({ name: "preuves_ecrans", arguments: { employeur: "Enseigne Fictive 2789" } }));
+    expect((r2.employeur as Record<string, unknown>).offres).toBe(2);
+  });
+
   it("ne contient jamais la clé valeur ni le texte brut d'un CV (JSON.stringify de la réponse ne contient pas 'valeur')", async () => {
     const extractionFictive = ReponseExtractionSchema.parse({
       anneesExperience: 3,

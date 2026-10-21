@@ -11,6 +11,7 @@
 //      explication est pire qu'une liste longue.
 
 import { extraitPourNote, noterOffre } from "../noteOffre";
+import { numeroAnnonce } from "../annonce";
 import { lireExperienceMois, lireSalaireAnnuel, salaireAffichable } from "./conditionsFlux";
 import { PROFIL_DEFAUT, type Profil } from "../profil";
 import { normaliserLieu, situer } from "./region";
@@ -254,19 +255,27 @@ export function cleCanonique(entreprise: string, titre: string): string {
  */
 export function brutesParIdStocke(
   brutes: readonly OffreBrute[],
-  connues: readonly { id: string; entreprise: string; poste: string }[],
+  connues: readonly { id: string; entreprise: string; poste: string; lien?: string }[],
 ): Map<string, OffreBrute> {
   const idStockeParCle = new Map<string, string>();
+  // Le numéro d'annonce du Guichet (JobAI#195) : si l'employeur a changé de nom entre deux passages, ni l'id ni la clé
+  // canonique ne retrouvent l'offre stockée, mais l'annonce est la même. Sans cette troisième voie, l'offre prendrait
+  // des absences pendant qu'elle est publiée sous nos yeux, et se périmerait à tort.
+  const idStockeParAnnonce = new Map<string, string>();
   for (const o of connues) {
     idStockeParCle.set(o.id, o.id);
     idStockeParCle.set(cleCanonique(o.entreprise, o.poste), o.id);
+    const n = numeroAnnonce(o.lien);
+    if (n !== null && !idStockeParAnnonce.has(n)) idStockeParAnnonce.set(n, o.id);
   }
   const vus = new Map<string, OffreBrute>();
   for (const b of brutes) {
     const entreprise = b.entreprise.trim() || "Employeur non nommé";
+    const numero = numeroAnnonce(b.lien);
     const stocke =
       idStockeParCle.get(idOffre(entreprise, b.titre)) ??
-      idStockeParCle.get(cleCanonique(entreprise, b.titre));
+      idStockeParCle.get(cleCanonique(entreprise, b.titre)) ??
+      (numero === null ? undefined : idStockeParAnnonce.get(numero));
     // La PREMIÈRE occurrence gagne, comme pour les doublons de `trier` : les récoltes
     // arrivent dans l'ordre de priorité des sources, et deux annonces du même poste dans un
     // même lot ne doivent pas rendre le résultat dépendant de l'ordre d'itération.
@@ -278,7 +287,7 @@ export function brutesParIdStocke(
 /** Les identifiants seuls — la moitié dont le balayage a besoin pour compter les absences. */
 export function idsStockesVus(
   brutes: readonly OffreBrute[],
-  connues: readonly { id: string; entreprise: string; poste: string }[],
+  connues: readonly { id: string; entreprise: string; poste: string; lien?: string }[],
 ): Set<string> {
   return new Set(brutesParIdStocke(brutes, connues).keys());
 }
@@ -351,9 +360,15 @@ export function trier(
    * appelants qui n'ont pas de profil à donner — les tests ; la passe, elle, le passe.
    */
   profil: Profil = PROFIL_DEFAUT,
+  /**
+   * Les numéros d'annonce du Guichet déjà dans le suivi (JobAI#195). Une annonce dont le numéro y est ne se recrée pas
+   * sous un autre nom d'employeur. Vide = comportement d'avant.
+   */
+  annoncesConnues: ReadonlySet<string> = new Set(),
 ): Tri {
   const retenues: Offre[] = [];
   const vues = new Set<string>();
+  const annoncesVues = new Set<string>();
   let souslePlancher = 0;
   let doublons = 0;
   let horsRegion = 0;
@@ -371,13 +386,21 @@ export function trier(
     // variantes du même poste passeraient l'une après l'autre dans le même lot.
     const canon = cleCanonique(entreprise, brute.titre);
 
-    if (vues.has(cle) || vues.has(canon) || dejaSuivies.has(cle) || dejaSuivies.has(canon)) {
+    const numero = numeroAnnonce(brute.lien);
+    if (
+      vues.has(cle) ||
+      vues.has(canon) ||
+      dejaSuivies.has(cle) ||
+      dejaSuivies.has(canon) ||
+      (numero !== null && (annoncesVues.has(numero) || annoncesConnues.has(numero)))
+    ) {
       doublons++;
       refusees.push({ entreprise, titre: brute.titre, ville: brute.ville, motif: "doublon" });
       continue;
     }
     vues.add(cle);
     vues.add(canon);
+    if (numero !== null) annoncesVues.add(numero);
 
     // ⚠️ LE LIEU NE REFUSE PLUS, IL S'ENREGISTRE (ADR-0019, décision Marc 2026-09-18).
     //
