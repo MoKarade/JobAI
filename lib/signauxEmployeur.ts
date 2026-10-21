@@ -58,6 +58,14 @@ export interface SignauxEmployeur {
    */
   plusAncienneOuverte: { jours: number; repereeLe: string } | null;
   /**
+   * La même, mais parmi les offres ouvertes dont on a VU l'apparition : celles dont la première vue tombe APRÈS le premier jour de la
+   * veille. Une offre déjà là ce jour-là a une durée tronquée (« depuis qu'on regarde », pas « depuis qu'elle existe ») : elle ne
+   * prouve rien sur l'employeur (JobAI#161, réglage du 2026-10-21 demandé par Marc). `null` si aucune n'en remplit la condition.
+   */
+  plusAncienneOuverteMesurable: { jours: number; repereeLe: string } | null;
+  /** Le premier jour de la veille (AAAA-MM-JJ), tiré du journal ; `null` sans aucune ligne. */
+  debutVeille: string | null;
+  /**
    * Durée médiane observée des offres FERMÉES (durée définitive, bornée à la dernière vue).
    * `null` sous `MINIMUM_FERMEES_MEDIANE` fermées observées — jamais un zéro.
    */
@@ -93,8 +101,32 @@ function mediane(valeurs: readonly number[]): number {
   return t.length % 2 === 1 ? t[m]! : (t[m - 1]! + t[m]!) / 2;
 }
 
-/** Les signaux d'UN employeur, à partir de ses offres. PURE. */
-export function signauxDe(offres: readonly Offre[], journal: Readonly<JournalVeille>): SignauxEmployeur {
+/**
+ * Le premier jour de la veille : la plus ancienne première vue du journal, ou `null` s'il est vide. PURE.
+ *
+ * ⚠️ TIRÉ DU JOURNAL ET NON ÉCRIT EN DUR : la veille a commencé le 2026-08-20, mais une date récitée ici dériverait en silence le jour
+ * où le journal change de forme. Si le journal est élagué (offres retirées du suivi), la date avance, et un peu moins d'offres
+ * sont alors reconnues « déjà là » : l'erreur va dans le sens prudent (plus de signaux, pas moins).
+ */
+export function debutDeLaVeille(journal: Readonly<JournalVeille>): string | null {
+  let debut: string | null = null;
+  for (const ligne of Object.values(journal)) {
+    if (debut === null || ligne.premiereVue < debut) debut = ligne.premiereVue;
+  }
+  return debut;
+}
+
+/**
+ * Les signaux d'UN employeur, à partir de ses offres. PURE.
+ *
+ * `debutVeille` se calcule UNE fois pour tous les employeurs (`signauxParEmployeur`) : le relire du journal entier pour chacun
+ * serait quadratique.
+ */
+export function signauxDe(
+  offres: readonly Offre[],
+  journal: Readonly<JournalVeille>,
+  debutVeille: string | null = debutDeLaVeille(journal),
+): SignauxEmployeur {
   // Une annonce, une offre : la représentante compte, ses copies lui prêtent leurs lignes de journal.
   const annonces = copiesParAnnonce(offres.filter((o) => !o.histo)).map((copies) => ({
     offre: representante(copies),
@@ -114,10 +146,17 @@ export function signauxDe(offres: readonly Offre[], journal: Readonly<JournalVei
   };
 
   let plusAncienneOuverte: SignauxEmployeur["plusAncienneOuverte"] = null;
+  let plusAncienneOuverteMesurable: SignauxEmployeur["plusAncienneOuverteMesurable"] = null;
   for (const a of ouvertes) {
     const d = duree(a);
-    if (d && (plusAncienneOuverte === null || d.jours > plusAncienneOuverte.jours)) {
+    if (!d) continue;
+    if (plusAncienneOuverte === null || d.jours > plusAncienneOuverte.jours) {
       plusAncienneOuverte = { jours: d.jours, repereeLe: d.premiereVue };
+    }
+    // Vue apparaître seulement si sa première vue est POSTÉRIEURE au premier jour de la veille (sinon durée tronquée).
+    const apparitionVue = debutVeille !== null && d.premiereVue > debutVeille;
+    if (apparitionVue && (plusAncienneOuverteMesurable === null || d.jours > plusAncienneOuverteMesurable.jours)) {
+      plusAncienneOuverteMesurable = { jours: d.jours, repereeLe: d.premiereVue };
     }
   }
 
@@ -145,6 +184,8 @@ export function signauxDe(offres: readonly Offre[], journal: Readonly<JournalVei
     ouvertes: ouvertes.length,
     fermees: fermees.length,
     plusAncienneOuverte,
+    plusAncienneOuverteMesurable,
+    debutVeille,
     dureeFermeeMedianeJours:
       joursFermees.length >= MINIMUM_FERMEES_MEDIANE ? mediane(joursFermees.map((d) => d.jours)) : null,
     fermeesObservees: joursFermees.length,
@@ -175,8 +216,9 @@ export function signauxParEmployeur(
     else groupes.set(cle, [o]);
   }
   const resultat: Record<string, SignauxEmployeur> = {};
+  const debutVeille = debutDeLaVeille(journal);
   for (const [cle, liste] of groupes) {
-    const s = signauxDe(liste, journal);
+    const s = signauxDe(liste, journal, debutVeille);
     if (s.offres > 0) resultat[cle] = s;
   }
   return resultat;

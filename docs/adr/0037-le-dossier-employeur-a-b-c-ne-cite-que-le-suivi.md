@@ -28,6 +28,24 @@ enseigne se regroupent). Reste à les résumer en une lettre, sans affirmer ce q
 6. **Affichage** : la fiche d'une offre (`/offre/[id]`) montre le bloc, calculé sur les offres de l'enseigne (requête bornée par le
    premier mot du nom, puis filtre par enseigne) ; `preuves_ecrans` avec `employeur` rend le même dossier pour la relecture.
 
+## Révision du 2026-10-21 — relecture de Marc sur 5 enseignes
+
+Lu en production sur Tim Hortons (C), A&W (C), Harvey's (B), Canadian Tire (B) et Jean Coutu (B), deux signaux ne disaient pas ce
+qu'ils prétendaient. Marc a demandé de les régler (« Corriger »).
+
+1. **« Ouverte depuis N jours » ne compte que pour une offre dont on a VU l'apparition.** « 62 jours » était le premier jour de la
+   veille (2026-08-20) : la durée d'une offre déjà là ce jour-là est tronquée (« depuis qu'on regarde »). Le dossier lit maintenant
+   `plusAncienneOuverteMesurable`, la plus ancienne ouverte dont la première vue est **postérieure** au premier jour de la veille
+   (tiré du journal, `debutDeLaVeille`, pas écrit en dur). Si toutes les offres ouvertes étaient déjà là, la ligne le dit et reste
+   neutre. Le seuil de 60 jours est inchangé.
+2. **Les « intitulés repris » ne comptent plus pour un employeur qui embauche en continu**, c'est-à-dire à partir de **10 offres
+   observées** (`SEUIL_EMBAUCHE_CONTINUE`). Chez une chaîne, un intitulé repris dit le roulement des postes, pas un mauvais
+   employeur ; chez un petit employeur, le même titre affiché deux fois dit encore quelque chose. La ligne reste, en constat
+   neutre, avec la mention « Sans poids dans la lettre ». [Supposition : 10 est un seuil de bon sens, pas une mesure ; le repli
+   honnête était de ne rien affirmer plutôt que de poser une lettre sur un signal douteux.]
+
+Les autres seuils (45 j de médiane, 2 intitulés repris, 3 et 6 offres observées) sont inchangés, faute de remarque de Marc.
+
 ## Ce que la lettre ne dit pas
 
 « C » veut dire « le suivi voit deux signaux défavorables », pas « mauvais employeur ». Une offre fermée n'est pas une offre
@@ -43,8 +61,11 @@ aucun signal favorable n'existe, seule l'ABSENCE de signal défavorable, avec as
 
 ## Risques
 
-- Les seuils (60 j, 45 j, 2 offres, 3 et 6 observées) sont des suppositions raisonnables, non calibrées ; la relecture de Marc sur
-  5 employeurs qu'il connaît sert à les ajuster. Ils vivent à un seul endroit (constantes exportées).
+- Les seuils (60 j, 45 j, 2 offres, 3 et 6 observées, et depuis la révision 10 offres pour l'embauche en continu) sont des
+  suppositions raisonnables, non calibrées ; la relecture de Marc sur des employeurs qu'il connaît sert à les ajuster. Ils vivent à
+  un seul endroit (constantes exportées).
+- Si le journal est élagué (offres retirées du suivi), le premier jour de la veille avance et un peu moins d'offres sont reconnues
+  « déjà là » : l'erreur va dans le sens prudent, vers plus de signaux.
 - Un employeur dont la veille n'a vu que quelques offres reste « inconnu » : c'est voulu.
 - Trois cartes d'une même enseigne montrent le même dossier : c'est celui de l'enseigne (ADR-0036).
 

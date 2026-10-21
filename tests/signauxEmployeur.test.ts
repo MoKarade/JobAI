@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import {
   cleIntitule,
+  debutDeLaVeille,
   signauxDe,
   signauxParEmployeur,
   MINIMUM_FERMEES_MEDIANE,
@@ -117,6 +118,23 @@ describe("durée d'ouverture", () => {
     const t = signauxDe([offre("h", { histo: true })], { h: vue("2025-01-01", "2025-02-01") });
     expect(t.offres).toBe(0);
     expect(t.plusAncienneOuverte).toBeNull();
+  });
+});
+
+describe("le premier jour de la veille", () => {
+  it("est la plus ancienne première vue du journal, et null sans journal", () => {
+    expect(debutDeLaVeille({})).toBeNull();
+    expect(
+      debutDeLaVeille({ a: vue("2026-09-01", "2026-10-16"), b: vue("2026-08-20", "2026-08-30"), c: vue("2026-10-01", "2026-10-16") }),
+    ).toBe("2026-08-20");
+  });
+
+  it("une offre ouverte vue dès ce jour-là n'est jamais « mesurable » ; une plus tardive l'est", () => {
+    const journal: JournalVeille = { a: vue("2026-08-20", "2026-10-16"), b: vue("2026-09-20", "2026-10-16") };
+    const s = signauxDe([offre("a", { poste: "A" }), offre("b", { poste: "B" })], journal);
+    expect(s.plusAncienneOuverte).toEqual({ jours: 57, repereeLe: "2026-08-20" });
+    expect(s.plusAncienneOuverteMesurable).toEqual({ jours: 26, repereeLe: "2026-09-20" });
+    expect(signauxDe([offre("a")], { a: vue("2026-08-20", "2026-10-16") }).plusAncienneOuverteMesurable).toBeNull();
   });
 });
 

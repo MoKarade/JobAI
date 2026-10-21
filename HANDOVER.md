@@ -6,6 +6,15 @@
 
 ---
 
+## 2026-10-21 — JobAI#161 : réglage du dossier employeur après la relecture de Marc (ADR-0037, révision)
+
+- Marc a tapé « Corriger » sur les 5 dossiers lus. Deux réglages, dans `lib/dossierEmployeur.ts` et `lib/signauxEmployeur.ts` :
+  « ouverte depuis N jours » ne compte plus pour une offre déjà là au premier jour de la veille (durée tronquée) ; les « intitulés
+  repris » ne comptent plus à partir de 10 offres observées (embauche en continu, 10 = supposition de bon sens).
+- La tâche reste en **preuve attendue** jusqu'à l'acceptation de Marc ; les 5 dossiers sont relus en production après le déploiement.
+
+---
+
 ## 2026-10-21 — JobAI#109 : un modèle lit la description d'une offre, sans toucher à la note (ADR-0039)
 
 - Nouvel outil MCP **`lire_annonces`** (payant, jamais seul) : Haiku 5.5 lit le titre et l'extrait de 2 000 caractères et rend un
