@@ -580,6 +580,19 @@ describe("preuves_ecrans — prouver les écrans sans session", () => {
     expect(r2.employeur).toBeNull();
   });
 
+  it("rend le dossier de l'employeur (lettre, résumé, lignes avec source et date) avec le paramètre employeur (JobAI#161)", async () => {
+    const { client } = await brancher({
+      lireOffres: async () => [offre({ entreprise: "Entreprise Fictive Inc.", perimeeLe: null })],
+    });
+    const r = corps(await client.callTool({ name: "preuves_ecrans", arguments: { employeur: "Entreprise Fictive" } }));
+    const dossier = r.dossier as { lettre: string; resume: string; lignes: unknown[] };
+    // Une seule offre, sans journal : la veille n'a rien observé, le dossier dit « inconnu » et n'invente aucune ligne.
+    expect(dossier.lettre).toBe("inconnu");
+    expect(dossier.lignes).toEqual([]);
+    const r2 = corps(await client.callTool({ name: "preuves_ecrans", arguments: {} }));
+    expect(r2.dossier).toBeUndefined();
+  });
+
   it("⚠️ un employeur renommé par le Guichet : les comptes reprennent les trois noms, l'annonce compte une fois (JobAI#195)", async () => {
     const guichet = "https://www.qc.guichetemplois.gc.ca/jobsearch/jobposting";
     const { client } = await brancher({

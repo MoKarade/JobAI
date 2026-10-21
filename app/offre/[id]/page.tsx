@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { lireOffre, rangParNote } from "@/lib/donnees";
+import { lireOffre, lireOffresDuMemeDebutDeNom, rangParNote } from "@/lib/donnees";
 import { palier } from "@/lib/scoring";
 import { ControlesOffre } from "@/components/ControlesOffre";
 import { BrouillonCandidature } from "@/components/BrouillonCandidature";
@@ -28,6 +28,10 @@ import type { JournalVeille } from "@/lib/veille";
 import { Cadre } from "@/components/Cadre";
 import { dateLisible } from "@/lib/dateLisible";
 import { titreOffre } from "@/lib/titreOffre";
+import { DossierEmployeur } from "@/components/DossierEmployeur";
+import { dossierEmployeur } from "@/lib/dossierEmployeur";
+import { cleEnseigne } from "@/lib/enseigne";
+import { signauxParEmployeur } from "@/lib/signauxEmployeur";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +106,22 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
   // l'offre — une panne de lecture d'état ne doit pas emporter la fiche, d'où le repli.
   const journal = await lireEtat<JournalVeille>(CLE_JOURNAL, {}).catch(() => ({}) as JournalVeille);
   const fraicheur = fraicheurOffre(offre, journal[offre.id], aujourdhui(new Date()));
+  // Le dossier de l'employeur (JobAI#161) : calculé sur toutes les offres de son enseigne, jamais sur cette seule offre. Une
+  // panne de lecture des offres se dit dans les journaux et le bloc disparaît : « inconnu » serait une affirmation, et l'absence n'en est pas une.
+  const dossier = await (async () => {
+    try {
+      const toutes = await lireOffresDuMemeDebutDeNom(offre.entreprise);
+      if (toutes === null) return null;
+      const cle = cleEnseigne(offre.entreprise, offre.id);
+      const siennes = toutes.filter((o) => cleEnseigne(o.entreprise, o.id) === cle);
+      // La requête borne par le premier mot : l'offre affichée y est toujours, même quand son nom est trop court pour borner.
+      if (!siennes.some((o) => o.id === offre.id)) siennes.push(offre);
+      return dossierEmployeur(signauxParEmployeur(siennes, journal)[cle]);
+    } catch (err) {
+      console.error("[offre] dossier de l'employeur illisible", { id: offre.id, err });
+      return null;
+    }
+  })();
   // ⚠️ `raisonsAffichables`, PAS `offre.raisons` (`[LIEN-04]`). C'est SUR CETTE FICHE que le
   // défaut a été vu : `km: 81.2` et « Annoncée à Thetford Mines — la distance reste à
   // mesurer » côte à côte. La règle vit dans `lib/raisons.ts`, avec l'écriture et la
@@ -213,6 +233,8 @@ export default async function DetailOffre({ params }: { params: Promise<{ id: st
             </dd>
           </div>
         </dl>
+
+        {dossier ? <DossierEmployeur dossier={dossier} /> : null}
 
         {atouts.length > 0 ? (
           <section className="detail__bloc">

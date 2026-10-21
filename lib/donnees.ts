@@ -5,7 +5,7 @@
 // affiche « aucune offre » alors que la base n'est pas configurée envoie Marc chercher un
 // bug dans ses données au lieu de sa configuration.
 
-import { and, asc, count, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { offerReasons, offers } from "./db/schema";
 import { assurerMigrations } from "./migrations";
@@ -124,6 +124,50 @@ export async function lireOffre(id: string): Promise<Offre | null> {
     histo: ligne.histo,
     perimeeLe: ligne.perimeeLe ? ligne.perimeeLe.toISOString() : null,
   };
+}
+
+/**
+ * Les offres dont l'employeur commence par le même premier mot que `entreprise` (sans distinction de casse), ou `null` si la
+ * base n'est pas configurée. Sert au dossier de l'employeur (JobAI#161) : une requête ciblée, la fiche d'une offre ne doit pas
+ * charger tout le suivi. L'appelant garde ensuite celles de la même ENSEIGNE (`cleEnseigne`) : ce filtre-ci ne fait que borner.
+ * Les raisons ne sont pas lues (les signaux n'en ont pas besoin) : `raisons` est vide.
+ */
+export async function lireOffresDuMemeDebutDeNom(entreprise: string): Promise<Offre[] | null> {
+  if (!process.env.DATABASE_URL) return null;
+
+  const mot = entreprise.trim().split(/\s+/)[0] ?? "";
+  // Les jokers de LIKE sont retirés du mot : un nom n'a pas à pouvoir élargir la requête.
+  const motSur = mot.replace(/[%_\\]/g, "");
+  if (motSur.length < 3) return [];
+
+  const lignes = await db.select().from(offers).where(ilike(offers.entreprise, `${motSur}%`));
+  return lignes.map((l) => ({
+    id: l.id,
+    source: l.source,
+    dateReperage: l.dateReperage,
+    entreprise: l.entreprise,
+    poste: l.poste,
+    lien: l.lien,
+    km: l.km,
+    noc: l.noc ?? null,
+    typePoste: l.typePoste ?? null,
+    dureeEmploi: l.dureeEmploi ?? null,
+    texteNote: l.texteNote ?? null,
+    salaireAnnuel: l.salaireAnnuel ?? null,
+    experienceMois: l.experienceMois ?? null,
+    ville: l.ville,
+    salaireAffiche: l.salaireAffiche,
+    priorite: l.priorite,
+    statut: l.statut,
+    dateEnvoi: l.dateEnvoi,
+    score: l.score,
+    scoreSource: l.scoreSource,
+    raisons: [],
+    notes: l.notes,
+    userNote: l.userNote,
+    histo: l.histo,
+    perimeeLe: l.perimeeLe ? l.perimeeLe.toISOString() : null,
+  }));
 }
 
 /** Remplace la justification d'une offre. Utilisé par le chargement du jeu de départ. */

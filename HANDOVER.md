@@ -6,6 +6,17 @@
 
 ---
 
+## 2026-10-21 — JobAI#161 : le dossier employeur A, B ou C (ADR-0037)
+
+- La fiche d'une offre (`/offre/[id]`) montre « Employeur : A, B, C ou inconnu » avec ses lignes, chacune citant sa source (suivi de
+  la veille) et sa date (dernier jour observé). Moins de 3 offres observées : « inconnu », sans ligne. La note de l'offre ne change pas.
+- `preuves_ecrans` avec `employeur` rend le même dossier (clé `dossier`) : c'est ce qui sert à la relecture avec Marc.
+- **Seuils à relire avec Marc** (suppositions, constantes de `lib/dossierEmployeur.ts`) : ouverte depuis 60 jours, médiane des fermées
+  45 jours, 2 intitulés repris, 3 offres observées pour sortir d'« inconnu », 6 (dont 3 fermées) pour un A.
+- Registre et RENA ne sont pas cités : sans date ni statut en base, aucune ligne ne pourrait citer sa source.
+
+---
+
 ## 2026-10-21 — JobAI#195 : une annonce du Guichet est une seule offre (ADR-0036)
 
 - **Mesure avant** (PR #206, lue en production le 2026-10-21 : `preuves_ecrans` → `suivi.doublonsAnnonce`) : 8 800 offres

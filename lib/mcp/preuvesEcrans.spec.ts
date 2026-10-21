@@ -8,6 +8,7 @@ import { definition } from "../competences";
 import { signauxParEmployeur } from "../signauxEmployeur";
 import { mesurerDoublonsAnnonce } from "../doublonsAnnonce";
 import { cleEnseigne } from "../enseigne";
+import { dossierEmployeur } from "../dossierEmployeur";
 import { coutUsd, type EtatCompteur } from "../coutLlm";
 
 export type PreuvesEntrees = {
@@ -123,6 +124,8 @@ export function construirePreuves(
     const tousSignaux = signauxParEmployeur(offres, journal);
     const cle = cleEnseigne(employeur, employeur);
     res.employeur = tousSignaux[cle] ?? null;
+    // Le dossier A, B ou C que la fiche d'une offre montre (JobAI#161) : mêmes signaux, mêmes lignes, même lettre.
+    res.dossier = dossierEmployeur(tousSignaux[cle]);
   }
 
   return res;
