@@ -616,6 +616,19 @@ describe("preuves_ecrans — prouver les écrans sans session", () => {
   });
 });
 
+describe("preuves_ecrans — la mesure des annonces en double (JobAI#195)", () => {
+  it("rend un bloc suivi.doublonsAnnonce fait de nombres, jamais d'un lien ni d'un intitulé", async () => {
+    const { client } = await brancher();
+    const r = corps(await client.callTool({ name: "preuves_ecrans", arguments: {} }));
+    const suivi = r.suivi as { doublonsAnnonce: Record<string, unknown> };
+    expect(typeof suivi.doublonsAnnonce.offres).toBe("number");
+    expect(typeof suivi.doublonsAnnonce.annoncesEnDouble).toBe("number");
+    expect(typeof suivi.doublonsAnnonce.offresEnTrop).toBe("number");
+    expect(Array.isArray(suivi.doublonsAnnonce.exemples)).toBe(true);
+    expect(JSON.stringify(suivi)).not.toMatch(/https?:/);
+  });
+});
+
 describe("preuves_ecrans — le coût des appels de modèle (JobAI#198)", () => {
   it("sans aucun appel, le bloc usage dit « aucun-appel » (jamais 0 $)", async () => {
     const { client } = await brancher();
