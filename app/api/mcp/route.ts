@@ -26,6 +26,7 @@ import { mesurerBase, sonderEmployeurs } from "@/lib/ingest/sondeEmployeurs";
 import { compterRegistre, lireClesRegistre } from "@/lib/registreBase";
 import { creerServeur } from "@/lib/mcp/serveur";
 import { lireEtat, lireEtatBrut } from "@/lib/etat";
+import { CLE_COUT_LLM, relireCompteur } from "@/lib/coutLlm";
 import { CLE_RESUME_DISTANCES } from "@/lib/resumePasse";
 import { CLE_JOURNAL } from "@/lib/veilleComplete";
 import type { JournalVeille } from "@/lib/veille";
@@ -215,6 +216,16 @@ export async function POST(requete: Request): Promise<Response> {
         return null;
       }
     },
+    // ⚠️ LECTURE BRUTE PUIS `relireCompteur`, comme `lireCoutPublie` : un JSON corrompu se rend `illisible` (et le bloc
+    // `usage` le dit), jamais « aucun appel ». Rien n'est écrit. Une panne de lecture rend `null`, pas un compteur vide.
+    lireCompteurUsage: () =>
+      lireEtatBrut(CLE_COUT_LLM).then(
+        (brut) => relireCompteur(brut),
+        (err) => {
+          console.error("[api/mcp] lecture du compteur d'usage impossible", err);
+          return null;
+        },
+      ),
     listerCvs: async () => {
       try {
         return await listerCvs();
