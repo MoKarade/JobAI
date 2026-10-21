@@ -12,6 +12,8 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 
 const CONTEXTE = "jobai-gmail-refresh-token-v1";
+/** Étiquette GCM de 16 octets, imposée à la lecture : une étiquette plus courte rendrait la falsification possible. */
+const LONGUEUR_ETIQUETTE = 16;
 
 function cle(secret: string): Buffer {
   return Buffer.from(hkdfSync("sha256", secret, "jobai", CONTEXTE, 32));
@@ -19,7 +21,7 @@ function cle(secret: string): Buffer {
 
 export function chiffrerJeton(clair: string, secret: string): string {
   const iv = randomBytes(12);
-  const c = createCipheriv("aes-256-gcm", cle(secret), iv);
+  const c = createCipheriv("aes-256-gcm", cle(secret), iv, { authTagLength: LONGUEUR_ETIQUETTE });
   const chiffre = Buffer.concat([c.update(clair, "utf8"), c.final()]);
   return ["v1", iv.toString("base64url"), c.getAuthTag().toString("base64url"), chiffre.toString("base64url")].join(".");
 }
@@ -28,8 +30,10 @@ export function dechiffrerJeton(blob: string, secret: string): string | null {
   const [version, iv, tag, chiffre, ...reste] = blob.split(".");
   if (version !== "v1" || !iv || !tag || !chiffre || reste.length > 0) return null;
   try {
-    const d = createDecipheriv("aes-256-gcm", cle(secret), Buffer.from(iv, "base64url"));
-    d.setAuthTag(Buffer.from(tag, "base64url"));
+    const etiquette = Buffer.from(tag, "base64url");
+    if (etiquette.length !== LONGUEUR_ETIQUETTE) return null;
+    const d = createDecipheriv("aes-256-gcm", cle(secret), Buffer.from(iv, "base64url"), { authTagLength: LONGUEUR_ETIQUETTE });
+    d.setAuthTag(etiquette);
     return Buffer.concat([d.update(Buffer.from(chiffre, "base64url")), d.final()]).toString("utf8");
   } catch {
     return null;

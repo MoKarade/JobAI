@@ -58,6 +58,10 @@ describe("jeton chiffré", () => {
     expect(dechiffrerJeton("", "s")).toBeNull();
     expect(dechiffrerJeton("v2.a.b.c", "s")).toBeNull();
     expect(dechiffrerJeton("v1.a.b.c.d", "s")).toBeNull();
+    // Une étiquette tronquée est refusée avant tout déchiffrement (finding Semgrep gcm-no-tag-length).
+    const [v, iv, tag, ct] = blob.split(".");
+    const courte = Buffer.from(tag ?? "", "base64url").subarray(0, 4).toString("base64url");
+    expect(dechiffrerJeton([v, iv, courte, ct].join("."), "s")).toBeNull();
   });
 
   it("chiffre deux fois la même valeur en deux blobs différents (IV neuf)", () => {
