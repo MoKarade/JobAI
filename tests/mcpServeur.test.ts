@@ -107,6 +107,7 @@ describe("la surface exposée à claude.ai", () => {
       "lire_offre",
       "modifier_suivi",
       "preuves_ecrans",
+      "propositions_statut",
       "reanalyser_profil",
       "resume_suivi",
       "sonde_employeurs",
@@ -126,6 +127,7 @@ describe("la surface exposée à claude.ai", () => {
     expect(parNom.get("diagnostic_bareme")).toBe(true);
     expect(parNom.get("sonde_employeurs")).toBe(true);
     expect(parNom.get("preuves_ecrans")).toBe(true);
+    expect(parNom.get("propositions_statut")).toBe(true);
     expect(parNom.get("modifier_suivi")).toBe(false);
     expect(parNom.get("reanalyser_profil")).toBe(false);
     // Un appel payant n'est jamais une lecture anodine : le client doit pouvoir le distinguer.

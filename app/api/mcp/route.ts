@@ -45,6 +45,7 @@ import { lireAnnonce } from "@/lib/lectureAnnonceLlm";
 import { garderLecture, lireLectures } from "@/lib/lectureAnnonceStore";
 import { enregistrerUsageLlm } from "@/lib/coutLlmStore";
 import { enFileSerie } from "@/lib/serie";
+import { lireCourrielsRecus } from "@/lib/gmail/acces";
 import { configGmail } from "@/lib/gmail/config";
 
 export const dynamic = "force-dynamic";
@@ -184,6 +185,7 @@ export async function POST(requete: Request): Promise<Response> {
     // ⚠️ `cle`/`majLe` SEULEMENT — jamais `valeur` (`[OBS-01]`). Certaines lignes portent un
     // JSON de plusieurs dizaines de milliers de caractères ; ce diagnostic sert à dater un
     // passage, pas à le relire.
+    lireCourrielsRecus: (opts) => lireCourrielsRecus(opts),
     lireConfigGmail: () => {
       const cfg = configGmail();
       return cfg.ok ? { configure: true, manquantes: [] } : { configure: false, manquantes: cfg.manquantes };

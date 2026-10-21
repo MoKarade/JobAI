@@ -123,6 +123,7 @@ describe("le transport HTTP répond aux requêtes réelles", () => {
       "lire_offre",
       "modifier_suivi",
       "preuves_ecrans",
+      "propositions_statut",
       "reanalyser_profil",
       "resume_suivi",
       "sonde_employeurs",
