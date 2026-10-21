@@ -7,6 +7,7 @@ import {
   dossierEmployeur,
   MINIMUM_OBSERVEES,
   OBSERVEES_POUR_A,
+  SEUIL_EMBAUCHE_CONTINUE,
   SEUIL_INTITULES_REPRIS,
   SEUIL_MEDIANE_LONGUE_JOURS,
   SEUIL_OUVERTE_LONGUE_JOURS,
@@ -16,6 +17,11 @@ import { signauxDe, type SignauxEmployeur } from "../lib/signauxEmployeur";
 import type { Offre } from "../lib/types";
 import type { JournalVeille } from "../lib/veille";
 
+/** Une offre ouverte dont on a vu l'apparition (première vue après le début de la veille) : les deux champs bougent ensemble. */
+function ouverteDepuis(jours: number, repereeLe: string): Partial<SignauxEmployeur> {
+  return { plusAncienneOuverte: { jours, repereeLe }, plusAncienneOuverteMesurable: { jours, repereeLe } };
+}
+
 /** Des signaux calmes et bien observés : un A, que chaque test dégrade d'un seul champ. */
 function signaux(reste: Partial<SignauxEmployeur> = {}): SignauxEmployeur {
   return {
@@ -23,6 +29,8 @@ function signaux(reste: Partial<SignauxEmployeur> = {}): SignauxEmployeur {
     ouvertes: 2,
     fermees: 6,
     plusAncienneOuverte: { jours: 20, repereeLe: "2026-09-26" },
+    plusAncienneOuverteMesurable: { jours: 20, repereeLe: "2026-09-26" },
+    debutVeille: "2026-08-20",
     dureeFermeeMedianeJours: 12,
     fermeesObservees: 6,
     offresObservees: 8,
@@ -42,7 +50,7 @@ describe("dossier d'un employeur — la lettre", () => {
 
   it("B : un seul signal défavorable (une offre ouverte depuis longtemps)", () => {
     const d = dossierEmployeur(
-      signaux({ plusAncienneOuverte: { jours: SEUIL_OUVERTE_LONGUE_JOURS, repereeLe: "2026-08-17" } }),
+      signaux(ouverteDepuis(SEUIL_OUVERTE_LONGUE_JOURS, "2026-08-25")),
     );
     expect(d.lettre).toBe("B");
     expect(d.lignes.filter((l) => l.ton === "defavorable")).toHaveLength(1);
@@ -51,7 +59,7 @@ describe("dossier d'un employeur — la lettre", () => {
   it("C : deux signaux défavorables", () => {
     const d = dossierEmployeur(
       signaux({
-        plusAncienneOuverte: { jours: 90, repereeLe: "2026-07-18" },
+        ...ouverteDepuis(90, "2026-07-18"),
         intitulesReprisTotal: SEUIL_INTITULES_REPRIS,
         intitulesRepris: [{ intitule: "aide de cuisine", fois: 3 }],
       }),
@@ -86,6 +94,58 @@ describe("dossier d'un employeur — la lettre", () => {
   });
 });
 
+describe("dossier d'un employeur — réglage du 2026-10-21 (relecture de Marc)", () => {
+  it("⚠️ une offre déjà ouverte au premier jour de la veille ne fait PAS signal : sa durée est tronquée", () => {
+    const d = dossierEmployeur(
+      signaux({ plusAncienneOuverte: { jours: 62, repereeLe: "2026-08-20" }, plusAncienneOuverteMesurable: null }),
+    );
+    expect(d.lettre).toBe("A");
+    expect(d.lignes.filter((l) => l.ton === "defavorable")).toHaveLength(0);
+    const texte = d.lignes.map((l) => l.texte).join(" ");
+    expect(texte).toContain("déjà là au premier jour de la veille (2026-08-20)");
+    expect(texte).not.toContain("depuis au moins 62");
+  });
+
+  it("une offre dont on a vu l'apparition, elle, compte toujours (même seuil de 60 jours)", () => {
+    const d = dossierEmployeur(
+      signaux({ plusAncienneOuverte: { jours: 62, repereeLe: "2026-08-20" }, ...ouverteDepuis(SEUIL_OUVERTE_LONGUE_JOURS, "2026-08-25") }),
+    );
+    expect(d.lettre).toBe("B");
+  });
+
+  it("⚠️ des intitulés repris ne comptent pas pour un employeur qui embauche en continu, mais la ligne les dit", () => {
+    const repris = { intitulesReprisTotal: 4, intitulesRepris: [{ intitule: "cuisinier", fois: 5 }] };
+    const chaine = dossierEmployeur(signaux({ ...repris, offresObservees: SEUIL_EMBAUCHE_CONTINUE, offres: 12 }));
+    expect(chaine.lettre).toBe("A");
+    const ligne = chaine.lignes.find((l) => l.texte.includes("cuisinier"));
+    expect(ligne?.ton).toBe("neutre");
+    expect(ligne?.texte).toContain("Sans poids dans la lettre");
+  });
+
+  it("des intitulés repris comptent toujours pour un petit employeur (moins de 10 offres observées)", () => {
+    const repris = { intitulesReprisTotal: 2, intitulesRepris: [{ intitule: "soudeur", fois: 3 }] };
+    const petit = dossierEmployeur(signaux({ ...repris, offresObservees: SEUIL_EMBAUCHE_CONTINUE - 1 }));
+    expect(petit.lettre).toBe("B");
+    expect(petit.lignes.find((l) => l.texte.includes("soudeur"))?.ton).toBe("defavorable");
+    expect(petit.lignes.map((l) => l.texte).join(" ")).not.toContain("Sans poids");
+  });
+
+  it("de bout en bout : le premier jour de la veille est tiré du journal", () => {
+    const o = (id: string): Offre => ({ id, source: "jobbank", dateReperage: "2026-08-20", entreprise: "Chaîne Fictive", poste: `poste ${id}`,
+      lien: "", km: null, noc: null, ville: null, salaireAffiche: null, priorite: "Moyenne", statut: "Identifiee", dateEnvoi: "",
+      score: null, scoreSource: null, raisons: [], notes: "", userNote: "", histo: false, perimeeLe: null }) as Offre;
+    const journal: JournalVeille = {
+      a: { premiereVue: "2026-08-20", derniereVue: "2026-10-21", absences: 0 }, // déjà là au premier jour
+      b: { premiereVue: "2026-09-25", derniereVue: "2026-10-21", absences: 0 },
+      c: { premiereVue: "2026-10-01", derniereVue: "2026-10-21", absences: 0 },
+    };
+    const s = signauxDe([o("a"), o("b"), o("c")], journal);
+    expect(s.debutVeille).toBe("2026-08-20");
+    expect(s.plusAncienneOuverte).toEqual({ jours: 62, repereeLe: "2026-08-20" });
+    expect(s.plusAncienneOuverteMesurable).toEqual({ jours: 26, repereeLe: "2026-09-25" });
+  });
+});
+
 describe("dossier d'un employeur — chaque ligne cite sa source et sa date", () => {
   it("toutes les lignes portent la source du suivi et le dernier jour observé", () => {
     const d = dossierEmployeur(signaux());
@@ -98,7 +158,7 @@ describe("dossier d'un employeur — chaque ligne cite sa source et sa date", ()
   });
 
   it("une ligne sans durée dit qu'elle est inconnue au lieu d'inventer un chiffre", () => {
-    const d = dossierEmployeur(signaux({ plusAncienneOuverte: null, dureeFermeeMedianeJours: null, fermeesObservees: 1 }));
+    const d = dossierEmployeur(signaux({ plusAncienneOuverte: null, plusAncienneOuverteMesurable: null, dureeFermeeMedianeJours: null, fermeesObservees: 1 }));
     const texte = d.lignes.map((l) => l.texte).join(" ");
     expect(texte).toContain("Durée d'ouverture inconnue");
     expect(texte).toContain("trop peu pour une durée médiane");

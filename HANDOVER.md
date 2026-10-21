@@ -6,6 +6,13 @@
 
 ---
 
+## 2026-10-21 — JobAI#161 : réglage du dossier employeur après la relecture de Marc (ADR-0037, révision)
+
+- Marc a tapé « Corriger » sur les 5 dossiers lus. Deux réglages, dans `lib/dossierEmployeur.ts` et `lib/signauxEmployeur.ts` :
+  « ouverte depuis N jours » ne compte plus pour une offre déjà là au premier jour de la veille (durée tronquée) ; les « intitulés
+  repris » ne comptent plus à partir de 10 offres observées (embauche en continu, 10 = supposition de bon sens).
+- La tâche reste en **preuve attendue** jusqu'à l'acceptation de Marc ; les 5 dossiers sont relus en production après le déploiement.
+
 ## 2026-10-21 — JobAI#92 : une distance approchée par le début du code postal (ADR-0040)
 
 - Les 3 874 offres « lieu inconnu » du diagnostic du 2026-10-21 portent toutes un code postal que l'ingestion lisait puis jetait. Il est

@@ -22,6 +22,13 @@ export const SEUIL_OUVERTE_LONGUE_JOURS = 60;
 export const SEUIL_MEDIANE_LONGUE_JOURS = 45;
 /** Intitulés repris (offres « en plus ») à partir desquels c'est un signal défavorable : un seul peut être un hasard. */
 export const SEUIL_INTITULES_REPRIS = 2;
+/**
+ * Offres observées à partir desquelles l'employeur est lu comme EMBAUCHANT EN CONTINU : des intitulés repris y disent le roulement
+ * des postes (une chaîne qui affiche « Cuisinier » pour ses succursales), pas un mauvais employeur. Le signal « intitulés repris »
+ * ne compte plus pour la lettre à partir de là ; la ligne reste, en constat (réglage de Marc, 2026-10-21, JobAI#161).
+ * [Supposition : 10 est un seuil de bon sens, à revoir sur les prochains dossiers.]
+ */
+export const SEUIL_EMBAUCHE_CONTINUE = 10;
 /** Offres observées par la veille en dessous desquelles le dossier dit « inconnu ». */
 export const MINIMUM_OBSERVEES = 3;
 /** Offres observées (dont 3 fermées, la médiane) qu'il faut pour que l'absence de signal défavorable donne un A. */
@@ -61,11 +68,15 @@ export function dossierEmployeur(signaux: SignauxEmployeur | null | undefined): 
   }
 
   const date = signaux.observeLe;
-  const ancienne = signaux.plusAncienneOuverte;
+  // ⚠️ SEULE UNE OFFRE DONT ON A VU L'APPARITION COMPTE (réglage de Marc, 2026-10-21). Une offre déjà ouverte au premier jour de la
+  // veille a une durée tronquée : « 62 jours » y veut dire « depuis qu'on regarde », et il touchait presque toutes les chaînes.
+  const ancienne = signaux.plusAncienneOuverteMesurable;
+  const toutesDejaLa = ancienne === null && signaux.plusAncienneOuverte !== null;
   const longue = ancienne !== null && ancienne.jours >= SEUIL_OUVERTE_LONGUE_JOURS;
   const medianeLongue =
     signaux.dureeFermeeMedianeJours !== null && signaux.dureeFermeeMedianeJours >= SEUIL_MEDIANE_LONGUE_JOURS;
-  const repris = signaux.intitulesReprisTotal >= SEUIL_INTITULES_REPRIS;
+  const embaucheEnContinu = signaux.offresObservees >= SEUIL_EMBAUCHE_CONTINUE;
+  const repris = signaux.intitulesReprisTotal >= SEUIL_INTITULES_REPRIS && !embaucheEnContinu;
 
   const ligne = (texte: string, ton: LigneDossier["ton"]): LigneDossier => ({ texte, ton, source: SOURCE_SUIVI, date });
   const lignes: LigneDossier[] = [
@@ -75,10 +86,15 @@ export function dossierEmployeur(signaux: SignauxEmployeur | null | undefined): 
     ),
     ancienne
       ? ligne(
-          `La plus ancienne offre ouverte l'est depuis au moins ${ancienne.jours} jour${s(ancienne.jours)} (repérée le ${ancienne.repereeLe}).`,
+          `La plus ancienne offre ouverte dont on a vu l'apparition l'est depuis au moins ${ancienne.jours} jour${s(ancienne.jours)} (repérée le ${ancienne.repereeLe}).`,
           longue ? "defavorable" : "neutre",
         )
-      : ligne("Durée d'ouverture inconnue : aucune offre ouverte n'a été observée.", "neutre"),
+      : toutesDejaLa
+        ? ligne(
+            `Les offres ouvertes étaient déjà là au premier jour de la veille (${signaux.debutVeille}) : on ne peut pas dire depuis quand elles le sont.`,
+            "neutre",
+          )
+        : ligne("Durée d'ouverture inconnue : aucune offre ouverte n'a été observée.", "neutre"),
     signaux.dureeFermeeMedianeJours !== null
       ? ligne(
           `Offres fermées : durée médiane vue de ${signaux.dureeFermeeMedianeJours} jour${s(signaux.dureeFermeeMedianeJours)}, sur ${signaux.fermeesObservees}.`,
@@ -93,7 +109,11 @@ export function dossierEmployeur(signaux: SignauxEmployeur | null | undefined): 
         ? "Aucun intitulé repris."
         : `${signaux.intitulesReprisTotal} offre${s(signaux.intitulesReprisTotal)} de plus sous un intitulé déjà vu : ${signaux.intitulesRepris
             .map((i) => `« ${i.intitule} » ×${i.fois}`)
-            .join(" · ")}.`,
+            .join(" · ")}.${
+          signaux.intitulesReprisTotal >= SEUIL_INTITULES_REPRIS && embaucheEnContinu
+            ? ` Sans poids dans la lettre : ${signaux.offresObservees} offres observées, l'employeur embauche en continu et ses postes tournent.`
+            : ""
+        }`,
       repris ? "defavorable" : "neutre",
     ),
   ];
