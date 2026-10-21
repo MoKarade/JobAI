@@ -6,6 +6,15 @@
 
 ---
 
+## 2026-10-21 — JobAI#107 : Gmail en lecture seule, échec fermé (ADR-0041)
+
+- Nouveau `lib/gmail/` : configuration (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `AUTH_SECRET`), flux OAuth code + PKCE, jeton de rafraîchissement
+  **chiffré** (clé dérivée d'`AUTH_SECRET`) dans `sync_state` (`gmail-jeton`), lecture bornée des courriels reçus en `GET` seulement, extraits expurgés.
+  Routes `/api/gmail/connexion` et `/api/gmail/retour` derrière la session. Seul le scope `gmail.readonly` est demandé et il est **vérifié au retour**.
+- **Éteint tant que le client OAuth de Marc n'existe pas (JobAI#201)** : sans variables, la connexion répond 503 et rien ne part vers Google.
+  `/api/gmail/courriels` rend les courriels récents ou un état nommé. `etat_synchro` rend une ligne `gmail` (`configure`, noms des variables manquantes, `connecte`) : c'est la preuve en production.
+- Suite : JobAI#218 (proposer un statut, sans écriture), JobAI#219 (le bloc de l'accueil). Rien n'est écrit dans le suivi par cette tâche.
+
 ## 2026-10-21 — JobAI#161 : réglage du dossier employeur après la relecture de Marc (ADR-0037, révision)
 
 - Marc a tapé « Corriger » sur les 5 dossiers lus. Deux réglages, dans `lib/dossierEmployeur.ts` et `lib/signauxEmployeur.ts` :

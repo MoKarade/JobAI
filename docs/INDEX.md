@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-62 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+63 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -57,6 +57,7 @@
 - [ADR-0038 — Le domaine est gradué (retenu, voisin, autre) et les métiers précis se proposent depuis le CV](adr/0038-le-domaine-est-gradue-et-les-metiers-se-proposent.md) — `docs/adr/0038-le-domaine-est-gradue-et-les-metiers-se-proposent.md`
 - [ADR-0039 — Un modèle lit la description d'une offre, et sa lecture est gardée sans toucher à la note](adr/0039-un-modele-lit-la-description-sans-toucher-a-la-note.md) — `docs/adr/0039-un-modele-lit-la-description-sans-toucher-a-la-note.md`
 - [ADR-0040 — Une distance approchée par le début du code postal, dite approchée partout](adr/0040-une-distance-approchee-par-le-debut-du-code-postal.md) — `docs/adr/0040-une-distance-approchee-par-le-debut-du-code-postal.md`
+- [ADR-0041 — Gmail en lecture seule : un client OAuth propre à JobAI, un jeton chiffré, échec fermé](adr/0041-gmail-en-lecture-seule-echec-ferme.md) — `docs/adr/0041-gmail-en-lecture-seule-echec-ferme.md`
 - [Décisions d'architecture (ADR)](adr/README.md) — `docs/adr/README.md`
 
 ## docs/claude/
