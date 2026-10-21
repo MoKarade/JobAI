@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-59 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+60 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -54,6 +54,7 @@
 - [ADR-0035 — L'analyse du CV passe à Sonnet 5.5, les autres appels à Haiku 5.5, et le coût se chiffre par modèle](adr/0035-l-analyse-du-cv-passe-a-sonnet-5-5.md) — `docs/adr/0035-l-analyse-du-cv-passe-a-sonnet-5-5.md`
 - [ADR-0036 — Une annonce du Guichet est une seule offre, même quand l'employeur change de nom](adr/0036-une-annonce-du-guichet-est-une-seule-offre.md) — `docs/adr/0036-une-annonce-du-guichet-est-une-seule-offre.md`
 - [ADR-0037 — Le dossier employeur A, B ou C ne cite que le suivi, et dit « inconnu » sans source](adr/0037-le-dossier-employeur-a-b-c-ne-cite-que-le-suivi.md) — `docs/adr/0037-le-dossier-employeur-a-b-c-ne-cite-que-le-suivi.md`
+- [ADR-0038 — Le domaine est gradué (retenu, voisin, autre) et les métiers précis se proposent depuis le CV](adr/0038-le-domaine-est-gradue-et-les-metiers-se-proposent.md) — `docs/adr/0038-le-domaine-est-gradue-et-les-metiers-se-proposent.md`
 - [Décisions d'architecture (ADR)](adr/README.md) — `docs/adr/README.md`
 
 ## docs/claude/

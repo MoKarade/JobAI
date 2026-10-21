@@ -107,3 +107,36 @@ export function jugerProfession(
   if (code === null) return "code-illisible";
   return codeRetenu(code, retenus) ? "retenue" : "ecartee";
 }
+
+/** Le niveau d'un code au regard des métiers retenus (ADR-0038). */
+export type NiveauDomaine = "retenu" | "voisin" | "autre" | "inconnu";
+
+/**
+ * Le niveau de domaine d'un code. PURE.
+ *
+ *   · `retenu`  — le code est dans les métiers retenus (cinq chiffres exacts, ou son préfixe de deux chiffres) ;
+ *   · `voisin`  — pas retenu, mais il partage son préfixe de DEUX chiffres (domaine ET niveau) avec un métier
+ *                 retenu : « du même rayon, pas du même métier » ;
+ *   · `autre`   — un code lu, hors de tout cela ;
+ *   · `inconnu` — pas de code lisible, OU aucun métier retenu : le mécanisme est inerte.
+ *
+ * ⚠️ `inconnu` NE PÉNALISE JAMAIS (même règle que `facteurDomaine`) : une offre sans code n'est pas hors domaine,
+ * son domaine est ignoré. Le voisinage se mesure sur DEUX chiffres, pas un : le premier chiffre seul réunirait tout
+ * « sciences naturelles et appliquées » (paysagiste, physicien du laser, technicien en robotique), c'est-à-dire
+ * le défaut qu'on corrige.
+ */
+export function niveauDomaine(
+  brut: string | null | undefined,
+  retenus: readonly string[],
+): NiveauDomaine {
+  if (retenus.length === 0) return "inconnu";
+  const code = lireCodeNoc(brut);
+  if (code === null) return "inconnu";
+  if (codeRetenu(code, retenus)) return "retenu";
+  const prefixe = code.code.slice(0, 2);
+  const voisin = retenus.some((r) => {
+    const cible = r.trim();
+    return (cible.length === 2 || cible.length === 5) && cible.slice(0, 2) === prefixe;
+  });
+  return voisin ? "voisin" : "autre";
+}

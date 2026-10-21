@@ -14,6 +14,8 @@ import { auth } from "@/auth";
 import { Cadre } from "@/components/Cadre";
 import { RevueProfil } from "@/components/RevueProfil";
 import { AppliquerBareme } from "@/components/AppliquerBareme";
+import { ReglageMetiers } from "@/components/ReglageMetiers";
+import { proposerMetiers, type Proposition } from "@/lib/propositionMetiers";
 import { ReanalyseCv } from "@/components/ReanalyseCv";
 import { TeleversementCv } from "@/components/TeleversementCv";
 import { listerCvs, profilActif, propositionDe } from "@/lib/cv/depot";
@@ -101,7 +103,7 @@ function SectionNouveauBareme({ apercu, sansCv, plafond }: { apercu: ApercuBarem
   const reste = !apercu.dejaApplique || enRetard > 0;
   return (
     <section className="carte-info">
-      <h2>{apercu.dejaApplique ? "Nouveau barème" : "Nouveau barème : le salaire en premier"}</h2>
+      <h2>{apercu.dejaApplique ? "Nouveau barème" : "Nouveau barème : le salaire en premier, le domaine gradué"}</h2>
       {apercu.dejaApplique ? (
         <p className="profil__aide">
           Appliqué : le salaire pèse {p.avant.salaire} points sur 100 et entre dans la note quand
@@ -157,7 +159,20 @@ function SectionNouveauBareme({ apercu, sansCv, plafond }: { apercu: ApercuBarem
               <dd>
                 {m.montent}, {m.baissent}, {m.inchangees}
               </dd>
-            </div>            <div>
+            </div>
+            <div>
+              <dt>Domaine : {apercu.domaine.hautDeListe.taille} premières offres, avant puis après</dt>
+              <dd>
+                Métier retenu {apercu.domaine.hautDeListe.avant.retenu}, puis{" "}
+                {apercu.domaine.hautDeListe.apres.retenu} ; voisin {apercu.domaine.hautDeListe.avant.voisin},
+                puis {apercu.domaine.hautDeListe.apres.voisin} ; autre domaine{" "}
+                {apercu.domaine.hautDeListe.avant.autre}, puis {apercu.domaine.hautDeListe.apres.autre}.{" "}
+                {apercu.domaine.plafonnees} offre{apercu.domaine.plafonnees > 1 ? "s sont" : " est"} abaissée
+                {apercu.domaine.plafonnees > 1 ? "s" : ""} par le plafond de domaine ({apercu.plafondsDomaine.voisin} pour un voisin,{" "}
+                {apercu.plafondsDomaine.autre} pour un autre domaine).
+              </dd>
+            </div>
+            <div>
               <dt>Écart moyen dû au nouveau barème seul</dt>
               <dd>
                 {m.ecartMoyenBaremeSeul === null ? "—" : signe(m.ecartMoyenBaremeSeul)} point
@@ -243,11 +258,21 @@ export default async function Profil() {
   // ne doit pas faire croire qu'il n'y a rien à appliquer — et ne doit pas casser la page.
   let apercu: ApercuBareme | null = null;
   let apercuIndisponible = erreurProfil !== null;
+  let metiersRetenus: string[] | null = null;
+  let proposition: Proposition | null = null;
   if (erreurProfil === null) {
     try {
       const [offres, metiers] = await Promise.all([lireOffres(), lireMetiers()]);
       if (offres === null) apercuIndisponible = true;
-      else apercu = apercuNouveauBareme(offres, profil, metiers, aujourdhui(new Date()));
+      else {
+        apercu = apercuNouveauBareme(offres, profil, metiers, aujourdhui(new Date()));
+        metiersRetenus = metiers;
+        // Les offres OUVERTES seulement : une offre fermée ne dit plus ce que le marché cherche (ADR-0038).
+        proposition = proposerMetiers(
+          offres.filter((o) => !o.histo && o.perimeeLe === null),
+          profil,
+        );
+      }
     } catch (e) {
       console.error("[profil] aperçu du nouveau barème impossible :", e);
       apercuIndisponible = true;
@@ -392,6 +417,12 @@ export default async function Profil() {
       </section>
 
       {apercu ? <SectionNouveauBareme apercu={apercu} sansCv={profil.origine === "defaut"} plafond={profil.plafondNoteCalculee} /> : null}
+      {metiersRetenus !== null ? (
+        <section className="carte-info">
+          <h2>Tes métiers</h2>
+          <ReglageMetiers metiersInitiaux={metiersRetenus} proposition={proposition} />
+        </section>
+      ) : null}
       {apercuIndisponible ? (
         <section className="carte-info">
           <h2>Nouveau barème</h2>
