@@ -64,6 +64,13 @@ export interface SignauxEmployeur {
   dureeFermeeMedianeJours: number | null;
   /** Fermées qui ont une durée (ligne de journal) : l'assise de la médiane. */
   fermeesObservees: number;
+  /** Offres (une annonce comptée une fois) que la veille a observées au moins une fois : l'assise du dossier (JobAI#161). */
+  offresObservees: number;
+  /**
+   * Le dernier jour (AAAA-MM-JJ) où un balayage a vu une offre de cet employeur, ou `null` si la veille n'en a vu aucune.
+   * C'est la DATE que citent les lignes du dossier : ce qu'on sait de l'employeur s'arrête là.
+   */
+  observeLe: string | null;
   /** Somme, sur chaque intitulé repris, de (fois − 1) : les offres « en plus ». */
   intitulesReprisTotal: number;
   /** Les intitulés repris les plus fréquents (au plus `MAX_INTITULES_REPRIS`). */
@@ -116,6 +123,11 @@ export function signauxDe(offres: readonly Offre[], journal: Readonly<JournalVei
 
   const joursFermees = fermees.map(duree).filter((d): d is NonNullable<typeof d> => d !== null);
 
+  const lignesVues = annonces.map((a) => a.copies.map((c) => journal[c.id]).filter((l) => l !== undefined));
+  const offresObservees = lignesVues.filter((l) => l.length > 0).length;
+  const dernieres = lignesVues.flat().map((l) => l!.derniereVue);
+  const observeLe = dernieres.length === 0 ? null : dernieres.reduce((x, y) => (x >= y ? x : y));
+
   const paquets = new Map<string, { intitule: string; fois: number }>();
   for (const o of suivies) {
     const cle = cleIntitule(o.poste);
@@ -136,6 +148,8 @@ export function signauxDe(offres: readonly Offre[], journal: Readonly<JournalVei
     dureeFermeeMedianeJours:
       joursFermees.length >= MINIMUM_FERMEES_MEDIANE ? mediane(joursFermees.map((d) => d.jours)) : null,
     fermeesObservees: joursFermees.length,
+    offresObservees,
+    observeLe,
     intitulesReprisTotal: repris.reduce((n, p) => n + p.fois - 1, 0),
     intitulesRepris: repris.slice(0, MAX_INTITULES_REPRIS),
   };
