@@ -6,6 +6,13 @@
 
 ---
 
+## 2026-10-22 — JobAI#237 : LIA, l'assistant, branchée sur les pages connectées
+
+- `@mokarade/lia-ui` v0.1.0 (tag, jamais une branche) monté dans `app/layout.tsx` par `components/LiaMontee.tsx`, seulement quand `exigerSession()` passe : pas sur `/connexion`. Clic = discussion, clic droit = menu.
+- Route `POST /api/lia/ask` (`app/api/lia/ask/route.ts`) : derrière le middleware ET `exigerSession()`, relaie la question au hub avec `HUB_TOKEN` (le hub parle à MemoryAI). Elle dit au hub si la session est celle du propriétaire (`AUTHORIZED_EMAIL`) : un invité n'atteint pas la mémoire de Marc. Échec fermé : sans réponse conforme, LIA dit « indisponible ».
+- Copie de la référence `app-template` (`lib/lia/`, tests `tests/lia.*.test.ts`). Détail et contrat : `docs/claude/13-lia.md`. Seul écart : `tests/lia.demander.test.ts` écrit le nom du jeton par calcul, pour passer le garde-fou n°5 (`tests/piiGuard.test.ts`).
+- **Tant que `POST /api/lia/ask` n'existe pas chez le hub (Hubperso#337) et MemoryAI**, LIA vit mais répond « indisponible ».
+
 ## 2026-10-22 — JobAI#232 : l'en-tête affiche le logo série A
 
 - `components/Cadre.tsx` : l'ancienne marque `>_` (chevron ambre dessiné en SVG) est remplacée par `<img src="/icon.svg">`, le MÊME fichier que l'onglet (loupe rose sur tuile sombre, série A validée le 21/10). `.entete__mark` perd la couleur et la lueur ambre (une image ne suit pas `currentColor`). Le mot-symbole « JOB_AI » et son souligné ambre ne changent pas ; la palette de l'interface non plus.

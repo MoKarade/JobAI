@@ -27,5 +27,5 @@
 - Commits, code, docs et UI en français ; commit préfixé par l'ID du backlog (`[V1-03] …`). Pas d'emoji dans l'UI ni les commits.
 
 ## Pour aller plus loin (à lire seulement si nécessaire)
-- Anciens titres -> chemins : `docs/correspondance.md`. Sections : `docs/claude/` (`01-principes`, `02-conventions`, `03-workflow-git`, `04-commandes`, `05-verifications`, `06-deploiement`, `07-hub`, `08-documentation`, `10-style-compte-rendu`, `11-protocole`, `12-graphe-code` : graphe de code, hooks et MCP `graphify` posés, 0 jeton ; `scripts/graphe.sh query|affected|path|explain` avant de grepper).
+- Anciens titres -> chemins : `docs/correspondance.md`. Sections : `docs/claude/` (`01-principes`, `02-conventions`, `03-workflow-git`, `04-commandes`, `05-verifications`, `06-deploiement`, `07-hub`, `08-documentation`, `10-style-compte-rendu`, `11-protocole`, `13-lia` : assistant LIA, `12-graphe-code` : graphe de code, hooks et MCP `graphify` posés, 0 jeton ; `scripts/graphe.sh query|affected|path|explain` avant de grepper).
 - Leçons apprises (175 règles durables) : `docs/claude/lecons.md` ; leurs histoires : `docs/LESSONS.md`. Compte-rendu : `docs/COMPTE-RENDU.md`.
