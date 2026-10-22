@@ -17,9 +17,11 @@ JobAI#107 lit les courriels reçus de Marc. Un courriel de recruteur dit souvent
 7. **Les abstentions sont un résultat.** Le bilan compte chaque courriel écarté avec sa raison (`sans-signal`, `sens-incertain`, `aucune-offre`, `plusieurs-offres`, `deja-a-jour`, `courriel-plus-recent`) : c'est ce compte, relu sur de vrais courriels, qui dit si les phrases-clés sont trop étroites ou trop larges.
 8. **Sans accès Gmail, l'outil le dit** (état nommé + étape à faire, JobAI#201) au lieu de rendre une liste vide : « pas d'accès » ≠ « aucune réponse ».
 
-## Mesure sur courriels réels : **à faire** (attend JobAI#201)
+## Mesure sur courriels réels : 2026-10-22
 
-Avant le client OAuth de Marc, aucun vrai courriel n'est lisible : cette ADR ne prétend à aucune précision mesurée. Protocole une fois l'accès ouvert : appeler `propositions_statut` (`jours` 60, `max` 50) ; Marc juge chaque proposition (juste / fausse) et chaque abstention `sens-incertain` ou `plusieurs-offres` (à tort / à raison) ; on consigne ici les comptes. Seuil visé : **aucune proposition fausse** sur l'échantillon ; une proposition fausse corrige la règle avant tout usage par l'écran (JobAI#219). Un modèle ne s'ajoute que si la mesure montre des abstentions à tort nombreuses, dans le repère de 20 $/mois.
+Accès Gmail ouvert par Marc le 2026-10-21 (JobAI#201). `propositions_statut` appelé en production le 2026-10-22 (`jours` 60, `max` 50) : **4 courriels lus** (boîte de réception, 60 jours, sans promotions, réseaux sociaux ni forums), **0 proposition**, **4 `sans-signal`**, 0 `sens-incertain`, 0 `aucune-offre`, 0 `plusieurs-offres`, 0 `deja-a-jour`. Aucune offre n'a été modifiée.
+
+Ce que ce résultat dit : aucun des 4 courriels ne porte de phrase-clé de réponse de recruteur, donc rien n'a été proposé à tort (précision : aucune proposition fausse, sur zéro proposition). Ce qu'il ne dit pas : le rappel (les réponses manquées) n'est pas mesurable sans réponse réelle dans la boîte, et 4 courriels ne suffisent pas à juger les phrases-clés. La mesure se refait à la première réponse de recruteur reçue : Marc juge chaque proposition (juste / fausse) et chaque abstention `sens-incertain` ou `plusieurs-offres` (à tort / à raison), et on consigne les comptes ici. Seuil visé : **aucune proposition fausse** ; une proposition fausse corrige la règle avant tout usage par l'écran (JobAI#219). Un modèle ne s'ajoute que si la mesure montre des abstentions à tort nombreuses, dans le repère de 20 $/mois.
 
 ## Limites connues [Probable]
 
