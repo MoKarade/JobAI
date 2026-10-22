@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-64 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+65 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -59,6 +59,7 @@
 - [ADR-0040 — Une distance approchée par le début du code postal, dite approchée partout](adr/0040-une-distance-approchee-par-le-debut-du-code-postal.md) — `docs/adr/0040-une-distance-approchee-par-le-debut-du-code-postal.md`
 - [ADR-0041 — Gmail en lecture seule : un client OAuth propre à JobAI, un jeton chiffré, échec fermé](adr/0041-gmail-en-lecture-seule-echec-ferme.md) — `docs/adr/0041-gmail-en-lecture-seule-echec-ferme.md`
 - [ADR-0042 — Proposer un statut depuis un courriel de recruteur : des mots-clés, une offre ou rien, jamais d'écriture](adr/0042-proposer-un-statut-depuis-un-courriel.md) — `docs/adr/0042-proposer-un-statut-depuis-un-courriel.md`
+- [ADR-0043 — Les réponses de recruteurs se confirment d'un geste sur l'accueil](adr/0043-les-reponses-de-recruteurs-se-confirment-sur-l-accueil.md) — `docs/adr/0043-les-reponses-de-recruteurs-se-confirment-sur-l-accueil.md`
 - [Décisions d'architecture (ADR)](adr/README.md) — `docs/adr/README.md`
 
 ## docs/claude/

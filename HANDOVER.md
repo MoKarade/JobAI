@@ -6,6 +6,13 @@
 
 ---
 
+## 2026-10-22 — JobAI#219 : les réponses de recruteurs se confirment sur l'accueil (ADR-0043)
+
+- Nouveau bloc `components/ReponsesRecruteurs.tsx` : offre, statut actuel, statut proposé, phrase du courriel, deux gestes (« Confirmer », « Écarter », 48 px). N'apparaît que s'il y a quelque chose à confirmer.
+- « Confirmer » écrit le statut gardé par le serveur via `modifierOffre` (`lib/actionsReponses.ts`) ; « Écarter » n'écrit rien dans le suivi. L'état vit dans `sync_state` (`gmail-propositions`, `gmail-traitees`, `gmail-passe`) : pas de migration.
+- Gmail n'est jamais lu pour afficher : la relecture part dans `after()`, au plus toutes les 15 min (`lib/gmail/reponsesStore.ts`).
+- **Preuve en production en attente de la première réponse de recruteur** : la boîte n'en contient aucune sur 60 jours (ADR-0042).
+
 ## 2026-10-21 — JobAI#218 : proposer un statut depuis un courriel de recruteur (ADR-0042)
 
 - Nouveaux `lib/gmail/rapprochement.ts` (courriel → UNE offre ou aucune) et `lib/gmail/proposition.ts` (phrases-clés FR/EN → statut proposé), purs, sans modèle.
