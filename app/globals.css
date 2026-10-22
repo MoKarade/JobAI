@@ -666,17 +666,13 @@ code {
   align-self: flex-start;
 }
 .entete__marque:focus-visible { outline: 2px solid var(--ambre); outline-offset: 3px; }
-/* Le chevron prend l'ambre, comme le souligné du mot-symbole : c'est le MÊME signe. */
-/* Le chevron de marque LUIT (maquette validée). C'est le seul endroit de l'app où
-   l'ambre rayonne au lieu de simplement colorer : c'est la signature, et elle ne se
-   répète nulle part ailleurs. En clair la lueur s'aperçoit à peine — c'est voulu,
-   c'est sur le charbon qu'elle prend son sens. */
+/* Le logo série A (`/icon.svg`, loupe rose sur tuile sombre) : une image, donc il ne suit
+   plus la couleur du texte. Le souligné du mot-symbole reste ambre. */
 .entete__mark {
-  width: 1.15em;
-  height: 1.15em;
-  color: var(--ambre);
+  width: 1.7em;
+  height: 1.7em;
+  border-radius: 22%;
   flex: none;
-  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--ambre) 55%, transparent));
 }
 .entete__accent { color: var(--ambre); }
 

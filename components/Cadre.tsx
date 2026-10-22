@@ -51,27 +51,11 @@ export function Cadre({
     <div className={`page${pleinEcran ? " page--pleine" : ""}`}>
       <header className="entete">
         <Link href="/" className="entete__marque">
-          {/* Le même motif que `app/icon.svg` : l'invite `>_`. Ici il est DESSINÉ plutôt
-              qu'importé, pour suivre la couleur du texte au survol — une image figée
-              resterait ambre là où l'encre change.
-              `aria-hidden` : le texte « JOB_AI » juste à côté donne déjà le nom du lien. */}
-          <svg
-            className="entete__mark"
-            viewBox="0 0 32 32"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <g
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M9 10.5 L14.5 16 L9 21.5" />
-              <path d="M18.5 22.5 L24 22.5" />
-            </g>
-          </svg>
+          {/* Le logo série A, le MÊME fichier que l'onglet (`app/icon.svg`) : la loupe sur une
+              offre et l'étincelle IA. `aria-hidden` : le texte « JOB_AI » juste à côté donne
+              déjà le nom du lien. */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- SVG statique de 2 Ko, rien à optimiser */}
+          <img className="entete__mark" src="/icon.svg" alt="" width={28} height={28} aria-hidden="true" />
           <span>
             JOB<span className="entete__accent">_</span>AI
           </span>
