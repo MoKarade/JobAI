@@ -11,7 +11,7 @@
 - Nouveaux `lib/gmail/rapprochement.ts` (courriel → UNE offre ou aucune) et `lib/gmail/proposition.ts` (phrases-clés FR/EN → statut proposé), purs, sans modèle.
   Nouvel outil MCP `propositions_statut` (lecture seule) : propositions avec la phrase source, abstentions comptées par raison. Aucun statut n'est écrit (garde-fou n°2).
 - `lib/gmail/acces.ts` porte la chaîne de l'échec fermé, partagée par `/api/gmail/courriels` et l'outil. Sans accès Gmail, l'outil rend l'étape à faire (JobAI#201).
-- **Mesure sur courriels réels : à faire** (attend le client OAuth de Marc, JobAI#201) ; le protocole est dans l'ADR-0042. Tâche en preuve attendue d'ici là.
+- **Mesure sur courriels réels (2026-10-22)** : 4 courriels lus, 0 proposition, 4 sans signal ; aucune réponse de recruteur dans la boîte sur 60 jours, donc rappel non mesurable. À refaire à la première réponse reçue (protocole dans l'ADR-0042).
 
 ## 2026-10-21 — JobAI#107 : Gmail en lecture seule, échec fermé (ADR-0041)
 
