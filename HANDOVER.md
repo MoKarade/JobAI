@@ -6,6 +6,11 @@
 
 ---
 
+## 2026-10-22 — JobAI#232 : l'en-tête affiche le logo série A
+
+- `components/Cadre.tsx` : l'ancienne marque `>_` (chevron ambre dessiné en SVG) est remplacée par `<img src="/icon.svg">`, le MÊME fichier que l'onglet (loupe rose sur tuile sombre, série A validée le 21/10). `.entete__mark` perd la couleur et la lueur ambre (une image ne suit pas `currentColor`). Le mot-symbole « JOB_AI » et son souligné ambre ne changent pas ; la palette de l'interface non plus.
+- Le service worker ne met rien en cache : le changement est visible au prochain chargement. Icône d'installation déjà posée : Android et PC se rafraîchissent seuls en quelques jours ; iPhone, retirer l'icône de l'écran d'accueil puis la rajouter.
+
 ## 2026-10-22 — JobAI#211 : mesure de la lecture de l'annonce (ADR-0039)
 
 - Section « Mesure du 2026-10-22 » de l'ADR-0039 : 24 offres lues en production, tableau note enregistrée / rôle mots-clés / rôle modèle / adéquation. Accord de rôle 3/24, corrélation de rang 0,25, coût Haiku 5.5 mesuré à 0,00027 $ l'appel (1,7 fois l'estimation).
