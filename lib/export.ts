@@ -33,7 +33,7 @@ const COLONNES = [
   "Ma note",
 ] as const;
 
-const LIBELLE_STATUT: Record<Offre["statut"], string> = {
+export const LIBELLE_STATUT: Record<Offre["statut"], string> = {
   Identifiee: "Identifiée",
   CVenvoye: "CV envoyé",
   Relance: "Relance faite",

@@ -2436,6 +2436,71 @@ a.carte__entreprise:focus-visible { outline: 2px solid var(--ambre); outline-off
   margin-top: 10px;
 }
 
+/* Les réponses de recruteurs repérées dans Gmail (JobAI#219) : une liste de gestes à faire, même trame que les relances. Les deux boutons
+   gardent la hauteur tactile du socle (--touche, 48 px, au-dessus des 44 px exigés) ; `.bouton` porte une marge haute de formulaire qu'on retire ici. */
+.reponses {
+  margin: 24px 0;
+  padding: 16px 18px;
+  border-radius: var(--r-carte);
+  background: var(--surface);
+  border: var(--trait-surface);
+}
+.reponses__titre {
+  margin: 0 0 4px;
+  font-size: var(--t-m);
+}
+.reponses__resume {
+  margin: 0;
+  font-size: var(--t-s);
+  color: var(--texte-doux);
+}
+.reponses__liste {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+.reponses__item {
+  display: grid;
+  gap: 4px;
+  padding-left: 10px;
+  border-left: 2px solid var(--bordure);
+}
+.reponses__lien {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touche);
+  font-weight: 600;
+  font-size: var(--t-s);
+}
+.reponses__statuts,
+.reponses__source {
+  margin: 0;
+  font-size: var(--t-2xs);
+  color: var(--texte-doux);
+}
+.reponses__phrase {
+  margin: 4px 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--bordure);
+  font-size: var(--t-s);
+}
+.reponses__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.reponses__actions .bouton {
+  margin-top: 0;
+}
+.reponses__erreur {
+  margin: 4px 0 0;
+  font-size: var(--t-s);
+  color: var(--erreur-texte);
+}
+
 /* Les outils de la carte : agrandir, et le renvoi au trafic. Même allure que les filtres —
    ce sont des contrôles de la même famille, ils n'ont pas à s'inventer un style. */
 .carte-outils {

@@ -33,6 +33,8 @@ import { Relances } from "@/components/Relances";
 import { BandeauResume } from "@/components/BandeauResume";
 import { Depliant } from "@/components/Depliant";
 import { Cadre } from "@/components/Cadre";
+import { ReponsesRecruteurs } from "@/components/ReponsesRecruteurs";
+import { actualiserSiPerime, lireReponsesAConfirmer } from "@/lib/gmail/reponsesStore";
 
 // Le suivi change à chaque geste de Marc : jamais de page mise en cache.
 export const dynamic = "force-dynamic";
@@ -134,6 +136,14 @@ export default async function Accueil() {
     });
   }
 
+  // Les réponses de recruteurs repérées dans Gmail (JobAI#219) : l'état GARDÉ seulement, jamais Gmail dans le chemin d'affichage. La
+  // relecture de la boîte part après la réponse, au plus une fois par quart d'heure ; hors connexion Gmail, rien n'est lu et le bloc se tait.
+  const reponses = offres === null || panne !== null ? [] : await lireReponsesAConfirmer(offres);
+  if (offres !== null && panne === null) {
+    const lues = offres;
+    after(() => actualiserSiPerime(lues, new Date()));
+  }
+
   return (
     <Cadre actif="/" titre="Suivi des offres">
       {panne === "schema-absent" ? (
@@ -216,6 +226,8 @@ export default async function Accueil() {
                 aRelancer={relances.aRelancer}
                 notees80Plus={suivi.notees80Plus}
               />
+
+              <ReponsesRecruteurs reponses={reponses} />
 
               {/* L'indice sur la ligne repliée est ce qui permet de NE PAS ouvrir : sans
                   lui, il faudrait déplier pour savoir s'il fallait déplier. */}
