@@ -98,10 +98,14 @@ Ce que les chiffres disent (24 offres, lus en production le 2026-10-22) :
   que prévu (environ 1 700 jetons en entrée par appel au lieu de 1 100). Pour les 6 541 offres : de l'ordre de **1,8 $ US une fois**,
   toujours sous le repère de 20 $/mois.
 
-**Ce que la mesure ne peut pas dire, et qui reste à Marc.** Le modèle a-t-il raison de placer le chef de projet en construction et le
-contremaître au-dessus du technicien noté 82 ? Seul Marc le sait, et il n'a encore rien tranché dans le suivi. Il juge donc quelques
-offres de ce tableau ; ses verdicts deviennent la vérité terrain, et l'ADR de l'entrée dans la note (JobAI#212) s'appuie dessus.
-Tant qu'ils manquent, **le plafond de 85 reste et la note n'est pas modifiée**.
+**Verdict de Marc (2026-10-22).** Sur les 5 offres du tableau qui divergent le plus (Fourgons Élite noté 82, Novik noté 73, Renovco, Verbois, Nordikeau), Marc répond « non » : il ne postulerait à aucune. Lecture : « non » vaut pour les cinq ; c'est une réponse d'un mot à une question sur cinq offres, à confirmer si elle devait se lire autrement [Probable].
+
+Ce que ça apprend, et ce que ça ne prouve pas :
+
+- **Les deux techniciens en tête de liste (82 et 73) sont refusés** : la note enregistrée met en haut des offres que Marc écarte. Ce que dit le modèle (adéquation 15 et 10) leur va mieux que la note.
+- **Les trois postes que le modèle juge les plus proches (adéquation 72 à 85) sont refusés aussi.** Ce sont des postes de coordination ou de supervision, mais en construction, en assemblage de meubles et en usine d'eau, loin de la robotique et de l'automatisation. La lecture d'aujourd'hui juge le **rôle** (coordination, technique), pas le **domaine** ; Marc écarte sur le domaine [Probable : une seule réponse, pas de raison donnée]. C'est le sujet du domaine gradué (ADR-0038, JobAI#151), qui attend encore ses gestes.
+- **Conséquence pour JobAI#212** : sur ces données, l'adéquation du modèle ne suffit pas pour faire entrer la lecture dans la note ni lever le plafond de 85. Ce qui ferait avancer : la lecture du modèle prise avec le domaine retenu (les 322 offres de métiers retenus), et des verdicts de Marc sur des offres de ces métiers. Tant que ça manque, **le plafond de 85 reste et la note n'est pas modifiée**.
+- Marc n'a dit « non » qu'à des offres que la mesure avait choisies pour leur écart : aucune réponse « oui » n'est encore connue. La vraie vérité terrain commence quand il tranche (postule ou écarte) des offres dans le suivi.
 
 ## Ce que cet ADR ne décide pas
 

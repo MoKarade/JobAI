@@ -9,7 +9,7 @@
 ## 2026-10-22 — JobAI#211 : mesure de la lecture de l'annonce (ADR-0039)
 
 - Section « Mesure du 2026-10-22 » de l'ADR-0039 : 24 offres lues en production, tableau note enregistrée / rôle mots-clés / rôle modèle / adéquation. Accord de rôle 3/24, corrélation de rang 0,25, coût Haiku 5.5 mesuré à 0,00027 $ l'appel (1,7 fois l'estimation).
-- **Vérité terrain absente** : le suivi ne contient aucune offre tranchée (6 541 « Identifiée »). Les écarts sont montrés à Marc, dont les verdicts servent de base à JobAI#212. Rien n'est modifié : le plafond de 85 reste.
+- **Vérité terrain absente** : le suivi ne contient aucune offre tranchée (6 541 « Identifiée »). Marc a répondu « non » aux 5 offres les plus divergentes (2 techniciens notés 82 et 73, 3 postes de coordination hors de son domaine) : la lecture juge le rôle, pas le domaine. L'adéquation seule ne suffit pas pour JobAI#212 ; rien n'est modifié, le plafond de 85 reste.
 - Une lecture sur 25 a échoué (raison de plus de 160 caractères, refusée par Zod) : à corriger en disant la limite dans la consigne, pas en l'acceptant.
 
 ## 2026-10-22 — JobAI#219 : les réponses de recruteurs se confirment sur l'accueil (ADR-0043)
