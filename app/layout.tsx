@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Manrope, DM_Mono } from "next/font/google";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { Analytics } from "@vercel/analytics/next";
+import LiaMontee from "@/components/LiaMontee";
+import { liaAutorisee } from "@/lib/lia/monter";
 import "./globals.css";
 
 /**
@@ -61,11 +63,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const lia = await liaAutorisee();
   return (
     <html lang="fr-CA" className={`${manrope.variable} ${dmMono.variable}`}>
       <body>
         {children}
+        {lia ? <LiaMontee /> : null}
         <ServiceWorker />
         <Analytics />
       </body>
