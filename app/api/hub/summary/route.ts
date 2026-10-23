@@ -16,6 +16,8 @@
 // 2026-10-22, une synchro Infisical a effacé celles du projet ; les reposer ne suffit pas, il
 // faut un nouveau déploiement (un push qui construit, jamais « Redeploy »). Tant que
 // HUB_TOKEN manque, cette route répond 503 : c'est le signal, pas une panne du code.
+// La synchro Infisical a de nouveau réécrit les variables Production le 2026-10-23 : même
+// règle, un nouveau déploiement après chaque réécriture (l'ancien reste le retour arrière).
 //
 // ⚠️ Cette route DOIT rester HORS du middleware d'authentification utilisateur : elle porte
 // sa propre auth par jeton. L'ajouter au matcher renverrait au hub une redirection HTML vers
