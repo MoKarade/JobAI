@@ -12,6 +12,11 @@
 //   panne en lisant l'état         → 200 + status "error", jamais un 500 muet : le hub sait
 //     alors afficher un widget honnête plutôt qu'un « injoignable » qui accuse le réseau.
 //
+// ⚠️ Variables d'environnement : Vercel les lit au BUILD/déploiement, pas à chaud. Le
+// 2026-10-22, une synchro Infisical a effacé celles du projet ; les reposer ne suffit pas, il
+// faut un nouveau déploiement (un push qui construit, jamais « Redeploy »). Tant que
+// HUB_TOKEN manque, cette route répond 503 : c'est le signal, pas une panne du code.
+//
 // ⚠️ Cette route DOIT rester HORS du middleware d'authentification utilisateur : elle porte
 // sa propre auth par jeton. L'ajouter au matcher renverrait au hub une redirection HTML vers
 // la page de connexion au lieu du JSON attendu — le widget afficherait « injoignable » en
