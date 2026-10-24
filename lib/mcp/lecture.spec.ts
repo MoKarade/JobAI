@@ -171,6 +171,14 @@ export interface EtatVeilleMcp {
    */
   plusVieilleVueJours: number | null;
   /**
+   * Combien de lignes du journal ont leur PREMIÈRE vue tel jour (AAAA-MM-JJ, jours triés). Aucun jour sans ligne n'est écrit,
+   * et `{}` veut dire « journal non lu », pas « rien vu ».
+   *
+   * Sert à lire d'où vient une durée : un pic un jour donné est un gros balayage, et les offres déjà là ce jour-là ont une
+   * durée tronquée par le balayage, pas par l'employeur (JobAI#261). Toutes les lignes comptent, périmées comprises.
+   */
+  premieresVuesParJour: Record<string, number>;
+  /**
    * L'âge à partir duquel la passe ferme d'office une offre jamais confirmée, en jours.
    *
    * ⚠️ `null` VEUT DIRE « LA RÈGLE NE TIRERA PAS », et c'est la seule chose qui distingue
@@ -221,6 +229,15 @@ export function resumerPourMcp(
   };
 }
 
+/** Les lignes du journal par jour de première vue, jours triés. PURE. */
+function premieresVuesParJour(journal: Readonly<Record<string, SuiviVeille>>): Record<string, number> {
+  const comptes = new Map<string, number>();
+  for (const ligne of Object.values(journal)) {
+    comptes.set(ligne.premiereVue, (comptes.get(ligne.premiereVue) ?? 0) + 1);
+  }
+  return Object.fromEntries([...comptes].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+}
+
 /** La partie « veille » du résumé. PURE. */
 function etatVeille(
   /**
@@ -240,6 +257,7 @@ function etatVeille(
     jamaisConfirmees: vivantes.length,
     ageJamaisConfirmees: { moins7: 0, de7a30: 0, de30a90: 0, plus90: 0 },
     plusVieilleVueJours: null,
+    premieresVuesParJour: {},
     seuilFermetureJours: null,
   };
   if (!veille) return vide;
@@ -269,6 +287,7 @@ function etatVeille(
     jamaisConfirmees: vivantes.length - confirmees,
     ageJamaisConfirmees: age,
     plusVieilleVueJours: plusVieille,
+    premieresVuesParJour: premieresVuesParJour(veille.journal),
     // Le MÊME appel que la passe, avec le MÊME plancher : deux calculs séparés finiraient
     // par annoncer un seuil que la passe n'applique pas.
     seuilFermetureJours: seuilFermetureJours(toutes, veille.journal, SEUIL_ABSENCES_PEREMPTION),
