@@ -6,6 +6,11 @@
 
 ---
 
+## 2026-10-24 — JobAI#261 : le dossier employeur ignore les premières vues des jours de balayage large
+
+- Mesure (JobAI#262, production, 8 995 lignes de journal) : 1 392 premières vues le 2026-08-20 et 4 550 le 2026-09-19, contre 1 à 226 les autres jours. Ces offres étaient déjà publiées : leur durée « depuis N jours » est tronquée.
+- `lib/signauxEmployeur.ts` : `joursDeBalayageLarge(journal)` (jour ≥ 10 fois la médiane quotidienne, au moins 7 jours au journal) ; `plusAncienneOuverteMesurable` ignore les offres dont la première vue tombe un de ces jours. Le facteur 10 est une supposition (ADR-0037, révision du 2026-10-24). Cause du pic du 09-19 non établie.
+
 ## 2026-10-24 — JobAI#262 : `resume_suivi` rend les premières vues du journal, jour par jour
 
 - Le bloc `veille` de `resume_suivi` gagne `premieresVuesParJour` : nombre de lignes du journal (périmées comprises) par jour de première vue, jours triés, `{}` sans journal. Lecture seule (`lib/mcp/lecture.spec.ts`).

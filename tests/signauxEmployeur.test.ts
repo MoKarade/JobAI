@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import {
   cleIntitule,
   debutDeLaVeille,
+  joursDeBalayageLarge,
   signauxDe,
   signauxParEmployeur,
   MINIMUM_FERMEES_MEDIANE,
@@ -135,6 +136,63 @@ describe("le premier jour de la veille", () => {
     expect(s.plusAncienneOuverte).toEqual({ jours: 57, repereeLe: "2026-08-20" });
     expect(s.plusAncienneOuverteMesurable).toEqual({ jours: 26, repereeLe: "2026-09-20" });
     expect(signauxDe([offre("a")], { a: vue("2026-08-20", "2026-10-16") }).plusAncienneOuverteMesurable).toBeNull();
+  });
+});
+
+describe("jours de balayage large (JobAI#261)", () => {
+  // Dix jours ordinaires de 3 lignes (médiane 3, seuil 30) et un jour de 40 lignes.
+  const journalAvecPic = (): JournalVeille => {
+    const j: JournalVeille = {};
+    for (let jour = 1; jour <= 10; jour++) {
+      for (let k = 0; k < 3; k++) j[`n${jour}-${k}`] = vue(`2026-09-${String(jour).padStart(2, "0")}`, "2026-10-16");
+    }
+    for (let k = 0; k < 40; k++) j[`pic${k}`] = vue("2026-09-20", "2026-10-16");
+    return j;
+  };
+
+  it("repère le jour où l'entrée est au moins dix fois la médiane quotidienne, et lui seul", () => {
+    expect([...joursDeBalayageLarge(journalAvecPic())]).toEqual(["2026-09-20"]);
+  });
+
+  it("le seuil est inclus : 30 lignes (10 fois la médiane de 3) font un jour large, 29 non", () => {
+    const avec = (n: number): JournalVeille => {
+      const j = journalAvecPic();
+      for (let k = n; k < 40; k++) delete j[`pic${k}`];
+      return j;
+    };
+    expect(joursDeBalayageLarge(avec(30)).has("2026-09-20")).toBe(true);
+    expect(joursDeBalayageLarge(avec(29)).size).toBe(0);
+  });
+
+  it("sept jours distincts suffisent pour dire ce qu'est un jour habituel", () => {
+    const j: JournalVeille = {};
+    for (let jour = 1; jour <= 6; jour++) j[`n${jour}`] = vue(`2026-09-0${jour}`, "2026-10-16");
+    for (let k = 0; k < 10; k++) j[`pic${k}`] = vue("2026-09-07", "2026-10-16");
+    expect([...joursDeBalayageLarge(j)]).toEqual(["2026-09-07"]);
+  });
+
+  it("ne dit rien d'un journal vide ou de moins de sept jours : on ne sait pas ce qu'est un jour habituel", () => {
+    expect(joursDeBalayageLarge({}).size).toBe(0);
+    const court: JournalVeille = {};
+    for (let jour = 1; jour <= 6; jour++) {
+      for (let k = 0; k < (jour === 6 ? 50 : 1); k++) court[`c${jour}-${k}`] = vue(`2026-09-0${jour}`, "2026-10-16");
+    }
+    expect(joursDeBalayageLarge(court).size).toBe(0);
+  });
+
+  it("⚠️ une offre première vue un jour de balayage large n'est pas « mesurable », même après le premier jour de la veille", () => {
+    const journal = { ...journalAvecPic(), o1: vue("2026-09-20", "2026-10-16"), o2: vue("2026-09-12", "2026-10-16") };
+    const seule = signauxDe([offre("o1", { poste: "A" })], journal);
+    expect(seule.plusAncienneOuverte).toEqual({ jours: 26, repereeLe: "2026-09-20" });
+    expect(seule.plusAncienneOuverteMesurable).toBeNull();
+    const avecOrdinaire = signauxDe([offre("o1", { poste: "A" }), offre("o2", { poste: "B" })], journal);
+    expect(avecOrdinaire.plusAncienneOuverteMesurable).toEqual({ jours: 34, repereeLe: "2026-09-12" });
+  });
+
+  it("signauxParEmployeur applique la même règle à chaque enseigne", () => {
+    const journal = { ...journalAvecPic(), o1: vue("2026-09-20", "2026-10-16") };
+    const r = signauxParEmployeur([offre("o1", { entreprise: "Chaîne Fictive" })], journal);
+    expect(Object.values(r)[0]?.plusAncienneOuverteMesurable).toBeNull();
   });
 });
 

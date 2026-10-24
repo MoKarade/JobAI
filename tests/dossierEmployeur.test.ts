@@ -102,7 +102,7 @@ describe("dossier d'un employeur — réglage du 2026-10-21 (relecture de Marc)"
     expect(d.lettre).toBe("A");
     expect(d.lignes.filter((l) => l.ton === "defavorable")).toHaveLength(0);
     const texte = d.lignes.map((l) => l.texte).join(" ");
-    expect(texte).toContain("déjà là au premier jour de la veille (2026-08-20)");
+    expect(texte).toContain("déjà là quand la veille les a vues pour la première fois");
     expect(texte).not.toContain("depuis au moins 62");
   });
 
