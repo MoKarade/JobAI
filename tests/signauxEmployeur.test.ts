@@ -154,12 +154,21 @@ describe("jours de balayage large (JobAI#261)", () => {
     expect([...joursDeBalayageLarge(journalAvecPic())]).toEqual(["2026-09-20"]);
   });
 
-  it("un jour juste sous le seuil n'est pas large", () => {
-    const j = journalAvecPic();
-    delete j["pic0"]; // 39 lignes sur 11 jours : la médiane reste 3, le seuil 30, le jour est encore large
-    expect(joursDeBalayageLarge(j).has("2026-09-20")).toBe(true);
-    for (let k = 1; k < 40; k++) if (k > 28) delete j[`pic${k}`]; // 29 lignes : sous le seuil
-    expect(joursDeBalayageLarge(j).size).toBe(0);
+  it("le seuil est inclus : 30 lignes (10 fois la médiane de 3) font un jour large, 29 non", () => {
+    const avec = (n: number): JournalVeille => {
+      const j = journalAvecPic();
+      for (let k = n; k < 40; k++) delete j[`pic${k}`];
+      return j;
+    };
+    expect(joursDeBalayageLarge(avec(30)).has("2026-09-20")).toBe(true);
+    expect(joursDeBalayageLarge(avec(29)).size).toBe(0);
+  });
+
+  it("sept jours distincts suffisent pour dire ce qu'est un jour habituel", () => {
+    const j: JournalVeille = {};
+    for (let jour = 1; jour <= 6; jour++) j[`n${jour}`] = vue(`2026-09-0${jour}`, "2026-10-16");
+    for (let k = 0; k < 10; k++) j[`pic${k}`] = vue("2026-09-07", "2026-10-16");
+    expect([...joursDeBalayageLarge(j)]).toEqual(["2026-09-07"]);
   });
 
   it("ne dit rien d'un journal vide ou de moins de sept jours : on ne sait pas ce qu'est un jour habituel", () => {
