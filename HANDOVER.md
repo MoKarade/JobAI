@@ -6,6 +6,10 @@
 
 ---
 
+## 2026-10-24 — JobAI#117 : `HUB_TOKEN` roté et `SENTRY_DSN` posé, build de prise en compte
+
+`HUB_TOKEN` de JobAI roté sur Vercel et `SENTRY_DSN` posé (autorisé par Marc le 24/10/2026, variables posées par le PC). Une variable Vercel ne s'applique qu'à un build neuf : la fusion de cette ligne le déclenche. À vérifier après le déploiement `READY` : le hub lit toujours `/api/hub/summary` de JobAI avec le nouveau jeton.
+
 ## 2026-10-24 — JobAI#261 : le dossier employeur ignore les premières vues des jours de balayage large
 
 - Mesure (JobAI#262, production, 8 995 lignes de journal) : 1 392 premières vues le 2026-08-20 et 4 550 le 2026-09-19, contre 1 à 226 les autres jours. Ces offres étaient déjà publiées : leur durée « depuis N jours » est tronquée.
