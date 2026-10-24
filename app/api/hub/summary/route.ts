@@ -18,6 +18,8 @@
 // HUB_TOKEN manque, cette route répond 503 : c'est le signal, pas une panne du code.
 // La synchro Infisical a de nouveau réécrit les variables Production le 2026-10-23 : même
 // règle, un nouveau déploiement après chaque réécriture (l'ancien reste le retour arrière).
+// 2026-10-24 : HUB_TOKEN roté et SENTRY_DSN posé (autorisé par Marc) : même règle, ce commit sert de
+// build de prise en compte (une PR qui ne touche que des .md ou des tests n'en lance aucun).
 //
 // ⚠️ Cette route DOIT rester HORS du middleware d'authentification utilisateur : elle porte
 // sa propre auth par jeton. L'ajouter au matcher renverrait au hub une redirection HTML vers
