@@ -59,6 +59,12 @@ aucun signal favorable n'existe, seule l'ABSENCE de signal défavorable, avec as
 - **Brancher le registre et le RENA maintenant** : sans date ni statut, la ligne ne pourrait pas citer sa source (exigence de la
   tâche), et accuser un homonyme à tort est le pire résultat possible.
 
+## Révision du 2026-10-24 — les jours de balayage large (JobAI#261)
+
+La révision du 2026-10-21 écartait les offres déjà là au « premier jour de la veille ». Relevé du PC et de Claude le 2026-10-24 : 4 lettres B sur 5 portaient encore « ouverte depuis au moins 65 jours (repérée le 2026-08-20) ». Mesure faite par `resume_suivi.veille.premieresVuesParJour` (JobAI#262), 8 995 lignes de journal sur 72 jours : **2026-08-20 = 1 392 lignes** et **2026-09-19 = 4 550 lignes**, contre 1 à 226 les autres jours (médiane de l'ordre de 30). Le premier lot réel du 2026-07-31 (46 lignes) est antérieur aux deux : « première vue après le premier jour de la veille » ne les écartait pas.
+
+Une offre « première vue » un jour de balayage large était très probablement déjà publiée : sa durée est tronquée par le balayage, pas par l'employeur. `joursDeBalayageLarge(journal)` repère ces jours dans le journal (un jour est large s'il compte au moins `FACTEUR_BALAYAGE_LARGE` = 10 fois la médiane des comptes quotidiens, avec au moins 7 jours distincts pour dire ce qu'est un jour habituel) ; `plusAncienneOuverteMesurable` ignore les offres dont la première vue tombe un de ces jours. Rien n'est écrit en dur, rien n'est écrit dans le suivi. [Supposition : le facteur 10 est un seuil de bon sens, non calibré ; il sépare nettement les deux pics du plus fort jour ordinaire (226), mais un balayage large de taille modeste passerait dessous.] Cause du pic du 2026-09-19 : non établie, hors de cette tâche.
+
 ## Risques
 
 - Les seuils (60 j, 45 j, 2 offres, 3 et 6 observées, et depuis la révision 10 offres pour l'embauche en continu) sont des

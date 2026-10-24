@@ -69,7 +69,8 @@ export function dossierEmployeur(signaux: SignauxEmployeur | null | undefined): 
 
   const date = signaux.observeLe;
   // ⚠️ SEULE UNE OFFRE DONT ON A VU L'APPARITION COMPTE (réglage de Marc, 2026-10-21). Une offre déjà ouverte au premier jour de la
-  // veille a une durée tronquée : « 62 jours » y veut dire « depuis qu'on regarde », et il touchait presque toutes les chaînes.
+  // veille a une durée tronquée : « 62 jours » y veut dire « depuis qu'on regarde », et il touchait presque toutes les chaînes. Il en
+  // va de même d'une offre dont la première vue tombe un jour de balayage large (JobAI#261).
   const ancienne = signaux.plusAncienneOuverteMesurable;
   const toutesDejaLa = ancienne === null && signaux.plusAncienneOuverte !== null;
   const longue = ancienne !== null && ancienne.jours >= SEUIL_OUVERTE_LONGUE_JOURS;
@@ -91,7 +92,7 @@ export function dossierEmployeur(signaux: SignauxEmployeur | null | undefined): 
         )
       : toutesDejaLa
         ? ligne(
-            `Les offres ouvertes étaient déjà là au premier jour de la veille (${signaux.debutVeille}) : on ne peut pas dire depuis quand elles le sont.`,
+            "Les offres ouvertes étaient déjà là quand la veille les a vues pour la première fois (premier jour de la veille ou balayage large) : on ne peut pas dire depuis quand elles le sont.",
             "neutre",
           )
         : ligne("Durée d'ouverture inconnue : aucune offre ouverte n'a été observée.", "neutre"),

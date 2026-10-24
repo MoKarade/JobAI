@@ -35,6 +35,16 @@ import type { JournalVeille } from "./veille";
 /** Effectif minimal d'offres FERMÉES pour qu'une médiane soit publiée. */
 export const MINIMUM_FERMEES_MEDIANE = 3;
 
+/**
+ * Un jour de BALAYAGE LARGE est un jour où le journal reçoit au moins ce multiple du nombre habituel de premières vues par jour
+ * (JobAI#261). [Supposition : 10 est un seuil de bon sens, non calibré ; mesuré le 2026-10-24, la médiane est de l'ordre de 30 par
+ * jour, les deux pics sont à 1 392 et 4 550 et le plus fort jour ordinaire à 226.]
+ */
+const FACTEUR_BALAYAGE_LARGE = 10;
+
+/** Nombre minimal de jours distincts au journal pour dire ce qu'est un jour habituel : en deçà, aucun jour n'est dit « large ». */
+const MINIMUM_JOURS_POUR_HABITUEL = 7;
+
 /** Combien d'intitulés repris l'écran montre au plus. */
 const MAX_INTITULES_REPRIS = 3;
 
@@ -59,7 +69,7 @@ export interface SignauxEmployeur {
   plusAncienneOuverte: { jours: number; repereeLe: string } | null;
   /**
    * La même, mais parmi les offres ouvertes dont on a VU l'apparition : celles dont la première vue tombe APRÈS le premier jour de la
-   * veille. Une offre déjà là ce jour-là a une durée tronquée (« depuis qu'on regarde », pas « depuis qu'elle existe ») : elle ne
+   * veille ET un jour qui n'est pas de balayage large (`joursDeBalayageLarge`, JobAI#261). Une offre déjà là ce jour-là a une durée tronquée (« depuis qu'on regarde », pas « depuis qu'elle existe ») : elle ne
    * prouve rien sur l'employeur (JobAI#161, réglage du 2026-10-21 demandé par Marc). `null` si aucune n'en remplit la condition.
    */
   plusAncienneOuverteMesurable: { jours: number; repereeLe: string } | null;
@@ -117,15 +127,37 @@ export function debutDeLaVeille(journal: Readonly<JournalVeille>): string | null
 }
 
 /**
+ * Les jours (AAAA-MM-JJ) où un balayage LARGE a fait entrer d'un coup bien plus d'offres que d'habitude. PURE.
+ *
+ * ⚠️ UNE OFFRE « PREMIÈRE VUE » UN JOUR DE BALAYAGE LARGE ÉTAIT TRÈS PROBABLEMENT DÉJÀ PUBLIÉE : sa durée est tronquée par le balayage,
+ * pas par l'employeur (JobAI#261). Mesuré le 2026-10-24 (`resume_suivi.veille.premieresVuesParJour`) : 1 392 lignes le 2026-08-20 et
+ * 4 550 le 2026-09-19, contre 1 à 226 les autres jours. Un seul « premier jour de la veille » ne les écartait pas, puisque le premier
+ * lot réel du 2026-07-31 leur est antérieur.
+ *
+ * Tiré du journal, jamais récité : un jour est large s'il compte au moins `FACTEUR_BALAYAGE_LARGE` fois la médiane des comptes
+ * quotidiens. Sous `MINIMUM_JOURS_POUR_HABITUEL` jours distincts, on ne sait pas ce qu'est un jour habituel : l'ensemble est vide.
+ */
+export function joursDeBalayageLarge(journal: Readonly<JournalVeille>): ReadonlySet<string> {
+  const parJour = new Map<string, number>();
+  for (const ligne of Object.values(journal)) {
+    parJour.set(ligne.premiereVue, (parJour.get(ligne.premiereVue) ?? 0) + 1);
+  }
+  if (parJour.size < MINIMUM_JOURS_POUR_HABITUEL) return new Set();
+  const seuil = mediane([...parJour.values()]) * FACTEUR_BALAYAGE_LARGE;
+  return new Set([...parJour].filter(([, n]) => n >= seuil).map(([jour]) => jour));
+}
+
+/**
  * Les signaux d'UN employeur, à partir de ses offres. PURE.
  *
- * `debutVeille` se calcule UNE fois pour tous les employeurs (`signauxParEmployeur`) : le relire du journal entier pour chacun
- * serait quadratique.
+ * `debutVeille` et `joursLarges` se calculent UNE fois pour tous les employeurs (`signauxParEmployeur`) : les relire du journal entier
+ * pour chacun serait quadratique.
  */
 export function signauxDe(
   offres: readonly Offre[],
   journal: Readonly<JournalVeille>,
   debutVeille: string | null = debutDeLaVeille(journal),
+  joursLarges: ReadonlySet<string> = joursDeBalayageLarge(journal),
 ): SignauxEmployeur {
   // Une annonce, une offre : la représentante compte, ses copies lui prêtent leurs lignes de journal.
   const annonces = copiesParAnnonce(offres.filter((o) => !o.histo)).map((copies) => ({
@@ -153,8 +185,9 @@ export function signauxDe(
     if (plusAncienneOuverte === null || d.jours > plusAncienneOuverte.jours) {
       plusAncienneOuverte = { jours: d.jours, repereeLe: d.premiereVue };
     }
-    // Vue apparaître seulement si sa première vue est POSTÉRIEURE au premier jour de la veille (sinon durée tronquée).
-    const apparitionVue = debutVeille !== null && d.premiereVue > debutVeille;
+    // Vue apparaître seulement si sa première vue est POSTÉRIEURE au premier jour de la veille ET ne tombe pas un jour de balayage
+    // large (sinon durée tronquée, JobAI#261).
+    const apparitionVue = debutVeille !== null && d.premiereVue > debutVeille && !joursLarges.has(d.premiereVue);
     if (apparitionVue && (plusAncienneOuverteMesurable === null || d.jours > plusAncienneOuverteMesurable.jours)) {
       plusAncienneOuverteMesurable = { jours: d.jours, repereeLe: d.premiereVue };
     }
@@ -217,8 +250,9 @@ export function signauxParEmployeur(
   }
   const resultat: Record<string, SignauxEmployeur> = {};
   const debutVeille = debutDeLaVeille(journal);
+  const joursLarges = joursDeBalayageLarge(journal);
   for (const [cle, liste] of groupes) {
-    const s = signauxDe(liste, journal, debutVeille);
+    const s = signauxDe(liste, journal, debutVeille, joursLarges);
     if (s.offres > 0) resultat[cle] = s;
   }
   return resultat;
