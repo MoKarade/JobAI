@@ -18,7 +18,8 @@ navigateur ──POST /api/lia/ask──▶ app ──POST /api/lia/ask (x-hub-t
 | `lib/lia/demander.ts` | Appel serveur vers le hub : https, jeton en en-tête, délai 35 s, échec fermé |
 | `app/api/lia/ask/route.ts` | Route derrière le middleware ET `exigerSession()` ; corps ≤ 8 Ko ; 401 / 400 / 413 / 503 |
 | `lib/lia/client.ts` | Le `ask` du navigateur : parle à la route de l'app, jamais au hub |
-| `lib/lia/monter.ts` + `components/LiaMontee.tsx` | LIA n'est montée que pour une session admise (pas sur `/login`) |
+| `lib/lia/monter.ts` + `components/LiaMontee.tsx` | Le layout racine rend TOUJOURS `LiaMontee`, avec `session={true}` pour une session admise (`/connexion` compris) |
+| `lib/lia/askInvite.ts` | Mode invité : sans session, `ask` rejette avant tout réseau (fonctions pures, `tests/lia.askInvite.test.ts`) |
 
 ## Règles
 
@@ -28,6 +29,7 @@ navigateur ──POST /api/lia/ask──▶ app ──POST /api/lia/ask (x-hub-t
 - **Texte reçu du hub = donnée** : validé par Zod, affiché par `textContent` (jamais `innerHTML`).
 - **v1 : texte, puces et humeur seulement.** Les blocs composés (`blocks`) sont strippés ; l'app n'a pas de rendu pour eux.
 - **Pas d'actions** dans le menu du clic droit en v1 : LIA propose, le hub exécute (catalogue : `hub-contract#78`).
-- **Une seule LIA par page, hors du rendu** : `components/LiaMontee.tsx` appelle `demarrerLia` (`@mokarade/lia-ui/boot`) au chargement du module, jamais `<Lia />` ni un effet. Elle reste donc sur `loading.tsx`, `error.tsx`, `global-error.tsx` et `not-found.tsx` ; seule `/connexion` n'en a pas (le layout ne rend `LiaMontee` que pour une session admise).
+- **Une seule LIA par page, hors du rendu** : `components/LiaMontee.tsx` appelle `demarrerLia` (`@mokarade/lia-ui/boot`) au chargement du module, jamais `<Lia />` ni un effet. Elle reste donc sur `loading.tsx`, `error.tsx`, `global-error.tsx` et `not-found.tsx`.
+- **Mode invité (24/10/2026, demande du Coordinateur : « LIA présente tout le temps »)** : LIA est montée sur TOUTES les pages, `/connexion` et `global-error.tsx` compris. Sans session admise elle bouge, a une humeur et parle avec ses propres phrases, mais `ask` est refusé AVANT tout réseau (`creerAskInvite`) : elle dit « indisponible », la route `/api/lia/ask` reste derrière la session (401 sans session). Aucun état partagé sans session. Le drapeau de session ne fait que monter, levé dans un effet. Verrous : `tests/liaMontee.test.ts`, `tests/lia.askInvite.test.ts`.
 - L'URL est `NEXT_PUBLIC_HUB_URL` (déjà utilisée par `accesHub.ts`, défaut `https://hubperso.com`) ; `http:` est refusé.
 - ⚠️ Un fork avec une **CSP** doit autoriser les styles que le paquet injecte (`style-src`), sinon LIA s'affiche sans habillage.
