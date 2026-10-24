@@ -6,6 +6,11 @@
 
 ---
 
+## 2026-10-24 — JobAI#262 : `resume_suivi` rend les premières vues du journal, jour par jour
+
+- Le bloc `veille` de `resume_suivi` gagne `premieresVuesParJour` : nombre de lignes du journal (périmées comprises) par jour de première vue, jours triés, `{}` sans journal. Lecture seule (`lib/mcp/lecture.spec.ts`).
+- Raison : mesurer JobAI#261 (le début de la veille du dossier employeur, 2026-07-31, est-il faussé par un premier gros balayage ?). Indices avant mesure, sans valeur de preuve : `veille-flux-mode` écrit le 2026-08-20 13:57 UTC, `veille-rayon` le 2026-08-20 13:11 UTC (`etat_synchro`). La répartition lue en production est écrite dans JobAI#261.
+
 ## 2026-10-22 — JobAI#237 : LIA, l'assistant, branchée sur les pages connectées
 
 - `@mokarade/lia-ui` v0.28.0 (tag, jamais une branche ; options du hub : `quandMouvementReduit="complet"`, pastille d'humeur du paquet visible, aucune pastille maison ; elle suit le curseur et le défilement et vit comme dans la maquette, sans parole spontanée tant que l'app ne branche pas `onSpontane`) démarrée hors du rendu par `demarrerLia` (`@mokarade/lia-ui/boot`, appelé au chargement de `components/LiaMontee.tsx`, importé par `app/layout.tsx`) : elle reste sur le chargement, les erreurs et la 404 ; montée sur toutes les pages, `/connexion` et `global-error` compris (24/10/2026, JobAI#259) : en mode invité, sans session admise (`exigerSession()`), elle bouge et parle mais son `ask` refuse avant tout réseau (`lib/lia/askInvite.ts`). Clic = discussion, clic droit = menu.

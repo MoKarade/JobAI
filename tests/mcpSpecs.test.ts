@@ -242,6 +242,27 @@ describe("resumerPourMcp — ce que la veille a confirmé, et ce qu'elle n'a jam
     expect(r.veille.plusVieilleVueJours).toBe(2);
   });
 
+  it("compte les lignes du journal par jour de première vue, jours triés, périmées comprises (JobAI#262)", () => {
+    const ligne = (premiereVue: string) => ({ premiereVue, derniereVue: "2026-09-13", absences: 0 });
+    const r = resumerPourMcp([offre({ id: "a" })], {
+      journal: {
+        a: ligne("2026-08-20"),
+        b: ligne("2026-07-31"),
+        c: ligne("2026-08-20"),
+        d: ligne("2026-08-20"),
+      },
+      aujourdhui: JOUR,
+    });
+    // `b`, `c` et `d` ne sont pas dans les offres : le journal garde aussi les périmées, et elles comptent.
+    expect(r.veille.premieresVuesParJour).toEqual({ "2026-07-31": 1, "2026-08-20": 3 });
+    expect(Object.keys(r.veille.premieresVuesParJour)).toEqual(["2026-07-31", "2026-08-20"]);
+  });
+
+  it("rend `{}` — pas un jour inventé — sans journal ou avec un journal vide", () => {
+    expect(resumerPourMcp([offre({ id: "a" })]).veille.premieresVuesParJour).toEqual({});
+    expect(resumerPourMcp([offre({ id: "a" })], { journal: {}, aujourdhui: JOUR }).veille.premieresVuesParJour).toEqual({});
+  });
+
   it("répartit les jamais confirmées par âge, parce qu'un compte seul ne dit pas s'il faut agir", () => {
     const r = resumerPourMcp(
       [
