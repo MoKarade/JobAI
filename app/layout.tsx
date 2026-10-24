@@ -69,7 +69,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="fr-CA" className={`${manrope.variable} ${dmMono.variable}`}>
       <body>
         {children}
-        {lia ? <LiaMontee /> : null}
+        <LiaMontee session={lia} />
         <ServiceWorker />
         <Analytics />
       </body>

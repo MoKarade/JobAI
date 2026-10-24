@@ -1,4 +1,5 @@
-// lib/lia/monter.ts — LIA n'apparaît que pour une session admise (pas sur /login).
+// lib/lia/monter.ts — dit si la session est admise. LIA est montée partout ; ce booléen la fait passer
+// du mode invité (sans question possible, voir askInvite.ts) au mode connecté.
 
 import { NonAutorise, exigerSession } from "@/lib/session";
 

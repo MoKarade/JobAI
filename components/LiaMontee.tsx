@@ -6,11 +6,16 @@
 // ⚠️ Elle est démarrée AU CHARGEMENT DU MODULE, jamais dans un effet ni dans le rendu : `demarrerLia` la pose dans
 // `document.body`, hors de l'arbre React, donc elle reste là pendant un chargement (`loading.tsx`), sur une erreur
 // (`error.tsx`, `global-error.tsx`) et sur une 404. Une seule voie : ne jamais remonter `<Lia />` ailleurs.
-// Le layout ne rend ce module que pour une session admise (`liaAutorisee`) : pas de LIA sur `/connexion`,
-// où `/api/lia/ask` répondrait 401.
+// Mode invité (24/10/2026, demande du Coordinateur : « LIA présente tout le temps ») : le layout et `global-error.tsx` la montent
+// aussi sans session, `/connexion` compris. Son `ask` ne part alors pas sur le réseau (lib/lia/askInvite.ts) ;
+// le layout dit si la session est admise, ce qui ouvre `ask` vers `/api/lia/ask` (toujours derrière la session).
 
 import { demarrerLia } from "@mokarade/lia-ui/boot";
+import { useEffect } from "react";
+import { creerAskInvite, creerIndicateurSession } from "@/lib/lia/askInvite";
 import { demanderLia } from "@/lib/lia/client";
+
+const session = creerIndicateurSession();
 
 // Mêmes options que le hub : LIA identique partout, même quand le système réduit les animations
 // (`quandMouvementReduit`), et la pastille d'humeur est celle du paquet (aucune pastille maison).
@@ -18,9 +23,13 @@ import { demanderLia } from "@/lib/lia/client";
 demarrerLia({
   quandMouvementReduit: "complet",
   humeurVisible: true,
-  ask: (question, signal) => demanderLia(question, signal, { page: window.location.pathname }),
+  ask: creerAskInvite(session, (question, signal) => demanderLia(question, signal, { page: window.location.pathname })),
 });
 
-export default function LiaMontee() {
+export default function LiaMontee({ session: admise = false }: { session?: boolean }) {
+  // Dans un effet (jamais au rendu) : le drapeau vit côté navigateur seulement, pas partagé entre requêtes serveur.
+  useEffect(() => {
+    if (admise) session.activer();
+  }, [admise]);
   return null;
 }
