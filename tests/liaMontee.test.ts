@@ -30,6 +30,12 @@ describe("LiaMontee : LIA présente tout le temps", () => {
     expect(source).toMatch(/if \(admise\) session\.activer\(\)/);
   });
 
+  it("l'état partagé passe par etatHttp, enveloppé pour l'invité, sans jeton ni en-tête écrit à la main", () => {
+    expect(source).toContain('import { etatHttp } from "@mokarade/lia-ui/etat-http"');
+    expect(source).toContain('creerEtatInvite(session, etatHttp("/api/lia/etat"))');
+    expect(source).not.toMatch(/HUB_TOKEN|x-hub-token|x-lia-proprietaire/i);
+  });
+
   it("garde les options du hub et aucune pastille maison", () => {
     expect(source).toContain('quandMouvementReduit: "complet"');
     expect(source).toContain("humeurVisible: true");

@@ -11,8 +11,9 @@
 // le layout dit si la session est admise, ce qui ouvre `ask` vers `/api/lia/ask` (toujours derrière la session).
 
 import { demarrerLia } from "@mokarade/lia-ui/boot";
+import { etatHttp } from "@mokarade/lia-ui/etat-http";
 import { useEffect } from "react";
-import { creerAskInvite, creerIndicateurSession } from "@/lib/lia/askInvite";
+import { creerAskInvite, creerEtatInvite, creerIndicateurSession } from "@/lib/lia/askInvite";
 import { demanderLia } from "@/lib/lia/client";
 
 const session = creerIndicateurSession();
@@ -24,6 +25,9 @@ demarrerLia({
   quandMouvementReduit: "complet",
   humeurVisible: true,
   ask: creerAskInvite(session, (question, signal) => demanderLia(question, signal, { page: window.location.pathname })),
+  // Une seule LIA, un seul état (Marc, 23/10/2026) : le même que celui du hub, relayé par la route de CETTE app (même origine,
+  // session de l'utilisateur, aucun jeton dans le navigateur). Un invité n'appelle rien : LIA garde son état local.
+  etat: creerEtatInvite(session, etatHttp("/api/lia/etat")),
 });
 
 export default function LiaMontee({ session: admise = false }: { session?: boolean }) {

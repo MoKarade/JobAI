@@ -67,7 +67,7 @@ describe("chemins publics", () => {
   });
 
   it("garde TOUT le reste, y compris les pages de données", () => {
-    for (const chemin of ["/", "/offres", "/api/offres", "/api/hub", "/api/hub/autre"]) {
+    for (const chemin of ["/", "/offres", "/api/offres", "/api/hub", "/api/hub/autre", "/api/lia/etat", "/api/lia/etat/x"]) {
       expect(estCheminPublic(chemin), `chemin ${chemin}`).toBe(false);
     }
   });

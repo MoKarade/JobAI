@@ -6,6 +6,13 @@
 
 ---
 
+## 2026-10-26 — JobAI#277 : LIA partage son état unique avec le hub, et sa discussion suit Marc
+
+- Avant : JobAI démarrait LIA sans l'option `etat` ; humeur, envies et discussion restaient locales au navigateur, donc différentes du hub. Marc, 23/10 : « une seule LIA, un seul état ».
+- Maintenant : `GET|PUT /api/lia/etat` (`app/api/lia/etat/route.ts`), derrière le middleware ET `exigerSession()`, relaie `/api/lia/etat` du hub avec le cookie de session de l'utilisateur (jamais `HUB_TOKEN`), comme BatchChef et CarAI (`lib/lia/etat.ts`, `etatHub.ts`, `hubCookie.ts`). `LiaMontee` passe `etat: creerEtatInvite(session, etatHttp("/api/lia/etat"))` : un invité n'appelle rien (mode invité inchangé), et la première lecture attend (3 s au plus) que la page dise si la session est admise, pour que la discussion d'une autre app se rouvre. Sans session, hub injoignable ou réponse hors contrat : 401 / 503, LIA garde son état local.
+- Même pin que le hub : lia-ui v0.39.0 (`validerEtat` ne retire plus `discussion` ; texte de Marc relayé sans être lu, jamais journalisé, jamais dans le dépôt : données de test fictives, dépôt public).
+- Verrous : `tests/lia.etat.test.ts`, `tests/lia.hubCookie.test.ts` (le cookie survit à la redirection apex → www), `tests/lia.askInvite.test.ts` (invité = aucun appel), `tests/liaMontee.test.ts`, `tests/auth.test.ts` et `tests/routesGardees.test.ts` (la route reste gardée). Preuve en production : `GET /api/lia/etat` rend l'état du hub avec la session de Marc ; la tâche reste ouverte jusque-là.
+
 ## 2026-10-26 — JobAI#278 : lia-ui remis à v0.38.0
 
 Dependabot (#275, fusionnée le 26/10 à 10:55Z) avait rétrogradé `@mokarade/lia-ui` de v0.38.0 à **v0.31.0** : il lit mal les tags, comme pour `@mokarade/hub-contract`. Re-pin à **v0.38.0** (commit `9faf1ac`, package.json et lockfile) et `@mokarade/lia-ui` ajouté aux `ignore` de `.github/dependabot.yml` : le re-pin se fait à la main à chaque version. Aucun changement de code. À vérifier après le déploiement : `/login` répond 200.
@@ -26,7 +33,7 @@ Dependabot (#275, fusionnée le 26/10 à 10:55Z) avait rétrogradé `@mokarade/l
 
 ## 2026-10-22 — JobAI#237 : LIA, l'assistant, branchée sur les pages connectées
 
-- `@mokarade/lia-ui` v0.38.0 (tag, jamais une branche ; options du hub : `quandMouvementReduit="complet"`, pastille d'humeur du paquet visible, aucune pastille maison ; elle suit le curseur et le défilement et vit comme dans la maquette, sans parole spontanée tant que l'app ne branche pas `onSpontane`) démarrée hors du rendu par `demarrerLia` (`@mokarade/lia-ui/boot`, appelé au chargement de `components/LiaMontee.tsx`, importé par `app/layout.tsx`) : elle reste sur le chargement, les erreurs et la 404 ; montée sur toutes les pages, `/connexion` et `global-error` compris (24/10/2026, JobAI#259) : en mode invité, sans session admise (`exigerSession()`), elle bouge et parle mais son `ask` refuse avant tout réseau (`lib/lia/askInvite.ts`). Clic = discussion, clic droit = menu.
+- `@mokarade/lia-ui` v0.39.0 (tag, jamais une branche ; options du hub : `quandMouvementReduit="complet"`, pastille d'humeur du paquet visible, aucune pastille maison ; elle suit le curseur et le défilement et vit comme dans la maquette, sans parole spontanée tant que l'app ne branche pas `onSpontane`) démarrée hors du rendu par `demarrerLia` (`@mokarade/lia-ui/boot`, appelé au chargement de `components/LiaMontee.tsx`, importé par `app/layout.tsx`) : elle reste sur le chargement, les erreurs et la 404 ; montée sur toutes les pages, `/connexion` et `global-error` compris (24/10/2026, JobAI#259) : en mode invité, sans session admise (`exigerSession()`), elle bouge et parle mais son `ask` refuse avant tout réseau (`lib/lia/askInvite.ts`). Clic = discussion, clic droit = menu.
 - Route `POST /api/lia/ask` (`app/api/lia/ask/route.ts`) : derrière le middleware ET `exigerSession()`, relaie la question au hub avec `HUB_TOKEN` (le hub parle à MemoryAI). Elle dit au hub si la session est celle du propriétaire (`AUTHORIZED_EMAIL`) : un invité n'atteint pas la mémoire de Marc. Échec fermé : sans réponse conforme, LIA dit « indisponible ».
 - Copie de la référence `app-template` (`lib/lia/`, tests `tests/lia.*.test.ts`). Détail et contrat : `docs/claude/13-lia.md`. Seul écart : `tests/lia.demander.test.ts` écrit le nom du jeton par calcul, pour passer le garde-fou n°5 (`tests/piiGuard.test.ts`).
 - **Tant que `POST /api/lia/ask` n'existe pas chez le hub (Hubperso#337) et MemoryAI**, LIA vit mais répond « indisponible ».
