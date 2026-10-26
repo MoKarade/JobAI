@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-10-26 — JobAI#117 : le workflow « Essai Sentry » (sans secret de dépôt)
+
+Lu en production le 26/10 : les scripts client de `emploi.hubperso.com/connexion` contiennent une adresse de DSN Sentry, donc `SENTRY_DSN` est posé et pris en compte. Ajout de l'essai de bout en bout : `npm run sentry:essai` (`scripts/sentry-essai.mjs`, pièces pures dans `lib/sentryEssai.ts`) et le workflow manuel « Essai Sentry » (`.github/workflows/sentry-essai.yml`). Écart avec app-template#92 : pas de `secrets.SENTRY_DSN` ni de SDK en plus. Un DSN n'est pas un secret (le navigateur le lit), le script le prend dans les scripts client de la production, ou dans `SENTRY_DSN` si elle est définie, et poste une enveloppe nettoyée par `retirerDonneesPersonnelles` ; il échoue sans réponse 2xx de Sentry et n'affiche jamais la clé. Preuve : lancer le workflow sur `main` et lire sa sortie (identifiant d'événement, HTTP 200).
+
+---
+
 ## 2026-10-26 — JobAI#285 : lia-ui v0.41.1, la bulle ne dépasse plus de l'écran
 
 JobAI épingle `@mokarade/lia-ui` v0.41.1 (sha pelé `90dc7e7`), seul changement (`package.json`, lock). Le relevé du PC sur v0.41.0 montrait la bulle hors écran à l'ouverture et à l'arrivée de la réponse, puis un saut. v0.41.1 place sans glisser quand la taille ou l'écran change et fait grandir la bulle vers le haut quand elle est dans la moitié basse. Rien à brancher côté app. Preuve : déploiement Vercel de production `READY` sur le commit fusionné, bundle servi contenant `lia-ui__chat--glisse` sur emploi.hubperso.com, puis relevé du PC ; la tâche reste ouverte jusque-là.
