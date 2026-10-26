@@ -39,7 +39,7 @@ preuve tirée du CV. Il manque le pas suivant : poser l'une à côté de l'autre
 
 ## Impact coût LLM
 
-Haiku 4,5 à l'écriture de cet ADR, passé à Haiku 5.5 depuis (ADR-0035) : entrée ≈ 1 200 jetons (vocabulaire 25 lignes + extrait de 2 000 caractères au plus), sortie ≤ 1 500 jetons
+Haiku 4,5 à l'écriture de cet ADR, passé à Haiku 5.5 depuis (ADR-0035) : entrée ≈ 1 200 jetons (vocabulaire 25 lignes à l'origine, 38 depuis le 26/10/2026, + extrait de 2 000 caractères au plus), sortie ≤ 1 500 jetons
 (`max_tokens`). Environ 0,003 à 0,01 $ US par clic ; les 100 meilleures offres, comparées une fois chacune, coûteraient
 de l'ordre de 0,3 à 1 $ US. Pas de plafond dur (décision de Marc du 16/10 : surveiller) ; le montant s'ajoute au bloc
 `usage`.
@@ -77,3 +77,9 @@ Lecture : sur le jeu de départ, la fonction ne change rien à aucune offre (auc
 ## Retour arrière
 
 Retirer le bouton et l'action : aucune donnée, aucune migration, aucune note n'est concernée.
+
+## Révision du 2026-10-26 — le vocabulaire passe de 25 à 38 lignes (JobAI#157)
+
+Les cinq comparaisons du 24/10 ont rendu presque tout en « hors fiche » (3 offres hors domaine : 0 couverte ; 2 offres de robotique et de conception électrique : 1 couverte sur 3 et 1 sur 2). Décision de Marc (24/10/2026) : « Élargir le vocabulaire ». Treize lignes s'ajoutent, toutes de **fiche seule** (`reglaNote` faux, aucune expression) : marques de robots, simulation de robots, plateformes d'automates, réseaux industriels, IHM, variateurs et servomoteurs, logiciels de schémas électriques, sécurité des machines, pneumatique et hydraulique, maintenance industrielle, amélioration continue, encadrement d'équipe, électronique embarquée. Elles servent à NOMMER ce qu'une offre demande (donc « il te manque » au lieu de « hors fiche ») ; elles ne lisent aucune offre et ne déplacent aucune note (`lib/scoring.ts` et `lib/noteOffre.ts` intacts, notes identiques). `COMPETENCES_MAX` passe de 25 à 40 (la fiche stockée accepte plus de lignes, rien n'est migré).
+
+Choix des treize lignes : à partir des termes cherchés chaque matin et des métiers visés de Marc, pas d'un relevé des exigences réelles (le texte des annonces n'est lisible que par l'application) [Probable]. Une ligne qui ne sert à rien se retire d'une ligne de code. Une compétence nouvelle n'entre sur la fiche qu'après une ré-analyse du CV (appel payant) et un geste de Marc ; sans cela, toute offre qui la demande dira « il te manque », ce qui est vrai de la fiche actuelle mais pas forcément du CV.
