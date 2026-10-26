@@ -13,6 +13,7 @@
     "test": "vitest run",
     "portes": "node qualite/portes.mjs",
     "portes:maj": "node qualite/portes.mjs --maj",
+    "sentry:essai": "node scripts/sentry-essai.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrer.ts",
     "db:seed": "tsx scripts/charger-seed.ts",

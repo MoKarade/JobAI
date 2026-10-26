@@ -46,3 +46,7 @@ aucune réactivation de `sendDefaultPii`, serveur et navigateur passent par `opt
 
 - Envoyer les messages tels quels, comme le modèle : trop risqué pour ce dépôt.
 - N'envoyer ni message ni valeur d'exception : on perdrait la cause, donc l'intérêt de l'outil.
+
+## Révision du 2026-10-26 — l'essai de bout en bout (JobAI#117)
+
+Le workflow manuel « Essai Sentry » (`npm run sentry:essai`) envoie une erreur volontaire et exige un accusé 2xx de Sentry. Contrairement au modèle `app-template`, il ne lit pas de secret de dépôt : le DSN n'est pas un secret (il est dans les scripts client de la production), le script l'y lit, ou dans `SENTRY_DSN` si elle est définie. Pas de SDK de plus : une enveloppe postée par `fetch`, nettoyée par `retirerDonneesPersonnelles`. Ce que l'essai prouve : le DSN servi accepte des événements. Il ne prouve pas que l'événement apparaît dans l'interface Sentry (aucun accès en lecture depuis la CI).

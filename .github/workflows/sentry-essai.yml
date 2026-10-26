@@ -1,0 +1,28 @@
+name: Essai Sentry
+
+# Lancement MANUEL seulement (JobAI#117) : envoie une erreur volontaire à Sentry et échoue si Sentry
+# ne répond pas par un code 2xx. Le DSN est lu dans les scripts client de la production (un DSN n'est
+# pas un secret), donc aucun secret de dépôt. Aucun déclencheur automatique : rien n'est envoyé sans geste.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  essai:
+    # Plafond : un job figé tourne six heures avant d'échouer. L'essai dure quelques secondes.
+    timeout-minutes: 5
+    name: Envoyer une erreur d'essai
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Envoyer l'erreur d'essai
+        run: npm run sentry:essai
