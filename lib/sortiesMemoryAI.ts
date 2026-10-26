@@ -5,6 +5,7 @@ import type { Offre, Statut } from "./types";
 
 const URL_DEFAUT = "https://memoryai.hubperso.com";
 const DELAI_MS = 2_500;
+const LONGUEUR_EMPREINTE = 24;
 
 export type EvenementSortie = {
   type: "statut_change" | "reponse_recruteur" | "offre_suivie";
@@ -30,14 +31,18 @@ function nettoyer(texte: string, maximum: number): string {
   return sortie;
 }
 
+function empreinte(texte: string): string {
+  return createHash("sha256").update(texte).digest("hex").slice(0, LONGUEUR_EMPREINTE);
+}
+
 function creerRef(offreId: string, suffixe: string): string | null {
-  if (!/^[\x21-\x7E]{1,80}$/.test(offreId) || !/^[\x21-\x7E]*$/.test(suffixe)) {
+  if (!/^[\x21-\x7E]+$/.test(offreId) || !/^[\x21-\x7E]*$/.test(suffixe)) {
     return null;
   }
 
   if (offreId.length + suffixe.length <= 80) return offreId + suffixe;
 
-  const empreinteOffre = createHash("sha256").update(offreId).digest("hex").slice(0, 16);
+  const empreinteOffre = empreinte(offreId);
   const longueurPrefixe = 80 - suffixe.length - empreinteOffre.length - 1;
   if (longueurPrefixe < 1) return null;
 
@@ -88,10 +93,12 @@ export function creerEvenementStatutChange(
   statut: Statut,
   date: string,
 ): EvenementSortie | null {
-  const secondes = Math.floor(Date.parse(date) / 1000);
-  const ref = Number.isFinite(secondes)
-    ? creerRef(offre.id, `:statut:${statut}:${secondes}`)
+  const dateCanonique = Number.isFinite(Date.parse(date))
+    ? new Date(date).toISOString()
     : null;
+  const ref = dateCanonique === null
+    ? null
+    : creerRef(offre.id, `:statut:${statut}:${dateCanonique}`);
   return creerEvenement(
     "statut_change",
     offre,
@@ -106,11 +113,17 @@ export function creerEvenementReponseRecruteur(
   courrielId: string,
   date: string,
 ): EvenementSortie | null {
+  if (!/^[\x21-\x7E]{1,200}$/.test(courrielId)) return null;
+
+  const suffixeReponse = `:reponse:${courrielId}`;
+  const suffixe = suffixeReponse.length + LONGUEUR_EMPREINTE + 2 <= 80
+    ? suffixeReponse
+    : `:reponse:${empreinte(courrielId)}`;
   return creerEvenement(
     "reponse_recruteur",
     offre,
     date,
-    creerRef(offre.id, `:reponse:${courrielId}`),
+    creerRef(offre.id, suffixe),
     "Réponse de recruteur enregistrée.",
   );
 }

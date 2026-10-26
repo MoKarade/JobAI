@@ -41,7 +41,7 @@ describe("événements MemoryAI", () => {
       date: dateEvenement,
       titre: "Poste d’essai — Entreprise exemple",
       resume: "Statut mis à jour : Entrevue.",
-      ref: "offre-essai-1:statut:Entrevue:1793052000",
+      ref: "offre-essai-1:statut:Entrevue:2026-10-26T22:00:00.123Z",
     });
   });
 
@@ -56,10 +56,10 @@ describe("événements MemoryAI", () => {
 
   it("donne des références distinctes aux changements successifs d'une offre et garde le renvoi stable", () => {
     const dateEnvoi = "2026-10-26T22:00:00.100Z";
-    const dateEntrevue = "2026-10-26T22:00:01.100Z";
-    const premier = creerEvenementStatutChange(offre, "CVenvoye", dateEnvoi)!;
+    const dateEntrevue = "2026-10-26T22:00:00.900Z";
+    const premier = creerEvenementStatutChange(offre, "Entrevue", dateEnvoi)!;
     const second = creerEvenementStatutChange(offre, "Entrevue", dateEntrevue)!;
-    const renvoi = creerEvenementStatutChange(offre, "CVenvoye", dateEnvoi)!;
+    const renvoi = creerEvenementStatutChange(offre, "Entrevue", dateEnvoi)!;
 
     expect(premier.ref).not.toBe(second.ref);
     expect(renvoi.ref).toBe(premier.ref);
@@ -73,34 +73,66 @@ describe("événements MemoryAI", () => {
     expect(premiere.ref).not.toBe(deuxieme.ref);
   });
 
-  it("garde toutes les références d'événement conformes et non ambiguës quand l'identifiant est tronqué", () => {
+  it("garde les références valides et non ambiguës même si les identifiants d'offre dépassent la limite", () => {
     const dateEvenement = "2026-10-26T22:00:00.000Z";
     const evenement = creerEvenementStatutChange(
-      { ...offre, id: "offre-" + "x".repeat(74) },
+      { ...offre, id: "offre-" + "x".repeat(110) },
       "Entrevue",
       dateEvenement,
     )!;
     const autre = creerEvenementStatutChange(
-      { ...offre, id: "offre-" + "x".repeat(73) + "y" },
+      { ...offre, id: "offre-" + "x".repeat(109) + "y" },
       "Entrevue",
       dateEvenement,
+    )!;
+    const suivie = creerEvenementOffreSuivie(
+      { ...offre, id: "offre-" + "x".repeat(110) },
+      date(),
     )!;
 
     for (const ref of [
       creerEvenementOffreSuivie(offre, date())!.ref,
       evenement.ref,
       creerEvenementReponseRecruteur(offre, "message-1", date())!.ref,
+      suivie.ref,
     ]) {
       expect(ref).toMatch(/^[\x21-\x7E]{1,80}$/);
     }
     expect(evenement.ref).toHaveLength(80);
     expect(autre.ref).toHaveLength(80);
     expect(evenement.ref).not.toBe(autre.ref);
+    expect(suivie.ref).toHaveLength(80);
+  });
+
+  it("garde une réponse distincte avec une offre longue et un identifiant de courriel long", () => {
+    const identifiantOffre = "offre-" + "x".repeat(74);
+    const identifiantMessage = "m".repeat(55);
+    const evenement = creerEvenementReponseRecruteur(
+      { ...offre, id: identifiantOffre },
+      identifiantMessage,
+      date(),
+    )!;
+    const renvoi = creerEvenementReponseRecruteur(
+      { ...offre, id: identifiantOffre },
+      identifiantMessage,
+      date(),
+    )!;
+    const autre = creerEvenementReponseRecruteur(
+      { ...offre, id: identifiantOffre },
+      `${"m".repeat(54)}n`,
+      date(),
+    )!;
+
+    expect(evenement.ref).toMatch(/^[\x21-\x7E]{1,80}$/);
+    expect(renvoi.ref).toBe(evenement.ref);
+    expect(evenement.ref).not.toBe(autre.ref);
   });
 
   it("refuse une date sans décalage et un identifiant non conforme", () => {
     expect(creerEvenementOffreSuivie(offre, "2026-10-26T12:00:00")).toBeNull();
     expect(creerEvenementOffreSuivie({ ...offre, id: "id avec espace" }, date())).toBeNull();
+    expect(creerEvenementReponseRecruteur(offre, "message-😀", date())).toBeNull();
+    expect(creerEvenementReponseRecruteur(offre, "m".repeat(201), date())).toBeNull();
   });
 
   it("borne le titre en unités de texte sans couper une paire Unicode", () => {
