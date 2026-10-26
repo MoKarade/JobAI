@@ -140,12 +140,17 @@ Garde cette seconde valeur : elle servira **deux fois**, à l'identique — côt
    | `HUB_TOKEN` | le jeton du hub | étape 3 |
    | `AUTH_COOKIE_DOMAIN` | `.hubperso.com` — **Production UNIQUEMENT** | étape 2 |
    | `NEXT_PUBLIC_HUB_URL` | `https://hubperso.com` (optionnel, c'est le défaut) | — |
+   | `MEMORYAI_SORTIES_TOKEN` | jeton de la porte `POST /api/sorties` (optionnel) | canal Secrets |
+   | `MEMORYAI_URL` | URL MemoryAI (optionnelle, défaut `https://memoryai.hubperso.com`) | — |
 
    Coche les trois environnements (Production, Preview, Development) pour toutes **sauf**
    `AUTH_COOKIE_DOMAIN`, qui ne va qu'en Production (voir étape 2).
 
    Il n'y a **plus** de `GOOGLE_CLIENT_ID` ni de `GOOGLE_CLIENT_SECRET` : JobAI ne parle plus
    à Google.
+
+   Sans `MEMORYAI_SORTIES_TOKEN`, JobAI n'envoie aucune sortie à MemoryAI. Le jeton reste
+   côté serveur ; ne l'ajoute ni à `.env.example` ni au dépôt.
 
 5. **Deploy**. Vercel te donne une URL en `https://jobai-xxxx.vercel.app`. Elle sert à
    vérifier que l'app démarre — mais **la connexion n'y marchera pas** : le cookie du hub ne

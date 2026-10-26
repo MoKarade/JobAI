@@ -91,6 +91,11 @@ import {
 import { BUDGET_PASSE_PAGE_MS } from "./synchro";
 import { creerChrono } from "./jalons";
 import { CLE_RESUME_DISTANCES, construireResume, resumeVierge } from "./resumePasse";
+import {
+  creerEvenementOffreSuivie,
+  creerEvenementStatutChange,
+  planifierSortie,
+} from "./sortiesMemoryAI";
 
 export type Resultat = { ok: true } | { ok: false; erreur: string };
 
@@ -2139,6 +2144,8 @@ export async function ajouterOffre(saisie: unknown): Promise<ResultatAjout> {
 
     await db.insert(offers).values(colonnesOffre(offre));
 
+    const evenement = creerEvenementOffreSuivie(offre, new Date().toISOString());
+    if (evenement) planifierSortie(evenement);
     revalidatePath("/");
     return { ok: true, id: offre.id };
   } catch (err) {
@@ -2221,7 +2228,12 @@ export async function modifierOffre(
 
   try {
     const [avant] = await db
-      .select({ dateEnvoi: offers.dateEnvoi })
+      .select({
+        dateEnvoi: offers.dateEnvoi,
+        statut: offers.statut,
+        entreprise: offers.entreprise,
+        poste: offers.poste,
+      })
       .from(offers)
       .where(eq(offers.id, id))
       .limit(1);
@@ -2245,6 +2257,15 @@ export async function modifierOffre(
       })
       .where(eq(offers.id, id));
 
+    if (champs.statut !== undefined && champs.statut !== avant.statut) {
+      const evenement = creerEvenementStatutChange(
+        { id, entreprise: avant.entreprise, poste: avant.poste },
+        champs.statut,
+        new Date().toISOString(),
+      );
+      if (evenement) planifierSortie(evenement);
+    }
+
     // Le tableau de bord et le widget dérivent des mêmes lignes : ils doivent changer
     // ensemble, sinon un compteur reste faux jusqu'au prochain rechargement.
     revalidatePath("/");
@@ -2254,4 +2275,3 @@ export async function modifierOffre(
     return { ok: false, erreur: "Enregistrement impossible. Réessaie." };
   }
 }
-
