@@ -1,7 +1,7 @@
 // tests/lia.askInvite.test.ts — mode invité de LIA : sans session, `ask` refuse AVANT tout réseau.
 
 import { describe, expect, it, vi } from "vitest";
-import { creerAskInvite, creerIndicateurSession } from "@/lib/lia/askInvite";
+import { creerAskInvite, creerEtatInvite, creerIndicateurSession } from "@/lib/lia/askInvite";
 
 const signal = new AbortController().signal;
 const reponse = { reponse: "Bonjour" } as never;
@@ -56,5 +56,66 @@ describe("creerAskInvite", () => {
     session.activer();
     const garde = creerAskInvite(session, vi.fn().mockRejectedValue(new Error("LIA indisponible (503)")));
     await expect(garde("?", signal)).rejects.toThrow("503");
+  });
+});
+
+describe("attendre : la page dit si la session est admise", () => {
+  it("déjà admise : vrai tout de suite", async () => {
+    const s = creerIndicateurSession();
+    s.activer();
+    await expect(s.attendre(10_000)).resolves.toBe(true);
+  });
+
+  it("admise pendant l'attente : vrai, sans attendre la fin du délai", async () => {
+    vi.useFakeTimers();
+    const s = creerIndicateurSession();
+    const attente = s.attendre(3_000);
+    await vi.advanceTimersByTimeAsync(500);
+    s.activer();
+    await expect(attente).resolves.toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it("jamais admise : faux à la fin du délai (la page est celle d'un invité)", async () => {
+    vi.useFakeTimers();
+    const attente = creerIndicateurSession().attendre(3_000);
+    await vi.advanceTimersByTimeAsync(3_000);
+    await expect(attente).resolves.toBe(false);
+    vi.useRealTimers();
+  });
+});
+
+describe("creerEtatInvite : un invité n'appelle jamais /api/lia/etat", () => {
+  const etat = { version: 1 } as never;
+  const hote = () => ({ lire: vi.fn().mockResolvedValue(etat), ecrire: vi.fn().mockResolvedValue(etat) });
+
+  it("invité : lecture et écriture rendent null sans aucun appel", async () => {
+    vi.useFakeTimers();
+    const h = hote();
+    const garde = creerEtatInvite(creerIndicateurSession(), h, 3_000);
+    const lecture = garde.lire();
+    await vi.advanceTimersByTimeAsync(3_000);
+    await expect(lecture).resolves.toBeNull();
+    await expect(garde.ecrire(etat)).resolves.toBeNull();
+    expect(h.lire).not.toHaveBeenCalled();
+    expect(h.ecrire).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("connecté : délègue tel quel ; la première lecture attend la session vue après coup", async () => {
+    vi.useFakeTimers();
+    const h = hote();
+    const session = creerIndicateurSession();
+    const garde = creerEtatInvite(session, h, 3_000);
+    const lecture = garde.lire();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(h.lire).not.toHaveBeenCalled();
+    session.activer();
+    await expect(lecture).resolves.toBe(etat);
+    await expect(garde.ecrire(etat)).resolves.toBe(etat);
+    expect(h.lire).toHaveBeenCalledTimes(1);
+    expect(h.ecrire).toHaveBeenCalledWith(etat);
+    vi.useRealTimers();
   });
 });
