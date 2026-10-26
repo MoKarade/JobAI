@@ -6,6 +6,10 @@
 
 ---
 
+## 2026-10-26 — JobAI#278 : lia-ui remis à v0.38.0
+
+Dependabot (#275, fusionnée le 26/10 à 10:55Z) avait rétrogradé `@mokarade/lia-ui` de v0.38.0 à **v0.31.0** : il lit mal les tags, comme pour `@mokarade/hub-contract`. Re-pin à **v0.38.0** (commit `9faf1ac`, package.json et lockfile) et `@mokarade/lia-ui` ajouté aux `ignore` de `.github/dependabot.yml` : le re-pin se fait à la main à chaque version. Aucun changement de code. À vérifier après le déploiement : `/login` répond 200.
+
 ## 2026-10-24 — JobAI#117 : `HUB_TOKEN` roté et `SENTRY_DSN` posé, build de prise en compte
 
 `HUB_TOKEN` de JobAI roté sur Vercel et `SENTRY_DSN` posé (autorisé par Marc le 24/10/2026, variables posées par le PC). Une variable Vercel ne s'applique qu'à un build neuf : la fusion de cette ligne le déclenche. À vérifier après le déploiement `READY` : le hub lit toujours `/api/hub/summary` de JobAI avec le nouveau jeton.
