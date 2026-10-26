@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { createHash } from "node:crypto";
 import { expurgerPII } from "./ingest/expurger";
 import type { Offre, Statut } from "./types";
 
@@ -29,17 +30,33 @@ function nettoyer(texte: string, maximum: number): string {
   return sortie;
 }
 
+function creerRef(offreId: string, suffixe: string): string | null {
+  if (!/^[\x21-\x7E]{1,80}$/.test(offreId) || !/^[\x21-\x7E]*$/.test(suffixe)) {
+    return null;
+  }
+
+  if (offreId.length + suffixe.length <= 80) return offreId + suffixe;
+
+  const empreinteOffre = createHash("sha256").update(offreId).digest("hex").slice(0, 16);
+  const longueurPrefixe = 80 - suffixe.length - empreinteOffre.length - 1;
+  if (longueurPrefixe < 1) return null;
+
+  return `${offreId.slice(0, longueurPrefixe)}~${empreinteOffre}${suffixe}`;
+}
+
 function creerEvenement(
   type: EvenementSortie["type"],
   offre: OffreSortie,
   date: string,
+  ref: string | null,
   resume?: string,
 ): EvenementSortie | null {
   const titre = nettoyer(`${offre.poste} — ${offre.entreprise}`, 120);
   if (
     !dateValide(date)
     || titre.length === 0
-    || !/^[\x21-\x7E]{1,80}$/.test(offre.id)
+    || ref === null
+    || !/^[\x21-\x7E]{1,80}$/.test(ref)
   ) {
     return null;
   }
@@ -49,7 +66,7 @@ function creerEvenement(
     date,
     titre,
     resume: resume ? nettoyer(resume, 600) : undefined,
-    ref: offre.id,
+    ref,
   };
 }
 
@@ -57,7 +74,13 @@ export function creerEvenementOffreSuivie(
   offre: OffreSortie,
   date: string,
 ): EvenementSortie | null {
-  return creerEvenement("offre_suivie", offre, date, "Offre ajoutée au suivi.");
+  return creerEvenement(
+    "offre_suivie",
+    offre,
+    date,
+    creerRef(offre.id, ""),
+    "Offre ajoutée au suivi.",
+  );
 }
 
 export function creerEvenementStatutChange(
@@ -65,14 +88,31 @@ export function creerEvenementStatutChange(
   statut: Statut,
   date: string,
 ): EvenementSortie | null {
-  return creerEvenement("statut_change", offre, date, `Statut mis à jour : ${statut}.`);
+  const secondes = Math.floor(Date.parse(date) / 1000);
+  const ref = Number.isFinite(secondes)
+    ? creerRef(offre.id, `:statut:${statut}:${secondes}`)
+    : null;
+  return creerEvenement(
+    "statut_change",
+    offre,
+    date,
+    ref,
+    `Statut mis à jour : ${statut}.`,
+  );
 }
 
 export function creerEvenementReponseRecruteur(
   offre: OffreSortie,
+  courrielId: string,
   date: string,
 ): EvenementSortie | null {
-  return creerEvenement("reponse_recruteur", offre, date, "Réponse de recruteur enregistrée.");
+  return creerEvenement(
+    "reponse_recruteur",
+    offre,
+    date,
+    creerRef(offre.id, `:reponse:${courrielId}`),
+    "Réponse de recruteur enregistrée.",
+  );
 }
 
 export function planifierSortie(evenement: EvenementSortie): void {

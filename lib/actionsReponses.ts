@@ -50,7 +50,11 @@ export async function confirmerReponse(courrielId: string): Promise<ResultatRepo
     const r = await modifierOffre(offre.id, { statut: proposition.statutPropose });
     if (!r.ok) return { ok: false, erreur: r.erreur };
     await marquer(courrielId, "confirmee");
-    const evenement = creerEvenementReponseRecruteur(offre, new Date().toISOString());
+    const evenement = creerEvenementReponseRecruteur(
+      offre,
+      courrielId,
+      new Date().toISOString(),
+    );
     if (evenement) planifierSortie(evenement);
     revalidatePath("/");
     return { ok: true };

@@ -30,28 +30,72 @@ describe("événements MemoryAI", () => {
       date: expect.any(String),
       titre: "Poste d’essai — Entreprise exemple",
       resume: "Offre ajoutée au suivi.",
-      ref: offre.id,
+      ref: "offre-essai-1",
     });
   });
 
   it("construit un changement de statut", () => {
-    expect(creerEvenementStatutChange(offre, "Entrevue", date())).toEqual({
+    const dateEvenement = "2026-10-26T22:00:00.123Z";
+    expect(creerEvenementStatutChange(offre, "Entrevue", dateEvenement)).toEqual({
       type: "statut_change",
-      date: expect.any(String),
+      date: dateEvenement,
       titre: "Poste d’essai — Entreprise exemple",
       resume: "Statut mis à jour : Entrevue.",
-      ref: offre.id,
+      ref: "offre-essai-1:statut:Entrevue:1793052000",
     });
   });
 
   it("construit une réponse sans reprendre le texte du courriel ni le nom du tiers", () => {
-    expect(creerEvenementReponseRecruteur(offre, date())).toEqual({
+    expect(creerEvenementReponseRecruteur(offre, "message-123", date())).toMatchObject({
       type: "reponse_recruteur",
-      date: expect.any(String),
       titre: "Poste d’essai — Entreprise exemple",
       resume: "Réponse de recruteur enregistrée.",
-      ref: offre.id,
+      ref: "offre-essai-1:reponse:message-123",
     });
+  });
+
+  it("donne des références distinctes aux changements successifs d'une offre et garde le renvoi stable", () => {
+    const dateEnvoi = "2026-10-26T22:00:00.100Z";
+    const dateEntrevue = "2026-10-26T22:00:01.100Z";
+    const premier = creerEvenementStatutChange(offre, "CVenvoye", dateEnvoi)!;
+    const second = creerEvenementStatutChange(offre, "Entrevue", dateEntrevue)!;
+    const renvoi = creerEvenementStatutChange(offre, "CVenvoye", dateEnvoi)!;
+
+    expect(premier.ref).not.toBe(second.ref);
+    expect(renvoi.ref).toBe(premier.ref);
+  });
+
+  it("utilise l'identifiant du courriel pour distinguer deux réponses", () => {
+    const dateReponse = date();
+    const premiere = creerEvenementReponseRecruteur(offre, "message-1", dateReponse)!;
+    const deuxieme = creerEvenementReponseRecruteur(offre, "message-2", dateReponse)!;
+
+    expect(premiere.ref).not.toBe(deuxieme.ref);
+  });
+
+  it("garde toutes les références d'événement conformes et non ambiguës quand l'identifiant est tronqué", () => {
+    const dateEvenement = "2026-10-26T22:00:00.000Z";
+    const evenement = creerEvenementStatutChange(
+      { ...offre, id: "offre-" + "x".repeat(74) },
+      "Entrevue",
+      dateEvenement,
+    )!;
+    const autre = creerEvenementStatutChange(
+      { ...offre, id: "offre-" + "x".repeat(73) + "y" },
+      "Entrevue",
+      dateEvenement,
+    )!;
+
+    for (const ref of [
+      creerEvenementOffreSuivie(offre, date())!.ref,
+      evenement.ref,
+      creerEvenementReponseRecruteur(offre, "message-1", date())!.ref,
+    ]) {
+      expect(ref).toMatch(/^[\x21-\x7E]{1,80}$/);
+    }
+    expect(evenement.ref).toHaveLength(80);
+    expect(autre.ref).toHaveLength(80);
+    expect(evenement.ref).not.toBe(autre.ref);
   });
 
   it("refuse une date sans décalage et un identifiant non conforme", () => {
@@ -108,7 +152,7 @@ describe("envoi des sorties", () => {
       date: expect.any(String),
       titre: "Poste d’essai — Entreprise exemple",
       resume: "Statut mis à jour : Entrevue.",
-      ref: offre.id,
+      ref: expect.stringMatching(/^[\x21-\x7E]{1,80}$/),
     });
   });
 
@@ -143,7 +187,7 @@ describe("envoi des sorties", () => {
         }),
     );
     vi.stubGlobal("fetch", requete);
-    const evenement = creerEvenementReponseRecruteur(offre, date())!;
+    const evenement = creerEvenementReponseRecruteur(offre, "message-1", date())!;
 
     const envoi = envoyerSorties([evenement]);
     await vi.advanceTimersByTimeAsync(2_500);
