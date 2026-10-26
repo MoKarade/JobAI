@@ -14,6 +14,7 @@ import { faitAvancer } from "./gmail/proposition";
 import { ajouterTraitee } from "./gmail/reponses";
 import { ecrireTraitees, lireGardees, lireTraiteesGardees } from "./gmail/reponsesStore";
 import { exigerSession } from "./session";
+import { creerEvenementReponseRecruteur, planifierSortie } from "./sortiesMemoryAI";
 
 export type ResultatReponse = { ok: true } | { ok: false; erreur: string };
 
@@ -49,6 +50,12 @@ export async function confirmerReponse(courrielId: string): Promise<ResultatRepo
     const r = await modifierOffre(offre.id, { statut: proposition.statutPropose });
     if (!r.ok) return { ok: false, erreur: r.erreur };
     await marquer(courrielId, "confirmee");
+    const evenement = creerEvenementReponseRecruteur(
+      offre,
+      courrielId,
+      new Date().toISOString(),
+    );
+    if (evenement) planifierSortie(evenement);
     revalidatePath("/");
     return { ok: true };
   } catch (err) {
