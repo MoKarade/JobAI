@@ -20,12 +20,12 @@
     "registre:importer": "tsx scripts/importer-registre.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.1.0",
+    "@anthropic-ai/sdk": "^1.2.0",
     "@modelcontextprotocol/sdk": "^1.30.1",
     "@mokarade/hub-contract": "github:MoKarade/hub-contract#v1.5.0",
     "@mokarade/lia-ui": "github:MoKarade/lia-ui#v0.38.0",
     "@neondatabase/serverless": "^1.2.0",
-    "@sentry/nextjs": "^11.8.0",
+    "@sentry/nextjs": "^11.9.0",
     "@vercel/analytics": "^2.0.1",
     "@vis.gl/react-google-maps": "^1.10.1",
     "drizzle-orm": "^0.45.4",
