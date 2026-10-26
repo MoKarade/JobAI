@@ -26,3 +26,4 @@ jobs:
       # JobAI sert sa connexion sous /connexion. Pas de contrôle summary : voir l'en-tête.
       chemin-summary: ""
       chemin-connexion: /connexion
+    secrets: inherit
