@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-10-26 — JobAI#157 : le vocabulaire de compétences passe de 25 à 38 lignes
+
+Décision de Marc du 24/10 (« Élargir le vocabulaire »). Treize lignes de fiche seule s'ajoutent à `lib/competences.ts` (marques de robots, réseaux industriels, IHM, variateurs, sécurité des machines, maintenance, amélioration continue, etc.), `COMPETENCES_MAX` passe à 40 ; aucune note ne bouge (aucune expression de lecture ajoutée). ADR-0034, révision du 26/10. Reste : refaire les 5 comparaisons depuis la session de Marc (le bouton « Comparer à ma fiche » exige sa session), puis sa relecture des verdicts ; les nouvelles lignes n'entrent sur la fiche qu'après une ré-analyse du CV.
+
+---
+
 ## 2026-10-26 — JobAI#117 : le workflow « Essai Sentry » (sans secret de dépôt)
 
 Lu en production le 26/10 : les scripts client de `emploi.hubperso.com/connexion` contiennent une adresse de DSN Sentry, donc `SENTRY_DSN` est posé et pris en compte. Ajout de l'essai de bout en bout : `npm run sentry:essai` (`scripts/sentry-essai.mjs`, pièces pures dans `lib/sentryEssai.ts`) et le workflow manuel « Essai Sentry » (`.github/workflows/sentry-essai.yml`). Écart avec app-template#92 : pas de `secrets.SENTRY_DSN` ni de SDK en plus. Un DSN n'est pas un secret (le navigateur le lit), le script le prend dans les scripts client de la production, ou dans `SENTRY_DSN` si elle est définie, et poste une enveloppe nettoyée par `retirerDonneesPersonnelles` ; il échoue sans réponse 2xx de Sentry et n'affiche jamais la clé. Preuve : lancer le workflow sur `main` et lire sa sortie (identifiant d'événement, HTTP 200).

@@ -103,6 +103,46 @@ export const VOCABULAIRE_COMPETENCES: readonly DefinitionCompetence[] = [
   fiche("analyse-des-risques", "Analyse des risques", ["risque", "risques", "risk", "amdec", "fmea"]),
   fiche("tests-de-validation", "Tests de validation", ["test", "tests", "validation", "essais"]),
   fiche("bureautique", "Bureautique (Office 365)", ["office", "excel", "word", "powerpoint", "bureautique", "o365", "microsoft"]),
+  // ── Élargissement du 2026-10-26 (JobAI#157, ADR-0034) : ce que demandent les offres du cœur de cible et que les
+  // 24 premières lignes ne savaient pas nommer (elles tombaient en « hors fiche »). Toutes sont de FICHE SEULE :
+  // elles se comparent à une offre, elles ne lisent aucune offre et ne déplacent aucune note.
+  fiche("marques-de-robots", "Marques de robots (Fanuc, ABB, KUKA, Yaskawa)", [
+    "fanuc", "abb", "kuka", "yaskawa", "universal robots", "staubli", "denso",
+  ]),
+  fiche("simulation-de-robots", "Simulation et programmation hors ligne de robots", [
+    "robotstudio", "roboguide", "simulation", "hors ligne", "offline programming",
+  ]),
+  fiche("marques-d-automates", "Plateformes d'automates (Allen-Bradley, Siemens, Omron)", [
+    "allen bradley", "rockwell", "studio 5000", "siemens", "tia portal", "twincat", "codesys", "omron", "schneider",
+  ]),
+  fiche("reseaux-industriels", "Réseaux industriels (Profinet, EtherNet/IP, Modbus)", [
+    "profinet", "profibus", "ethernet ip", "modbus", "devicenet", "can bus", "reseau industriel", "reseaux industriels",
+  ]),
+  fiche("ihm-hmi", "IHM / HMI", ["ihm", "hmi", "interface homme machine", "factorytalk", "wincc", "wonderware"]),
+  fiche("variateurs-servomoteurs", "Variateurs et servomoteurs", [
+    "variateur", "variateurs", "vfd", "servo", "servos", "servomoteur", "servomoteurs", "motion control", "entrainement",
+  ]),
+  fiche("logiciels-schemas-electriques", "Logiciels de schémas électriques (EPLAN, AutoCAD Electrical)", [
+    "eplan", "autocad electrical", "autocad",
+  ]),
+  fiche("securite-des-machines", "Sécurité des machines (ISO 10218, NFPA 79)", [
+    "securite machine", "securite des machines", "machine safety", "iso 10218", "nfpa 79", "csa z432",
+  ]),
+  fiche("pneumatique-hydraulique", "Pneumatique et hydraulique", [
+    "pneumatique", "pneumatiques", "hydraulique", "hydrauliques", "pneumatic", "hydraulic",
+  ]),
+  fiche("maintenance-industrielle", "Maintenance et dépannage industriels", [
+    "maintenance", "depannage", "gmao", "cmms", "troubleshooting",
+  ]),
+  fiche("amelioration-continue", "Amélioration continue (Lean, Kaizen, 5S)", [
+    "amelioration continue", "lean", "kaizen", "5s", "six sigma", "continuous improvement",
+  ]),
+  fiche("encadrement-d-equipe", "Encadrement d'équipe", [
+    "supervision", "superviser", "encadrement", "chef d equipe", "team lead", "leadership", "gestion d equipe",
+  ]),
+  fiche("electronique-embarquee", "Électronique et systèmes embarqués", [
+    "pcb", "microcontroleur", "arduino", "embarque", "embedded", "firmware", "raspberry",
+  ]),
 ];
 
 const PAR_ID: ReadonlyMap<string, DefinitionCompetence> = new Map(
@@ -130,8 +170,8 @@ export const CompetenceProuveeSchema = z.object({
 });
 export type CompetenceProuvee = z.infer<typeof CompetenceProuveeSchema>;
 
-/** Plafond d'une fiche : au moins le vocabulaire entier, une compétence retenue une seule fois. */
-export const COMPETENCES_MAX = 25;
+/** Plafond d'une fiche : au moins le vocabulaire entier (38 lignes au 26/10/2026), une compétence retenue une seule fois. */
+export const COMPETENCES_MAX = 40;
 
 export interface CompetenceRejetee {
   id: string;

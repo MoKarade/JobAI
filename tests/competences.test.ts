@@ -10,8 +10,10 @@ import {
   COMPETENCES_MAX,
   IDS_COMPETENCES,
   VOCABULAIRE_COMPETENCES,
+  definition,
   expressionsDeNotation,
   fichePourLecture,
+  phraseMontre,
   replier,
   resumeDesRefus,
   verifierCompetences,
@@ -44,6 +46,34 @@ describe("le vocabulaire fermé", () => {
       if (c.reglaNote) expect(c.expressions.length, c.id).toBeGreaterThan(0);
       else expect(c.expressions, c.id).toEqual([]);
     }
+  });
+
+  it("l'élargissement du 26/10 (JobAI#157) : 38 lignes, les 13 nouvelles de fiche seule, le plafond les contient", () => {
+    const nouvelles = [
+      "marques-de-robots", "simulation-de-robots", "marques-d-automates", "reseaux-industriels", "ihm-hmi",
+      "variateurs-servomoteurs", "logiciels-schemas-electriques", "securite-des-machines", "pneumatique-hydraulique",
+      "maintenance-industrielle", "amelioration-continue", "encadrement-d-equipe", "electronique-embarquee",
+    ];
+    expect(IDS_COMPETENCES).toHaveLength(38);
+    expect(COMPETENCES_MAX).toBeGreaterThanOrEqual(IDS_COMPETENCES.length);
+    for (const id of nouvelles) {
+      const c = definition(id);
+      expect(c, id).toBeDefined();
+      expect(c?.reglaNote, id).toBe(false);
+      expect(c?.expressions, id).toEqual([]);
+    }
+  });
+
+  it("une phrase de CV nomme la nouvelle compétence, et une phrase qui n'en parle pas ne la prouve pas", () => {
+    const montre = (id: string, phrase: string) => phraseMontre(phrase, definition(id)!);
+    expect(montre("marques-de-robots", "Programmation de robots FANUC et ABB")).toBe(true);
+    expect(montre("reseaux-industriels", "Mise en réseau Ethernet/IP et Profinet")).toBe(true);
+    expect(montre("ihm-hmi", "Conception d'IHM pour les opérateurs")).toBe(true);
+    expect(montre("amelioration-continue", "Animation de chantiers 5S et Kaizen")).toBe(true);
+    expect(montre("maintenance-industrielle", "Dépannage de lignes d'emballage")).toBe(true);
+    // Mots entiers : « abbaye » ne contient pas la marque « abb ».
+    expect(montre("marques-de-robots", "Visite d'une abbaye")).toBe(false);
+    expect(montre("variateurs-servomoteurs", "Gestion de budget et de planning")).toBe(false);
   });
 
   it("les langages et la bureautique ne règlent PAS la note", () => {
