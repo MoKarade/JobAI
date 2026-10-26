@@ -6,6 +6,10 @@
 
 ---
 
+## 2026-10-26 — JobAI#282 : JobAI pousse ses sorties à MemoryAI
+
+Une offre ajoutée au suivi, un changement de statut effectif et une réponse de recruteur confirmée envoient un événement (`offre_suivie`, `statut_change`, `reponse_recruteur`) à `POST /api/sorties` de MemoryAI, par le serveur, après l'écriture réussie et hors du chemin de la réponse (`after()`). Module : `lib/sortiesMemoryAI.ts` ; appels dans `lib/actions.ts` (`ajouterOffre`, `modifierOffre`) et `lib/actionsReponses.ts` (`confirmerReponse`). Variables OPTIONNELLES : `MEMORYAI_SORTIES_TOKEN` (sans elle, rien ne part) et `MEMORYAI_URL` (défaut `https://memoryai.hubperso.com`), documentées dans `docs/DEPLOIEMENT.md`. Le titre (poste et employeur) passe par `expurgerPII` ; le résumé est une phrase fixe, jamais le texte d'un courriel ni un nom de recruteur. `ref` unique par transition (MemoryAI déduplique sur type et ref : un 2ᵉ changement de statut ne doit pas passer pour un doublon). Échec fermé et muet : délai de 2,5 s, journal sans texte. Verrou : `tests/sortiesMemoryAI.test.ts` + `tests/piiGuard.test.ts`. Preuve de production : après le redéploiement de MemoryAI qui porte `MEMORYAI_TOKEN_JOBAI_ECRITURE`, un changement de statut fait par Marc apparaît dans MemoryAI ; tant que ce n'est pas lu, la tâche reste `preuve-attendue`.
+
 ## 2026-10-26 — JobAI#289 : lia-ui v0.42.0, la hauteur de la bulle se révèle en douceur
 
 JobAI épingle `@mokarade/lia-ui` v0.42.0 (sha pelé `cff04f4`), seul changement (`package.json`, lock). La bulle de v0.41.1 restait dans l'écran mais changeait de hauteur d'un coup à chaque réponse. v0.42.0 découvre la hauteur gagnée en 280 ms depuis le bord fixe, sans ombre coupée, et ne bouge rien avec `prefers-reduced-motion`. Rien à brancher côté app. Preuve : déploiement Vercel de production `READY` sur le commit fusionné, bundle servi contenant `inset(-24px)` sur emploi.hubperso.com, puis mesure sur la page de connexion publique ; la tâche reste ouverte jusque-là.
