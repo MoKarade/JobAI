@@ -6,6 +6,10 @@
 
 ---
 
+## 2026-10-26 — JobAI#289 : lia-ui v0.42.0, la hauteur de la bulle se révèle en douceur
+
+JobAI épingle `@mokarade/lia-ui` v0.42.0 (sha pelé `cff04f4`), seul changement (`package.json`, lock). La bulle de v0.41.1 restait dans l'écran mais changeait de hauteur d'un coup à chaque réponse. v0.42.0 découvre la hauteur gagnée en 280 ms depuis le bord fixe, sans ombre coupée, et ne bouge rien avec `prefers-reduced-motion`. Rien à brancher côté app. Preuve : déploiement Vercel de production `READY` sur le commit fusionné, bundle servi contenant `inset(-24px)` sur emploi.hubperso.com, puis mesure sur la page de connexion publique ; la tâche reste ouverte jusque-là.
+
 ## 2026-10-26 — JobAI#157 : le vocabulaire de compétences passe de 25 à 38 lignes
 
 Décision de Marc du 24/10 (« Élargir le vocabulaire »). Treize lignes de fiche seule s'ajoutent à `lib/competences.ts` (marques de robots, réseaux industriels, IHM, variateurs, sécurité des machines, maintenance, amélioration continue, etc.), `COMPETENCES_MAX` passe à 40 ; aucune note ne bouge (aucune expression de lecture ajoutée). ADR-0034, révision du 26/10. Reste : refaire les 5 comparaisons depuis la session de Marc (le bouton « Comparer à ma fiche » exige sa session), puis sa relecture des verdicts ; les nouvelles lignes n'entrent sur la fiche qu'après une ré-analyse du CV.
