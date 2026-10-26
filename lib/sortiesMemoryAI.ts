@@ -5,7 +5,8 @@ import type { Offre, Statut } from "./types";
 
 const URL_DEFAUT = "https://memoryai.hubperso.com";
 const DELAI_MS = 2_500;
-const LONGUEUR_EMPREINTE = 24;
+const LONGUEUR_EMPREINTE_OFFRE = 16;
+const LONGUEUR_EMPREINTE_IDENTIFIANT = 24;
 
 export type EvenementSortie = {
   type: "statut_change" | "reponse_recruteur" | "offre_suivie";
@@ -32,7 +33,7 @@ function nettoyer(texte: string, maximum: number): string {
 }
 
 function empreinte(texte: string): string {
-  return createHash("sha256").update(texte).digest("hex").slice(0, LONGUEUR_EMPREINTE);
+  return createHash("sha256").update(texte).digest("hex");
 }
 
 function creerRef(offreId: string, suffixe: string): string | null {
@@ -42,7 +43,7 @@ function creerRef(offreId: string, suffixe: string): string | null {
 
   if (offreId.length + suffixe.length <= 80) return offreId + suffixe;
 
-  const empreinteOffre = empreinte(offreId);
+  const empreinteOffre = empreinte(offreId).slice(0, LONGUEUR_EMPREINTE_OFFRE);
   const longueurPrefixe = 80 - suffixe.length - empreinteOffre.length - 1;
   if (longueurPrefixe < 1) return null;
 
@@ -92,13 +93,17 @@ export function creerEvenementStatutChange(
   offre: OffreSortie,
   statut: Statut,
   date: string,
+  identifiantEvenement: string,
 ): EvenementSortie | null {
   const dateCanonique = Number.isFinite(Date.parse(date))
     ? new Date(date).toISOString()
     : null;
   const ref = dateCanonique === null
     ? null
-    : creerRef(offre.id, `:statut:${statut}:${dateCanonique}`);
+    : creerRef(
+        offre.id,
+        `:statut:${statut}:${Date.parse(dateCanonique)}:${empreinte(identifiantEvenement).slice(0, LONGUEUR_EMPREINTE_IDENTIFIANT)}`,
+      );
   return creerEvenement(
     "statut_change",
     offre,
@@ -116,9 +121,9 @@ export function creerEvenementReponseRecruteur(
   if (!/^[\x21-\x7E]{1,200}$/.test(courrielId)) return null;
 
   const suffixeReponse = `:reponse:${courrielId}`;
-  const suffixe = suffixeReponse.length + LONGUEUR_EMPREINTE + 2 <= 80
+  const suffixe = suffixeReponse.length + LONGUEUR_EMPREINTE_IDENTIFIANT + 2 <= 80
     ? suffixeReponse
-    : `:reponse:${empreinte(courrielId)}`;
+    : `:reponse:${empreinte(courrielId).slice(0, LONGUEUR_EMPREINTE_IDENTIFIANT)}`;
   return creerEvenement(
     "reponse_recruteur",
     offre,

@@ -11,6 +11,7 @@
 // « ça n'a pas marché » sans se casser. Une erreur avalée en silence, en revanche, serait
 // pire que l'échec — d'où le journal côté serveur.
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { eq, inArray, isNull, like } from "drizzle-orm";
 import { db } from "./db";
@@ -2262,6 +2263,7 @@ export async function modifierOffre(
         { id, entreprise: avant.entreprise, poste: avant.poste },
         champs.statut,
         new Date().toISOString(),
+        randomUUID(),
       );
       if (evenement) planifierSortie(evenement);
     }

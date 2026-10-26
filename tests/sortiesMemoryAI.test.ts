@@ -36,12 +36,11 @@ describe("événements MemoryAI", () => {
 
   it("construit un changement de statut", () => {
     const dateEvenement = "2026-10-26T22:00:00.123Z";
-    expect(creerEvenementStatutChange(offre, "Entrevue", dateEvenement)).toEqual({
+    expect(creerEvenementStatutChange(offre, "Entrevue", dateEvenement, "event-1")).toMatchObject({
       type: "statut_change",
       date: dateEvenement,
       titre: "Poste d’essai — Entreprise exemple",
       resume: "Statut mis à jour : Entrevue.",
-      ref: "offre-essai-1:statut:Entrevue:2026-10-26T22:00:00.123Z",
     });
   });
 
@@ -57,9 +56,19 @@ describe("événements MemoryAI", () => {
   it("donne des références distinctes aux changements successifs d'une offre et garde le renvoi stable", () => {
     const dateEnvoi = "2026-10-26T22:00:00.100Z";
     const dateEntrevue = "2026-10-26T22:00:00.900Z";
-    const premier = creerEvenementStatutChange(offre, "Entrevue", dateEnvoi)!;
-    const second = creerEvenementStatutChange(offre, "Entrevue", dateEntrevue)!;
-    const renvoi = creerEvenementStatutChange(offre, "Entrevue", dateEnvoi)!;
+    const premier = creerEvenementStatutChange(offre, "Entrevue", dateEnvoi, "event-1")!;
+    const second = creerEvenementStatutChange(offre, "Entrevue", dateEntrevue, "event-2")!;
+    const renvoi = creerEvenementStatutChange(offre, "Entrevue", dateEnvoi, "event-1")!;
+
+    expect(premier.ref).not.toBe(second.ref);
+    expect(renvoi.ref).toBe(premier.ref);
+  });
+
+  it("distingue deux événements dans la même milliseconde avec une clé d'événement distincte", () => {
+    const horodatage = "2026-10-26T22:00:00.123Z";
+    const premier = creerEvenementStatutChange(offre, "Entrevue", horodatage, "event-a")!;
+    const second = creerEvenementStatutChange(offre, "Entrevue", horodatage, "event-b")!;
+    const renvoi = creerEvenementStatutChange(offre, "Entrevue", horodatage, "event-a")!;
 
     expect(premier.ref).not.toBe(second.ref);
     expect(renvoi.ref).toBe(premier.ref);
@@ -79,11 +88,13 @@ describe("événements MemoryAI", () => {
       { ...offre, id: "offre-" + "x".repeat(110) },
       "Entrevue",
       dateEvenement,
+      "event-long",
     )!;
     const autre = creerEvenementStatutChange(
       { ...offre, id: "offre-" + "x".repeat(109) + "y" },
       "Entrevue",
       dateEvenement,
+      "event-long",
     )!;
     const suivie = creerEvenementOffreSuivie(
       { ...offre, id: "offre-" + "x".repeat(110) },
@@ -167,7 +178,7 @@ describe("envoi des sorties", () => {
     const requete = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     vi.stubGlobal("fetch", requete);
 
-    await envoyerSorties([creerEvenementStatutChange(offre, "Entrevue", date())!]);
+    await envoyerSorties([creerEvenementStatutChange(offre, "Entrevue", date(), "event-envoi")!]);
 
     expect(requete).toHaveBeenCalledOnce();
     const [url, options] = requete.mock.calls[0]!;
