@@ -93,6 +93,7 @@ Ce que les chiffres disent (24 offres, lus en production le 2026-10-22) :
 - **Une lecture a échoué** : l'une des raisons dépassait les 160 caractères autorisés, la lecture entière est refusée (décision 3).
   C'est le comportement voulu (pas de réparation), mais 1 lecture sur 25 perdue est un coût payé pour rien. Un correctif possible
   est de dire la limite dans la consigne, pas d'accepter une raison trop longue.
+  [2026-10-28 : la consigne `consigneLecture` énonce désormais la limite (160 caractères par raison au plus, JobAI#265)].
 - **Coût mesuré** (bloc `usage`) : Haiku 5.5, **25 appels, 42 933 jetons en entrée, 4 816 en sortie, 0,0067 $ US**, soit
   **0,00027 $ l'appel**. C'est environ 1,7 fois l'estimation de la décision (0,00016 $) : la consigne et le schéma d'outil pèsent plus
   que prévu (environ 1 700 jetons en entrée par appel au lieu de 1 100). Pour les 6 541 offres : de l'ordre de **1,8 $ US une fois**,
