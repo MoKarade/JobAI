@@ -147,6 +147,12 @@ describe("le rôle lu par les mots-clés", () => {
     expect(c).toContain("coordonnateur");
     expect(c).toContain("robotique");
   });
+
+  it("la consigne énonce la limite de longueur par raison", () => {
+    const c = consigneLecture({ motsCoordination: ["coordonnateur"], motsTechnique: ["robotique"] });
+    expect(c).toContain(String(160));
+    expect(c).toContain("chaque raison fait au plus 160 caractères");
+  });
 });
 
 describe("lireAnnonce", () => {

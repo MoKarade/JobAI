@@ -64,7 +64,7 @@ export function consigneLecture(profil: Pick<Profil, "motsCoordination" | "motsT
     `Exemples de vocabulaire de coordination : ${coord}.`,
     `Exemples de vocabulaire technique : ${tech}.`,
     "Réponds en appelant l'outil `rendre_lecture` : le rôle, une adéquation de 0 (aucun rapport) à 100 (exactement le poste",
-    "visé), et une à trois raisons courtes tirées du TEXTE de l'annonce. Ne déduis rien qui n'y est pas écrit.",
+    `visé), et une à trois raisons courtes tirées du TEXTE de l'annonce (chaque raison fait au plus ${RAISON_LONGUEUR_MAX} caractères). Ne déduis rien qui n'y est pas écrit.`,
   ].join("\n");
 }
 
