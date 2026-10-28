@@ -31,6 +31,11 @@ Un test vert sur un champ retiré est exactement le genre de vert dont on prend 
   bascule unique est `getTrackerState()` — `null` = pas encore branché, `throw` = panne.
   **Règle de maintenance** : chaque phase qui rend une métrique réellement disponible la
   branche ici et fait passer le statut à `ok`. Jamais de chiffre fabriqué.
+- **Le résumé se calcule DANS la base, jamais en relisant les offres** (`lib/resumeSql.ts`). Le hub
+  appelle `/hub/summary` toutes les 15 s tant qu'un onglet est visible : relire ~8 000 offres à chaque
+  appel a dépassé le transfert sortant du plan gratuit Neon (26/10/2026, JobAI#312). Un nouveau
+  compteur s'ajoute dans `lireAgregats` ET dans `resumer` (lib/suivi.ts, la référence) ;
+  `tests/resumeSql.test.ts` exige le même résultat sur une vraie Postgres.
 - Le bloc `usage` (coût LLM) n'est publié que **mesuré**, jamais estimé — et **pas du tout**
   tant qu'aucun appel n'a eu lieu (`amount: 0` affirmerait « JobAI ne coûte rien »). Quatre
   sites d'appel dans le dépôt (`lib/cv/extraction.ts`, `lib/analyseMarcheLlm.ts`,
