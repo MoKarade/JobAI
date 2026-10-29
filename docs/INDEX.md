@@ -2,7 +2,7 @@
 
 <!-- GÉNÉRÉ par `node .github/ci/generer-index.mjs` : ne pas modifier à la main (`--verifier` échoue si ce fichier est périmé). -->
 
-66 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
+67 document(s). Ancien titre -> nouveau chemin : [correspondance.md](correspondance.md).
 
 ## docs/
 
@@ -76,6 +76,7 @@
 - [11-protocole](claude/11-protocole.md) — `docs/claude/11-protocole.md`
 - [12 — Graphe de code local (graphifyy) : hooks, wiki et MCP](claude/12-graphe-code.md) — `docs/claude/12-graphe-code.md`
 - [13. LIA dans JobAI](claude/13-lia.md) — `docs/claude/13-lia.md`
+- [14 — Navigation entre apps : la liste du parc](claude/14-nav-apps.md) — `docs/claude/14-nav-apps.md`
 - [lecons](claude/lecons.md) — `docs/claude/lecons.md`
 
 ## docs/specs/
