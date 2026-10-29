@@ -45,6 +45,54 @@ describe("GET /api/sante", () => {
   });
 });
 
+async function withCommit(value: string | undefined, fn: () => Promise<void>) {
+  const before = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (value === undefined) delete process.env.VERCEL_GIT_COMMIT_SHA;
+  else process.env.VERCEL_GIT_COMMIT_SHA = value;
+  try {
+    return await fn();
+  } finally {
+    if (before === undefined) delete process.env.VERCEL_GIT_COMMIT_SHA;
+    else process.env.VERCEL_GIT_COMMIT_SHA = before;
+  }
+}
+
+// JobAI#324 : le commit servi, pour voir un alias figé après un retour en arrière (.github#822).
+// Ici seule la réponse 503 est atteignable sans base réelle ; la réponse 200 est couverte dans tests/santeOk.test.ts.
+describe("GET /api/sante : commit servi", () => {
+  const SHA = "0123456789abcdef0123456789abcdef01234567";
+
+  it("rend les 7 premiers caractères du commit, même dans la réponse 503", async () => {
+    await withDatabaseUrl(undefined, async () => {
+      await withCommit(SHA, async () => {
+        const res = await GET();
+        expect(res.status).toBe(503);
+        expect(await res.json()).toEqual({ ok: false, cause: "base", commit: "0123456" });
+      });
+    });
+  });
+
+  it("met en minuscules un commit en majuscules", async () => {
+    await withDatabaseUrl(undefined, async () => {
+      await withCommit("ABCDEF1234567", async () => {
+        expect((await (await GET()).json()).commit).toBe("abcdef1");
+      });
+    });
+  });
+
+  it("omet le champ si la variable est absente, vide ou pas hexadécimale", async () => {
+    await withDatabaseUrl(undefined, async () => {
+      for (const valeur of [undefined, "", "   ", "pas-un-commit", "0123xyz", "abc12"]) {
+        await withCommit(valeur, async () => {
+          const corps = await (await GET()).json();
+          expect(corps).toEqual({ ok: false, cause: "base" });
+          expect(corps).not.toHaveProperty("commit");
+        });
+      }
+    });
+  });
+});
+
 describe("baseConfiguree", () => {
   it("refuse l'absence, le vide et le blanc", () => {
     expect(baseConfiguree({})).toBe(false);
