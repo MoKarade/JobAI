@@ -3,6 +3,7 @@ import { Manrope, DM_Mono } from "next/font/google";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { Analytics } from "@vercel/analytics/next";
 import LiaMontee from "@/components/LiaMontee";
+import NavApps from "@/components/NavApps";
 import { liaAutorisee } from "@/lib/lia/monter";
 import "./globals.css";
 
@@ -70,6 +71,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         {children}
         <LiaMontee session={lia} />
+        {lia && <NavApps courant="jobai" />}
         <ServiceWorker />
         <Analytics />
       </body>
