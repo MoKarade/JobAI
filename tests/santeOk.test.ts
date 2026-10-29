@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 let baseRepond = true;
+const commitAvant = process.env.VERCEL_GIT_COMMIT_SHA;
 
 vi.mock("../lib/db", () => ({
   baseConfiguree: () => true,
@@ -22,7 +23,8 @@ const { GET } = await import("../app/api/sante/route");
 
 afterEach(() => {
   baseRepond = true;
-  delete process.env.VERCEL_GIT_COMMIT_SHA;
+  if (commitAvant === undefined) delete process.env.VERCEL_GIT_COMMIT_SHA;
+  else process.env.VERCEL_GIT_COMMIT_SHA = commitAvant;
   vi.restoreAllMocks();
 });
 
@@ -35,6 +37,7 @@ describe("GET /api/sante avec une base configurée", () => {
   });
 
   it("200 { ok: true } sans le champ quand la variable est absente", async () => {
+    delete process.env.VERCEL_GIT_COMMIT_SHA;
     const corps = await (await GET()).json();
     expect(corps).toEqual({ ok: true });
     expect(corps).not.toHaveProperty("commit");

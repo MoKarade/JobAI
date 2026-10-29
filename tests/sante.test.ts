@@ -80,9 +80,9 @@ describe("GET /api/sante : commit servi", () => {
     });
   });
 
-  it("omet le champ si la variable est absente, vide ou pas hexadécimale", async () => {
+  it("omet le champ si la variable est absente, vide, pas hexadécimale ou trop longue (41 caractères)", async () => {
     await withDatabaseUrl(undefined, async () => {
-      for (const valeur of [undefined, "", "   ", "pas-un-commit", "0123xyz", "abc12"]) {
+      for (const valeur of [undefined, "", "   ", "pas-un-commit", "0123xyz", "abc12", "a".repeat(41)]) {
         await withCommit(valeur, async () => {
           const corps = await (await GET()).json();
           expect(corps).toEqual({ ok: false, cause: "base" });
