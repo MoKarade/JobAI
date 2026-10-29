@@ -35,6 +35,7 @@ vi.mock("../lib/resumeSql", () => ({
 
 const { getTrackerState } = await import("../lib/trackerState");
 const { assurerMigrations } = await import("../lib/migrations");
+const { lireResume } = await import("../lib/resumeSql");
 
 beforeEach(() => {
   journal.length = 0;
@@ -56,6 +57,15 @@ describe("garantie de schéma avant lecture", () => {
     // Discrimination : déplacer l'appel après le `select` fait tomber cette assertion,
     // alors qu'un simple `toHaveBeenCalled()` resterait vert.
     expect(journal).toEqual(["migrations", "select"]);
+  });
+
+  it("passe la base et la date du jour (AAAA-MM-JJ) à lireResume", async () => {
+    resume = { total: 1 };
+
+    await getTrackerState();
+
+    expect(lireResume).toHaveBeenCalledTimes(1);
+    expect(lireResume).toHaveBeenCalledWith({}, expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
   });
 
   it("ne touche à rien sans base configurée — l'absence n'est pas une panne", async () => {

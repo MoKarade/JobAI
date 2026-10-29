@@ -125,6 +125,25 @@ describe("le résumé de la base égale celui de resumer", () => {
     expect(obtenu?.meilleure).toEqual({ entreprise: "Trop vieille", poste: expect.any(String), score: 99 });
   });
 
+  it("une date du jour illisible : aucune nouvelle côté base non plus, comme resumer", async () => {
+    const lignes = await inserer([
+      ligne({ dateReperage: "2026-10-28", score: 80 }),
+      ligne({ dateReperage: "2026-10-25", score: 60 }),
+      ligne({ score: 90 }),
+    ]);
+
+    const attendu = resumer(lignes, "pas une date");
+    const obtenu = await lireResume(db, "pas une date");
+
+    expect(obtenu).toEqual(attendu);
+    // Sans fenêtre, la branche SQL `false` s'applique : rien n'est nouveau, et la moyenne est null, pas 0.
+    expect(obtenu?.nouvelles).toBe(0);
+    expect(obtenu?.noteMoyenneNouvelles).toBeNull();
+    // Le reste du résumé ne dépend pas de la date : les actives et la meilleure offre sont bien lues.
+    expect(obtenu?.actives).toBe(3);
+    expect(obtenu?.meilleure?.score).toBe(90);
+  });
+
   it("noteMoyenneNouvelles vaut null (pas 0) quand aucune nouvelle n'est notée", async () => {
     const lignes = await inserer([ligne({ dateReperage: "2026-10-27", score: null }), ligne({ score: 60 })]);
     const obtenu = await lireResume(db, AUJOURDHUI);
