@@ -20,25 +20,26 @@ vi.mock("../lib/migrations", () => ({
   }),
 }));
 
-const lignes: Record<string, unknown>[] = [];
+// Le résumé est calculé par la base (lib/resumeSql.ts, testé sur une vraie Postgres dans tests/resumeSql.test.ts) :
+// ici on ne vérifie que l'ORDRE et les trois issues, donc `lireResume` est simulé.
+let resume: unknown = null;
 
-vi.mock("../lib/db", () => ({
-  db: {
-    select: () => ({
-      from: async () => {
-        journal.push("select");
-        return lignes;
-      },
-    }),
-  },
+vi.mock("../lib/db", () => ({ db: {} }));
+
+vi.mock("../lib/resumeSql", () => ({
+  lireResume: vi.fn(async () => {
+    journal.push("select");
+    return resume;
+  }),
 }));
 
 const { getTrackerState } = await import("../lib/trackerState");
 const { assurerMigrations } = await import("../lib/migrations");
+const { lireResume } = await import("../lib/resumeSql");
 
 beforeEach(() => {
   journal.length = 0;
-  lignes.length = 0;
+  resume = null;
   process.env.DATABASE_URL = "postgres://exemple/base-de-test";
 });
 
@@ -49,20 +50,22 @@ afterEach(() => {
 
 describe("garantie de schéma avant lecture", () => {
   it("applique les migrations AVANT de lire les offres", async () => {
-    lignes.push({
-      histo: false,
-      score: 80,
-      statut: "Identifiee",
-      entreprise: "Entreprise test",
-      poste: "Poste test",
-      perimeeLe: null,
-    });
+    resume = { total: 1 };
 
     await getTrackerState();
 
     // Discrimination : déplacer l'appel après le `select` fait tomber cette assertion,
     // alors qu'un simple `toHaveBeenCalled()` resterait vert.
     expect(journal).toEqual(["migrations", "select"]);
+  });
+
+  it("passe la base et la date du jour (AAAA-MM-JJ) à lireResume", async () => {
+    resume = { total: 1 };
+
+    await getTrackerState();
+
+    expect(lireResume).toHaveBeenCalledTimes(1);
+    expect(lireResume).toHaveBeenCalledWith({}, expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
   });
 
   it("ne touche à rien sans base configurée — l'absence n'est pas une panne", async () => {

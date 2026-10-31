@@ -18,9 +18,8 @@
 // un chiffre fabriqué pour faire joli sur le tableau de bord.
 
 import { db } from "./db";
-import { offers } from "./db/schema";
 import { assurerMigrations } from "./migrations";
-import { resumer } from "./suivi";
+import { lireResume } from "./resumeSql";
 import { aujourdhui } from "./ajout";
 import type { ResumeSuivi } from "./types";
 
@@ -48,29 +47,15 @@ export async function getTrackerState(): Promise<ResumeSuivi | null> {
   // que les fichiers du dépôt déployé — l'appelant ne choisit rien.
   await assurerMigrations();
 
-  const lignes = await db
-    .select({
-      histo: offers.histo,
-      score: offers.score,
-      statut: offers.statut,
-      entreprise: offers.entreprise,
-      poste: offers.poste,
-      perimeeLe: offers.perimeeLe,
-      dateReperage: offers.dateReperage,
-    })
-    .from(offers);
-
+  // ⚠️ LA BASE COMPTE, ELLE NE RENVOIE PAS LES OFFRES. Le hub appelle ce chemin toutes les 15 s tant qu'un onglet est
+  // visible : relire ~8 000 lignes à chaque fois a rempli le transfert sortant du plan Neon (26/10/2026). `lireResume`
+  // rend neuf nombres et une offre ; les règles sont celles de `resumer` (lib/suivi.ts), verrouillées par
+  // tests/resumeSql.test.ts sur une vraie Postgres.
+  //
   // Base branchée mais vide : le suivi n'a pas encore été importé. « En construction »
   // reste la réponse honnête — publier « 0 offre suivie » affirmerait quelque chose de faux.
-  if (lignes.length === 0) return null;
-
-  // `Date` en base, chaîne ISO côté application — même conversion que `lireOffres`.
-  // Le résumé ne teste que la nullité, mais laisser deux représentations coexister
-  // finirait par produire une comparaison qui échoue silencieusement.
+  //
   // La date est calculée DANS le fuseau de Marc, pas en UTC : sinon, passé 20 h locale,
   // « aujourd'hui » serait déjà demain et la fenêtre des nouveautés glisserait d'un jour.
-  return resumer(
-    lignes.map((l) => ({ ...l, perimeeLe: l.perimeeLe ? l.perimeeLe.toISOString() : null })),
-    aujourdhui(new Date()),
-  );
+  return lireResume(db, aujourdhui(new Date()));
 }
