@@ -36,7 +36,7 @@
     "next-auth": "^5.0.0-beta.31",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "unpdf": "^1.9.1",
+    "unpdf": "^2.1.0",
     "zod": "^4.6.6"
   },
   "//overrides": "Failles HIGH dans des dépendances transitives que Next épingle lui-même : postcss (XSS + lecture de fichier arbitraire via sourceMappingURL), sharp, et nanoid (boucle infinie sur taille nulle, GHSA-2v37-7h3g-55p8 — arrive par postcss, déjà surchargé). Planchers, jamais redescendus. À retirer dès qu'une version de Next les remonte d'elle-même — vérifier avec `npm audit --omit=dev`, qui doit rendre 0.",
